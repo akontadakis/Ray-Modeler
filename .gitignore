@@ -4,17 +4,17 @@
 # Build artifacts
 /dist
 /build
-/.vscode
+
+# VS Code editor settings
+.vscode/
+
+# macOS system files
+.DS_Store
 
 # Log files
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# OS-specific files
-.DS_Store
-Thumbs.db
-
-# Environment variables (if you ever add any)
+# Environment variables
 .env
-.env.local
