@@ -325,16 +325,20 @@ for (const [orientation, winParams] of Object.entries(allWindows)) {
 
             // Frame Bottom
             const botVerts = quadVerts(orientation, frame_u0, frame_u1, frame_v0, frame_v0 + ft);
-            shadingGeometry += generateRadBox(botVerts, fd, 'frame_mat', `frame_${winId}_bot`, transformAndFormat);
+            const p_botVerts = botVerts.map(v => [v[0] + depthVec[0], v[1] + depthVec[1], v[2] + depthVec[2]]);
+            shadingGeometry += generateRadBox(p_botVerts, fd, 'frame_mat', `frame_${winId}_bot`, transformAndFormat);
             // Frame Top
             const topVerts = quadVerts(orientation, frame_u0, frame_u1, frame_v1 - ft, frame_v1);
-            shadingGeometry += generateRadBox(topVerts, fd, 'frame_mat', `frame_${winId}_top`, transformAndFormat);
+            const p_topVerts = topVerts.map(v => [v[0] + depthVec[0], v[1] + depthVec[1], v[2] + depthVec[2]]);
+            shadingGeometry += generateRadBox(p_topVerts, fd, 'frame_mat', `frame_${winId}_top`, transformAndFormat);
             // Frame Left
             const leftVerts = quadVerts(orientation, frame_u0, frame_u0 + ft, frame_v0 + ft, frame_v1 - ft);
-            shadingGeometry += generateRadBox(leftVerts, fd, 'frame_mat', `frame_${winId}_left`, transformAndFormat);
+            const p_leftVerts = leftVerts.map(v => [v[0] + depthVec[0], v[1] + depthVec[1], v[2] + depthVec[2]]);
+            shadingGeometry += generateRadBox(p_leftVerts, fd, 'frame_mat', `frame_${winId}_left`, transformAndFormat);
             // Frame Right
             const rightVerts = quadVerts(orientation, frame_u1 - ft, frame_u1, frame_v0 + ft, frame_v1 - ft);
-            shadingGeometry += generateRadBox(rightVerts, fd, 'frame_mat', `frame_${winId}_right`, transformAndFormat);
+            const p_rightVerts = rightVerts.map(v => [v[0] + depthVec[0], v[1] + depthVec[1], v[2] + depthVec[2]]);
+            shadingGeometry += generateRadBox(p_rightVerts, fd, 'frame_mat', `frame_${winId}_right`, transformAndFormat);
         }
     }
 }
