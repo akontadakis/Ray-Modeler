@@ -76,7 +76,8 @@ The desktop version provides the most seamless experience.
 3. **Run the Application**:
    - *Windows*: Run the Ray Modeler Setup X.X.X.exe installer.
    - *macOS*: Open the Ray Modeler-X.X.X.dmg and drag the application to your Applications folder.
-**Security Warnings on First Launch**
+
+Security Warnings on First Launch:
 
 Because the application is not yet code-signed, your operating system will likely show a security warning. When a user on a Mac downloads and tries to open the unsigned app, they will be stopped by Gatekeeper, which will show a message like "Ray Modeler cannot be opened because the developer cannot be verified."
 
