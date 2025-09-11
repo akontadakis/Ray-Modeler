@@ -8,8 +8,6 @@ import { recreateSimulationPanels } from './simulation.js';
 import { lightingManager } from './lighting.js';
 import { generateScripts } from './scriptGenerator.js';
 
-
-
 // The local helper functions are removed from here as they will be moved.
 class Project {
     constructor() {
@@ -364,7 +362,7 @@ async downloadProjectFile() {
         const surroundingPtsContent = await this._generateSensorPointsContent('surrounding');
         const daylightingPtsContent = this._generateDaylightingPointsContent();
         const rayContent = generateRayFileContent();
-        
+
         // Sanitize the project data for JSON serialization by removing large file contents.
         const dataForJson = JSON.parse(JSON.stringify(projectData));
         dataForJson.epwFileContent = null; 
@@ -485,154 +483,154 @@ async downloadProjectFile() {
     }
 
     async _generateSensorPointsContent(gridType = 'all') {
-        const { dom, showAlert, getSensorGridParams } = await import('./ui.js');
-        const points = [];
-        const W = parseFloat(dom.width.value);
-        const L = parseFloat(dom.length.value);
-        const H = parseFloat(dom.height.value);
-        const alphaRad = THREE.MathUtils.degToRad(parseFloat(dom['room-orientation'].value));
-        const cosA = Math.cos(alphaRad);
-        const sinA = Math.sin(alphaRad);
-    
-        const transformPoint = (localPoint) => {
-            const p = { x: localPoint[0], y: localPoint[1], z: localPoint[2] };
-            const centered_x = p.x - W / 2;
-            const centered_y = p.y - L / 2;
-            const rx = centered_x * cosA - centered_y * sinA;
-            const ry = centered_x * sinA + centered_y * cosA;
-            return [rx, ry, p.z];
+    const { dom, showAlert, getSensorGridParams } = await import('./ui.js');
+    const points = [];
+    const W = parseFloat(dom.width.value);
+    const L = parseFloat(dom.length.value);
+    const H = parseFloat(dom.height.value);
+    const alphaRad = THREE.MathUtils.degToRad(parseFloat(dom['room-orientation'].value));
+    const cosA = Math.cos(alphaRad);
+    const sinA = Math.sin(alphaRad);
+
+    const transformPoint = (localPoint) => {
+        // Map from local room coords [W,L,H] to Radiance coords [X,Y,Z]
+        const p = { x: localPoint[0], y: localPoint[1], z: localPoint[2] };
+        const centered_x = p.x - W / 2;
+        const centered_y = p.y - L / 2; // Radiance Y is Three.js Z
+        const rx = centered_x * cosA - centered_y * sinA;
+        const ry = centered_x * sinA + centered_y * cosA;
+        return [rx, ry, p.z]; // Radiance Z is Three.js Y
+    };
+
+    const transformVector = (localVector) => {
+         // Map from local room normal [x,y,z] to Radiance normal [X,Y,Z]
+        const v = { x: localVector[0], y: localVector[1], z: localVector[2] };
+        const rx = v.x * cosA - v.y * sinA;
+        const ry = v.x * sinA + v.y * cosA;
+        return [rx, ry, v.z];
+    };
+
+    const generatePointsInRect = (x, z, width, depth, spacing) => {
+        if (spacing <= 0 || width <= 0 || depth <= 0) return [];
+        const rectPositions = [];
+        const numX = Math.floor(width / spacing);
+        const numZ = Math.floor(depth / spacing);
+        if (numX === 0 || numZ === 0) return [];
+
+        const startX = x + (width - (numX > 1 ? (numX - 1) * spacing : 0)) / 2;
+        const startZ = z + (depth - (numZ > 1 ? (numZ - 1) * spacing : 0)) / 2;
+
+        for (let i = 0; i < numX; i++) {
+             for (let j = 0; j < numZ; j++) {
+                rectPositions.push({ x: startX + i * spacing, z: startZ + j * spacing });
+            }
+        }
+        return rectPositions;
+    };
+
+    const enGridParams = getSensorGridParams()?.illuminance?.floor;
+
+    if (gridType === 'task') {
+        if (!enGridParams?.isTaskArea) return null;
+        const spacing = parseFloat(dom['floor-grid-spacing'].value);
+        const offset = parseFloat(dom['floor-grid-offset'].value);
+        const { x, z, width, depth } = enGridParams.task;
+
+        const taskPoints = generatePointsInRect(x, z, width, depth, spacing);
+        const normalVector = [0, 0, 1]; // Normal for a horizontal plane
+
+        for (const p of taskPoints) {
+            const localPos = [p.x, p.z, offset];
+            const worldPos = transformPoint(localPos);
+            const worldNorm = transformVector(normalVector);
+            points.push(`${worldPos.map(c => c.toFixed(4)).join(' ')} ${worldNorm.map(c => c.toFixed(4)).join(' ')}`);
+        }
+    } else if (gridType === 'surrounding') {
+        if (!enGridParams?.isTaskArea || !enGridParams?.hasSurrounding) return null;
+
+        const spacing = parseFloat(dom['floor-grid-spacing'].value);
+        const offset = parseFloat(dom['floor-grid-offset'].value);
+        const task = enGridParams.task;
+        const bandWidth = enGridParams.surroundingWidth;
+
+        // Define outer rectangle (task area + surrounding band), clamped to room dimensions
+        const outerX = Math.max(0, task.x - bandWidth);
+        const outerZ = Math.max(0, task.z - bandWidth);
+        const outerW = Math.min(W - outerX, task.width + 2 * bandWidth);
+        const outerD = Math.min(L - outerZ, task.depth + 2 * bandWidth);
+
+        const outerPoints = generatePointsInRect(outerX, outerZ, outerW, outerD, spacing);
+        const normalVector = [0, 0, 1];
+
+        for (const p of outerPoints) {
+            // Check if the point is OUTSIDE the inner task area
+            const isOutsideTask = (p.x < task.x || p.x > task.x + task.width || p.z < task.z || p.z > task.z + task.depth);
+            if (isOutsideTask) {
+                const localPos = [p.x, p.z, offset];
+                const worldPos = transformPoint(localPos);
+                const worldNorm = transformVector(normalVector);
+                points.push(`${worldPos.map(c => c.toFixed(4)).join(' ')} ${worldNorm.map(c => c.toFixed(4)).join(' ')}`);
+            }
+        }
+    } else { // gridType === 'all'
+        // This is the original logic of the function
+        const generateCenteredPoints = (totalLength, spacing) => {
+            if (spacing <= 0 || totalLength <= 0) return [];
+            const numPoints = Math.floor(totalLength / spacing);
+            if (numPoints === 0) return [totalLength / 2];
+            const totalGridLength = (numPoints - 1) * spacing;
+            const start = (totalLength - totalGridLength) / 2;
+            return Array.from({ length: numPoints }, (_, i) => start + i * spacing);
         };
-    
-        const transformVector = (localVector) => {
-            const v = { x: localVector[0], y: localVector[1], z: localVector[2] };
-            const rx = v.x * cosA - v.y * sinA;
-            const ry = v.x * sinA + v.y * cosA;
-            return [rx, ry, v.z];
-        };
-    
-        const generatePointsInRect = (x, z, width, depth, spacing) => {
-            if (spacing <= 0 || width <= 0 || depth <= 0) return { xCoords: [], zCoords: [] };
-            const xCoords = [];
-            const zCoords = [];
-            const numX = Math.floor(width / spacing);
-            const numZ = Math.floor(depth / spacing);
-    
-            const startX = x + (width - (numX > 0 ? (numX - 1) * spacing : 0)) / 2;
-            for (let i = 0; i < numX; i++) xCoords.push(startX + i * spacing);
-            
-            const startZ = z + (depth - (numZ > 0 ? (numZ - 1) * spacing : 0)) / 2;
-            for (let i = 0; i < numZ; i++) zCoords.push(startZ + i * spacing);
-    
-            return { xCoords, zCoords };
-        };
-    
-        const enGridParams = getSensorGridParams()?.illuminance?.floor;
-    
-        if (gridType === 'task') {
-            if (!enGridParams?.isTaskArea) return null;
-            const spacing = parseFloat(dom['floor-grid-spacing'].value);
-            const offset = parseFloat(dom['floor-grid-offset'].value);
-            const { x, z, width, depth } = enGridParams.task;
-            
-            const { xCoords, zCoords } = generatePointsInRect(x, z, width, depth, spacing);
-            const normalVector = [0, 0, 1];
-    
-            for (const p1 of xCoords) {
-                for (const p2 of zCoords) {
-                    const localPos = [p1, p2, offset];
+
+        const surfaces = [
+            { name: 'floor', enabled: dom['grid-floor-toggle']?.checked }, { name: 'ceiling', enabled: dom['grid-ceiling-toggle']?.checked },
+            { name: 'north', enabled: dom['grid-north-toggle']?.checked }, { name: 'south', enabled: dom['grid-south-toggle']?.checked },
+            { name: 'east', enabled: dom['grid-east-toggle']?.checked }, { name: 'west', enabled: dom['grid-west-toggle']?.checked },
+        ];
+
+        surfaces.forEach(({ name, enabled }) => {
+            if (!enabled) return;
+            let spacing, offset, points1, points2, positionFunc, normalVector;
+            if (name === 'floor' || name === 'ceiling') {
+                spacing = parseFloat(dom[`${name}-grid-spacing`].value);
+                offset = parseFloat(dom[`${name}-grid-offset`].value);
+                points1 = generateCenteredPoints(W, spacing);
+                points2 = generateCenteredPoints(L, spacing);
+                normalVector = (name === 'floor') ? [0, 0, 1] : [0, 0, -1];
+                positionFunc = (p1, p2) => [p1, p2, name === 'floor' ? offset : H + offset];
+            } else {
+                spacing = parseFloat(dom['wall-grid-spacing'].value);
+                offset = parseFloat(dom['wall-grid-offset'].value);
+                points2 = generateCenteredPoints(H, spacing);
+                const wallLength = (name === 'north' || name === 'south') ? W : L;
+                points1 = generateCenteredPoints(wallLength, spacing);
+                switch (name) {
+                    case 'north': normalVector = [0, 1, 0]; positionFunc = (p1, p2) => [p1, offset, p2]; break;
+                    case 'south': normalVector = [0, -1, 0]; positionFunc = (p1, p2) => [p1, L - offset, p2]; break;
+                    case 'west': normalVector = [1, 0, 0]; positionFunc = (p1, p2) => [offset, p1, p2]; break;
+                    case 'east': normalVector = [-1, 0, 0]; positionFunc = (p1, p2) => [W - offset, p1, p2]; break;
+                }
+            }
+            for (const p1 of points1) {
+                for (const p2 of points2) {
+                    const localPos = positionFunc(p1, p2);
                     const worldPos = transformPoint(localPos);
                     const worldNorm = transformVector(normalVector);
                     points.push(`${worldPos.map(c => c.toFixed(4)).join(' ')} ${worldNorm.map(c => c.toFixed(4)).join(' ')}`);
                 }
             }
-        } else if (gridType === 'surrounding') {
-            if (!enGridParams?.isTaskArea) return null; // Surrounding depends on task
-            
-            const spacing = parseFloat(dom['floor-grid-spacing'].value);
-            const offset = parseFloat(dom['floor-grid-offset'].value);
-            const task = enGridParams.task;
-            const bandWidth = enGridParams.surroundingWidth;
-    
-            // Define outer rectangle (task area + surrounding band), clamped to room dimensions
-            const outerX = Math.max(0, task.x - bandWidth);
-            const outerZ = Math.max(0, task.z - bandWidth);
-            const outerW = Math.min(W - outerX, task.width + 2 * bandWidth);
-            const outerD = Math.min(L - outerZ, task.depth + 2 * bandWidth);
-    
-            const { xCoords, zCoords } = generatePointsInRect(outerX, outerZ, outerW, outerD, spacing);
-            const normalVector = [0, 0, 1];
-    
-            for (const p1 of xCoords) {
-                for (const p2 of zCoords) {
-                    // Check if the point is OUTSIDE the inner task area
-                    const isOutsideTask = (p1 < task.x || p1 > task.x + task.width || p2 < task.z || p2 > task.z + task.depth);
-                    if (isOutsideTask) {
-                        const localPos = [p1, p2, offset];
-                        const worldPos = transformPoint(localPos);
-                        const worldNorm = transformVector(normalVector);
-                        points.push(`${worldPos.map(c => c.toFixed(4)).join(' ')} ${worldNorm.map(c => c.toFixed(4)).join(' ')}`);
-                    }
-                }
-            }
-        } else { // gridType === 'all'
-            // This is the original logic of the function
-            const generateCenteredPoints = (totalLength, spacing) => {
-                if (spacing <= 0 || totalLength <= 0) return [];
-                const numPoints = Math.floor(totalLength / spacing);
-                if (numPoints === 0) return [totalLength / 2];
-                const totalGridLength = (numPoints - 1) * spacing;
-                const start = (totalLength - totalGridLength) / 2;
-                return Array.from({ length: numPoints }, (_, i) => start + i * spacing);
-            };
-            
-            const surfaces = [
-                { name: 'floor', enabled: dom['grid-floor-toggle']?.checked }, { name: 'ceiling', enabled: dom['grid-ceiling-toggle']?.checked },
-                { name: 'north', enabled: dom['grid-north-toggle']?.checked }, { name: 'south', enabled: dom['grid-south-toggle']?.checked },
-                { name: 'east', enabled: dom['grid-east-toggle']?.checked }, { name: 'west', enabled: dom['grid-west-toggle']?.checked },
-            ];
-    
-            surfaces.forEach(({ name, enabled }) => {
-                if (!enabled) return;
-                let spacing, offset, points1, points2, positionFunc, normalVector;
-                if (name === 'floor' || name === 'ceiling') {
-                    spacing = parseFloat(dom[`${name}-grid-spacing`].value);
-                    offset = parseFloat(dom[`${name}-grid-offset`].value);
-                    points1 = generateCenteredPoints(W, spacing);
-                    points2 = generateCenteredPoints(L, spacing);
-                    normalVector = (name === 'floor') ? [0, 0, 1] : [0, 0, -1];
-                    positionFunc = (p1, p2) => [p1, p2, name === 'floor' ? offset : H + offset];
-                } else {
-                    spacing = parseFloat(dom['wall-grid-spacing'].value);
-                    offset = parseFloat(dom['wall-grid-offset'].value);
-                    points2 = generateCenteredPoints(H, spacing);
-                    const wallLength = (name === 'north' || name === 'south') ? W : L;
-                    points1 = generateCenteredPoints(wallLength, spacing);
-                    switch (name) {
-                        case 'north': normalVector = [0, 1, 0]; positionFunc = (p1, p2) => [p1, offset, p2]; break;
-                        case 'south': normalVector = [0, -1, 0]; positionFunc = (p1, p2) => [p1, L - offset, p2]; break;
-                        case 'west': normalVector = [1, 0, 0]; positionFunc = (p1, p2) => [offset, p1, p2]; break;
-                        case 'east': normalVector = [-1, 0, 0]; positionFunc = (p1, p2) => [W - offset, p1, p2]; break;
-                    }
-                }
-                for (const p1 of points1) {
-                    for (const p2 of points2) {
-                        const localPos = positionFunc(p1, p2);
-                        const worldPos = transformPoint(localPos);
-                        const worldNorm = transformVector(normalVector);
-                        points.push(`${worldPos.map(c => c.toFixed(4)).join(' ')} ${worldNorm.map(c => c.toFixed(4)).join(' ')}`);
-                    }
-                }
-            });
-        }
-    
-        if (points.length === 0) {
-            if (gridType === 'all') { // Only show alert for the main grid generation
-                 showAlert("No sensor grids enabled; sensor points file will be empty.", "Info");
-            }
-            return null;
-        }
-        return "# Radiance Sensor Points (X Y Z Vx Vy Vz)\n" + points.join('\n');
+        });
     }
+
+    if (points.length === 0) {
+        if (gridType === 'all') { // Only show alert for the main grid generation
+             showAlert("No sensor grids enabled; sensor points file will be empty.", "Info");
+        }
+        return null;
+    }
+    return "# Radiance Sensor Points (X Y Z Vx Vy Vz)\n" + points.join('\n');
+}
 
     async _generateDaylightingPointsContent() {
         const lightingState = lightingManager.getCurrentState();

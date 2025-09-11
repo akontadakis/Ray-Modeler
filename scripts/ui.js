@@ -1,7 +1,7 @@
 // scripts/ui.js
 
 import { updateScene, axesObject, updateSensorGridColors, roomObject, shadingObject, sensorMeshes, wallSelectionGroup, highlightWall, clearWallHighlights, updateHighlightColor } from './geometry.js';
-import { activeCamera, perspectiveCamera, orthoCamera, setActiveCamera, onWindowResize, controls, transformControls, sensorTransformControls, viewpointCamera, viewCamHelper, scene, updateLiveViewType, renderer, toggleFirstPersonView as sceneToggleFPV, isFirstPersonView as sceneIsFPV, fpvOrthoCamera } from './scene.js';
+import { activeCamera, perspectiveCamera, orthoCamera, setActiveCamera, onWindowResize, controls, transformControls, sensorTransformControls, viewpointCamera, scene, updateLiveViewType, renderer, toggleFirstPersonView as sceneToggleFPV, isFirstPersonView as sceneIsFPV, fpvOrthoCamera, updateViewpointFromUI, setGizmoVisibility, setGizmoMode as sceneSetGizmoMode } from './scene.js';
 import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { project } from './project.js';
@@ -19,6 +19,16 @@ export function getDom() { return dom; } // Export a getter function instead
 let updateScheduled = false;
 export let selectedWallId = null;
 let isWallSelectionLocked = false;
+
+// --- START: Added state for Task Area Visualizer ---
+let taskAreaCtx, taskAreaCanvas;
+let isDraggingTaskArea = false;
+let isResizingTaskArea = false;
+let resizeHandle = null; // e.g., 'br', 'tl', 'bl', 'tr'
+let dragStartPos = { x: 0, y: 0 };
+let initialTaskRect = { x: 0, z: 0, w: 0, d: 0 };
+const HANDLE_SIZE = 8; // Size of resize handles in pixels
+// --- END: Added state for Task Area Visualizer ---
 
 // Debounce utility to prevent rapid-fire updates from sliders
 let debounceTimer;
@@ -234,8 +244,7 @@ export function scheduleUpdate(id = null) {
 const wallDirections = ['n', 's', 'e', 'w'];
 let windowModes = {'n': 'wwr', 's': 'wwr', 'e': 'wwr', 'w': 'wwr'};
 
-function setupDOM() {
-    // START: Replace the `ids` array in setupDOM() in ui.js
+export function setupDOM() {
 const ids = [
     // Global
     'theme-btn-light', 'theme-btn-dark', 'theme-btn-cyber', 'theme-switcher-container',
@@ -290,24 +299,24 @@ const ids = [
     
     // EN 12464-1 Task/Surrounding Grids
     'task-area-toggle', 'task-area-controls',
+    'task-area-visualizer-container', 'task-area-canvas',
     'task-area-start-x', 'task-area-start-x-val', 'task-area-start-z', 'task-area-start-z-val',
     'task-area-width', 'task-area-width-val', 'task-area-depth', 'task-area-depth-val',
-    'surrounding-area-toggle', 'surrounding-area-controls',
-    'surrounding-area-width', 'surrounding-area-width-val',
+    'surrounding-area-toggle', 'surrounding-area-controls', 'surrounding-area-width', 'surrounding-area-width-val',
 
     'show-view-grid-3d-toggle', 'view-grid-spacing', 'view-grid-spacing-val',
-    'view-grid-offset', 'view-grid-offset-val', 'view-grid-directions', 
+    'view-grid-offset', 'view-grid-offset-val', 'view-grid-directions',
     'view-grid-start-vec-x', 'view-grid-start-vec-y', 'view-grid-start-vec-z',
 
     // Viewpoint Panel
-    'view-type', 'mode-translate-btn', 'mode-rotate-btn', 'gizmo-toggle', 'fpv-toggle-btn',
+    'panel-viewpoint', 'view-type', 'fpv-toggle-btn', 'gizmo-toggle', 'mode-translate-btn', 'mode-rotate-btn',
     'view-pos-x', 'view-pos-x-val', 'view-pos-y', 'view-pos-y-val', 'view-pos-z', 'view-pos-z-val',
     'view-dir-x', 'view-dir-x-val', 'view-dir-y', 'view-dir-y-val', 'view-dir-z', 'view-dir-z-val',
     'view-fov', 'view-fov-val', 'view-dist', 'view-dist-val',
 
     // View Options Panel
     'proj-btn-persp', 'proj-btn-ortho',
-    'transparent-toggle', 'ground-plane-toggle', 'world-axes-toggle', 'world-axes-size', 'world-axes-size-val',
+    'transparent-toggle', 'transparency-controls', 'surface-opacity', 'surface-opacity-val', 'ground-plane-toggle', 'world-axes-toggle', 'world-axes-size', 'world-axes-size-val',
     'h-section-toggle', 'h-section-controls', 'h-section-dist', 'h-section-dist-val',
     'v-section-toggle', 'v-section-controls', 'v-section-dist', 'v-section-dist-val',
 
@@ -415,7 +424,7 @@ const controlIds = [
             `aperture-controls-${dir}`, `win-count-${dir}`, `win-count-${dir}-val`,
             `mode-wwr-btn-${dir}`, `mode-manual-btn-${dir}`, `wwr-controls-${dir}`, `manual-controls-${dir}`,
             `wwr-${dir}`, `wwr-${dir}-val`, `wwr-sill-height-${dir}`, `wwr-sill-height-${dir}-val`,
-            `win-width-${dir}`, `win-width-${dir}-val`, `win-height-${dir}`, `win-height-${dir}-val`, `sill-height-${dir}`, `sill-height-${dir}-val`, `win-depth-pos-${dir}`, `win-depth-pos-${dir}-val`,
+            `win-width-${dir}`, `win-width-${dir}-val`, `win-height-${dir}`, `win-height-${dir}-val`, `sill-height-${dir}`, `sill-height-${dir}-val`, `win-depth-pos-${dir}`, `win-depth-pos-${dir}-val`, `win-depth-pos-${dir}-manual`, `win-depth-pos-${dir}-val-manual`,
             `shading-${dir}-toggle`, `shading-controls-${dir}`, `shading-type-${dir}`, `shading-controls-overhang-${dir}`,
             `shading-controls-lightshelf-${dir}`, `shading-controls-louver-${dir}`, `overhang-dist-above-${dir}`, `overhang-dist-above-${dir}-val`,
             `overhang-tilt-${dir}`, `overhang-tilt-${dir}-val`, `overhang-depth-${dir}`, `overhang-depth-${dir}-val`, `overhang-thick-${dir}`, `overhang-thick-${dir}-val`, `overhang-extension-${dir}`, `overhang-extension-${dir}-val`,
@@ -593,9 +602,242 @@ function updateFovControlsForViewType(viewType) {
     updateLiveViewType(viewType);
 }
 
-export async function setupEventListeners() {
-    setupDOM();
+/**
+* Updates the visibility of the viewpoint gizmo based on the toggle's state.
+*/
+function updateGizmoVisibility() {
+    setGizmoVisibility(dom['gizmo-toggle'].checked);
+}
 
+// --- START: New functions for Task Area Visualizer ---
+/**
+* Updates the task area sliders based on interactions with the 2D canvas.
+* @param {object} rect - An object with {x, z, w, d} for the task area.
+*/
+function updateSlidersFromCanvas(rect) {
+    const W = parseFloat(dom.width.value);
+    const L = parseFloat(dom.length.value);
+
+    // Clamp values to prevent the rectangle from going out of the room's bounds
+    const clampedW = Math.max(0.1, Math.min(rect.w, W));
+    const clampedD = Math.max(0.1, Math.min(rect.d, L));
+    const clampedX = Math.max(0, Math.min(rect.x, W - clampedW));
+    const clampedZ = Math.max(0, Math.min(rect.z, L - clampedD));
+
+    // To prevent an infinite event loop, temporarily remove the 'input' listener
+    // that calls the draw function again.
+    const sliders = [dom['task-area-start-x'], dom['task-area-start-z'], dom['task-area-width'], dom['task-area-depth']];
+    sliders.forEach(s => s.removeEventListener('input', drawTaskAreaVisualizer));
+
+    dom['task-area-start-x'].value = clampedX.toFixed(1);
+    dom['task-area-start-z'].value = clampedZ.toFixed(1);
+    dom['task-area-width'].value = clampedW.toFixed(1);
+    dom['task-area-depth'].value = clampedD.toFixed(1);
+
+    // Manually trigger updates for the UI labels and the 3D scene
+    updateAllLabels();
+    scheduleUpdate();
+
+    // Restore the event listeners after the current execution stack clears
+    setTimeout(() => {
+        sliders.forEach(s => s.addEventListener('input', drawTaskAreaVisualizer));
+    }, 0);
+}
+
+/**
+* Draws the room outline and the task area rectangle on the 2D canvas.
+*/
+function drawTaskAreaVisualizer() {
+    if (!taskAreaCtx || !dom['task-area-toggle']?.checked) return;
+
+    const container = dom['task-area-visualizer-container'];
+    const dpr = window.devicePixelRatio || 1;
+    const rect = container.getBoundingClientRect();
+    taskAreaCanvas.width = rect.width * dpr;
+    taskAreaCanvas.height = rect.height * dpr;
+    taskAreaCtx.scale(dpr, dpr);
+
+    const W = parseFloat(dom.width.value);
+    const L = parseFloat(dom.length.value);
+
+    const { x, z, w, d } = getTaskAreaValues();
+
+    const padding = 10;
+    const canvasW = taskAreaCanvas.clientWidth - padding * 2;
+    const canvasH = taskAreaCanvas.clientHeight - padding * 2;
+
+    const scale = Math.min(canvasW / W, canvasH / L);
+
+    const roomDrawW = W * scale;
+    const roomDrawH = L * scale;
+    const offsetX = (taskAreaCanvas.clientWidth - roomDrawW) / 2;
+    const offsetY = (taskAreaCanvas.clientHeight - roomDrawH) / 2;
+
+    taskAreaCtx.clearRect(0, 0, taskAreaCanvas.clientWidth, taskAreaCanvas.clientHeight);
+
+    // Draw room outline
+    taskAreaCtx.strokeStyle = 'var(--text-secondary)';
+    taskAreaCtx.lineWidth = 1;
+    taskAreaCtx.strokeRect(offsetX, offsetY, roomDrawW, roomDrawH);
+
+    // Draw task area
+    const taskDrawX = offsetX + x * scale;
+    const taskDrawY = offsetY + z * scale;
+    const taskDrawW = w * scale;
+    const taskDrawH = d * scale;
+
+    taskAreaCtx.fillStyle = 'rgba(59, 130, 246, 0.3)';
+    taskAreaCtx.fillRect(taskDrawX, taskDrawY, taskDrawW, taskDrawH);
+    taskAreaCtx.strokeStyle = 'rgba(59, 130, 246, 0.8)';
+    taskAreaCtx.lineWidth = 2;
+    taskAreaCtx.strokeRect(taskDrawX, taskDrawY, taskDrawW, taskDrawH);
+
+    // Draw resize handles
+    taskAreaCtx.fillStyle = 'rgba(59, 130, 246, 1)';
+    const handleOffset = HANDLE_SIZE / 2;
+    taskAreaCtx.fillRect(taskDrawX - handleOffset, taskDrawY - handleOffset, HANDLE_SIZE, HANDLE_SIZE); // top-left
+    taskAreaCtx.fillRect(taskDrawX + taskDrawW - handleOffset, taskDrawY - handleOffset, HANDLE_SIZE, HANDLE_SIZE); // top-right
+    taskAreaCtx.fillRect(taskDrawX - handleOffset, taskDrawY + taskDrawH - handleOffset, HANDLE_SIZE, HANDLE_SIZE); // bottom-left
+    taskAreaCtx.fillRect(taskDrawX + taskDrawW - handleOffset, taskDrawY + taskDrawH - handleOffset, HANDLE_SIZE, HANDLE_SIZE); // bottom-right
+}
+
+/**
+* Helper to get current task area values from the sliders.
+*/
+function getTaskAreaValues() {
+    return {
+        x: parseFloat(dom['task-area-start-x'].value),
+        z: parseFloat(dom['task-area-start-z'].value),
+        w: parseFloat(dom['task-area-width'].value),
+        d: parseFloat(dom['task-area-depth'].value)
+    };
+}
+
+/**
+* Helper to get all metrics needed for canvas calculations.
+*/
+function getCanvasMetrics(e) {
+    const container = dom['task-area-visualizer-container'];
+    const W = parseFloat(dom.width.value);
+    const L = parseFloat(dom.length.value);
+    const padding = 10;
+    const canvasW = e.target.clientWidth - padding * 2;
+    const canvasH = e.target.clientHeight - padding * 2;
+    const scale = Math.min(canvasW / W, canvasH / L);
+    const roomDrawW = W * scale;
+    const roomDrawH = L * scale;
+    const offsetX = (e.target.clientWidth - roomDrawW) / 2;
+    const offsetY = (e.target.clientHeight - roomDrawH) / 2;
+    return { ...getTaskAreaValues(), W, L, scale, offsetX, offsetY, container };
+}
+
+/**
+* Handles the mouse down event on the task area canvas to initiate dragging or resizing.
+*/
+function onTaskAreaMouseDown(e) {
+    const { x, z, w, d, scale, offsetX, offsetY } = getCanvasMetrics(e);
+
+    const handleHalf = HANDLE_SIZE / 2;
+    const taskDrawX = offsetX + x * scale;
+    const taskDrawY = offsetY + z * scale;
+    const taskDrawW = w * scale;
+    const taskDrawH = d * scale;
+
+    if (e.offsetX > taskDrawX - handleHalf && e.offsetX < taskDrawX + handleHalf && e.offsetY > taskDrawY - handleHalf && e.offsetY < taskDrawY + handleHalf) resizeHandle = 'tl';
+    else if (e.offsetX > taskDrawX + taskDrawW - handleHalf && e.offsetX < taskDrawX + taskDrawW + handleHalf && e.offsetY > taskDrawY - handleHalf && e.offsetY < taskDrawY + handleHalf) resizeHandle = 'tr';
+    else if (e.offsetX > taskDrawX - handleHalf && e.offsetX < taskDrawX + handleHalf && e.offsetY > taskDrawY + taskDrawH - handleHalf && e.offsetY < taskDrawY + taskDrawH + handleHalf) resizeHandle = 'bl';
+    else if (e.offsetX > taskDrawX + taskDrawW - handleHalf && e.offsetX < taskDrawX + taskDrawW + handleHalf && e.offsetY > taskDrawY + taskDrawH - handleHalf && e.offsetY < taskDrawY + taskDrawH + handleHalf) resizeHandle = 'br';
+    else resizeHandle = null;
+
+    if (resizeHandle) {
+        isResizingTaskArea = true;
+    } else if (e.offsetX > taskDrawX && e.offsetX < taskDrawX + taskDrawW && e.offsetY > taskDrawY && e.offsetY < taskDrawY + taskDrawH) {
+        isDraggingTaskArea = true;
+    }
+
+    if(isDraggingTaskArea || isResizingTaskArea) {
+        dragStartPos = { x: e.offsetX, y: e.offsetY };
+        initialTaskRect = { x, z, w, d };
+    }
+}
+
+/**
+* Handles the mouse move event to update the rectangle and cursor style.
+*/
+function onTaskAreaMouseMove(e) {
+    const metrics = getCanvasMetrics(e);
+    const { scale, offsetX, offsetY, container } = metrics;
+
+    const taskDrawX = offsetX + metrics.x * scale;
+    const taskDrawY = offsetY + metrics.z * scale;
+    const taskDrawW = metrics.w * scale;
+    const taskDrawH = metrics.d * scale;
+    const handleHalf = HANDLE_SIZE / 2;
+
+    if ((e.offsetX > taskDrawX - handleHalf && e.offsetX < taskDrawX + handleHalf && e.offsetY > taskDrawY - handleHalf && e.offsetY < taskDrawY + handleHalf) || (e.offsetX > taskDrawX + taskDrawW - handleHalf && e.offsetX < taskDrawX + taskDrawW + handleHalf && e.offsetY > taskDrawY + taskDrawH - handleHalf && e.offsetY < taskDrawY + taskDrawH + handleHalf)) container.style.cursor = 'nwse-resize';
+    else if ((e.offsetX > taskDrawX + taskDrawW - handleHalf && e.offsetX < taskDrawX + taskDrawW + handleHalf && e.offsetY > taskDrawY - handleHalf && e.offsetY < taskDrawY + handleHalf) || (e.offsetX > taskDrawX - handleHalf && e.offsetX < taskDrawX + handleHalf && e.offsetY > taskDrawY + taskDrawH - handleHalf && e.offsetY < taskDrawY + taskDrawH + handleHalf)) container.style.cursor = 'nesw-resize';
+    else if (e.offsetX > taskDrawX && e.offsetX < taskDrawX + taskDrawW && e.offsetY > taskDrawY && e.offsetY < taskDrawY + taskDrawH) container.style.cursor = 'move';
+    else container.style.cursor = 'crosshair';
+
+    if (!isDraggingTaskArea && !isResizingTaskArea) return;
+
+    const dx = (e.offsetX - dragStartPos.x) / scale;
+    const dy = (e.offsetY - dragStartPos.y) / scale;
+    let newRect = { ...initialTaskRect };
+
+    if (isDraggingTaskArea) {
+        newRect.x = initialTaskRect.x + dx;
+        newRect.z = initialTaskRect.z + dy;
+    } else if (isResizingTaskArea) {
+        if (resizeHandle.includes('l')) { newRect.x = initialTaskRect.x + dx; newRect.w = initialTaskRect.w - dx; }
+        if (resizeHandle.includes('r')) { newRect.w = initialTaskRect.w + dx; }
+        if (resizeHandle.includes('t')) { newRect.z = initialTaskRect.z + dy; newRect.d = initialTaskRect.d - dy; }
+        if (resizeHandle.includes('b')) { newRect.d = initialTaskRect.d + dy; }
+    }
+    updateSlidersFromCanvas(newRect);
+    drawTaskAreaVisualizer();
+}
+
+/**
+* Handles the mouse up event to end the drag/resize operation.
+*/
+function onTaskAreaMouseUp() {
+    isDraggingTaskArea = false;
+    isResizingTaskArea = false;
+    resizeHandle = null;
+    const container = dom['task-area-visualizer-container'];
+    if (container) container.style.cursor = 'move';
+}
+
+/**
+* Sets up all event listeners for the task area visualizer.
+*/
+function setupTaskAreaVisualizer() {
+    taskAreaCanvas = dom['task-area-canvas'];
+    if (!taskAreaCanvas) return;
+    taskAreaCtx = taskAreaCanvas.getContext('2d');
+
+    const inputsToWatch = ['width', 'length', 'task-area-start-x', 'task-area-start-z', 'task-area-width', 'task-area-depth'];
+    inputsToWatch.forEach(id => {
+        dom[id]?.addEventListener('input', drawTaskAreaVisualizer);
+    });
+
+    dom['task-area-toggle']?.addEventListener('change', () => {
+        if(dom['task-area-toggle'].checked) {
+            drawTaskAreaVisualizer();
+        }
+    });
+
+    taskAreaCanvas.addEventListener('mousedown', onTaskAreaMouseDown);
+    taskAreaCanvas.addEventListener('mousemove', onTaskAreaMouseMove);
+    taskAreaCanvas.addEventListener('mouseup', onTaskAreaMouseUp);
+    taskAreaCanvas.addEventListener('mouseleave', onTaskAreaMouseUp); 
+
+    new ResizeObserver(drawTaskAreaVisualizer).observe(dom['task-area-visualizer-container']);
+}
+
+// --- END: New functions for Task Area Visualizer ---
+export async function setupEventListeners() {
     // Add the event listener for the lock button
     dom['wall-select-lock-btn']?.addEventListener('click', () => {
         isWallSelectionLocked = !isWallSelectionLocked;
@@ -619,9 +861,9 @@ export async function setupEventListeners() {
 
     if (dom['bsdf-file']) {
         dom['bsdf-file'].addEventListener('change', (event) => {
-          handleFileSelection(event.target.files[0], 'bsdf-file');
-      });
-  }
+        handleFileSelection(event.target.files[0], 'bsdf-file');
+        });
+    }
 
     dom['view-type']?.addEventListener('change', (e) => updateFovControlsForViewType(e.target.value));
     dom['save-project-button']?.addEventListener('click', () => project.downloadProjectFile());
@@ -662,11 +904,31 @@ export async function setupEventListeners() {
     dom['grid-south-toggle']?.addEventListener('change', updateGridControls);
     dom['grid-east-toggle']?.addEventListener('change', updateGridControls);
     dom['grid-west-toggle']?.addEventListener('change', updateGridControls);
-    
+
     // Listeners for EN 12464-1 grid controls
-    dom['task-area-toggle']?.addEventListener('change', (e) => { dom['task-area-controls']?.classList.toggle('hidden', !e.target.checked); scheduleUpdate(); });
-    dom['surrounding-area-toggle']?.addEventListener('change', (e) => { dom['surrounding-area-controls']?.classList.toggle('hidden', !e.target.checked); scheduleUpdate(); });
-    
+    dom['task-area-toggle']?.addEventListener('change', (e) => {
+        const isEnabled = e.target.checked;
+        dom['task-area-controls']?.classList.toggle('hidden', !isEnabled);
+        // A surrounding area is only logical if a task area is defined.
+        dom['surrounding-area-toggle'].disabled = !isEnabled;
+        if (!isEnabled) {
+            // Uncheck and hide surrounding controls if task area is disabled
+            dom['surrounding-area-toggle'].checked = false;
+            dom['surrounding-area-toggle'].dispatchEvent(new Event('change'));
+        }
+        scheduleUpdate();
+    });
+    dom['surrounding-area-toggle']?.addEventListener('change', (e) => {
+        dom['surrounding-area-controls']?.classList.toggle('hidden', !e.target.checked);
+        scheduleUpdate();
+    });
+
+    // Add dynamic validation to keep the task area inside the room
+    const taskAreaSliders = ['task-area-start-x', 'task-area-start-z', 'task-area-width', 'task-area-depth'];
+    taskAreaSliders.forEach(id => {
+        dom[id]?.addEventListener('input', () => validateInputs(id));
+    });
+
     dom['proj-btn-persp']?.addEventListener('click', () => setProjectionMode('perspective'));
     dom['proj-btn-ortho']?.addEventListener('click', () => setProjectionMode('orthographic'));
 
@@ -678,6 +940,11 @@ export async function setupEventListeners() {
     dom['v-section-toggle']?.addEventListener('change', () => {
         dom['v-section-controls']?.classList.toggle('hidden', !dom['v-section-toggle'].checked);
         _updateLivePreviewVisibility();
+        scheduleUpdate();
+    });
+
+    dom['transparent-toggle']?.addEventListener('change', () => {
+        dom['transparency-controls']?.classList.toggle('hidden', !dom['transparent-toggle'].checked);
         scheduleUpdate();
     });
 
@@ -697,25 +964,30 @@ export async function setupEventListeners() {
 
     dom['render-section-preview-btn']?.addEventListener('click', handleRenderPreview);
 
-    dom['transparent-toggle']?.addEventListener('change', scheduleUpdate);
     dom['ground-plane-toggle']?.addEventListener('change', scheduleUpdate);
     dom['world-axes-toggle']?.addEventListener('change', scheduleUpdate);
     dom['fpv-toggle-btn']?.addEventListener('click', () => {
-    const viewType = dom['view-type'].value;
-    const fpvActive = sceneToggleFPV(viewType); // sceneToggleFPV now returns the state
+            const viewType = dom['view-type'].value;
+            const fpvActive = sceneToggleFPV(viewType); // sceneToggleFPV now returns the state
 
-    // Handle UI changes here, separated from scene logic
-    const btnText = dom['fpv-toggle-btn']?.querySelector('span');
-    if (btnText) {
-        btnText.textContent = fpvActive ? 'Exit Viewpoint' : 'Enter Viewpoint';
-    }
-    if (fpvActive) {
-        dom['fpv-toggle-btn']?.classList.replace('btn-primary', 'btn-secondary');
-    } else {
-        dom['fpv-toggle-btn']?.classList.replace('btn-secondary', 'btn-primary');
-    }
-});
+            // Handle UI changes here, separated from scene logic
+            const btnText = dom['fpv-toggle-btn']?.querySelector('span');
+            if (btnText) {
+                btnText.textContent = fpvActive ? 'Exit Viewpoint' : 'Enter Viewpoint';
+            }
+            if (fpvActive) {
+                dom['fpv-toggle-btn']?.classList.replace('btn-primary', 'btn-secondary');
+            } else {
+                dom['fpv-toggle-btn']?.classList.replace('btn-secondary', 'btn-primary');
+                // When exiting FPV, update gizmo visibility based on the checkbox.
+                setGizmoVisibility(dom['gizmo-toggle'].checked);
+            }
+        });
+
+    setupTaskAreaVisualizer(); // Initialize the new visualizer
+
     dom['custom-alert-close']?.addEventListener('click', hideAlert);
+    dom['gizmo-toggle']?.addEventListener('change', (e) => setGizmoVisibility(e.target.checked));
 
     // --- 3D Scene Interaction ---
     renderer.domElement.addEventListener('click', onSensorClick, false);
@@ -818,10 +1090,6 @@ const updateColorScaleAndViz = () => {
     renderer.domElement.addEventListener('click', onWallClick, false);
 
     if(dom['view-type']) updateLiveViewType(dom['view-type'].value);
-
-    // Initial UI updates
-    updateGridControls();
-    updateOccupancyTimeRangeDisplay();
 
     // --- Occupancy Schedule Listeners ---
     dom['occupancy-toggle']?.addEventListener('change', (e) => {
@@ -1025,10 +1293,19 @@ function render2DHeatmap() {
 
     promptForProjectDirectory();
 
-    // --- Electron-Specific Listeners ---
+    // Defer initial state settings until the 3D scene is fully initialized.
+    dom['render-container'].addEventListener('sceneReady', () => {
+        // Listen for the custom event dispatched by scene.js when the gizmo moves.
+        renderer.domElement.addEventListener('gizmoUpdated', updateViewpointFromGizmo);
 
-    // Listen for the 'run-simulation-button' which is dynamically created
-    document.body.addEventListener('click', async (event) => {
+        // Set the gizmo's visibility based on the default checkbox state.
+        setGizmoVisibility(dom['gizmo-toggle'].checked);
+    }, { once: true }); // The event should only fire once.
+
+
+        // --- Electron-Specific Listeners ---
+        // Listen for the 'run-simulation-button' which is dynamically created
+        document.body.addEventListener('click', async (event) => {
         const button = event.target.closest('[data-action="run"]');
         if (button && project.dirHandle) {
             const panel = button.closest('.floating-window');
@@ -1591,15 +1868,22 @@ function handleInputChange(e) {
     const id = e.target.id;
     const val = e.target.value;
     const valEl = dom[`${id}-val`];
-   if (valEl) {
+    if (valEl) {
         let unit = '';
         if (id.includes('width') || id.includes('length') || id.includes('height') || id.includes('dist') || id.includes('thick') || id.includes('depth') || id.includes('extension') || id.includes('sep') || id.includes('offset') || id.includes('spacing') || id.startsWith('view-pos') || id.startsWith('daylight-sensor')) unit = 'm';
         else if (id.startsWith('wwr-') && !id.includes('sill')) unit = '%';
         else if (id.includes('fov') || id.includes('orientation') || id.includes('tilt') || id.includes('angle')) unit = '°';
         updateValueLabel(valEl, val, unit, id);
+        }
+
+    // Add specific handler for viewpoint sliders to update the gizmo in real-time
+    if (id.startsWith('view-pos-') || id.startsWith('view-dir-') || id === 'view-fov' || id === 'view-dist') {
+        updateViewpointFromSliders();
     }
+ 
     debouncedScheduleUpdate(id);
 }
+
 
 /**
  * Configuration for formatting numeric values based on input ID patterns.
@@ -1678,13 +1962,37 @@ export function validateInputs(changedId = null) {
             dom[id].min = -1;
             dom[id].max = 1;
             dom[id].step = 0.01;
-        }
+            }
     });
 
     // Set constraints for Daylighting Sensor sliders
     if (dom['daylight-sensor1-x']) dom['daylight-sensor1-x'].max = W;
     if (dom['daylight-sensor1-z']) dom['daylight-sensor1-z'].max = L;
     if (dom['daylight-sensor1-y']) dom['daylight-sensor1-y'].max = H;
+
+    // Constrain Task Area to be within room dimensions
+    if (dom['task-area-toggle']?.checked) {
+        dom['task-area-width'].max = W;
+        dom['task-area-depth'].max = L;
+
+        // Ensure width/depth don't exceed max when changed
+        if (parseFloat(dom['task-area-width'].value) > W) dom['task-area-width'].value = W;
+        if (parseFloat(dom['task-area-depth'].value) > L) dom['task-area-depth'].value = L;
+
+        const taskWidth = parseFloat(dom['task-area-width'].value);
+        const taskDepth = parseFloat(dom['task-area-depth'].value);
+
+        dom['task-area-start-x'].max = Math.max(0, W - taskWidth);
+        dom['task-area-start-z'].max = Math.max(0, L - taskDepth);
+
+        // Re-validate start positions if a change made the current value invalid
+        if (parseFloat(dom['task-area-start-x'].value) > dom['task-area-start-x'].max) {
+            dom['task-area-start-x'].value = dom['task-area-start-x'].max;
+        }
+        if (parseFloat(dom['task-area-start-z'].value) > dom['task-area-start-z'].max) {
+            dom['task-area-start-z'].value = dom['task-area-start-z'].max;
+        }
+    }
 
     wallDirections.forEach(dir => {
         const wallW = (dir === 'n' || 's') ? W : L;
@@ -1758,7 +2066,8 @@ export function getWindowParamsForWall(orientation) {
     const dir = orientation.toLowerCase();
     const winCount = parseInt(dom[`win-count-${dir}`].value);
     const mode = windowModes[dir];
-    const winDepthPos = parseFloat(dom[`win-depth-pos-${dir}`]?.value || 0);
+    const winDepthPosId = mode === 'wwr' ? `win-depth-pos-${dir}` : `win-depth-pos-${dir}-manual`;
+    const winDepthPos = parseFloat(dom[winDepthPosId]?.value || 0);
     let ww, wh, sh;
 
    if (mode === 'wwr') {
@@ -1870,6 +2179,74 @@ export function getAllShadingParams() {
     return params;
 }
 
+/**
+ * Gathers all sensor grid parameters from the UI into a structured object.
+ * @returns {object} An object containing illuminance and view grid parameters.
+ */
+export function getSensorGridParams() {
+    const dom = getDom(); 
+
+    const getFloat = (id, defaultValue = 0) => dom[id] ? parseFloat(dom[id].value) : defaultValue;
+    const getInt = (id, defaultValue = 0) => dom[id] ? parseInt(dom[id].value, 10) : defaultValue;
+    const getChecked = (id, defaultValue = false) => dom[id] ? dom[id].checked : defaultValue;
+
+    const floorParams = {
+        enabled: getChecked('grid-floor-toggle'),
+        spacing: getFloat('floor-grid-spacing', 0.5),
+        offset: getFloat('floor-grid-offset', 0.8),
+        showIn3D: getChecked('show-floor-grid-3d-toggle'),
+        isTaskArea: getChecked('task-area-toggle'),
+        hasSurrounding: getChecked('surrounding-area-toggle'),
+        task: {
+            x: getFloat('task-area-start-x'),
+            z: getFloat('task-area-start-z'),
+            width: getFloat('task-area-width'),
+            depth: getFloat('task-area-depth'),
+        },
+        surroundingWidth: getFloat('surrounding-area-width', 0.5),
+    };
+
+    const illuminanceParams = {
+        enabled: getChecked('illuminance-grid-toggle'),
+        showIn3D: getChecked('show-floor-grid-3d-toggle'),
+        floor: floorParams,
+        ceiling: {
+            enabled: getChecked('grid-ceiling-toggle'),
+            spacing: getFloat('ceiling-grid-spacing', 0.5),
+            offset: getFloat('ceiling-grid-offset', -0.2),
+        },
+        walls: {
+            enabled: ['north', 'south', 'east', 'west'].some(dir => getChecked(`grid-${dir}-toggle`)),
+            spacing: getFloat('wall-grid-spacing', 0.5),
+            offset: getFloat('wall-grid-offset', 0.1),
+            surfaces: {
+                n: getChecked('grid-north-toggle'),
+                s: getChecked('grid-south-toggle'),
+                e: getChecked('grid-east-toggle'),
+                w: getChecked('grid-west-toggle'),
+            }
+        }
+    };
+
+    const viewParams = {
+        enabled: getChecked('view-grid-toggle'),
+        showIn3D: getChecked('show-view-grid-3d-toggle'),
+        spacing: getFloat('view-grid-spacing', 0.75),
+        offset: getFloat('view-grid-offset', 1.2),
+        numDirs: getInt('view-grid-directions', 6),
+        startVec: [
+            getFloat('view-grid-start-vec-x', 1),
+            getFloat('view-grid-start-vec-y', 0),
+            getFloat('view-grid-start-vec-z', 0)
+        ]
+    };
+
+    return {
+        illuminance: illuminanceParams,
+        view: viewParams
+    };
+}
+
 function setProjectionMode(mode, updateViewButtons = true) {
     const isPersp = mode === 'perspective';
     dom['proj-btn-persp'].classList.toggle('active', isPersp);
@@ -1892,81 +2269,59 @@ function setProjectionMode(mode, updateViewButtons = true) {
 
 
 export function updateViewpointFromSliders() {
-    // The sliders are now the single source of truth for updating the camera's state.
-    const roomW = parseFloat(dom.width.value);
-    const roomL = parseFloat(dom.length.value);
-
-    // 1. Get Position from Sliders (in room coordinates, origin at corner)
-    const pos = new THREE.Vector3(
-        parseFloat(dom['view-pos-x'].value),
-        parseFloat(dom['view-pos-y'].value),
-        parseFloat(dom['view-pos-z'].value)
-    );
-
-    // 2. Get Direction from Sliders
-    const dir = new THREE.Vector3(
-        parseFloat(dom['view-dir-x'].value),
-        parseFloat(dom['view-dir-y'].value),
-        parseFloat(dom['view-dir-z'].value)
-    );
-
-    // 3. Convert room-corner coordinates to world coordinates (centered room)
-    const worldPos = new THREE.Vector3(pos.x - roomW / 2, pos.y, pos.z - roomL / 2);
-
-    // 4. Calculate the target point in world space
-    const target = new THREE.Vector3().addVectors(worldPos, dir.normalize());
-
-    // 5. Update the 3D viewpoint camera
-    viewpointCamera.position.copy(worldPos);
-    viewpointCamera.lookAt(target);
-    viewpointCamera.fov = parseFloat(dom['view-fov'].value);
-    viewpointCamera.far = parseFloat(dom['view-dist'].value);
-    viewpointCamera.updateProjectionMatrix();
-    viewCamHelper.update();
+    // This function now gathers all necessary parameters from the DOM
+    // and passes them to the new scene management function.
+    const params = {
+        W: parseFloat(dom.width.value),
+        L: parseFloat(dom.length.value),
+        vpx: parseFloat(dom['view-pos-x'].value),
+        vpy: parseFloat(dom['view-pos-y'].value),
+        vpz: parseFloat(dom['view-pos-z'].value),
+        vdx: parseFloat(dom['view-dir-x'].value),
+        vdy: parseFloat(dom['view-dir-y'].value),
+        vdz: parseFloat(dom['view-dir-z'].value),
+        fov: parseFloat(dom['view-fov'].value),
+        dist: parseFloat(dom['view-dist'].value)
+    };
+    // Call the new function imported from scene.js to update the 3D view
+    updateViewpointFromUI(params);
 }
 
 export function updateViewpointFromGizmo() {
-    // This function now only READS from the gizmo/camera state to update the UI.
+    // The camera's position is now clamped within scene.js before this event fires.
+    // This function's only job is to update the UI sliders to match the camera.
     const roomW = parseFloat(dom.width.value);
-    const roomH = parseFloat(dom.height.value);
     const roomL = parseFloat(dom.length.value);
+
     const worldPos = viewpointCamera.position;
 
-    // 1. Clamp world position to keep the gizmo inside the room boundaries
-    worldPos.x = THREE.MathUtils.clamp(worldPos.x, -roomW / 2, roomW / 2);
-    worldPos.y = THREE.MathUtils.clamp(worldPos.y, 0, roomH);
-    worldPos.z = THREE.MathUtils.clamp(worldPos.z, -roomL / 2, roomL / 2);
-    viewpointCamera.position.copy(worldPos); // Apply clamp
-
-    // 2. Convert from world coordinates (centered) back to slider coordinates (corner origin)
+    // Convert from world coordinates (centered) back to slider coordinates (corner origin)
     const sliderPos = new THREE.Vector3(
         worldPos.x + roomW / 2,
         worldPos.y,
         worldPos.z + roomL / 2
     );
 
-    // 3. Get the camera's direction vector to update the direction sliders
-    const direction = new THREE.Vector3();
-    viewpointCamera.getWorldDirection(direction);
+    // scripts/ui.js
+    // Get the camera's direction vector to update the direction sliders
+    const worldDirection = new THREE.Vector3();
+    viewpointCamera.getWorldDirection(worldDirection);
 
-    // 4. Update UI Sliders without firing their 'input' events to prevent a loop
+    // The worldDirection includes the room's rotation. We must "un-rotate" it
+    // to get the local direction vector that the sliders should represent.
+    const inverseRoomQuaternion = roomObject.quaternion.clone().invert();
+    const localDirection = worldDirection.clone().applyQuaternion(inverseRoomQuaternion);
+
+    // Update UI Sliders without firing their 'input' events to prevent a loop
     dom['view-pos-x'].value = sliderPos.x.toFixed(2);
     dom['view-pos-y'].value = sliderPos.y.toFixed(2);
     dom['view-pos-z'].value = sliderPos.z.toFixed(2);
-    dom['view-dir-x'].value = direction.x.toFixed(2);
-    dom['view-dir-y'].value = direction.y.toFixed(2);
-    dom['view-dir-z'].value = direction.z.toFixed(2);
+    dom['view-dir-x'].value = localDirection.x.toFixed(2);
+    dom['view-dir-y'].value = localDirection.y.toFixed(2);
+    dom['view-dir-z'].value = localDirection.z.toFixed(2);
 
-    // 5. Manually refresh all text labels to reflect the new slider values
+    // Manually refresh all text labels to reflect the new slider values
     updateAllLabels();
-}
-
-export function updateGizmoVisibility() {
-    if (!transformControls || !viewCamHelper || !dom['gizmo-toggle']) return;
-    const isVisible = dom['gizmo-toggle'].checked;
-    transformControls.visible = isVisible;
-    transformControls.enabled = isVisible;
-    viewCamHelper.visible = isVisible;
 }
 
 export function setWindowMode(dir, mode, triggerUpdate = true) {
@@ -1979,7 +2334,7 @@ export function setWindowMode(dir, mode, triggerUpdate = true) {
 }
 
 function setGizmoMode(mode) {
-    transformControls.setMode(mode);
+    sceneSetGizmoMode(mode); // Call the new function imported from scene.js
     dom['mode-translate-btn'].classList.toggle('active', mode === 'translate');
     dom['mode-rotate-btn'].classList.toggle('active', mode !== 'translate');
 }
@@ -2143,53 +2498,6 @@ function setViewMode(mode) {
 
     // Refresh the entire results dashboard to show the correct stats and legends
     updateResultsDashboard();
-}
-
-/**
-* Gathers all parameters from the Sensor Grid UI panel.
-* @returns {object|null} An object with grid parameters, or null if the panel doesn't exist.
-*/
-export function getSensorGridParams() {
-    if (!dom['illuminance-grid-toggle']) return null;
-    
-    const floorIlluminanceParams = dom['grid-floor-toggle']?.checked
-        ? {
-            isTaskArea: dom['task-area-toggle']?.checked,
-            task: {
-                x: parseFloat(dom['task-area-start-x']?.value),
-                z: parseFloat(dom['task-area-start-z']?.value),
-                width: parseFloat(dom['task-area-width']?.value),
-                depth: parseFloat(dom['task-area-depth']?.value),
-            },
-            hasSurrounding: dom['surrounding-area-toggle']?.checked,
-            surroundingWidth: parseFloat(dom['surrounding-area-width']?.value),
-        }
-        : null;
-
-    return {
-        illuminance: {
-            enabled: dom['illuminance-grid-toggle'].checked && (
-                dom['grid-floor-toggle']?.checked || dom['grid-ceiling-toggle']?.checked ||
-                dom['grid-north-toggle']?.checked || dom['grid-south-toggle']?.checked ||
-                dom['grid-east-toggle']?.checked || dom['grid-west-toggle']?.checked
-            ),
-            showIn3D: dom['show-floor-grid-3d-toggle']?.checked,
-            color: dom['illuminance-grid-color']?.value
-        },
-        view: {
-            enabled: dom['view-grid-toggle'].checked,
-            showIn3D: dom['show-view-grid-3d-toggle']?.checked,
-            color: dom['view-grid-color']?.value,
-            spacing: parseFloat(dom['view-grid-spacing']?.value),
-            offset: parseFloat(dom['view-grid-offset']?.value),
-            numDirs: parseInt(dom['view-grid-directions']?.value, 10),
-            startVec: [
-                parseFloat(dom['view-grid-start-vec-x']?.value),
-                parseFloat(dom['view-grid-start-vec-y']?.value),
-                parseFloat(dom['view-grid-start-vec-z']?.value)
-            ]
-        }
-    };
 }
 
 /**
@@ -2371,7 +2679,6 @@ async function handleResultsFile(file, key) {
         if (fileNameDisplay) fileNameDisplay.textContent = file.name;
 
         updateSpectralMetricsDashboard(loadedKey); // Update the spectral dashboard
-
 
     // After loading, check for annual data to update relevant dashboards
     if (resultsManager.hasAnnualData(loadedKey)) {
@@ -2769,8 +3076,9 @@ function onSensorRightClick(event) {
     dom['sensor-context-menu'].classList.add('hidden');
 
     // Only show the menu if there's results data loaded
-    if (resultsManager.getActiveData() === null || resultsManager.getActiveData().length === 0) {
-    return;
+    const activeData = resultsManager.getActiveData();
+    if (!activeData || activeData.length === 0) {
+        return;
     }
 
     event.preventDefault();
@@ -2837,35 +3145,37 @@ function onSetViewpointHere() {
     const roomH = parseFloat(dom.height.value);
     const roomL = parseFloat(dom.length.value);
 
-    // 1. Calculate the new camera position in world coordinates (slightly above the sensor)
-    // A common eye height for a seated person is ~1.2m. Assuming workplane is 0.8m,
-    // we add 0.4m to the sensor's y position.
+    // 1. Calculate the new camera position in world coordinates
     const newCameraPosWorld = new THREE.Vector3(worldPoint.x, worldPoint.y + 0.4, worldPoint.z);
 
-    // 2. Calculate the target: the center of the room's height.
+    // 2. Calculate the target in world coordinates
     const roomCenterWorld = new THREE.Vector3(0, roomH / 2, 0);
 
-    // 3. Calculate the new direction vector
-    const newDirection = new THREE.Vector3().subVectors(roomCenterWorld, newCameraPosWorld).normalize();
+    // 3. Calculate the new direction vector in world space
+    const newWorldDirection = new THREE.Vector3().subVectors(roomCenterWorld, newCameraPosWorld).normalize();
 
-    // 4. Convert the new camera world position to slider coordinates (corner-based)
+    // 4. ***FIX***: Convert the new WORLD direction to LOCAL direction to match what the sliders expect
+    const inverseRoomQuaternion = roomObject.quaternion.clone().invert();
+    const newLocalDirection = newWorldDirection.clone().applyQuaternion(inverseRoomQuaternion);
+
+    // 5. Convert the new camera world position to slider coordinates (corner-based)
     const newCameraPosSlider = {
-    x: newCameraPosWorld.x + roomW / 2,
-    y: newCameraPosWorld.y,
-    z: newCameraPosWorld.z + roomL / 2
+        x: newCameraPosWorld.x + roomW / 2,
+        y: newCameraPosWorld.y,
+        z: newCameraPosWorld.z + roomL / 2
     };
 
-    // 5. Update the UI sliders, which will in turn dispatch events to update the 3D scene
+    // 6. Update the UI sliders with the corrected local-space values
     _updateViewpointSliderAndDispatch('view-pos-x', newCameraPosSlider.x);
     _updateViewpointSliderAndDispatch('view-pos-y', newCameraPosSlider.y);
     _updateViewpointSliderAndDispatch('view-pos-z', newCameraPosSlider.z);
 
-    _updateViewpointSliderAndDispatch('view-dir-x', newDirection.x);
-    _updateViewpointSliderAndDispatch('view-dir-y', newDirection.y);
-    _updateViewpointSliderAndDispatch('view-dir-z', newDirection.z);
+    _updateViewpointSliderAndDispatch('view-dir-x', newLocalDirection.x);
+    _updateViewpointSliderAndDispatch('view-dir-y', newLocalDirection.y);
+    _updateViewpointSliderAndDispatch('view-dir-z', newLocalDirection.z);
 
-    // 6. Ensure the viewpoint panel is visible so the user sees the changes
-     const viewpointPanel = document.getElementById('panel-viewpoint');
+    // 7. Ensure the viewpoint panel is visible so the user sees the changes
+    const viewpointPanel = document.getElementById('panel-viewpoint');
     if (viewpointPanel && viewpointPanel.classList.contains('hidden')) {
         togglePanelVisibility('panel-viewpoint', 'toggle-panel-viewpoint-btn');
     } else if (viewpointPanel) {
@@ -3233,28 +3543,41 @@ async function handleRenderPreview() {
  */
 export function getViewpointFileContent(forceFisheye = false) {
     const dom = getDom();
-    if (!dom['view-pos-x'] || !dom['view-dir-x']) return null;
+    // Ensure all necessary DOM elements exist before proceeding.
+    const requiredIds = ['view-pos-x', 'view-pos-y', 'view-pos-z', 'view-dir-x', 'view-dir-y', 'view-dir-z', 'view-fov', 'view-type', 'width', 'length', 'room-orientation'];
+    if (requiredIds.some(id => !dom[id])) return null;
 
-    const vp = `${dom['view-pos-x'].value} ${dom['view-pos-z'].value} ${dom['view-pos-y'].value}`;
-    const vd = `${dom['view-dir-x'].value} ${dom['view-dir-z'].value} ${dom['view-dir-y'].value}`;
-    const vu = "0 0 1"; // Z-up in Radiance
+    // Gather values from DOM
+    const vpx = parseFloat(dom['view-pos-x'].value), vpy = parseFloat(dom['view-pos-y'].value), vpz = parseFloat(dom['view-pos-z'].value);
+    const vdx = parseFloat(dom['view-dir-x'].value), vdy = parseFloat(dom['view-dir-y'].value), vdz = parseFloat(dom['view-dir-z'].value);
+    const fov = parseFloat(dom['view-fov'].value);
+    const viewType = forceFisheye ? 'h' : dom['view-type'].value;
+    const W = parseFloat(dom.width.value), L = parseFloat(dom.length.value);
+    const alphaRad = THREE.MathUtils.degToRad(parseFloat(dom['room-orientation'].value));
+    const cosA = Math.cos(alphaRad), sinA = Math.sin(alphaRad);
 
-    if (forceFisheye) {
-        return `rview -vth -vh 180 -vv 180 -vp ${vp} -vd ${vd} -vu ${vu}`;
-    }
+    // Correctly transform local UI coordinates to Radiance world coordinates
+    const transformPointToRadiance = (pos, w, l, c, s) => {
+        const p = { x: pos[0], y: pos[2], z: pos[1] }; // Map to Radiance Z-up coords
+        const cx = p.x - w / 2, cy = p.y - l / 2;    // Center coordinates
+        const rx = cx * c - cy * s, ry = cx * s + cy * c; // Rotate
+        return `${rx.toFixed(4)} ${ry.toFixed(4)} ${p.z.toFixed(4)}`;
+    };
+    const transformDirectionToRadiance = (dir, c, s) => {
+        const v = { x: dir[0], y: dir[2], z: dir[1] }; // Map to Radiance Z-up coords
+        const rx = v.x * c - v.y * s, ry = v.x * s + v.y * c; // Rotate
+        return `${rx.toFixed(4)} ${ry.toFixed(4)} ${v.z.toFixed(4)}`;
+    };
 
-    const viewType = dom['view-type'].value;
-    const fov = dom['view-fov'].value;
+    const rad_vp = transformPointToRadiance([vpx, vpy, vpz], W, L, cosA, sinA);
+    const rad_vd = transformDirectionToRadiance([vdx, vdy, vdz], cosA, sinA);
 
-    switch(viewType) {
-        case 'h': return `rview -vth -vh 180 -vv 180 -vp ${vp} -vd ${vd} -vu ${vu}`;
-        case 'a': return `rview -vta -vh 180 -vv 180 -vp ${vp} -vd ${vd} -vu ${vu}`;
-        case 'c': return `rview -vtc -vh 360 -vv 180 -vp ${vp} -vd ${vd} -vu ${vu}`;
-        case 'l': return `rview -vtl -vh ${fov} -vv ${fov} -vp ${vp} -vd ${vd} -vu ${vu}`;
-        case 'v':
-        default:
-            return `rview -vtv -vh ${fov} -vv ${fov} -vp ${vp} -vd ${vd} -vu ${vu}`;
-    }
+    // Generate the correct .vf file content string (without the incorrect "rview" command)
+    const viewTypeMap = { 'v': '-vtv', 'h': '-vth', 'c': '-vtc', 'l': '-vtl', 'a': '-vta' };
+    const radViewType = viewTypeMap[viewType] || '-vtv';
+    const vfov = (viewType === 'h' || viewType === 'a') ? 180 : fov;
+
+    return `${radViewType} -vp ${rad_vp} -vd ${rad_vd} -vu 0 0 1 -vh ${vfov} -vv ${vfov}`;
 }
 
 /**

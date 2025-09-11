@@ -15,7 +15,7 @@ export const wallSelectionGroup = new THREE.Group(); // Group for selectable wal
 export const axesObject = new THREE.Group();
 export const groundObject = new THREE.Group();
 export const northArrowObject = new THREE.Group();
-
+const taskAreaHelpersGroup = new THREE.Group();
 
 // --- SHARED RESOURCES & HELPERS ---
 // A single, reusable material for highlighting selected walls
@@ -47,6 +47,8 @@ const shared = {
   sensorMat: new THREE.MeshBasicMaterial({ color: '#343434' }), // Fallback color
   wireMat: new THREE.LineBasicMaterial({ color: '#343434' }),
   shadeMat: new THREE.MeshBasicMaterial({ color: '#1a1a1a', side: THREE.DoubleSide }), // Fallback color
+  taskAreaMat: new THREE.MeshBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.2, side: THREE.DoubleSide }),
+  surroundingAreaMat: new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.2, side: THREE.DoubleSide }),
   };
 
 function applyClippingToMaterial(mat, clippingPlanes) {
@@ -120,11 +122,18 @@ export async function updateScene(changedId = null) {
   renderer.clippingPlanes = activeClippingPlanes;
 
   // Apply room rotation to all relevant geometry groups
+  // scripts/geometry.js
   roomObject.rotation.y = rotationY;
   shadingObject.rotation.y = rotationY;
   sensorGridObject.rotation.y = rotationY;
   wallSelectionGroup.rotation.y = rotationY;
   daylightingSensorsGroup.rotation.y = rotationY;
+
+  // If the room orientation changed, re-sync the viewpoint camera from the UI sliders.
+  if (changedId === 'room-orientation') {
+      const { updateViewpointFromSliders } = await import('./ui.js');
+      updateViewpointFromSliders();
+  }
 
   // Recreate all geometry based on the new parameters
   createRoomGeometry();
@@ -222,8 +231,9 @@ function createRoomGeometry() {
   clearGroup(wallSelectionGroup);
 
   const { W, L, H, wallThickness, floorThickness, ceilingThickness } = readParams();
-  const glazingTrans = parseFloat(dom['glazing-trans'].value);
+ const glazingTrans = parseFloat(dom['glazing-trans'].value);
   const isTransparent = dom['transparent-toggle'].checked;
+  const surfaceOpacity = isTransparent ? parseFloat(dom['surface-opacity'].value) : 1.0;
 
   const materialProperties = {
     polygonOffset: true,
@@ -233,7 +243,7 @@ function createRoomGeometry() {
     clippingPlanes: renderer.clippingPlanes,
     clipIntersection: true,
     transparent: isTransparent,
-    opacity: isTransparent ? 0.5 : 1.0,
+    opacity: surfaceOpacity,
   };
 
   // Create materials using theme colors
@@ -320,16 +330,19 @@ roomContainer.add(floorGroup);
         holePath.closePath();
         wallShape.holes.push(holePath);
 
+        // Invert depth position for East/West walls for intuitive slider control
+        const effectiveWinDepthPos = (key === 'e' || key === 'w') ? -winDepthPos : winDepthPos;
+
         const glassWidth = Math.max(0, ww - 2 * ft);
         const glassHeight = Math.max(0, wh - 2 * ft);
         if (glassWidth > 0 && glassHeight > 0) {
           const glass = new THREE.Mesh(new THREE.PlaneGeometry(glassWidth, glassHeight), windowMaterial);
           applyClippingToMaterial(glass.material, renderer.clippingPlanes);
-          glass.position.set(winCenterX, winCenterY, winDepthPos); // Position in the middle of the frame depth
+          glass.position.set(winCenterX, winCenterY, effectiveWinDepthPos); // Position in the middle of the frame depth
           wallMeshGroup.add(glass);
         }
 
-        if (addFrame && ft > 0) {
+      if (addFrame && ft > 0) {
           const frameShape = new THREE.Shape();
           frameShape.moveTo(winCenterX - ww / 2, winCenterY - wh / 2);
           frameShape.lineTo(winCenterX + ww / 2, winCenterY - wh / 2);
@@ -347,22 +360,21 @@ roomContainer.add(floorGroup);
           const frameExtrudeSettings = { steps: 1, depth: frameDepth, bevelEnabled: false };
           const frameGeometry = new THREE.ExtrudeGeometry(frameShape, frameExtrudeSettings);
           // Center the frame geometry around the window's depth position
-          frameGeometry.translate(0, 0, winDepthPos - (frameDepth / 2));
+          frameGeometry.translate(0, 0, effectiveWinDepthPos - (frameDepth / 2));
 
           const frameMesh = new THREE.Mesh(frameGeometry, frameMaterial);
           applyClippingToMaterial(frameMesh.material, renderer.clippingPlanes);
 
-          const frameEdges = new THREE.LineSegments(new THREE.EdgesGeometry(frameGeometry), shared.wireMat.clone());
-          applyClippingToMaterial(frameEdges.material, renderer.clippingPlanes);
-
-          wallMeshGroup.add(frameMesh, frameEdges);
+          wallMeshGroup.add(frameMesh);
         }
       }
+
       const extrudeSettings = {
         steps: 1,
         depth: wallThickness,
         bevelEnabled: false
       };
+
       const wallGeometry = new THREE.ExtrudeGeometry(wallShape, extrudeSettings);
       // For E/W walls, we pre-translate the geometry backwards. The group rotation
       // will then correctly position the wall with its thickness pointing outwards.
@@ -394,6 +406,7 @@ roomContainer.add(floorGroup);
 export function createSensorGrid() {
   const dom = getDom();
   clearGroup(sensorGridObject);
+  clearGroup(taskAreaHelpersGroup); // Clear the old helpers
 
   const { W, L, H } = readParams();
   const gridContainer = new THREE.Group();
@@ -417,11 +430,13 @@ export function createSensorGrid() {
   // Decouple visualization from the main "enabled" toggle, which is for simulation.
   // The user expects to see the grid if the "Show in 3D" box is checked.
   if (gridParams?.view.showIn3D) {
-    createGridForSurface('floor', W, L, H, gridContainer, 'view', gridParams);
+  createGridForSurface('floor', W, L, H, gridContainer, 'view', gridParams);
   }
 
-  sensorGridObject.add(gridContainer);
-}
+  // Add the new visual helpers for the task/surrounding areas
+  _createTaskAreaVisuals(W, L, gridContainer, gridParams);
+  sensorGridObject.add(gridContainer, taskAreaHelpersGroup);
+  }
 
 /**
  * Generates an array of centered point coordinates along a single axis.
@@ -461,56 +476,69 @@ function _generateGridPositions(surface, W, L, H) {
     const positions = [];
 
     // --- Special handling for Floor with Task/Surrounding Areas ---
-    if (surface === 'floor' && gridParams?.illuminance.enabled) {
+    if (surface === 'floor' && gridParams?.illuminance.enabled && dom['grid-floor-toggle']?.checked) {
         spacing = parseFloat(dom[`floor-grid-spacing`].value);
         offset = parseFloat(dom[`floor-grid-offset`].value);
         const floorParams = gridParams.illuminance.floor;
 
         if (floorParams?.isTaskArea) {
             const task = floorParams.task;
-            const taskPointsX = Array.from({ length: Math.floor(task.width / spacing) }, (_, i) => task.x + (i * spacing));
-            const taskPointsZ = Array.from({ length: Math.floor(task.depth / spacing) }, (_, i) => task.z + (i * spacing));
-            for (const p1 of taskPointsX) {
-                for (const p2 of taskPointsZ) {
-                    positions.push(new THREE.Vector3(p1, offset, p2));
+
+            // Helper to generate points within a rectangular area, respecting spacing
+            const generatePointsInRect = (x, z, width, depth, spacing) => {
+                if (spacing <= 0 || width <= 0 || depth <= 0) return [];
+                const rectPositions = [];
+                const numX = Math.floor(width / spacing);
+                const numZ = Math.floor(depth / spacing);
+                if (numX === 0 || numZ === 0) return [];
+
+                const startX = x + (width - (numX > 1 ? (numX - 1) * spacing : 0)) / 2;
+                const startZ = z + (depth - (numZ > 1 ? (numZ - 1) * spacing : 0)) / 2;
+
+                for (let i = 0; i < numX; i++) {
+                    for (let j = 0; j < numZ; j++) {
+                        rectPositions.push({ x: startX + i * spacing, z: startZ + j * spacing });
+                    }
                 }
-            }
+                return rectPositions;
+            };
 
+            // Generate points for the task area
+            const taskPoints = generatePointsInRect(task.x, task.z, task.width, task.depth, spacing);
+            taskPoints.forEach(p => positions.push(new THREE.Vector3(p.x, offset, p.z)));
+
+            // Generate points for the surrounding area band
             if (floorParams.hasSurrounding) {
-                const surround = floorParams.surroundingWidth;
-                const surroundingPointsX = generateCenteredPoints(W, spacing);
-                const surroundingPointsZ = generateCenteredPoints(L, spacing);
+                const band = floorParams.surroundingWidth;
+                const outerX = Math.max(0, task.x - band);
+                const outerZ = Math.max(0, task.z - band);
+                const outerW = Math.min(W - outerX, task.width + 2 * band);
+                const outerD = Math.min(L - outerZ, task.depth + 2 * band);
 
-                for (const p1 of surroundingPointsX) {
-                    for (const p2 of surroundingPointsZ) {
-                        // Check if the point is inside the larger surrounding box
-                        const isInsideSurround = (p1 >= task.x - surround && p1 <= task.x + task.width + surround) &&
-                                                 (p2 >= task.z - surround && p2 <= task.z + task.depth + surround);
-                        // Check if the point is inside the inner task area
-                        const isInsideTask = (p1 >= task.x && p1 <= task.x + task.width) &&
-                                             (p2 >= task.z && p2 <= task.z + task.depth);
-                        
-                        if (isInsideSurround && !isInsideTask) {
-                            positions.push(new THREE.Vector3(p1, offset, p2));
-                        }
+                const outerPoints = generatePointsInRect(outerX, outerZ, outerW, outerD, spacing);
+
+                for (const p of outerPoints) {
+                    const isInsideTask = (p.x >= task.x && p.x <= task.x + task.width && p.z >= task.z && p.z <= task.z + task.depth);
+                    if (!isInsideTask) {
+                        positions.push(new THREE.Vector3(p.x, offset, p.z));
                     }
                 }
             }
-        } else {
-            // Default behavior: grid the entire floor
-            points1 = generateCenteredPoints(W, spacing);
-            points2 = generateCenteredPoints(L, spacing);
-            for (const p1 of points1) {
-                for (const p2 of points2) {
-                    positions.push(new THREE.Vector3(p1, offset, p2));
-                }
-            }
-        }
-        return positions;
-    }
+          } else {
+              // Default behavior: grid the entire floor
+              points1 = generateCenteredPoints(W, spacing);
+              points2 = generateCenteredPoints(L, spacing);
+              for (const p1 of points1) {
+                  for (const p2 of points2) {
+                      positions.push(new THREE.Vector3(p1, offset, p2));
+                  }
+              }
+          }
+          return positions;
+      }
 
-    // --- Original logic for other surfaces ---
-    if (surface === 'ceiling') {
+      // --- Original logic for other surfaces ---
+      if (surface === 'ceiling') {
         spacing = parseFloat(dom[`ceiling-grid-spacing`].value);
         offset = parseFloat(dom[`ceiling-grid-offset`].value);
         points1 = generateCenteredPoints(W, spacing);
@@ -656,9 +684,12 @@ export function createShadingDevices() {
   shadingContainer.position.set(-W / 2, 0, -L / 2);
 
   for (const [orientation, winParams] of Object.entries(allWindows)) {
-    const { ww, wh, sh, winCount, mode, wallWidth } = winParams;
+    const { ww, wh, sh, winCount, mode, wallWidth, winDepthPos } = winParams;
     const shadeParams = allShading[orientation];
-    
+
+    // Invert depth for E/W walls to match the glazing position
+    const effectiveWinDepthPos = (orientation === 'E' || orientation === 'W') ? -winDepthPos : winDepthPos;
+
     if (!shadeParams || winCount === 0 || ww === 0 || wh === 0) continue;
 
     const spacing = mode === 'wwr' ? 0.1 : ww / 2;
@@ -681,19 +712,25 @@ export function createShadingDevices() {
     }
 
       if (deviceGroup) {
-        if (orientation === 'N') {
-          deviceGroup.position.set(winStartPos + ww / 2, sh, 0);
-        } else if (orientation === 'S') {
-        deviceGroup.position.set(winStartPos + ww / 2, sh, L);
-        deviceGroup.rotation.y = Math.PI;
-      } else if (orientation === 'W') {
-        deviceGroup.position.set(0, sh, winStartPos + ww / 2);
-        deviceGroup.rotation.y = Math.PI / 2;
-      } else if (orientation === 'E') {
-        deviceGroup.position.set(W, sh, winStartPos + ww / 2);
-        deviceGroup.rotation.y = -Math.PI / 2;
-      }
-      shadingContainer.add(deviceGroup);
+    // Position and rotate the device to match its parent wall, then translate to the glazing depth.
+    if (orientation === 'N') {
+      deviceGroup.position.set(winStartPos + ww / 2, sh, 0);
+      deviceGroup.rotation.y = Math.PI; // Match North wall's rotation
+      deviceGroup.translateZ(effectiveWinDepthPos);
+    } else if (orientation === 'S') {
+      deviceGroup.position.set(winStartPos + ww / 2, sh, L);
+      // S wall has 0 rotation, no change needed.
+      deviceGroup.translateZ(effectiveWinDepthPos);
+    } else if (orientation === 'W') {
+      deviceGroup.position.set(0, sh, winStartPos + ww / 2);
+      deviceGroup.rotation.y = Math.PI / 2; // Match West wall's rotation
+      deviceGroup.translateZ(effectiveWinDepthPos);
+    } else if (orientation === 'E') {
+      deviceGroup.position.set(W, sh, winStartPos + ww / 2);
+      deviceGroup.rotation.y = -Math.PI / 2; // Match East wall's rotation
+      deviceGroup.translateZ(effectiveWinDepthPos);
+    }
+    shadingContainer.add(deviceGroup);
     }
     }
   }
@@ -987,4 +1024,62 @@ export function highlightWall(wallObject) {
         highlightedWall.originalMaterial = wallObject.material;
         wallObject.material = highlightMaterial;
     }
+}
+
+/**
+* Creates visual helpers (semi-transparent planes and outlines) for the
+* EN 12464-1 task and surrounding areas on the floor grid.
+* @param {number} W - Room width.
+* @param {number} L - Room length.
+* @param {THREE.Group} container - The group to add the helpers to.
+* @param {object} gridParams - The parameters object from getSensorGridParams.
+* @private
+*/
+function _createTaskAreaVisuals(W, L, container, gridParams) {
+  const dom = getDom();
+  const floorParams = gridParams?.illuminance.floor;
+
+  if (!dom['grid-floor-toggle']?.checked || !floorParams?.isTaskArea) {
+  return; // Only draw if the floor grid and task area are enabled
+  }
+
+  const offset = parseFloat(dom['floor-grid-offset'].value);
+  const vizHeight = offset + 0.005; // Position slightly above the grid offset to prevent z-fighting
+
+  const createAreaPlane = (width, depth, material) => {
+  const planeGeom = new THREE.PlaneGeometry(width, depth);
+  const planeMesh = new THREE.Mesh(planeGeom, material);
+  planeMesh.rotation.x = -Math.PI / 2; // Orient flat on the XY plane
+
+  const outlineGeom = new THREE.EdgesGeometry(planeGeom);
+  const outline = new THREE.LineSegments(outlineGeom, new THREE.LineBasicMaterial({ color: material.color, linewidth: 2 }));
+
+  const group = new THREE.Group();
+  group.add(planeMesh, outline);
+  return group;
+  };
+
+  // 1. Create Task Area visual
+  const task = floorParams.task;
+  if (task.width > 0 && task.depth > 0) {
+  const taskAreaVisual = createAreaPlane(task.width, task.depth, shared.taskAreaMat);
+  taskAreaVisual.position.set(task.x + task.width / 2, vizHeight, task.z + task.depth / 2);
+  container.add(taskAreaVisual);
+  }
+
+  // 2. Create Surrounding Area visual
+  if (floorParams.hasSurrounding) {
+    const band = floorParams.surroundingWidth;
+    const surroundingWidth = Math.min(W, task.width + 2 * band);
+    const surroundingDepth = Math.min(L, task.depth + 2 * band);
+    const surroundingX = Math.max(0, task.x - band);
+    const surroundingZ = Math.max(0, task.z - band);
+
+  if (surroundingWidth > 0 && surroundingDepth > 0) {
+          const surroundingAreaVisual = createAreaPlane(surroundingWidth, surroundingDepth, shared.surroundingAreaMat);
+          surroundingAreaVisual.position.set(surroundingX + surroundingWidth / 2, vizHeight - 0.001, surroundingZ + surroundingDepth / 2);
+          // Add to the main container, it will be rendered underneath the task area plane
+          container.add(surroundingAreaVisual);
+      }
+  }
 }

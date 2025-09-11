@@ -4,7 +4,6 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
-import { getDom, updateViewpointFromGizmo, updateGizmoVisibility } from './ui.js';
 import { roomObject, shadingObject, sensorGridObject, axesObject, northArrowObject, groundObject, wallSelectionGroup } from './geometry.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -24,6 +23,7 @@ export let viewpointCamera, viewCamHelper, transformControls, fpvOrthoCamera, se
 export let horizontalClipPlane, verticalClipPlane;
 export let daylightingSensorsGroup;
 export let isFirstPersonView = false;
+export let currentViewType = 'v'; // Default to perspective
 
 // --- CORE FUNCTIONS ---
 
@@ -81,9 +81,7 @@ const FisheyeShader = {
 /**
 * Sets up the entire Three.js scene, including cameras, renderers, and controls.
 */
-export function setupScene() {
-    const dom = getDom();
-    const container = dom['render-container'];
+export function setupScene(container) {
     if (!container) {
         console.error("Render container not found!");
         return;
@@ -125,9 +123,10 @@ export function setupScene() {
     // 9. Add Geometry Groups to Scene
     scene.add(roomObject, shadingObject, sensorGridObject, axesObject, northArrowObject, groundObject, daylightingSensorsGroup, wallSelectionGroup);
 
-
-    updateGizmoVisibility();
+    // 10. Signal that the scene is initialized and ready for interaction.
+    container.dispatchEvent(new CustomEvent('sceneReady', { bubbles: true }));
 }
+
 
 /**
 * The main animation loop, called every frame to render the scene.
@@ -138,11 +137,11 @@ export function animate() {
     // The composer's active camera is now managed by other functions,
     // so we can just render it. This ensures effects like fisheye always work.
     composer.render();
-    const dom = getDom();
 
     // The label renderer needs to know which camera is conceptually active.
+    const isParallelFPV = currentViewType === 'l';
     const currentLabelCamera = isFirstPersonView
-        ? (dom['view-type']?.value === 'l' ? fpvOrthoCamera : viewpointCamera)
+        ? (isParallelFPV ? fpvOrthoCamera : viewpointCamera)
         : activeCamera;
     labelRenderer.render(scene, currentLabelCamera);
 
@@ -155,8 +154,8 @@ export function animate() {
  * Handles window resize events to keep the camera and renderer updated.
  */
 export function onWindowResize() {
-    const dom = getDom();
-    const container = dom['render-container'];
+    if (!renderer) return;
+    const container = renderer.domElement.parentElement;
     if (!container || container.clientWidth === 0 || container.clientHeight === 0) return;
 
     const aspect = container.clientWidth / container.clientHeight;
@@ -209,6 +208,59 @@ export function setActiveCamera(newCamera) {
     }
 }
 
+/**
+* Updates the viewpoint camera's properties based on values from the UI.
+* This function centralizes scene manipulation logic, called by the UI layer.
+* @param {object} params - An object containing viewpoint parameters.
+*/
+export function updateViewpointFromUI(params) {
+    if (!viewpointCamera || !viewCamHelper) return;
+
+    const { W, L, vpx, vpy, vpz, vdx, vdy, vdz, fov, dist } = params;
+    
+    const pos = new THREE.Vector3(vpx, vpy, vpz);
+    const localDir = new THREE.Vector3(vdx, vdy, vdz);
+
+    // Prevent normalization of a zero vector, which results in NaNs
+    if (localDir.lengthSq() === 0) {
+        localDir.set(0, 0, -1); // Default to looking along negative Z in local space
+    }
+
+    // Convert UI's corner-based coordinates to the scene's center-based world coordinates
+    const worldPos = new THREE.Vector3(pos.x - W / 2, pos.y, pos.z - L / 2);
+    
+    // Rotate the local direction vector by the room's current rotation to get the world direction
+    const worldDir = localDir.clone().normalize().applyQuaternion(roomObject.quaternion);
+    const target = new THREE.Vector3().addVectors(worldPos, worldDir);
+
+    viewpointCamera.position.copy(worldPos);
+    viewpointCamera.lookAt(target);
+    viewpointCamera.fov = fov;
+    viewpointCamera.far = dist;
+    viewpointCamera.updateProjectionMatrix();
+    viewCamHelper.update();
+}
+
+/**
+* Sets the visibility of the viewpoint gizmo and its helper.
+* @param {boolean} isVisible - True to show the gizmo, false to hide it.
+*/
+export function setGizmoVisibility(isVisible) {
+    if (!transformControls || !viewCamHelper) return;
+    transformControls.visible = isVisible;
+    transformControls.enabled = isVisible;
+    viewCamHelper.visible = isVisible;
+}
+
+/**
+* Sets the mode for the transform controls gizmo ('translate' or 'rotate').
+* @param {string} mode - The desired gizmo mode.
+*/
+export function setGizmoMode(mode) {
+    if (transformControls) {
+        transformControls.setMode(mode);
+    }
+}
 
 // --- HELPER FUNCTIONS for setupScene ---
 
@@ -275,9 +327,24 @@ function _setupControls(domElement) {
     // TransformControls for moving/rotating the viewpoint gizmo
     transformControls = new TransformControls(activeCamera, domElement);
     transformControls.addEventListener('dragging-changed', (event) => {
-        controls.enabled = !event.value; // Disable orbit controls while dragging the gizmo
+    controls.enabled = !event.value; // Disable orbit controls while dragging the gizmo
     });
-    transformControls.addEventListener('objectChange', updateViewpointFromGizmo);
+    // This listener now clamps the camera's position to stay within the room,
+    // then notifies the UI layer to update the sliders.
+    transformControls.addEventListener('objectChange', () => {
+        if (renderer && viewpointCamera && roomObject) {
+            const roomBox = new THREE.Box3().setFromObject(roomObject);
+            const roomSize = new THREE.Vector3();
+            roomBox.getSize(roomSize);
+
+            // Clamp world position to keep gizmo inside room boundaries
+            viewpointCamera.position.x = THREE.MathUtils.clamp(viewpointCamera.position.x, -roomSize.x / 2, roomSize.x / 2);
+            viewpointCamera.position.y = THREE.MathUtils.clamp(viewpointCamera.position.y, 0, roomSize.y);
+            viewpointCamera.position.z = THREE.MathUtils.clamp(viewpointCamera.position.z, -roomSize.z / 2, roomSize.z / 2);
+            
+            renderer.domElement.dispatchEvent(new CustomEvent('gizmoUpdated'));
+        }
+    });
 
     // TransformControls for the daylighting sensor
     sensorTransformControls = new TransformControls(activeCamera, domElement);
@@ -305,6 +372,9 @@ function _setupHelpersAndGizmos() {
 
     // Add the sensor transform controls to the scene (it's attached to an object later)
     scene.add(sensorTransformControls);
+
+    // Set the gizmo to be invisible by default, matching the UI checkbox on startup.
+    setGizmoVisibility(false);
 }
 
 /**
@@ -313,6 +383,7 @@ function _setupHelpersAndGizmos() {
  */
 export function updateLiveViewType(viewType) {
     if (!fisheyePass) return;
+    currentViewType = viewType; // Store the current view type for the animation loop
 
     const isFisheye = viewType === 'h' || viewType === 'a';
     const isParallel = viewType === 'l';
@@ -347,12 +418,13 @@ if (isFirstPersonView) {
     if (viewCamHelper) viewCamHelper.visible = false;
     if (axesObject) axesObject.visible = false;
     renderPass.camera = isParallel ? fpvOrthoCamera : viewpointCamera;
-} else {
-    transformControls.attach(viewpointCamera);
-    if (axesObject) axesObject.visible = true;
-    updateGizmoVisibility();
-    renderPass.camera = activeCamera;
-}
+    } else {
+        transformControls.attach(viewpointCamera);
+        if (axesObject) axesObject.visible = true;
+        // The UI layer is now responsible for updating the gizmo's visibility
+        // after FPV mode is exited.
+        renderPass.camera = activeCamera;
+    }
 
 // Return the new state so the UI layer can handle UI updates.
 return isFirstPersonView;

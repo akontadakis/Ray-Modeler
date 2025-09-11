@@ -826,6 +826,9 @@
             <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
         </div>
 
+
+
+
     <div id="panel-sensor" class="floating-window ui-panel hidden">
         <div class="window-header">
             <span>Sensor Grid</span>
@@ -845,45 +848,54 @@
                 <div class="space-y-3">
                     <h3 class="font-semibold text-sm uppercase">Surface Selection</h3>
                     <div class="grid grid-cols-2 gap-3">
-                        <label for="grid-floor-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-floor-toggle" checked><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Floor</span></label>
-                        <label for="grid-ceiling-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-ceiling-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Ceiling</span></label>
-                        <label for="grid-north-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-north-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">North Wall</span></label>
-                        <label for="grid-south-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-south-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">South Wall</span></label>
-                        <label for="grid-east-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-east-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">East Wall</span></label>
-                        <label for="grid-west-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-west-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">West Wall</span></label>
+                    <label for="grid-floor-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-floor-toggle" checked><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Floor</span></label>
+                    <label for="grid-ceiling-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-ceiling-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Ceiling</span></label>
+                    <label for="grid-north-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-north-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">North Wall</span></label>
+                    <label for="grid-south-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-south-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">South Wall</span></label>
+                    <label for="grid-east-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-east-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">East Wall</span></label>
+                    <label for="grid-west-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-west-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">West Wall</span></label>
+                </div>
+            </div>
+            <div id="floor-grid-controls" class="space-y-3 pt-4 border-t border-[--grid-color]">
+                <h3 class="font-semibold text-sm uppercase">Floor Grid</h3>
+                <div class="pt-2">
+                    <label for="show-floor-grid-3d-toggle" class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="show-floor-grid-3d-toggle">
+                        <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Show in 3D View</span>
+                    </label>
+                </div>
+                <div class="space-y-3 pt-2 mt-2 border-t border-dashed border-[--grid-color]">
+                    <label for="task-area-toggle" class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="task-area-toggle">
+                        <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Define Specific Task Area</span>
+                    </label>
+                    <div id="task-area-controls" class="hidden space-y-3 pl-4">
+                        <div><label class="label text-xs" for="task-area-start-x">Start X</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="task-area-start-x" min="0" max="20" value="0.5" step="0.1"><span id="task-area-start-x-val" class="data-value font-mono w-12 text-left">0.5m</span></div></div>
+                        <div><label class="label text-xs" for="task-area-start-z">Start Z</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="task-area-start-z" min="0" max="20" value="0.5" step="0.1"><span id="task-area-start-z-val" class="data-value font-mono w-12 text-left">0.5m</span></div></div>
+                        <div><label class="label text-xs" for="task-area-width">Width</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="task-area-width" min="0.5" max="20" value="2.0" step="0.1"><span id="task-area-width-val" class="data-value font-mono w-12 text-left">2.0m</span></div></div>
+                        <div><label class="label text-xs" for="task-area-depth">Depth</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="task-area-depth" min="0.5" max="20" value="1.0" step="0.1"><span id="task-area-depth-val" class="data-value font-mono w-12 text-left">1.0m</span></div></div>
+                        <div class="mt-4 pt-4 border-t border-dashed border-[--grid-color]">
+                            <label class="label text-xs">Task Area Visualizer</label>
+                            <div id="task-area-visualizer-container" class="relative mt-2 aspect-video bg-[--grid-color] rounded overflow-hidden cursor-move">
+                                <canvas id="task-area-canvas"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div id="floor-grid-controls" class="space-y-3 pt-4 border-t border-[--grid-color]">
-                    <h3 class="font-semibold text-sm uppercase">Floor Grid</h3>
-                    <div class="space-y-3 pt-2 mt-2 border-t border-dashed border-[--grid-color]">
-                        <label for="task-area-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="task-area-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Define Specific Task Area</span></label>
-                        <div id="task-area-controls" class="hidden space-y-3 pl-4">
-                            <div><label class="label text-xs">Start X</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="task-area-start-x" min="0" max="20" value="0.5" step="0.1"><span id="task-area-start-x-val" class="data-value font-mono w-12 text-left">0.5m</span></div></div>
-                            <div><label class="label text-xs">Start Z</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="task-area-start-z" min="0" max="20" value="0.5" step="0.1"><span id="task-area-start-z-val" class="data-value font-mono w-12 text-left">0.5m</span></div></div>
-                            <div><label class="label text-xs">Width</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="task-area-width" min="0.5" max="20" value="2.0" step="0.1"><span id="task-area-width-val" class="data-value font-mono w-12 text-left">2.0m</span></div></div>
-                            <div><label class="label text-xs">Depth</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="task-area-depth" min="0.5" max="20" value="1.0" step="0.1"><span id="task-area-depth-val" class="data-value font-mono w-12 text-left">1.0m</span></div></div>
-                        </div>
+                <div class="space-y-3 pt-2 mt-2 border-t border-dashed border-[--grid-color]">
+                    <label for="surrounding-area-toggle" class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="surrounding-area-toggle" disabled>
+                        <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Include Surrounding Area</span>
+                    </label>
+                    <div id="surrounding-area-controls" class="hidden space-y-3 pl-4">
+                        <div><label class="label text-xs">Band Width</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="surrounding-area-width" min="0.1" max="2.0" value="0.5" step="0.1"><span id="surrounding-area-width-val" class="data-value font-mono w-12 text-left">0.5m</span></div></div>
                     </div>
-                    <div class="space-y-3 pt-2 mt-2 border-t border-dashed border-[--grid-color]">
-                         <label for="surrounding-area-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="surrounding-area-toggle" disabled><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Include Surrounding Area</span></label>
-                        <div id="surrounding-area-controls" class="hidden space-y-3 pl-4">
-                             <div><label class="label text-xs">Band Width</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="surrounding-area-width" min="0.1" max="2.0" value="0.5" step="0.1"><span id="surrounding-area-width-val" class="data-value font-mono w-12 text-left">0.5m</span></div></div>
-                        </div>
-                        </div>
-                        <div class="pt-2">
-                            <label for="show-floor-grid-3d-toggle" class="flex items-center cursor-pointer">
-                                <input type="checkbox" id="show-floor-grid-3d-toggle">
-                                <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Show in 3D View</span>
-                            </label>
-                        </div>
-                        <div><label class="label" for="floor-grid-spacing">Spacing (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="floor-grid-spacing" min="0.05" max="2.0" value="0.50" step="0.05"><span id="floor-grid-spacing-val" class="data-value font-mono w-12 text-left">0.50m</span></div></div>
-                        <div><label class="label" for="floor-grid-offset">Height Offset (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="floor-grid-offset" min="0" max="10" value="0.8" step="0.1"><span id="floor-grid-offset-val" class="data-value font-mono w-12 text-left">0.8m</span></div></div>
-                    </div>
-                    <div id="ceiling-grid-controls" class="hidden space-y-3 pt-4 border-t border-[--grid-color]">
-                        <h3 class="font-semibold text-sm uppercase">Ceiling Grid</h3>
-                    <div><label class="label" for="ceiling-grid-spacing">Spacing (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="ceiling-grid-spacing" min="0.05" max="2.0" value="0.50" step="0.05"><span id="ceiling-grid-spacing-val" class="data-value font-mono w-12 text-left">0.50m</span></div></div>
-                    <div><label class="label" for="ceiling-grid-offset">Height Offset (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="ceiling-grid-offset" min="-1.0" max="0" value="-0.2" step="0.1"><span id="ceiling-grid-offset-val" class="data-value font-mono w-12 text-left">-0.2m</span></div></div>
                 </div>
+                <div><label class="label" for="floor-grid-spacing">Spacing (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="floor-grid-spacing" min="0.05" max="2.0" value="0.50" step="0.05"><span id="floor-grid-spacing-val" class="data-value font-mono w-12 text-left">0.50m</span></div></div>
+                <div><label class="label" for="floor-grid-offset">Height Offset (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="floor-grid-offset" min="0" max="10" value="0.8" step="0.05"><span id="floor-grid-offset-val" class="data-value font-mono w-12 text-left">0.8m</span></div></div>
+            </div>
+            <div id="ceiling-grid-controls" class="hidden space-y-3 pt-4 border-t border-[--grid-color]">
+                <h3 class="font-semibold text-sm uppercase">Ceiling Grid</h3>
                 <div id="wall-grid-controls" class="hidden space-y-3 pt-4 border-t border-[--grid-color]">
                     <h3 class="font-semibold text-sm uppercase">Wall Grids</h3>
                     <div><label class="label" for="wall-grid-spacing">Spacing (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="wall-grid-spacing" min="0.05" max="2.0" value="0.50" step="0.05"><span id="wall-grid-spacing-val" class="data-value font-mono w-12 text-left">0.50m</span></div></div>
@@ -922,6 +934,11 @@
             </div>
             <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
         </div>
+
+
+
+
+
 
     <div id="panel-viewpoint" class="floating-window ui-panel hidden">
         <div class="window-header">
@@ -985,48 +1002,51 @@
                         <span id="view-pos-z-val" class="data-value font-mono w-12 text-left">1.4m</span>
                     </div>
                 </div>
-            </div>
-            <div class="border-t border-[--grid-color] pt-4 space-y-4">
-                <h3 class="font-bold text-xs uppercase text-[--text-secondary]">Target (vd)</h3>
-                <div>
-                    <label class="label text-xs">X</label>
-                    <div class="flex items-center space-x-4 mt-1">
-                        <input type="range" id="view-dir-x" min="0" max="20" value="1.7" step="0.1">
-                        <span id="view-dir-x-val" class="data-value font-mono w-12 text-left">1.7m</span>
-                    </div>
-                </div>
-                <div>
-                    <label class="label text-xs">Y (Height)</label>
-                    <div class="flex items-center space-x-4 mt-1">
-                        <input type="range" id="view-dir-y" min="0" max="10" value="1.2" step="0.1">
-                        <span id="view-dir-y-val" class="data-value font-mono w-12 text-left">1.2m</span>
-                    </div>
-                </div>
-                <div>
-                    <label class="label text-xs">Z</label>
-                    <div class="flex items-center space-x-4 mt-1">
-                        <input type="range" id="view-dir-z" min="0" max="20" value="2.0" step="0.1">
-                        <span id="view-dir-z-val" class="data-value font-mono w-12 text-left">2.0m</span>
-                    </div>
+        </div>
+        <div class="border-t border-[--grid-color] pt-4 space-y-4">
+            <h3 class="font-bold text-xs uppercase text-[--text-secondary]">Direction (vd)</h3>
+            <div>
+                <label class="label text-xs">X</label>
+                <div class="flex items-center space-x-4 mt-1">
+                    <input type="range" id="view-dir-x" min="-1" max="1" value="0.5" step="0.01">
+                    <span id="view-dir-x-val" class="data-value font-mono w-12 text-left">0.50</span>
                 </div>
             </div>
+            <div>
+                <label class="label text-xs">Y (Height)</label>
+                <div class="flex items-center space-x-4 mt-1">
+                    <input type="range" id="view-dir-y" min="-1" max="1" value="0" step="0.01">
+                    <span id="view-dir-y-val" class="data-value font-mono w-12 text-left">0.00</span>
+                </div>
+            </div>
+            <div>
+                <label class="label text-xs">Z</label>
+                <div class="flex items-center space-x-4 mt-1">
+                    <input type="range" id="view-dir-z" min="-1" max="1" value="0.5" step="0.01">
+                    <span id="view-dir-z-val" class="data-value font-mono w-12 text-left">0.50</span>
+                </div>
+            </div>
+        </div>
 
-            <div class="border-t border-[--grid-color] pt-4 space-y-4">
+        <div class="border-t border-[--grid-color] pt-4 space-y-4">
+            <div>
                 <div>
                     <label class="label mt-2">Field of View</label>
                     <div class="flex items-center space-x-4 mt-1">
                         <input type="range" id="view-fov" min="10" max="180" value="60" step="1">
-                        <span id="view-fov-val" class="data-value font-mono w-12 text-center">60°</span>
+                        <span id="view-fov-val" class="data-value font-mono w-12 text-center">30°</span>
                     </div>
                 </div>
                 <div>
                     <label class="label mt-2">View Distance</label>
                     <div class="flex items-center space-x-4 mt-1">
-                        <input type="range" id="view-dist" min="1" max="50" value="10" step="0.1">
-                        <span id="view-dist-val" class="data-value font-mono w-12 text-left">10.0m</span>
+                        <input type="range" id="view-dist" min="1" max="50" value="5" step="0.1">
+                        <span id="view-dist-val" class="data-value font-mono w-12 text-left">5.0m</span>
                     </div>
                 </div>
             </div>
+        </div>
+        </div>
         </div>
             <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
         </div>
@@ -1041,7 +1061,16 @@
             </div>
             <div class="window-content space-y-5">
                 <div><label class="label">3D Projection</label><div class="btn-group"><button id="proj-btn-persp" class="btn active">Perspective</button><button id="proj-btn-ortho" class="btn">Orthographic</button></div></div>
-                <div class="space-y-3 pt-4 border-t border-[--grid-color]"><label for="transparent-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="transparent-toggle" checked><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Transparent Surfaces</span></label></div>
+                <div class="space-y-3 pt-4 border-t border-[--grid-color]">
+                    <label for="transparent-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="transparent-toggle" checked><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Transparent Surfaces</span></label>
+                    <div id="transparency-controls" class="mt-4 pl-4">
+                        <label class="label text-xs" for="surface-opacity">Surface Opacity</label>
+                        <div class="flex items-center space-x-3 mt-1">
+                            <input type="range" id="surface-opacity" min="0.05" max="1.0" value="0.5" step="0.01">
+                            <span id="surface-opacity-val" class="data-value font-mono w-12 text-left">0.50</span>
+                        </div>
+                    </div>
+                </div>
                 <div class="space-y-3 pt-4 border-t border-[--grid-color]">
                     <label for="ground-plane-toggle" class="flex items-center cursor-pointer">
                         <input type="checkbox" id="ground-plane-toggle" checked>
