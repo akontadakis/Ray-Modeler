@@ -7,9 +7,8 @@ Ray Modeler is a web-based graphical user interface for the Radiance Lighting Si
 
 Designed for lighting designers, architects, and building science researchers, Ray Modeler provides an intuitive, interactive environment to model, simulate, and analyze lighting performance in single-zone spaces without needing to write Radiance code manually.
 
-| Welcome Screen |
-| :---: |
-| ![Ray Modeler Welcome Screen](/Users/a.kontadakis/Documents/Dev/Ray-Modeler/Pictures/welcome_screen.png) |
+| :---: | :---: |
+| ![Ray Modeler Welcome Screen](./Pictures/welcome_screen.png) | ![Ray Modeler Main UI](./Pictures/main_ui.jpg) |
 
 ## Table of Contents
 
@@ -151,9 +150,8 @@ OpenRouter provides access to a wide variety of models from different providers 
 
 The interface is designed around a logical workflow, guiding the user from setup to analysis.
 
-| Main Interface |
-| :---: |
-| ![Ray Modeler Main UI](/Users/a.kontadakis/Documents/Dev/Ray-Modeler/Pictures/main_ui.png) |
+| :---: | :---: |
+| ![Ray Modeler Welcome Screen](./Pictures/welcome_screen.png) | ![Ray Modeler Main UI](./Pictures/main_ui.jpg) |
 
 - **3D Viewport (Center)**: The main interactive area where the 3D scene is displayed. You can navigate the scene using standard orbit controls (mouse drag, scroll).
   
