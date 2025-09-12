@@ -19,6 +19,7 @@ export function getDom() { return dom; } // Export a getter function instead
 let updateScheduled = false;
 export let selectedWallId = null;
 let isWallSelectionLocked = false;
+const suggestionMemory = new Set(); // Prevents spamming suggestions during a session
 
 // --- START: Added state for Task Area Visualizer ---
 let taskAreaCtx, taskAreaCanvas;
@@ -942,7 +943,14 @@ export async function setupEventListeners() {
     dom['view-btn-left']?.addEventListener('click', () => setCameraView('left'));
     dom['view-btn-right']?.addEventListener('click', () => setCameraView('right'));
     dom['frame-toggle']?.addEventListener('change', () => { dom['frame-controls']?.classList.toggle('hidden', !dom['frame-toggle'].checked); scheduleUpdate(); });
-    dom['bsdf-toggle']?.addEventListener('change', () => { dom['bsdf-controls']?.classList.toggle('hidden', !dom['bsdf-toggle'].checked); });
+    dom['bsdf-toggle']?.addEventListener('change', async (e) => {
+        const isEnabled = e.target.checked;
+        dom['bsdf-controls']?.classList.toggle('hidden', !isEnabled);
+        if (isEnabled) {
+            const { triggerProactiveSuggestion } = await import('./ai-assistant.js');
+            triggerProactiveSuggestion('bsdf_enabled');
+        }
+    });
     dom['gizmo-toggle']?.addEventListener('change', updateGizmoVisibility);
     dom['illuminance-grid-toggle']?.addEventListener('change', (e) => { dom['illuminance-grid-controls'].classList.toggle('hidden', !e.target.checked); scheduleUpdate(); });
     dom['view-grid-toggle']?.addEventListener('change', async (e) => {
@@ -961,7 +969,7 @@ export async function setupEventListeners() {
     dom['grid-west-toggle']?.addEventListener('change', updateGridControls);
 
     // Listeners for EN 12464-1 grid controls
-    dom['task-area-toggle']?.addEventListener('change', (e) => {
+    dom['task-area-toggle']?.addEventListener('change', async (e) => {
         const isEnabled = e.target.checked;
         dom['task-area-controls']?.classList.toggle('hidden', !isEnabled);
         // A surrounding area is only logical if a task area is defined.
@@ -972,6 +980,11 @@ export async function setupEventListeners() {
             dom['surrounding-area-toggle'].dispatchEvent(new Event('change'));
         }
         scheduleUpdate();
+
+        if (isEnabled) {
+            const { triggerProactiveSuggestion } = await import('./ai-assistant.js');
+            triggerProactiveSuggestion('task_area_enabled');
+        }
     });
     dom['surrounding-area-toggle']?.addEventListener('change', (e) => {
         dom['surrounding-area-controls']?.classList.toggle('hidden', !e.target.checked);
@@ -1859,8 +1872,12 @@ function setupEpwUploadModal() {
                     }
                     modal.classList.replace('flex', 'hidden');
                     // START: Dispatch custom event
-                    // This allows other modules to know that a new EPW has been loaded
+                   // This allows other modules to know that a new EPW has been loaded
                     dom['upload-epw-btn'].dispatchEvent(new CustomEvent('epwLoaded'));
+
+                    // Trigger proactive suggestion for annual analysis
+                    const { triggerProactiveSuggestion } = await import('./ai-assistant.js');
+                    triggerProactiveSuggestion('epw_loaded');
 
                     if (dom['location-inputs-container']) dom['location-inputs-container'].style.display = 'block';
                     
@@ -1940,7 +1957,18 @@ function handleInputChange(e) {
     if (id.startsWith('view-pos-') || id.startsWith('view-dir-') || id === 'view-fov' || id === 'view-dist') {
         updateViewpointFromSliders();
     }
- 
+
+    // Check for unrealistic reflectance values, but only suggest once per session.
+    if (id.includes('-refl') && !suggestionMemory.has('unrealistic_reflectance')) {
+        const numVal = parseFloat(val);
+        if (numVal < 0.1 || numVal > 0.85) {
+            import('./ai-assistant.js').then(({ triggerProactiveSuggestion }) => {
+                triggerProactiveSuggestion('unrealistic_reflectance');
+            });
+            suggestionMemory.add('unrealistic_reflectance'); // Remember we've shown this
+        }
+    }
+
     debouncedScheduleUpdate(id);
 }
 
@@ -2409,15 +2437,21 @@ function updateGridControls() {
     scheduleUpdate();
 }
 
-export function handleShadingTypeChange(dir, triggerUpdate = true) {
+export async function handleShadingTypeChange(dir, triggerUpdate = true) {
     const type = dom[`shading-type-${dir}`]?.value;
     if (type === undefined) return;
     ['overhang', 'lightshelf', 'louver', 'roller'].forEach(t => {
-    const controlEl = dom[`shading-controls-${t}-${dir}`];
-    if (controlEl) controlEl.classList.toggle('hidden', type !== t);
+        const controlEl = dom[`shading-controls-${t}-${dir}`];
+        if (controlEl) controlEl.classList.toggle('hidden', type !== t);
     });
-    if(scene && triggerUpdate) {
-       scheduleUpdate('shading-type');
+
+    if (type === 'louver') {
+        const { triggerProactiveSuggestion } = await import('./ai-assistant.js');
+        triggerProactiveSuggestion('louver_shading_enabled');
+    }
+
+    if (scene && triggerUpdate) {
+        scheduleUpdate('shading-type');
     }
 }
 
@@ -3689,6 +3723,12 @@ export function displayProactiveSuggestion(htmlContent) {
                         break;
                     case 'open_glare_rose':
                         openGlareRoseDiagram();
+                        break;
+                    case 'set_view_fisheye':
+                        if (dom['view-type']) {
+                            dom['view-type'].value = 'h'; // 'h' is standard fisheye
+                            dom['view-type'].dispatchEvent(new Event('change', { bubbles: true }));
+                        }
                         break;
                 }
             }

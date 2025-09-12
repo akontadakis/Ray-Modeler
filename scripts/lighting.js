@@ -408,7 +408,18 @@ async _addDomEventListeners(panel) {
         this.dom['ies-file-input']?.addEventListener('change', (e) => this._handleIesFileChange(e));
 
         // --- Daylighting Controls Listeners ---
-        this.dom['daylighting-enabled-toggle']?.addEventListener('change', () => this._toggleDaylightingControls());
+        this.dom['daylighting-enabled-toggle']?.addEventListener('change', async () => {
+            const isEnabled = this.dom['daylighting-enabled-toggle'].checked;
+            this._toggleDaylightingControls();
+            if (isEnabled) {
+                try {
+                    const { triggerProactiveSuggestion } = await import('./ai-assistant.js');
+                    triggerProactiveSuggestion('daylighting_controls_enabled');
+                } catch (err) {
+                    console.error("Failed to trigger proactive suggestion:", err);
+                }
+            }
+        });
         this.dom['daylighting-control-type']?.addEventListener('change', () => this._toggleDaylightControlTypeParams());
         this.dom['daylighting-availability-schedule']?.addEventListener('change', async (e) => {
             const file = e.target.files[0];
@@ -451,9 +462,14 @@ async _addDomEventListeners(panel) {
               content: fileContent
           };
           this._parseAndDrawIesPhotometry(fileContent);
-          viewer?.classList.remove('hidden');
-      } catch (error) {
-          console.error("Error processing IES file:", error);
+            viewer?.classList.remove('hidden');
+
+            // Trigger proactive suggestion
+            import('./ai-assistant.js').then(({ triggerProactiveSuggestion }) => {
+                triggerProactiveSuggestion('ies_file_loaded');
+            });
+        } catch (error) {
+            console.error("Error processing IES file:", error);
           viewer?.classList.add('hidden');
           this.iesFileData = null;
           this._setFileDisplayName('ies-file-input', `Error: ${file.name}`);

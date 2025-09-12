@@ -1,8 +1,7 @@
 // scripts/simulation.js
 
-import { showAlert, makeDraggable, makeResizable, ensureWindowInView, getNewZIndex, setupFileListenersForPanel, initializePanelControls } from './ui.js';
+import { showAlert, makeDraggable, makeResizable, ensureWindowInView, getNewZIndex, setupFileListenersForPanel, initializePanelControls, getDom } from './ui.js';
 import { project } from './project.js'; // Import project to access its state
-
 
 // --- MODULE-LEVEL VARIABLES ---
 let panelCounter = 0;
@@ -106,11 +105,9 @@ export function recreateSimulationPanels(simSettings, loadedFiles, ui) {
  * @param {string} templateId - The full template ID of the recipe panel.
  * @returns {HTMLElement|null} The panel element if found, otherwise null.
  */
-export function openRecipePanelByType(templateId) {
+export async function openRecipePanelByType(templateId) {
     const moduleList = document.getElementById('simulation-module-list');
     const button = moduleList?.querySelector(`[data-template="${templateId}"]`);
-    const panelContainer = document.getElementById('window-container');
-    let panel = panelContainer.querySelector(`.floating-window[data-template-id="${templateId}"]`);
 
     if (!button) {
         console.error(`Button for template ${templateId} not found.`);
@@ -129,6 +126,16 @@ export function openRecipePanelByType(templateId) {
     if(panel) {
         panel.style.zIndex = getNewZIndex();
         ensureWindowInView(panel);
+
+        // --- Proactive Suggestions on Panel Open ---
+        if (templateId === 'template-recipe-dgp') {
+            const dom = getDom();
+            const currentViewType = dom['view-type']?.value;
+            if (currentViewType !== 'h' && currentViewType !== 'a') {
+                const { triggerProactiveSuggestion } = await import('./ai-assistant.js');
+                triggerProactiveSuggestion('dgp_recipe_bad_viewpoint');
+            }
+        }
     }
 
     return panel;
@@ -218,12 +225,23 @@ function _createSimulationPanel(templateId, button) {
     clone.style.left = `calc(50vw - 200px + ${(openWindows % 5) * 20}px)`;
     clone.style.transform = 'none';
 
-    document.getElementById('window-container').appendChild(clone);
+   document.getElementById('window-container').appendChild(clone);
+
+    // Add specific listeners for certain panels upon creation
+    if (templateId === 'template-global-sim-params') {
+        const abInput = clone.querySelector('[id^="ab-num-"]');
+        abInput?.addEventListener('change', (e) => {
+            if (parseInt(e.target.value, 10) < 2) {
+                import('./ai-assistant.js').then(({ triggerProactiveSuggestion }) => {
+                    triggerProactiveSuggestion('low_ambient_bounces');
+                });
+            }
+        });
+    }
 
     initializePanelControls(clone);
     _initializePanelLogic(clone);
     setupFileListenersForPanel(clone);
-    ensureWindowInView(clone);
 
     if (button) {
         button.innerHTML = '−';
