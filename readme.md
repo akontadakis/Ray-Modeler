@@ -93,15 +93,37 @@ Because the application is not yet code-signed, your operating system will likel
 
 The AI Assistant panel provides a chat interface to help you with your workflow. It understands the application's current state and can perform actions on your behalf using natural language commands.
 
-- **Context-Aware Chat**: Ask questions about Radiance, lighting concepts, or your current project setup. The AI analyzes your scene's parameters to provide tailored advice.
+- **AI-Powered Actions (Tool Use)**: Beyond answering questions, the assistant can directly manipulate the UI and query project data. This allows for a powerful natural language workflow. Its capabilities include:
 
-- **AI-Powered Actions (Tool Use)**: Beyond answering questions, the assistant can directly manipulate the UI. Ask it to change settings, run simulations, or analyze results.
+  - **Project Validation**: Ask it to `"validate my project for an annual glare simulation"` and it will check for common setup errors, such as a missing weather file or an incorrect viewpoint type, and report back any issues.
 
-- **Scene & Project Management**: Modify nearly any parameter in the scene. Ask it to `"Change the room width to 5 meters"`, `"set the wall reflectance to 0.6"` or `"save the project"`..
+  - **Advanced Scene Manipulation**:
+    - **Shading**: `"Add a 0.5 meter deep overhang to the south wall."`
+    - **Sensor Grids**: `"Enable a sensor grid on the floor with 0.75m spacing."`
+    - **Daylighting**: `"Enable continuous daylighting controls with a setpoint of 500 lux."`
+  
+  - **Simulation & Recipe Control**:
+    - **Global Parameters**: `"Set the global ambient bounces to 5."`
+    - **Recipe Configuration**: `"In the open illuminance recipe, change the time to 9:00 AM."`
 
-- **Simulation Control**: Control the entire simulation workflow. You can instruct it to `"Open the illuminance recipe"`, `"run the rendering simulation"`, `"show me the average illuminance"`.
+  - **Results Analysis & Data Query**:
+    - **Data Query**: `"What is the average illuminance for the current results?"` or `"How many points are above 500 lux?"`
+    - **Time Scrubbing**: `"Show me the results for the winter solstice at noon."`
+    - **Dashboard Control**: `"Open the glare rose diagram."`
+  
+  - **File Management**:
+    - **Load Results**: `"Load a results file into dataset A."`
+    - **Clear Results**: `"Clear all loaded results data."`
 
-- **3D Viewport & UI Control**: Manipulate the interface and visualization. For example: `"change the view to 'top',"` `"move the viewpoint camera to the center of the room,"` `"highlight the sensor with the maximum value,"` or `"close the dimensions panel"`.
+- **Proactive Suggestions**: The AI Assistant monitors user actions and provides contextual, non-intrusive suggestions to guide the workflow and prevent common errors. These suggestions appear as dismissible chips in the UI. For example:
+
+  - After loading an **EPW weather file**, it will suggest opening an annual simulation recipe.
+
+  - If a material's **reflectance is set to an unusually high or low value**, it will warn that this may be physically unrealistic.
+
+  - If the user enables a **View Grid**, it will suggest opening the Imageless Annual Glare recipe.
+
+  - If the **DGP recipe is open but the viewpoint is not set to fisheye**, it will offer to correct the setting.
 
 ### API Key Configuration
 
@@ -209,6 +231,18 @@ The panels on the left toolbar are used to define the scene.
   
   - *Daylighting Controls*: Define a daylighting sensor with a specific position and direction, and set control parameters (setpoint, continuous/stepped dimming, etc.) for energy simulations.
 
+  - *Interactive IES Photometry Viewer*: When an `.ies` file is loaded, the application parses the photometric data and generates an interactive 2D polar plot directly in the lighting panel. This visualization shows the luminaire's light distribution curve and key data like total lumens and maximum candela, providing immediate feedback on the selected file.
+
+  - *Detailed Daylighting Controls*: Beyond simple activation, the daylighting control system can be configured with multiple photosensors. Each sensor has a specific 3D position, direction vector, and can be set to control a specific percentage of the luminaires in the space. Advanced parameters from Radiance's `gendaylit` are exposed in the UI, including:
+    - **Control Strategy**: `Continuous`, `Stepped`, or `Continuous/Off`.
+    - **Dimming Curve**: Minimum power fraction and minimum light output fraction for continuous dimming systems.
+    - **Stepped Dimming**: The number of steps for stepped control systems.
+    - **Availability Schedule**: An optional `.csv` schedule file can be provided to define when the daylighting system is active.
+
+- *EN 12464-1 Luminaire Specification*: To support lighting for workplaces compliance, each light source can be defined with a **Maintenance Factor (MF)**, **Color Rendering Index ($R_a$)**, and **Correlated Color Temperature (TCP)**.
+
+- *Enhanced 3D Gizmos*: To aid in placement, all light sources are visualized with a direction arrow helper indicating their orientation. Spotlights are further enhanced with a wireframe cone that visualizes their cone angle and beam spread.
+
 - **Material Properties**: Define the surface characteristics of the room.
 
   - *Surface Selection*: Tabs for Walls, Floor, Ceiling, Frames, and Shading devices.
@@ -226,7 +260,9 @@ The panels on the left toolbar are used to define the scene.
   - *Illuminance Grid*: Generates a grid of points on any selected surface (walls, floor, ceiling) with a defined spacing and offset. These points are used for illuminance map and annual daylight simulations.
   
   - *View Grid*: Generates a grid of points on a horizontal plane, with multiple view directions at each point. This is used for imageless annual glare analysis.
-  
+
+  - *Interactive Task & Surrounding Area Definition*: For EN 12464-1 compliance workflows, the UI includes a dedicated section to define a specific **Task Area** on the floor grid. This is managed through an interactive 2D canvas that provides a top-down view of the room, where the task area can be dragged and resized. The corresponding sliders for start position, width, and depth are updated in real-time. A **Surrounding Area** band can also be automatically generated around the defined task area.
+
   - *3D Visualization*: Both grid types can be toggled for visibility in the 3D viewport.
 
 - **Viewpoint**: Controls the specific camera view used by Radiance for generating renderings (`rpict`) and glare images (`evalglare`).
@@ -244,6 +280,12 @@ The panels on the left toolbar are used to define the scene.
   - *Section Cuts*: Enable horizontal or vertical clipping planes to create live section views of the interior.
   
   - *Live Preview*: When a section cut is active, you can render a real-time preview of that view using the loaded weather data (Electron version only).
+
+- **UI Theming**: The application includes multiple UI themes (Light, Dark, Cyber) that can be cycled through. The selected theme affects all UI panels, the 3D viewport background, and the map tiles for a consistent user experience.
+
+- **3D Glare Source Projection**: When viewing an `evalglare` report in the analysis panel, each detected glare source is listed. Clicking on a source in the list will project a ray from the camera's position into the 3D scene to identify and highlight the object that caused the glare, providing an intuitive way to verify results.
+
+- **Sensor Point Context Menu**: Right-clicking on any sensor point in the 3D view (when results are loaded) opens a context menu. This menu provides an option to instantly move the Radiance **Viewpoint** camera to that exact sensor's location, making it easy to investigate specific areas of interest.
 
 ### 📜 Simulation Modules (Recipes)
 
