@@ -947,16 +947,9 @@ export function updateDaylightingSensorVisuals() {
     sensorContainer.position.set(-W / 2, 0, -L / 2);
     daylightingSensorsGroup.add(sensorContainer);
 
-    const sensorDef = {
-        x: parseFloat(dom['daylight-sensor1-x']?.value),
-        y: parseFloat(dom['daylight-sensor1-y']?.value),
-        z: parseFloat(dom['daylight-sensor1-z']?.value)
-    };
-
-    if (isNaN(sensorDef.x) || isNaN(sensorDef.y) || isNaN(sensorDef.z)) return;
-
-    const geometry = new THREE.BoxGeometry(0.12, 0.04, 0.12);
+    const sensorCount = parseInt(dom['daylight-sensor-count']?.value, 10) || 1;
     const sensorColor = getComputedStyle(document.documentElement).getPropertyValue('--daylighting-sensor-color').trim();
+    const geometry = new THREE.BoxGeometry(0.12, 0.04, 0.12);
     const material = new THREE.MeshStandardMaterial({
         color: new THREE.Color(sensorColor),
         emissive: new THREE.Color(sensorColor),
@@ -965,35 +958,45 @@ export function updateDaylightingSensorVisuals() {
         roughness: 0.1
     });
 
-    const sensorGroup = new THREE.Group();
-    sensorGroup.name = 'daylightingSensor1'; // Name for easy selection
-    const sensorBox = new THREE.Mesh(geometry, material);
-    sensorGroup.add(sensorBox);
+    for (let i = 1; i <= sensorCount; i++) {
+        const sensorDef = {
+            x: parseFloat(dom[`daylight-sensor${i}-x`]?.value),
+            y: parseFloat(dom[`daylight-sensor${i}-y`]?.value),
+            z: parseFloat(dom[`daylight-sensor${i}-z`]?.value)
+        };
 
-    // Add direction arrow
-    const dir = {
-        x: parseFloat(dom['daylight-sensor1-dir-x']?.value || 0),
-        y: parseFloat(dom['daylight-sensor1-dir-y']?.value || 1),
-        z: parseFloat(dom['daylight-sensor1-dir-z']?.value || 0)
-    };
-    const directionVec = new THREE.Vector3(dir.x, dir.y, dir.z).normalize();
-    const arrowHelper = new THREE.ArrowHelper(directionVec, new THREE.Vector3(0, 0, 0), 0.4, 0xffff00);
-    sensorGroup.add(arrowHelper);
+        if (isNaN(sensorDef.x) || isNaN(sensorDef.y) || isNaN(sensorDef.z)) continue;
 
-    sensorGroup.position.set(sensorDef.x, sensorDef.y, sensorDef.z);
-    sensorContainer.add(sensorGroup);
-    daylightingSensorMeshes.push(sensorGroup);
+        const sensorGroup = new THREE.Group();
+        sensorGroup.name = `daylightingSensor${i}`;
+        const sensorBox = new THREE.Mesh(geometry, material.clone());
+        sensorGroup.add(sensorBox);
 
-    // Attach or detach the gizmo based on the toggle's state. This is now the single source of truth.
-    if (dom['daylight-sensor-gizmo-toggle']?.checked) {
+        const dir = {
+            x: parseFloat(dom[`daylight-sensor${i}-dir-x`]?.value || 0),
+            y: parseFloat(dom[`daylight-sensor${i}-dir-y`]?.value || 1),
+            z: parseFloat(dom[`daylight-sensor${i}-dir-z`]?.value || 0)
+        };
+        const directionVec = new THREE.Vector3(dir.x, dir.y, dir.z).normalize();
+        const arrowHelper = new THREE.ArrowHelper(directionVec, new THREE.Vector3(0, 0, 0), 0.4, 0xffff00);
+        sensorGroup.add(arrowHelper);
+
+        sensorGroup.position.set(sensorDef.x, sensorDef.y, sensorDef.z);
+        sensorContainer.add(sensorGroup);
+        daylightingSensorMeshes.push(sensorGroup);
+    }
+
+
+    // Attach or detach the gizmo based on the toggle's state.
+    // For simplicity, the gizmo will always control the *first* sensor.
+    if (dom['daylight-sensor-gizmo-toggle']?.checked && daylightingSensorMeshes.length > 0) {
         if (sensorTransformControls) {
-            sensorTransformControls.attach(sensorGroup);
+            sensorTransformControls.attach(daylightingSensorMeshes[0]);
             sensorTransformControls.visible = true;
             sensorTransformControls.enabled = true;
         }
     } else {
         if (sensorTransformControls) {
-            // Detach might not be strictly necessary if it was already detached, but it's safe.
             sensorTransformControls.detach();
             sensorTransformControls.visible = false;
             sensorTransformControls.enabled = false;

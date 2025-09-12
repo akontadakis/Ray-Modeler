@@ -296,7 +296,7 @@ const ids = [
     'floor-grid-offset', 'floor-grid-offset-val', 'ceiling-grid-spacing', 'ceiling-grid-spacing-val',
     'ceiling-grid-offset', 'ceiling-grid-offset-val', 'wall-grid-spacing', 'wall-grid-spacing-val',
     'wall-grid-offset', 'wall-grid-offset-val','show-floor-grid-3d-toggle',
-    
+
     // EN 12464-1 Task/Surrounding Grids
     'task-area-toggle', 'task-area-controls',
     'task-area-visualizer-container', 'task-area-canvas',
@@ -352,10 +352,19 @@ const ids = [
     'daylight-sensor1-y', 'daylight-sensor1-y-val',
     'daylight-sensor1-z', 'daylight-sensor1-z-val',
     'daylight-sensor-gizmo-toggle',
-    'daylight-sensor1-dir-x', 'daylight-sensor1-dir-x-val',
     'daylight-sensor1-dir-y', 'daylight-sensor1-dir-y-val',
     'daylight-sensor1-dir-z', 'daylight-sensor1-dir-z-val',
     'daylight-sensor1-percent', 'daylight-sensor1-percent-val',
+    'daylight-sensor2-x', 'daylight-sensor2-x-val',
+    'daylight-sensor2-y', 'daylight-sensor2-y-val',
+    'daylight-sensor2-z', 'daylight-sensor2-z-val',
+    'daylight-sensor2-dir-x', 'daylight-sensor2-dir-x-val',
+    'daylight-sensor2-dir-y', 'daylight-sensor2-dir-y-val',
+    'daylight-sensor2-dir-z', 'daylight-sensor2-dir-z-val',
+    'daylight-sensor2-percent', 'daylight-sensor2-percent-val',
+
+    // EN 12464-1 Specific
+    'maintenance-factor', 'maintenance-factor-val',
 
     // Results Panel
     'results-file-input-a', 'results-file-name-a', 'compare-mode-toggle', 'comparison-file-loader',
@@ -607,6 +616,52 @@ function updateFovControlsForViewType(viewType) {
 */
 function updateGizmoVisibility() {
     setGizmoVisibility(dom['gizmo-toggle'].checked);
+}
+
+/**
+* Toggles the UI for single vs. dual daylighting sensor setups.
+* @private
+*/
+function _toggleSensorCountControls() {
+    const count = parseInt(dom['daylight-sensor-count'].value, 10);
+    const header = dom['daylight-sensor-placement-header'];
+    const sensor2Controls = dom['daylight-sensor-2-controls'];
+    const percent1Slider = dom['daylight-sensor1-percent'];
+
+    if (count === 2) {
+        header.textContent = 'Control Sensor Placement (Reference Point)';
+        sensor2Controls.classList.remove('hidden');
+        percent1Slider.disabled = false;
+        // Set a sensible default if switching to 2 sensors
+        percent1Slider.value = 0.5;
+    } else { // count is 1
+        header.textContent = 'Control Sensor Placement';
+        sensor2Controls.classList.add('hidden');
+        percent1Slider.disabled = true;
+        percent1Slider.value = 1.0; // Force to 100% control
+    }
+    updateAllLabels();
+    scheduleUpdate('daylight-sensor-count');
+}
+
+/**
+* Enforces that the sum of the two sensor control fraction sliders does not exceed 1.0.
+* @param {Event} event - The input event from one of the sliders.
+* @private
+*/
+function _handleFractionSliders(event) {
+    const slider1 = dom['daylight-sensor1-percent'];
+    const slider2 = dom['daylight-sensor2-percent'];
+    const changedSlider = event.target;
+    const otherSlider = (changedSlider === slider1) ? slider2 : slider1;
+
+    let val1 = parseFloat(slider1.value);
+    let val2 = parseFloat(slider2.value);
+
+    if (val1 + val2 > 1.0) {
+        otherSlider.value = 1.0 - parseFloat(changedSlider.value);
+    }
+    updateAllLabels();
 }
 
 // --- START: New functions for Task Area Visualizer ---
@@ -1291,6 +1346,11 @@ function render2DHeatmap() {
     // The event handler now just triggers a scene update. The logic is consolidated in geometry.js.
     dom['daylight-sensor-gizmo-toggle']?.addEventListener('change', () => scheduleUpdate());
 
+    // --- Daylighting Sensor Count and Fraction Listeners ---
+    dom['daylight-sensor-count']?.addEventListener('change', _toggleSensorCountControls);
+    dom['daylight-sensor1-percent']?.addEventListener('input', _handleFractionSliders);
+    dom['daylight-sensor2-percent']?.addEventListener('input', _handleFractionSliders);
+
     promptForProjectDirectory();
 
     // Defer initial state settings until the 3D scene is fully initialized.
@@ -1894,7 +1954,7 @@ const FORMATTING_RULES = [
     { test: (id, unit) => unit === '°', format: (num) => `${Math.round(num)}°` },
     { test: (id) => id.includes('sunpath-scale') || id.includes('world-axes-size'), format: (num) => `${num.toFixed(1)}x` },
     { test: (id) => id.includes('sunpath-compass-thick'), format: (num) => `${num.toFixed(1)}px` },
-    { test: (id) => id.includes('refl') || id.includes('spec') || id.includes('trans') || id.includes('rough') || id.startsWith('view-dir'), format: (num) => num.toFixed(2) },
+    { test: (id) => id.includes('refl') || id.includes('spec') || id.includes('trans') || id.includes('rough') || id.startsWith('view-dir') || id.includes('-percent'), format: (num) => num.toFixed(2) },
     { test: (id) => id.includes('thick') || id.includes('sep'), format: (num) => `${num.toFixed(3)}m` },
     { test: (id) => id.includes('spacing') || id.includes('offset') || id.includes('dist') || id.includes('depth'), format: (num) => `${num.toFixed(2)}m` },
     { test: (id, unit) => unit === 'm', format: (num) => `${num.toFixed(1)}m` }
@@ -1933,7 +1993,7 @@ export function updateAllLabels() {
         if (el && valEl && (el.tagName === 'INPUT' || el.tagName === 'SELECT')) {
             const val = el.value;
             let unit = '';
-            if (id.includes('width') || id.includes('length') || id.includes('height') || id.includes('dist') || id.includes('thick') || id.includes('depth') || id.includes('extension') || id.includes('sep') || id.includes('offset') || id.includes('spacing') || id.startsWith('view-pos')) unit = 'm';
+            if ((id.includes('width') || id.includes('length') || id.includes('height') || id.includes('dist') || id.includes('thick') || id.includes('depth') || id.includes('extension') || id.includes('sep') || id.includes('offset') || id.includes('spacing') || id.startsWith('view-pos') || id.startsWith('daylight-sensor')) && !id.includes('-percent')) unit = 'm';
             else if (id.startsWith('wwr-') && !id.includes('sill')) unit = '%';
             else if (id.includes('fov') || id.includes('orientation') || id.includes('tilt') || id.includes('angle')) unit = '°';
             updateValueLabel(valEl, val, unit, id);
@@ -1966,9 +2026,11 @@ export function validateInputs(changedId = null) {
     });
 
     // Set constraints for Daylighting Sensor sliders
-    if (dom['daylight-sensor1-x']) dom['daylight-sensor1-x'].max = W;
-    if (dom['daylight-sensor1-z']) dom['daylight-sensor1-z'].max = L;
-    if (dom['daylight-sensor1-y']) dom['daylight-sensor1-y'].max = H;
+    for (let i = 1; i <= 2; i++) {
+        if (dom[`daylight-sensor${i}-x`]) dom[`daylight-sensor${i}-x`].max = W;
+        if (dom[`daylight-sensor${i}-z`]) dom[`daylight-sensor${i}-z`].max = L;
+        if (dom[`daylight-sensor${i}-y`]) dom[`daylight-sensor${i}-y`].max = H;
+    }
 
     // Constrain Task Area to be within room dimensions
     if (dom['task-area-toggle']?.checked) {

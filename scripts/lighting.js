@@ -235,16 +235,22 @@ class LightingManager {
         }
 
         // Handle dynamic elements like sensors and file inputs
-        state.daylighting?.sensors?.forEach((sensor, index) => {
-            const i = index + 1;
-            this._setUIValue(`daylight-sensor${i}-x`, sensor.x);
-            this._setUIValue(`daylight-sensor${i}-y`, sensor.y);
-            this._setUIValue(`daylight-sensor${i}-z`, sensor.z);
-            this._setUIValue(`daylight-sensor${i}-dir-x`, sensor.direction?.x);
-            this._setUIValue(`daylight-sensor${i}-dir-y`, sensor.direction?.y);
-            this._setUIValue(`daylight-sensor${i}-dir-z`, sensor.direction?.z);
-        });
-        
+        if (state.daylighting?.sensors) {
+            const sensorCount = state.daylighting.sensors.length;
+            this._setUIValue('daylight-sensor-count', sensorCount);
+
+            state.daylighting.sensors.forEach((sensor, index) => {
+                const i = index + 1;
+                this._setUIValue(`daylight-sensor${i}-x`, sensor.x);
+                this._setUIValue(`daylight-sensor${i}-y`, sensor.y);
+                this._setUIValue(`daylight-sensor${i}-z`, sensor.z);
+                this._setUIValue(`daylight-sensor${i}-dir-x`, sensor.direction?.x);
+                this._setUIValue(`daylight-sensor${i}-dir-y`, sensor.direction?.y);
+                this._setUIValue(`daylight-sensor${i}-dir-z`, sensor.direction?.z);
+                this._setUIValue(`daylight-sensor${i}-percent`, sensor.percentControlled);
+            });
+        }
+
         this._setFileDisplayName('daylighting-availability-schedule', state.daylighting?.scheduleFile?.name);
 
         // Update UI visibility
@@ -265,6 +271,8 @@ class LightingManager {
         def.daylighting = { enabled: isEnabled };
         if (!isEnabled) return;
 
+        const sensorCount = parseInt(this.dom['daylight-sensor-count']?.value, 10) || 1;
+
         Object.assign(def.daylighting, {
             controlType: this.dom['daylighting-control-type'].value,
             setpoint: parseFloat(this.dom['daylighting-setpoint'].value),
@@ -273,20 +281,19 @@ class LightingManager {
             nSteps: parseInt(this.dom['daylighting-steps'].value, 10),
             sensors: [],
         });
-        
-        // This loop is now scalable and will gather data for as many sensors as it finds in the DOM.
-        let i = 1;
-        while (this.dom[`daylight-sensor${i}-x`]) { // Loop until a sensor's DOM element is not found
+
+        // Loop based on the selected sensor count
+        for (let i = 1; i <= sensorCount; i++) {
             def.daylighting.sensors.push({
                 x: parseFloat(this.dom[`daylight-sensor${i}-x`].value),
                 y: parseFloat(this.dom[`daylight-sensor${i}-y`].value),
                 z: parseFloat(this.dom[`daylight-sensor${i}-z`].value),
                 direction: {
-                x: parseFloat(this.dom[`daylight-sensor${i}-dir-x`].value),
-                y: parseFloat(this.dom[`daylight-sensor${i}-dir-y`].value),
-                z: parseFloat(this.dom[`daylight-sensor${i}-dir-z`].value)
+                    x: parseFloat(this.dom[`daylight-sensor${i}-dir-x`].value),
+                    y: parseFloat(this.dom[`daylight-sensor${i}-dir-y`].value),
+                    z: parseFloat(this.dom[`daylight-sensor${i}-dir-z`].value)
                 },
-                percentControlled: 100, // Placeholder for future UI control
+                percentControlled: parseFloat(this.dom[`daylight-sensor${i}-percent`].value),
             });
         }
     }
