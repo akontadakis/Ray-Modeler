@@ -1,36 +1,38 @@
 # Ray Modeler △
 
 > **Editor's Note:** This is a passion project that I've been developing for the past year, primarily as a learning exercise. It is not intended for commercial use but rather as a tool to help others explore, learn, and understand Radiance simulations and how they can improve building design.
-
 > Please consider this a **beta version**. The intent is to improve it over time, but many features have not been extensively tested. If you run into a bug, your feedback would be greatly appreciated!
 
 Ray Modeler is a web-based graphical user interface for the Radiance Lighting Simulation Suite. It streamlines the entire daylighting and electric lighting analysis workflow, from parametric 3D modeling to simulation script generation and advanced results visualization.
 
 Designed for lighting designers, architects, and building science researchers, Ray Modeler provides an intuitive, interactive environment to model, simulate, and analyze lighting performance in single-zone spaces without needing to write Radiance code manually.
 
+| Welcome Screen |
+| :---: |
+| ![Ray Modeler Welcome Screen](/Users/a.kontadakis/Documents/Dev/Ray-Modeler/Pictures/welcome_screen.png) |
+
 ## Table of Contents
 
-- ✨ Core Capabilities
-
-- 🚀 Getting Started
-
-- 🤖 AI Assistant
-
-- 💻 UI Walkthrough
-
-- 📖 In-Depth Feature Guide
-
-- 📋 Scene Definition Panels
-
-- 📜 Simulation Recipes
-
-- 📊 Analysis Modules
-
-- 🛠️ For Developers: Building from Source
-
-- 🔧 Technology Stack
-
-- 📄 License
+- [Ray Modeler △](#ray-modeler-)
+  - [Table of Contents](#table-of-contents)
+  - [✨ Core Capabilities](#-core-capabilities)
+  - [🚀 Getting Started](#-getting-started)
+  - [🤖 AI Assistant](#-ai-assistant)
+    - [API Key Configuration](#api-key-configuration)
+    - [Getting Your API Key](#getting-your-api-key)
+  - [UI Walkthrough 💻](#ui-walkthrough-)
+  - [📖 In-Depth Feature Guide](#-in-depth-feature-guide)
+    - [📋 Scene Definition Panels](#-scene-definition-panels)
+    - [📜 Simulation Modules (Recipes)](#-simulation-modules-recipes)
+  - [Analysis Modules 📊](#analysis-modules-)
+    - [Desktop Integration (Electron)](#desktop-integration-electron)
+  - [🛠️ For Developers: Building from Source](#️-for-developers-building-from-source)
+    - [Prerequisites](#prerequisites)
+    - [Build for macOS 🍎](#build-for-macos-)
+    - [Build for Windows 💻](#build-for-windows-)
+    - [Cross-Platform Building](#cross-platform-building)
+  - [🛠️ Technology Stack](#️-technology-stack)
+  - [License 📄](#license-)
 
 ## ✨ Core Capabilities
 
@@ -148,6 +150,10 @@ OpenRouter provides access to a wide variety of models from different providers 
 ## UI Walkthrough 💻
 
 The interface is designed around a logical workflow, guiding the user from setup to analysis.
+
+| Main Interface |
+| :---: |
+| ![Ray Modeler Main UI](/Users/a.kontadakis/Documents/Dev/Ray-Modeler/Pictures/main_ui.png) |
 
 - **3D Viewport (Center)**: The main interactive area where the 3D scene is displayed. You can navigate the scene using standard orbit controls (mouse drag, scroll).
   
