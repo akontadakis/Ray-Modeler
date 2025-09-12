@@ -204,6 +204,7 @@ class LightingManager {
             'maintenance-factor': state.maintenance_factor,
             'light-source-ra': state.ra,
             'light-source-tcp': state.tcp,
+            'luminaire-wattage': state.luminaire_wattage,
 
             'daylighting-enabled-toggle': { value: state.daylighting?.enabled, type: 'checked' },
             'daylighting-control-type': state.daylighting?.controlType,
@@ -709,6 +710,7 @@ async _addDomEventListeners(panel) {
             maintenance_factor: parseFloat(this.dom['maintenance-factor']?.value),
             ra: this.dom['light-source-ra']?.value,
             tcp: this.dom['light-source-tcp']?.value,
+            luminaire_wattage: parseFloat(this.dom['luminaire-wattage']?.value || 0),
         };
     }
     

@@ -327,6 +327,39 @@ Each recipe in the Simulation Sidebar automates a specific Radiance workflow by 
   
   - The UGR recipe uses evalglare to calculate the Unified Glare Rating from the observer's viewpoint.
 
+- **Lighting Energy Analysis**: Extends the electric lighting design capabilities to include energy consumption analysis. This recipe runs an annual simulation using the defined daylighting controls to estimate the total annual energy consumption (kWh/year) and calculates the percentage of energy saved due to the control strategy. It provides a more holistic view of the lighting strategy by connecting design decisions to tangible outcomes like energy usage and Lighting Power Density (LPD).
+
+  - The simulation of the electric lighting control is based on the following methodology:
+  
+  The fractional electric lighting output, `f_L`, required to meet the illuminance setpoint `I_{set}` given the available daylight illuminance `I_{tot}` at a reference point is:
+
+  ```Bash
+  f_L = \max\left[0, \frac{I_{set} - I_{tot}}{I_{set}}\right]
+  ```
+
+  The fractional electric lighting input power, `f_P`, is then calculated based on the control type:
+
+  - **Continuous Dimming Control**: Assumes power increases linearly from a minimum level.
+
+    ``` Bash
+    f_P = \begin{cases} 
+    f_{P,min} & \text{for } f_L < f_{L,min} \\ 
+    f_{P,min} + (f_L - f_{L,min}) \frac{1 - f_{P,min}}{1 - f_{L,min}} & \text{for } f_{L,min} \le f_L \le 1 
+    \end{cases}
+    ```
+
+  - **Continuous/Off Dimming Control**: Same as continuous, but the lights switch off completely at minimum output.
+
+  - **Stepped Control**: Power takes on discrete values depending on the number of steps, `N_L`.
+
+    ```Bash
+    f_P = \begin{cases} 
+    0 & \text{for } f_L = 0 \\ 
+    \frac{\lceil N_L \cdot f_L \rceil}{N_L} & \text{for } 0 < f_L < 1 \\ 
+    1 & \text{for } f_L = 1 
+    \end{cases}
+    ```
+
 ## Analysis Modules 📊
 
 The Analysis Sidebar uses a background Web Worker to parse various Radiance result files without freezing the interface. The application automatically detects the file type and enables the relevant visualization tools.

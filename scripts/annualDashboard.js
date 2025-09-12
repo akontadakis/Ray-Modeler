@@ -11,6 +11,9 @@ let savingsGauge = null;
 let powerGauge = null;
 let glareRoseChart = null;
 let combinedAnalysisChart = null;
+let lpdGauge = null;
+let energyGauge = null;
+let energySavingsGauge = null;
 
 /**
  * Opens the glare rose panel and triggers chart generation.
@@ -364,6 +367,50 @@ function createUdiChart(canvasId, udiData) {
 }
 
 /**
+* Clears and hides the lighting energy dashboard.
+*/
+export function clearLightingEnergyDashboard() {
+    document.getElementById('lighting-energy-dashboard')?.classList.add('hidden');
+    if (lpdGauge) lpdGauge.destroy();
+    if (energyGauge) energyGauge.destroy();
+    if (energySavingsGauge) energySavingsGauge.destroy();
+
+    lpdGauge = null;
+    energyGauge = null;
+    energySavingsGauge = null;
+
+    const lpdVal = document.getElementById('lpd-val');
+    const energyVal = document.getElementById('energy-val');
+    const savingsVal = document.getElementById('energy-savings-val');
+
+    if(lpdVal) lpdVal.textContent = '--';
+    if(energyVal) energyVal.textContent = '--';
+    if(savingsVal) savingsVal.textContent = '--';
+}
+
+/**
+* Updates the UI with lighting energy metrics.
+* @param {object | null} metrics - The calculated energy metrics from resultsManager.
+*/
+export function updateLightingEnergyDashboard(metrics) {
+clearLightingEnergyDashboard();
+    if (!metrics) return;
+
+    const dashboard = document.getElementById('lighting-energy-dashboard');
+    if(!dashboard) return;
+
+    dashboard.classList.remove('hidden');
+
+    const lpdEl = document.getElementById('lpd-val');
+    const energyEl = document.getElementById('energy-val');
+    const savingsEl = document.getElementById('energy-savings-val');
+
+    if(lpdEl) lpdEl.textContent = metrics.lpd.toFixed(2);
+    if(energyEl) energyEl.textContent = metrics.annualEnergy.toFixed(0);
+    if(savingsEl) savingsEl.textContent = metrics.savings.toFixed(1);
+}
+
+/**
  * Clears and hides the annual metrics dashboard.
  */
 export function clearAnnualDashboard() {
@@ -374,6 +421,7 @@ export function clearAnnualDashboard() {
     if (udiChart) udiChart.destroy();
     if (savingsGauge) savingsGauge.destroy();
     if (powerGauge) powerGauge.destroy();
+    clearLightingEnergyDashboard(); // Also clear the new dashboard
     sdaGauge = null;
     aseGauge = null;
     udiChart = null;

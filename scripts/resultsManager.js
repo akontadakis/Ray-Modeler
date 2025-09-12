@@ -50,6 +50,7 @@ class ResultsManager {
             glareResult: null,
             annualGlareResults: {},
             spectralResults: {},
+            lightingEnergyMetrics: null,
             lightingMetrics: null,
             stats: null
         };
@@ -125,7 +126,9 @@ class ResultsManager {
                     this.datasets[key].spectralResults.neuropic = parsedData.data;
                     isSpectral = true;
                     } else if (lowerFileName.includes('_direct.ill')) { // NEW: Detect direct-only .ill files
-                        this.datasets[key].annualDirectData = parsedData.annualData || [];
+                    this.datasets[key].annualDirectData = parsedData.annualData || [];
+                    } else if (parsedData.lightingEnergyMetrics) {
+                        this.datasets[key].lightingEnergyMetrics = parsedData.lightingEnergyMetrics;
                     } else {
                         // Standard (non-spectral) data handling
                         this.datasets[key].data = parsedData.data || [];

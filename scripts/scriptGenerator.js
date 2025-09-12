@@ -159,12 +159,18 @@ export function generateScripts(projectData, recipeType) {
             scripts.push(postProcessScript5ph);
             return scripts;
 
-       case 'template-recipe-imageless-glare':
+        case 'template-recipe-imageless-glare':
             scriptSet = createImagelessGlareScript(projectData);
             break;
         case 'template-recipe-spectral-lark':
             scriptSet = createLarkSpectralScript(projectData);
-            break;
+        break;
+        case 'template-recipe-lighting-energy':
+            scriptSet = createLightingEnergyScript(projectData);
+            if (Array.isArray(scriptSet)) { // It returns an array of files
+                scripts.push(...scriptSet);
+            }
+            return scripts;
         default:
             console.warn(`Unknown recipe type provided to generateScripts: ${recipeType}`);
             return scripts;
@@ -1851,7 +1857,6 @@ echo ---
 
 }
 
-
 function createSdaAseScript(projectData) {
     const { projectInfo: pi, mergedSimParams: p } = projectData;
     const projectName = pi['project-name'].replace(/\s+/g, '_') || 'scene';
@@ -1867,7 +1872,7 @@ function createSdaAseScript(projectData) {
     const ad = p['ad'] || 1000;
     const as = p['as'] || 512;
     const ar = p['ar'] || 512;
-    const aa = p['aa'] || 0.15;
+const aa = p['aa'] || 0.15;
     const lw = p['lw'] || 0.005;
 
     const pythonScriptContent = `import numpy as np
@@ -1876,93 +1881,96 @@ import os
 import struct
 
 def read_ill_file(file_path, num_points):
-"""Reads a binary .ill file and converts to photopic illuminance."""
-try:
-data = np.fromfile(file_path, dtype=np.float32)
-if data.size == 0:
-print(f"Warning: Ill file is empty: {file_path}")
-return np.zeros((8760, num_points))
+    """Reads a binary .ill file and converts to photopic illuminance."""
+    try:
+        data = np.fromfile(file_path, dtype=np.float32)
+        if data.size == 0:
+            print(f"Warning: Ill file is empty: {file_path}")
+            return np.zeros((8760, num_points))
 
-    rgb_illuminance = data.reshape(8760, num_points, 3)
-    # Standard photopic conversion from radiance (W/m^2/sr) to illuminance (lux)
-    illuminance = 179 * (rgb_illuminance[:,:,0]*0.265 + rgb_illuminance[:,:,1]*0.670 + rgb_illuminance[:,:,2]*0.065)
-    return illuminance
-except Exception as e:
-    print(f"Error reading or reshaping file '{file_path}': {e}")
-    return None
+        rgb_illuminance = data.reshape(8760, num_points, 3)
+        # Standard photopic conversion from radiance (W/m^2/sr) to illuminance (lux)
+        illuminance = 179 * (rgb_illuminance[:,:,0]*0.265 + rgb_illuminance[:,:,1]*0.670 + rgb_illuminance[:,:,2]*0.065)
+        return illuminance
+    except Exception as e:
+        print(f"Error reading or reshaping file '{file_path}': {e}")
+        return None
+
 def generate_schedule(direct_ill_file, num_points, threshold, trigger_percent):
-"""Generates a blind schedule based on direct illuminance."""
-print(f"Generating blind schedule from {direct_ill_file}...")
-direct_ill = read_ill_file(direct_ill_file, num_points)
-if direct_ill is None: return
+    """Generates a blind schedule based on direct illuminance."""
+    print(f"Generating blind schedule from {direct_ill_file}...")
+    direct_ill = read_ill_file(direct_ill_file, num_points)
+    if direct_ill is None: return
 
-schedule = []
-points_threshold = num_points * trigger_percent
-for hour in range(8760):
-    points_over_threshold = np.sum(direct_ill[hour, :] > threshold)
-    if points_over_threshold > points_threshold:
-        schedule.append(1)  # Blinds closed
-    else:
-        schedule.append(0)  # Blinds open
-
-with open("blinds.schedule", "w") as f:
-    f.write("\\n".join(map(str, schedule)))
-print("Generated blinds.schedule")
-def combine_results(schedule_file, open_ill_file, closed_ill_file, num_points, output_file):
-"""Combines two .ill files based on a schedule."""
-print("Combining results for final sDA calculation...")
-with open(schedule_file, "r") as f:
-schedule = [int(line.strip()) for line in f]
-
-# Open files in binary read mode
-with open(open_ill_file, "rb") as f_open, open(closed_ill_file, "rb") as f_closed, open(output_file, "wb") as f_out:
-    # Each point-hour is 3 floats * 4 bytes/float = 12 bytes
-    record_size = 12 
-    
+    schedule = []
+    points_threshold = num_points * trigger_percent
     for hour in range(8760):
-        for point in range(num_points):
-            # Calculate the byte offset for the current record
-            offset = (hour * num_points + point) * record_size
-            
-            if schedule[hour] == 1: # Blinds closed
-                f_closed.seek(offset)
-                record = f_closed.read(record_size)
-            else: # Blinds open
-                f_open.seek(offset)
-                record = f_open.read(record_size)
-            
-            f_out.write(record)
+        points_over_threshold = np.sum(direct_ill[hour, :] > threshold)
+        if points_over_threshold > points_threshold:
+            schedule.append(1)  # Blinds closed
+        else:
+            schedule.append(0)  # Blinds open
 
-print(f"Final combined results saved to {output_file}")
-if name == "main":
-parser = argparse.ArgumentParser(description="Post-process sDA/ASE simulation results.")
-parser.add_argument("--generate-schedule", action="store_true", help="Generate blind schedule.")
-parser.add_argument("--combine-results", action="store_true", help="Combine open/closed results.")
-parser.add_argument("--direct-ill", help="Path to direct-only illuminance file.")
-parser.add_argument("--open-ill", help="Path to blinds-open illuminance file.")
-parser.add_argument("--closed-ill", help="Path to blinds-closed illuminance file.")
-parser.add_argument("--output-file", help="Path for the final combined .ill file.")
-parser.add_argument("--num-points", type=int, required=True, help="Number of sensor points.")
-parser.add_argument("--threshold", type=float, default=1000.0, help="Lux threshold for blind trigger.")
-parser.add_argument("--trigger", type=float, default=0.02, help="Area percentage for blind trigger.")
+    with open("blinds.schedule", "w") as f:
+        f.write("\\n".join(map(str, schedule)))
+    print("Generated blinds.schedule")
 
-args = parser.parse_args()
+def combine_results(schedule_file, open_ill_file, closed_ill_file, num_points, output_file):
+    """Combines two .ill files based on a schedule."""
+    print("Combining results for final sDA calculation...")
+    with open(schedule_file, "r") as f:
+        schedule = [int(line.strip()) for line in f]
 
-if args.generate_schedule:
-    if not args.direct_ill:
-        print("Error: --direct-ill is required for generating schedule.")
+    # Open files in binary read mode
+    with open(open_ill_file, "rb") as f_open, open(closed_ill_file, "rb") as f_closed, open(output_file, "wb") as f_out:
+        # Each point-hour is 3 floats * 4 bytes/float = 12 bytes
+        record_size = 12 
+        
+        for hour in range(8760):
+            for point in range(num_points):
+                # Calculate the byte offset for the current record
+                offset = (hour * num_points + point) * record_size
+                
+                if schedule[hour] == 1: # Blinds closed
+                    f_closed.seek(offset)
+                    record = f_closed.read(record_size)
+                else: # Blinds open
+                    f_open.seek(offset)
+                    record = f_open.read(record_size)
+                
+                f_out.write(record)
+
+    print(f"Final combined results saved to {output_file}")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Post-process sDA/ASE simulation results.")
+    parser.add_argument("--generate-schedule", action="store_true", help="Generate blind schedule.")
+    parser.add_argument("--combine-results", action="store_true", help="Combine open/closed results.")
+    parser.add_argument("--direct-ill", help="Path to direct-only illuminance file.")
+    parser.add_argument("--open-ill", help="Path to blinds-open illuminance file.")
+    parser.add_argument("--closed-ill", help="Path to blinds-closed illuminance file.")
+    parser.add_argument("--output-file", help="Path for the final combined .ill file.")
+    parser.add_argument("--num-points", type=int, required=True, help="Number of sensor points.")
+    parser.add_argument("--threshold", type=float, default=1000.0, help="Lux threshold for blind trigger.")
+    parser.add_argument("--trigger", type=float, default=0.02, help="Area percentage for blind trigger.")
+
+    args = parser.parse_args()
+
+    if args.generate_schedule:
+        if not args.direct_ill:
+            print("Error: --direct-ill is required for generating schedule.")
+        else:
+            generate_schedule(args.direct_ill, args.num_points, args.threshold, args.trigger)
+    elif args.combine_results:
+        if not args.open_ill or not args.closed_ill or not args.output_file:
+            print("Error: --open-ill, --closed-ill, and --output-file are required for combining results.")
+        else:
+            combine_results("blinds.schedule", args.open_ill, args.closed_ill, args.num_points, args.output_file)
     else:
-        generate_schedule(args.direct_ill, args.num_points, args.threshold, args.trigger)
-elif args.combine_results:
-    if not args.open_ill or not args.closed_ill or not args.output_file:
-        print("Error: --open-ill, --closed-ill, and --output-file are required for combining results.")
-    else:
-        combine_results("blinds.schedule", args.open_ill, args.closed_ill, args.num_points, args.output_file)
-else:
-    print("No action specified. Use --generate-schedule or --combine-results.")
+        print("No action specified. Use --generate-schedule or --combine-results.")
 `;
 
-const shContent = `#!/bin/bash
+    const shContent = `#!/bin/bash
 # RUN_sDA_ASE_Analysis.sh
 # Full IES LM-83 sDA/ASE workflow with dynamic shading.
 # Generated by Ray Modeler.
@@ -1973,66 +1981,73 @@ const shContent = `#!/bin/bash
 # from the "Annual Daylight (3-Phase)" recipe.
 
 # --- Configuration ---
-PROJECT_NAME="${projectName}"
+PROJECT_NAME="\${projectName}"
 WEATHER_FILE="../04_skies/${epwFileName}"
 BSDF_OPEN="../05_bsdf/${bsdfOpenFile}"
 BSDF_CLOSED="../05_bsdf/${bsdfClosedFile}"
 POINTS_FILE="../08_results/grid.pts"
 
-Radiance parameters based on IES LM-83-23
-AB=abAD={ad}
-AS=asAR={ar}
-AA=aaLW={lw}
+# Radiance parameters based on IES LM-83-23
+AB=${ab}; AD=${ad}
+AS=${as}; AR=${ar}
+AA=${aa}; LW=${lw}
 
-Blind operation parameters
-BLINDS_THRESHOLD=blindsThresholdBLINDS_TRIGGER={blindsTrigger}
+# Blind operation parameters
+BLINDS_THRESHOLD=${blindsThreshold}
+BLINDS_TRIGGER=${blindsTrigger}
 
---- File & Directory Setup ---
+# --- File & Directory Setup ---
 RESULTS_DIR="../08_results"
-MATRIX_DIR="RESULTS_DIR/matrices"SKY_DIR="../04_skies"PYTHON_SCRIPT="process_sDA.py"NUM_POINTS=(wc -l < "${POINTS_FILE}")
+MATRIX_DIR="\${RESULTS_DIR}/matrices"
+SKY_DIR="../04_skies"
+PYTHON_SCRIPT="process_sDA.py"
+NUM_POINTS=\$(wc -l < "\${POINTS_FILE}")
 
 echo "--- Starting sDA/ASE Simulation Workflow ---"
-echo "Found ${NUM_POINTS} sensor points."
+echo "Found \${NUM_POINTS} sensor points."
 
-1. Generate Sky Matrices
+# 1. Generate Sky Matrices
 echo "1. Generating full and direct-only sky matrices..."
-SKY_MTX="MATRIX_DIR/sky.smx"SKY_DIRECT_MTX="{MATRIX_DIR}/sky_direct.smx"
-epw2wea "WEATHER_FILE"∣gendaymtx−m1−"{SKY_MTX}"
-epw2wea "WEATHER_FILE"∣gendaymtx−m1−d−"{SKY_DIRECT_MTX}"
+SKY_MTX="\${MATRIX_DIR}/sky.smx"
+SKY_DIRECT_MTX="\${MATRIX_DIR}/sky_direct.smx"
+epw2wea "\${WEATHER_FILE}" | gendaymtx -m 1 - > "\${SKY_MTX}"
+epw2wea "\${WEATHER_FILE}" | gendaymtx -m 1 -d - > "\${SKY_DIRECT_MTX}"
 
-2. Run dctimestep for ASE (Direct Sun Only)
+# 2. Run dctimestep for ASE (Direct Sun Only)
 echo "2. Calculating direct-only illuminance for ASE and blind schedule..."
-ILL_DIRECT_ONLY="RESULTS_DIR/{projectName}_ASE_direct_only.ill"
-dctimestep "MATRIX_DIR/view.mtx""{BSDF_OPEN}" "MATRIX_DIR/daylight.mtx""{SKY_DIRECT_MTX}" > "${ILL_DIRECT_ONLY}"
-echo "-> ASE results file created: ${ILL_DIRECT_ONLY}"
+ILL_DIRECT_ONLY="\${RESULTS_DIR}/\${PROJECT_NAME}_ASE_direct_only.ill"
+dctimestep "\${MATRIX_DIR}/view.mtx" "\${BSDF_OPEN}" "\${MATRIX_DIR}/daylight.mtx" "\${SKY_DIRECT_MTX}" > "\${ILL_DIRECT_ONLY}"
+echo "-> ASE results file created: \${ILL_DIRECT_ONLY}"
 
-3. Generate Blind Schedule with Python script
+# 3. Generate Blind Schedule with Python script
 echo "3. Generating hourly blind operation schedule..."
-python3 "PYTHON_SCRIPT"−−generate−schedule−−direct−ill"{ILL_DIRECT_ONLY}" --num-points "NUM_POINTS"−−threshold"{BLINDS_THRESHOLD}" --trigger "${BLINDS_TRIGGER}"
+python3 "\${PYTHON_SCRIPT}" --generate-schedule --direct-ill "\${ILL_DIRECT_ONLY}" --num-points "\${NUM_POINTS}" --threshold "\${BLINDS_THRESHOLD}" --trigger "\${BLINDS_TRIGGER}"
 
-4. Run dctimestep for Blinds OPEN state (Full Sky)
+# 4. Run dctimestep for Blinds OPEN state (Full Sky)
 echo "4. Calculating annual illuminance with blinds OPEN..."
-ILL_OPEN="RESULTS_DIR/results_open.ill"dctimestep"{MATRIX_DIR}/view.mtx" "BSDF_OPEN""{MATRIX_DIR}/daylight.mtx" "SKY_MTX""{ILL_OPEN}"
+ILL_OPEN="\${RESULTS_DIR}/results_open.ill"
+dctimestep "\${MATRIX_DIR}/view.mtx" "\${BSDF_OPEN}" "\${MATRIX_DIR}/daylight.mtx" "\${SKY_MTX}" > "\${ILL_OPEN}"
 
-5. Run dctimestep for Blinds CLOSED state (Full Sky)
+# 5. Run dctimestep for Blinds CLOSED state (Full Sky)
 echo "5. Calculating annual illuminance with blinds CLOSED..."
-ILL_CLOSED="RESULTS_DIR/results_closed.ill"dctimestep"{MATRIX_DIR}/view.mtx" "BSDF_CLOSED""{MATRIX_DIR}/daylight.mtx" "SKY_MTX""{ILL_CLOSED}"
+ILL_CLOSED="\${RESULTS_DIR}/results_closed.ill"
+dctimestep "\${MATRIX_DIR}/view.mtx" "\${BSDF_CLOSED}" "\${MATRIX_DIR}/daylight.mtx" "\${SKY_MTX}" > "\${ILL_CLOSED}"
 
-6. Combine Results for sDA based on schedule
+# 6. Combine Results for sDA based on schedule
 echo "6. Combining results based on blind schedule..."
-ILL_SDA_FINAL="RESULTS_DIR/{projectName}_sDA_final.ill"
-python3 "PYTHON_SCRIPT"−−combine−results−−open−ill"{ILL_OPEN}" --closed-ill "ILL_CLOSED"−−num−points"{NUM_POINTS}" --output-file "${ILL_SDA_FINAL}"
+ILL_SDA_FINAL="\${RESULTS_DIR}/\${PROJECT_NAME}_sDA_final.ill"
+python3 "\${PYTHON_SCRIPT}" --combine-results --open-ill "\${ILL_OPEN}" --closed-ill "\${ILL_CLOSED}" --num-points "\${NUM_POINTS}" --output-file "\${ILL_SDA_FINAL}"
 
 echo ""
 echo "--- sDA/ASE Workflow Complete ---"
-echo "Load this file for ASE analysis: ${ILL_DIRECT_ONLY}"
-echo "Load this file for sDA analysis: ${ILL_SDA_FINAL}"
+echo "Load this file for ASE analysis: \${ILL_DIRECT_ONLY}"
+echo "Load this file for sDA analysis: \${ILL_SDA_FINAL}"
 echo "---"
 `;
 
   // BAT file generation is omitted for this complex workflow, as a Bash-like environment (WSL, Git Bash) is strongly recommended.
   const batContent = `# BAT file for this complex workflow is not provided.
-Please use a bash interpreter (like Git Bash or WSL on Windows) to run the generated .sh script.`;
+# Please use a bash interpreter (like Git Bash or WSL on Windows) to run the generated .sh script.`;
   return [
       { fileName: `RUN_${projectName}_sDA_ASE.sh`, content: shContent },
       { fileName: `RUN_${projectName}_sDA_ASE.bat`, content: batContent },
@@ -2550,7 +2565,256 @@ echo "---"
     const batContent = `REM This workflow uses advanced shell features. Please run the .sh script using a bash interpreter (e.g., Git Bash, WSL).`;
 
     return {
-        sh: { fileName: `RUN_${projectName}_EN12464_UGR.sh`, content: shContent },
-        bat: { fileName: `RUN_${projectName}_EN12464_UGR.bat`, content: batContent }
-    };
+         sh: { fileName: `RUN_${projectName}_EN12464_UGR.sh`, content: shContent },
+    bat: { fileName: `RUN_${projectName}_EN12464_UGR.bat`, content: batContent }
+};
+}
+
+function createLightingEnergyScript(projectData) {
+    const { projectInfo: pi, mergedSimParams: p, lighting, geometry } = projectData;
+    const projectName = pi['project-name'].replace(/\s+/g, '_') || 'scene';
+    const epwFileName = p['weather-file']?.name || 'weather.epw';
+    const bsdfOpenFile = p['bsdf-open-file']?.name || 'bsdf_open.xml';
+    const bsdfClosedFile = p['bsdf-closed-file']?.name || 'bsdf_closed.xml';
+
+    const blindsThreshold = p['blinds-threshold-lux'] || 1000;
+    const blindsTrigger = p['blinds-trigger-percent'] / 100.0 || 0.02;
+
+    // Get lighting control and power info
+    const { daylighting: dc, luminaire_wattage } = lighting;
+    let numLuminaires = 1;
+    if (lighting.placement === 'grid' && lighting.grid) {
+        numLuminaires = (lighting.grid.rows || 1) * (lighting.grid.cols || 1);
+    }
+    const totalInstalledPower = luminaire_wattage * numLuminaires;
+    const roomArea = geometry.room.W * geometry.room.L;
+
+
+    const pythonScriptContent = `import numpy as np
+import argparse
+import os
+import pandas as pd
+
+def read_ill_file(file_path, num_points):
+    """Reads a binary .ill file and converts to photopic illuminance."""
+    try:
+        data = np.fromfile(file_path, dtype=np.float32)
+        if data.size == 0:
+            print(f"Warning: Ill file is empty: {file_path}")
+            return np.zeros((8760, num_points))
+        rgb = data.reshape(8760, num_points, 3)
+        return 179 * (rgb[:,:,0]*0.265 + rgb[:,:,1]*0.670 + rgb[:,:,2]*0.065)
+    except Exception as e:
+        print(f"Error reading or reshaping file '{file_path}': {e}")
+        return None
+
+def generate_schedule(direct_ill_file, num_points, threshold, trigger_percent):
+    """Generates a blind schedule based on direct illuminance."""
+    print(f"Generating blind schedule from {direct_ill_file}...")
+    direct_ill = read_ill_file(direct_ill_file, num_points)
+    if direct_ill is None: return
+
+    schedule = []
+    points_threshold = int(num_points * trigger_percent)
+    for hour in range(8760):
+        points_over_threshold = np.sum(direct_ill[hour, :] > threshold)
+        schedule.append(1 if points_over_threshold > points_threshold else 0)
+
+    with open("blinds.schedule", "w") as f:
+        f.write("\\n".join(map(str, schedule)))
+    print("Generated blinds.schedule")
+
+def combine_results(schedule_file, open_ill_file, closed_ill_file, num_points, output_file):
+    """Combines two .ill files based on a schedule."""
+    print("Combining results for final illuminance calculation...")
+    with open(schedule_file, "r") as f:
+        schedule = [int(line.strip()) for line in f]
+
+    with open(open_ill_file, "rb") as f_open, open(closed_ill_file, "rb") as f_closed, open(output_file, "wb") as f_out:
+        record_size = 12 
+        for hour in range(8760):
+            for point in range(num_points):
+                offset = (hour * num_points + point) * record_size
+                f_source = f_closed if schedule[hour] == 1 else f_open
+                f_source.seek(offset)
+                record = f_source.read(record_size)
+                f_out.write(record)
+    print(f"Final combined results saved to {output_file}")
+
+def calculate_energy(final_ill_file, num_points, args):
+    """Calculates lighting energy based on illuminance and control settings."""
+    print("\\nCalculating lighting energy consumption...")
+    final_ill = read_ill_file(final_ill_file, num_points)
+    if final_ill is None: return
+
+    hourly_avg_ill = np.mean(final_ill, axis=1)
+    total_power_fraction_sum = 0
+    occupied_hour_count = 0
+
+    time_index = pd.to_datetime(pd.date_range(start='2023-01-01', end='2024-01-01', freq='h', inclusive='left'))
+    occupied_mask = (time_index.hour >= 8) & (time_index.hour < 18) & (time_index.dayofweek < 5)
+
+    for h in range(8760):
+        if occupied_mask[h]:
+            occupied_hour_count += 1
+            daylight = hourly_avg_ill[h]
+            
+            fL = max(0, (args.setpoint - daylight) / args.setpoint)
+            fP = 0
+            if args.control_type == 'Continuous':
+                if fL < args.min_light_frac:
+                    fP = args.min_power_frac
+                else:
+                    fP = args.min_power_frac + (fL - args.min_light_frac) * (1 - args.min_power_frac) / (1 - args.min_light_frac)
+            elif args.control_type == 'ContinuousOff':
+                if fL < args.min_light_frac:
+                    fP = 0
+                else:
+                    fP = args.min_power_frac + (fL - args.min_light_frac) * (1 - args.min_power_frac) / (1 - args.min_light_frac)
+            elif args.control_type == 'Stepped':
+                if fL <= 0: fP = 0
+                elif fL >= 1: fP = 1
+                else: fP = np.ceil(args.n_steps * fL) / args.n_steps
+            
+            total_power_fraction_sum += fP
+
+    avg_power_fraction = total_power_fraction_sum / occupied_hour_count if occupied_hour_count > 0 else 0
+    total_installed_power_kw = args.total_power / 1000.0
+    annual_energy_kwh = avg_power_fraction * total_installed_power_kw * occupied_hour_count
+    savings = (1 - avg_power_fraction) * 100
+    lpd = args.total_power / args.room_area
+
+    summary_df = pd.DataFrame({
+        'Lighting Power Density (W/m^2)': [f"{lpd:.2f}"],
+        'Annual Lighting Energy (kWh/yr)': [f"{annual_energy_kwh:.0f}"],
+        'Daylighting Savings (%)': [f"{savings:.1f}"]
+    })
+    summary_path = os.path.join(args.outdir, "energy_summary.csv")
+    summary_df.to_csv(summary_path, index=False)
+
+    print("\\n--- Lighting Energy Summary ---")
+    print(f"  Lighting Power Density (LPD): {lpd:.2f} W/m²")
+    print(f"  Annual Energy Consumption:    {annual_energy_kwh:.0f} kWh")
+    print(f"  Energy Savings vs. No DL-Ctrl:  {savings:.1f}%")
+    print(f"\\nSummary saved to: {summary_path}")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("action", choices=['generate_schedule', 'combine_results', 'calculate_energy'])
+    parser.add_argument("--num-points", type=int, required=True)
+    parser.add_argument("--outdir", type=str, default="../08_results")
+
+    parser.add_argument("--direct-ill", help="Path to direct-only illuminance file.")
+    parser.add_argument("--open-ill", help="Path to blinds-open illuminance file.")
+    parser.add_argument("--closed-ill", help="Path to blinds-closed illuminance file.")
+    parser.add_argument("--final-ill", help="Path to final combined illuminance file.")
+    parser.add_argument("--threshold", type=float, default=1000.0)
+    parser.add_argument("--trigger", type=float, default=0.02)
+
+    parser.add_argument("--total-power", type=float, help="Total installed lighting power (Watts)")
+    parser.add_argument("--room-area", type=float, help="Room floor area (m^2)")
+    parser.add_argument("--control-type", choices=['Continuous', 'ContinuousOff', 'Stepped'])
+    parser.add_argument("--setpoint", type=float, default=500.0)
+    parser.add_argument("--min-power-frac", type=float, default=0.1)
+    parser.add_argument("--min-light-frac", type=float, default=0.1)
+    parser.add_argument("--n-steps", type=int, default=3)
+    args = parser.parse_args()
+
+    if args.action == 'generate_schedule':
+        generate_schedule(args.direct_ill, args.num_points, args.threshold, args.trigger)
+    elif args.action == 'combine_results':
+        combine_results("blinds.schedule", args.open_ill, args.closed_ill, args.num_points, args.final_ill)
+    elif args.action == 'calculate_energy':
+        calculate_energy(args.final_ill, args.num_points, args)
+`;
+
+    const shContent = `#!/bin/bash
+# RUN_Lighting_Energy_Analysis.sh
+# Full workflow for annual lighting energy estimation with dynamic shading.
+# IMPORTANT: This script requires matrix files (view.mtx, daylight.mtx) generated
+# by the "Annual Daylight (3-Phase)" recipe. Run that recipe first.
+
+# --- Configuration ---
+PROJECT_NAME="${projectName}"
+WEATHER_FILE="../04_skies/${epwFileName}"
+BSDF_OPEN="../05_bsdf/${bsdfOpenFile}"
+BSDF_CLOSED="../05_bsdf/${bsdfClosedFile}"
+POINTS_FILE="../08_results/grid.pts"
+PYTHON_SCRIPT="process_energy.py"
+NUM_POINTS=$(wc -l < "\${POINTS_FILE}")
+
+# Blind operation parameters
+BLINDS_THRESHOLD=${blindsThreshold}
+BLINDS_TRIGGER=${blindsTrigger}
+
+# Energy parameters
+TOTAL_POWER=${totalInstalledPower}
+ROOM_AREA=${roomArea}
+CONTROL_TYPE=${dc.controlType}
+SETPOINT=${dc.setpoint}
+MIN_POWER_FRAC=${dc.minPowerFraction}
+MIN_LIGHT_FRAC=${dc.minLightFraction}
+N_STEPS=${dc.nSteps}
+
+# --- File & Directory Setup ---
+RESULTS_DIR="../08_results"
+MATRIX_DIR="\${RESULTS_DIR}/matrices"
+SKY_DIR="../04_skies"
+
+echo "--- Starting Lighting Energy Simulation Workflow ---"
+echo "Found \${NUM_POINTS} sensor points."
+
+# 1. Generate Sky Matrices
+echo "1. Generating full and direct-only sky matrices..."
+SKY_MTX="\${MATRIX_DIR}/sky.smx"
+SKY_DIRECT_MTX="\${MATRIX_DIR}/sky_direct.smx"
+epw2wea "\${WEATHER_FILE}" | gendaymtx -m 1 - > "\${SKY_MTX}"
+epw2wea "\${WEATHER_FILE}" | gendaymtx -m 1 -d - > "\${SKY_DIRECT_MTX}"
+
+# 2. Calculate direct illuminance for blind schedule
+echo "2. Calculating direct-only illuminance for blind schedule..."
+ILL_DIRECT="\${RESULTS_DIR}/results_direct.ill"
+dctimestep "\${MATRIX_DIR}/view.mtx" "\${BSDF_OPEN}" "\${MATRIX_DIR}/daylight.mtx" "\${SKY_DIRECT_MTX}" > "\${ILL_DIRECT}"
+
+# 3. Generate Blind Schedule
+echo "3. Generating hourly blind operation schedule..."
+python3 "\${PYTHON_SCRIPT}" generate_schedule --direct-ill "\${ILL_DIRECT}" --num-points "\${NUM_POINTS}" --threshold "\${BLINDS_THRESHOLD}" --trigger "\${BLINDS_TRIGGER}" --outdir "\${RESULTS_DIR}"
+
+# 4. Calculate annual illuminance for blinds OPEN and CLOSED
+echo "4. Calculating annual illuminance for both blind states..."
+ILL_OPEN="\${RESULTS_DIR}/results_open.ill"
+ILL_CLOSED="\${RESULTS_DIR}/results_closed.ill"
+dctimestep "\${MATRIX_DIR}/view.mtx" "\${BSDF_OPEN}" "\${MATRIX_DIR}/daylight.mtx" "\${SKY_MTX}" > "\${ILL_OPEN}"
+dctimestep "\${MATRIX_DIR}/view.mtx" "\${BSDF_CLOSED}" "\${MATRIX_DIR}/daylight.mtx" "\${SKY_MTX}" > "\${ILL_CLOSED}"
+
+# 5. Combine results based on schedule
+echo "5. Combining results based on blind schedule..."
+ILL_FINAL="\${RESULTS_DIR}/\${PROJECT_NAME}_energy_final.ill"
+python3 "\${PYTHON_SCRIPT}" combine_results --open-ill "\${ILL_OPEN}" --closed-ill "\${ILL_CLOSED}" --final-ill "\${ILL_FINAL}" --num-points "\${NUM_POINTS}" --outdir "\${RESULTS_DIR}"
+
+# 6. Run final energy calculation
+echo "6. Calculating final energy metrics..."
+python3 "\${PYTHON_SCRIPT}" calculate_energy \\
+    --final-ill "\${ILL_FINAL}" \\
+    --num-points "\${NUM_POINTS}" \\
+    --outdir "\${RESULTS_DIR}" \\
+    --total-power "\${TOTAL_POWER}" \\
+    --room-area "\${ROOM_AREA}" \\
+    --control-type "\${CONTROL_TYPE}" \\
+    --setpoint "\${SETPOINT}" \\
+    --min-power-frac "\${MIN_POWER_FRAC}" \\
+    --min-light-frac "\${MIN_LIGHT_FRAC}" \\
+    --n-steps "\${N_STEPS}"
+
+echo ""
+echo "--- Energy Analysis Workflow Complete ---"
+`;
+
+    const batContent = `# BAT file for this complex workflow is not provided. Please use a bash interpreter.`;
+
+    return [
+        { fileName: `RUN_${projectName}_Energy_Analysis.sh`, content: shContent },
+        { fileName: `RUN_${projectName}_Energy_Analysis.bat`, content: batContent },
+        { fileName: 'process_energy.py', content: pythonScriptContent }
+    ];
 }

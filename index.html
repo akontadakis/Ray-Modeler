@@ -698,11 +698,25 @@
                           </div>
                       </div>
                     </div>
-                </div>
+              </div>
 
-                <div class="param-section pt-4 mt-4 border-t border-[--grid-color]">
-                    <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">EN 12464-1 Specification</h4>
-                    <p class="info-box !text-xs !py-2 !px-3">Define compliance parameters. These values are used by EN 12464-1 recipes and for documentation.</p>
+              <div class="param-section pt-4 mt-4 border-t border-[--grid-color]">
+                  <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Power & Energy</h4>
+                  <div class="grid grid-cols-2 gap-4 mt-3">
+                      <div>
+                          <label for="luminaire-wattage" class="label text-xs">Luminaire Power (Watts)</label>
+                          <input type="number" id="luminaire-wattage" value="35" min="0" step="1" class="w-full mt-1">
+                      </div>
+                      <div>
+                          <label class="label text-xs">Lighting Power Density</label>
+                          <div id="lpd-display" class="data-value font-mono text-lg mt-1">-- W/m²</div>
+                      </div>
+                  </div>
+              </div>
+
+              <div class="param-section pt-4 mt-4 border-t border-[--grid-color]">
+                  <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">EN 12464-1 Specification</h4>
+                  <p class="info-box !text-xs !py-2 !px-3">Define compliance parameters. These values are used by EN 12464-1 recipes and for documentation.</p>
                     <div class="mt-3">
                         <label class="label text-xs flex justify-between" for="maintenance-factor">
                             <span>Maintenance Factor (MF)</span>
@@ -2095,12 +2109,30 @@
                                         <button class="btn btn-xs btn-secondary" title="Copy to clipboard">Copy</button>
                                     </div>
                                     <textarea readonly class="w-full h-48 font-mono text-xs p-2 rounded bg-[--grid-color] border border-gray-500/50 resize-y"></textarea>
-                                </div>
                             </div>
                         </div>
+                    </div>
             <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
         </div>
                 </template>
+
+                <div id="lighting-energy-dashboard" class="hidden space-y-5 pt-4 border-t border-dashed border-[--grid-color]">
+                    <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Lighting Energy Metrics</h4>
+                    <div class="grid grid-cols-3 gap-4 text-center">
+                        <div>
+                            <h5 class="font-semibold text-sm">LPD</h5>
+                            <p class="data-value font-mono text-lg mt-2"><span id="lpd-val">--</span> W/m²</p>
+                        </div>
+                        <div>
+                            <h5 class="font-semibold text-sm">Annual Use</h5>
+                            <p class="data-value font-mono text-lg mt-2"><span id="energy-val">--</span> kWh</p>
+                        </div>
+                        <div>
+                            <h5 class="font-semibold text-sm">Savings</h5>
+                            <p class="data-value font-mono text-lg mt-2"><span id="energy-savings-val">--</span> %</p>
+                        </div>
+                    </div>
+                </div>
 
                 <template id="template-recipe-dgp">
                     <div class="floating-window ui-panel">
@@ -2703,10 +2735,41 @@
                 </div>
             </template>
 
-            <template id="template-recipe-en-ugr">
-                <div class="floating-window ui-panel">
-                    <div class="window-header">
-                        <span>Recipe: EN 12464-1 UGR</span>
+        <template id="template-recipe-lighting-energy">
+            <div class="floating-window ui-panel">
+                <div class="window-header">
+                    <span>Recipe: Lighting Energy Analysis</span>
+                    <div class="window-controls"><div class="window-icon-max"></div><div class="collapse-icon"></div><div class="window-icon-close"></div></div>
+                </div>
+                <div class="window-content">
+                    <p class="info-box">Runs an annual simulation using daylighting controls to estimate electric lighting energy usage and savings. This requires the same inputs as the sDA/ASE recipe.</p>
+                    <div class="param-section">
+                        <h4 class="text-base font-semibold">Simulation Inputs</h4>
+                        <div class="space-y-3 mt-4">
+                            <div><label class="label" for="weather-file">Weather File (.epw)</label><input type="file" id="weather-file" accept=".epw" class="w-full text-sm"></div>
+                            <div><label class="label" for="bsdf-open-file">BSDF - Blinds Open (.xml)</label><input type="file" id="bsdf-open-file" accept=".xml" class="w-full text-sm"></div>
+                            <div><label class="label" for="bsdf-closed-file">BSDF - Blinds Closed (.xml)</label><input type="file" id="bsdf-closed-file" accept=".xml" class="w-full text-sm"></div>
+                        </div>
+                    </div>
+                    <div class="param-section">
+                        <h4 class="text-base font-semibold">Blind Operation Parameters</h4>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="label" for="blinds-threshold-lux">Illuminance Threshold (lux)</label><input type="number" id="blinds-threshold-lux" value="1000" min="0" step="50" class="w-full mt-1"></div>
+                            <div><label class="label" for="blinds-trigger-percent">Area Trigger (%)</label><input type="number" id="blinds-trigger-percent" value="2" min="0" max="100" step="1" class="w-full mt-1"></div>
+                        </div>
+                    </div>
+                    <div class="execution-section mt-4 pt-4 border-t-2 border-[--grid-color]">
+                        <h4 class="text-base font-semibold mb-3">Execution</h4>
+                        <button data-action="generate" class="btn btn-primary w-full">Generate Energy Analysis Package</button>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <template id="template-recipe-en-ugr">
+            <div class="floating-window ui-panel">
+                <div class="window-header">
+                    <span>Recipe: EN 12464-1 UGR</span>
                         <div class="window-controls"><div class="window-icon-max"></div><div class="collapse-icon"></div><div class="window-icon-close"></div></div>
                     </div>
                     <div class="window-content">

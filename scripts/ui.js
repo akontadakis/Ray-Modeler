@@ -345,6 +345,7 @@ const ids = [
 
     // Daylighting Controls
     'ies-photometry-viewer', 'ies-polar-plot-canvas', 'ies-info-display',
+    'luminaire-wattage', 'lpd-display',
     'daylighting-enabled-toggle', 'daylighting-controls-wrapper', 'daylighting-control-type',
     'daylighting-setpoint', 'daylight-continuous-params', 'daylighting-min-power-frac',
     'daylighting-min-power-frac-val', 'daylighting-min-light-frac', 'daylighting-min-light-frac-val',
@@ -422,7 +423,10 @@ const ids = [
     'selected-wall-display', 'wall-select-lock-btn', 'lock-icon-unlocked', 'lock-icon-locked',
 
     // AI Proactive Suggestions
-    'proactive-suggestion-container'
+    'proactive-suggestion-container',
+
+    // Lighting Energy Dashboard
+    'lighting-energy-dashboard', 'lpd-val', 'energy-val', 'energy-savings-val'
 ];
 
 
@@ -1969,6 +1973,11 @@ function handleInputChange(e) {
         }
     }
 
+    // Live update for LPD
+    if (['luminaire-wattage', 'width', 'length', 'grid-rows', 'grid-cols'].includes(id) || id.startsWith('placement-mode-')) {
+        _updateLpdDisplay();
+    }
+
     debouncedScheduleUpdate(id);
 }
 
@@ -2711,7 +2720,7 @@ let timeSeriesChart = null;
 /**
 * Clears all UI elements related to results visualization.
 */
-export function clearAllResultsDisplay() {
+export async function clearAllResultsDisplay() {
     // Clear all previous results visualizations from all panels
     if (dom['results-dashboard']) dom['results-dashboard'].classList.add('hidden');
     if (dom['glare-analysis-dashboard']) dom['glare-analysis-dashboard'].classList.add('hidden');
@@ -2725,6 +2734,9 @@ export function clearAllResultsDisplay() {
 
     clearAnnualDashboard();
     clearTimeSeriesExplorer();
+    // NEW: Also clear the lighting energy dashboard
+    const { clearLightingEnergyDashboard } = await import('./annualDashboard.js');
+    clearLightingEnergyDashboard();
     updateSpectralMetricsDashboard(null); // Clear the spectral dashboard
 
     // Explicitly clear any 3D sensor grid visualization from previous results
@@ -2780,7 +2792,12 @@ async function handleResultsFile(file, key) {
     if (resultsManager.hasAnnualData(loadedKey)) {
         const metrics = resultsManager.calculateAnnualMetrics(loadedKey, {});
         const lightingMetrics = resultsManager.datasets[loadedKey].lightingMetrics;
+        const energyMetrics = resultsManager.datasets[loadedKey].lightingEnergyMetrics;
         updateAnnualMetricsDashboard(metrics, lightingMetrics);
+        if (energyMetrics) {
+            const { updateLightingEnergyDashboard } = await import('./annualDashboard.js');
+            updateLightingEnergyDashboard(energyMetrics);
+        }
         updateTimeSeriesExplorer();
     } else {
         clearAnnualDashboard();
@@ -3581,6 +3598,35 @@ function _updateLivePreviewVisibility() {
     const hEnabled = dom['h-section-toggle']?.checked;
     const vEnabled = dom['v-section-toggle']?.checked;
     dom['live-preview-section']?.classList.toggle('hidden', !hEnabled && !vEnabled);
+}
+
+/**
+* Calculates and updates the Lighting Power Density (LPD) display.
+* @private
+*/
+function _updateLpdDisplay() {
+    if (!dom['lpd-display'] || !dom['luminaire-wattage']) return;
+
+    const W = parseFloat(dom.width.value);
+    const L = parseFloat(dom.length.value);
+    const area = W * L;
+    if (area === 0) {
+        dom['lpd-display'].textContent = '-- W/m²';
+        return;
+    }
+
+    const wattage = parseFloat(dom['luminaire-wattage'].value);
+    const isGrid = dom['placement-mode-grid']?.classList.contains('active');
+    let numLuminaires = 1;
+    if (isGrid) {
+        const rows = parseInt(dom['grid-rows']?.value, 10) || 1;
+        const cols = parseInt(dom['grid-cols']?.value, 10) || 1;
+        numLuminaires = rows * cols;
+    }
+
+    const totalPower = wattage * numLuminaires;
+    const lpd = totalPower / area;
+    dom['lpd-display'].textContent = `${lpd.toFixed(2)} W/m²`;
 }
 
 /**

@@ -19,7 +19,8 @@ const availableModules = [
     { id: 'template-recipe-spectral-lark', name: 'Recipe: Spectral Analysis (Lark)' },
     { id: 'template-recipe-en17037', name: 'Recipe: EN 17037 Compliance' },
     { id: 'template-recipe-en-illuminance', name: 'Recipe: EN 12464-1 Illuminance' },
-    { id: 'template-recipe-en-ugr', name: 'Recipe: EN 12464-1 UGR' }
+    { id: 'template-recipe-en-ugr', name: 'Recipe: EN 12464-1 UGR' },
+    { id: 'template-recipe-lighting-energy', name: 'Recipe: Lighting Energy Analysis' }
 ];
 
 // --- CORE PUBLIC FUNCTIONS ---
