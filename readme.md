@@ -149,7 +149,7 @@ OpenRouter provides access to a wide variety of models from different providers 
 
 The interface is designed around a logical workflow, guiding the user from setup to analysis.
 
-![Ray Modeler Main UI](./Pictures/main_ui.jpg)
+![Ray Modeler Main UI](./Pictures/main_ui.png)
 
 - **3D Viewport (Center)**: The main interactive area where the 3D scene is displayed. You can navigate the scene using standard orbit controls (mouse drag, scroll).
   
