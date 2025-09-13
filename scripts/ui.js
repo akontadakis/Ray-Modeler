@@ -248,7 +248,7 @@ let windowModes = {'n': 'wwr', 's': 'wwr', 'e': 'wwr', 'w': 'wwr'};
 export function setupDOM() {
 const ids = [
     // Global
-    'theme-btn-light', 'theme-btn-dark', 'theme-btn-cyber', 'theme-switcher-container',
+    'theme-btn-light', 'theme-btn-dark', 'theme-btn-cyber', 'theme-btn-cafe58', 'theme-switcher-container',
     'render-container', 'sidebar-wrapper', 'right-sidebar', 'analysis-sidebar',
     'welcome-screen', 'glow-canvas',
     'toggle-modules-btn', 'toggle-analysis-btn', 'generate-scene-button',
@@ -2722,6 +2722,7 @@ export function setupThemeSwitcher() {
     const lightBtn = dom['theme-btn-light'];
     const darkBtn = dom['theme-btn-dark'];
     const cyberBtn = dom['theme-btn-cyber'];
+    const cafe58Btn = dom['theme-btn-cafe58'];
     const htmlEl = document.documentElement;
 
     const lightTilesUrl = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
@@ -2735,6 +2736,7 @@ export function setupThemeSwitcher() {
         lightBtn.style.display = 'none';
         darkBtn.style.display = 'none';
         cyberBtn.style.display = 'none';
+        cafe58Btn.style.display = 'none';
 
         let sceneBgColor, mapTilesUrl;
 
@@ -2747,6 +2749,10 @@ export function setupThemeSwitcher() {
             cyberBtn.style.display = 'flex'; // Show cyber theme icon
             sceneBgColor = '#030d22';
             mapTilesUrl = darkTilesUrl;
+        } else if (theme === 'cafe58') {
+            cafe58Btn.style.display = 'flex'; // Show cafe58 theme icon
+            sceneBgColor = '#E1DEDE';
+            mapTilesUrl = lightTilesUrl;
         } else { // 'light' theme
             lightBtn.style.display = 'flex'; // Show light theme icon
             sceneBgColor = '#E9E9EF';
@@ -2797,7 +2803,8 @@ export function setupThemeSwitcher() {
     // Clicking the current theme's icon switches to the next one
     lightBtn.addEventListener('click', () => applyTheme('dark'));
     darkBtn.addEventListener('click', () => applyTheme('cyber'));
-    cyberBtn.addEventListener('click', () => applyTheme('light'));
+    cyberBtn.addEventListener('click', () => applyTheme('cafe58'));
+    cafe58Btn.addEventListener('click', () => applyTheme('light'));
 
     // Initial theme check on page load
     const savedTheme = localStorage.getItem('theme');

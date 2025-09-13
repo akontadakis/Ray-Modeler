@@ -99,6 +99,40 @@ html[data-theme="cyber"] {
   .workflow-step { background-color: #ff2e97; }
 }
 
+html[data-theme="cafe58"] {
+  /* Cafe 58 Theme */
+  --bg-main: #E1DEDE;
+  --bg-selection: #FF6D1D;
+  --highlight-color: #FF6D1D;
+  --text-on-selection: #FFFFFF;
+  --text-primary: #26303D;
+  --text-secondary: #5a687a;
+  --line-color: #FFA518;
+  --grid-color: #D4D1D1;
+  --panel-bg: rgba(225, 222, 222, 0.85);
+  --north-arrow-color: #26303D;
+
+  /* Visualization Colors */
+  --wall-color: #707C8A;
+  --floor-color: #26303D;
+  --ceiling-color: #E1DEDE;
+  --frame-color: #26303D;
+  --shading-color: #26303D;
+  --light-source-color: #FFA518;
+  --illuminance-grid-color: #26303D;
+  --view-grid-color: #FF6D1D;
+  --daylighting-sensor-color: #FF6D1D;
+
+  --resize-handle-icon: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="%235a687a" stroke-width="2" stroke-linecap="round"><path d="M8 4L4 8M10 2L2 10"/></svg>');
+  --select-arrow-icon: url('data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns="http://www.w3.org/2000/svg" width="292.4" height="292.4"%3E%3Cpath fill="%2326303D" d="M287 69.4a17.6 17.6 0 0 0-13-5.4H18.4c-5 0-9.3 1.8-12.9 5.4A17.6 17.6 0 0 0 0 82.2c0 5 1.8 9.3 5.4 12.9l128 127.9c3.6 3.6 7.8 5.4 12.8 5.4s9.2-1.8 12.8-5.4L287 95c3.5-3.5 5.4-7.8 5.4-12.8 0-5-1.9-9.2-5.5-12.8z"%2F%3E%3C/svg%3E');
+
+  --btn-secondary-bg: #D4D1D1;
+  --btn-secondary-hover-bg: #C7C4C4;
+
+  /* Cafe 58 Theme Workflow Colors */
+  .workflow-step { background-color: #FFA518; }
+}
+
 /* --- BASE LAYOUT & CANVAS --- */
 body {
   font-family: 'Inter', sans-serif;
@@ -1364,6 +1398,10 @@ html[data-theme="dark"] #welcome-logo-dark {
 }
 
 html[data-theme="cyber"] #welcome-logo-cyber {
+    display: block;
+}
+
+html[data-theme="cafe58"] #welcome-logo-cafe58 {
     display: block;
 }
 
