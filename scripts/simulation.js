@@ -115,6 +115,8 @@ export async function openRecipePanelByType(templateId) {
         return null;
     }
 
+    let panel = document.querySelector(`.floating-window[data-template-id="${templateId}"]`);
+
     if (!panel) {
         // Panel doesn't exist, create it.
         panel = _createSimulationPanel(templateId, button);

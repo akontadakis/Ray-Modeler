@@ -33,7 +33,7 @@ const availableTools = [
                 "parameters": {
                     "type": "OBJECT",
                     "properties": {
-                        "analysisType": { "type": "STRING", "description": "The type of analysis to validate for. Must be one of: 'general', 'illuminance', 'rendering', 'dgp', 'annual'." }
+                        "analysisType": { "type": "STRING", "description": "The type of analysis to validate for. Must be one of 'general', 'illuminance', 'rendering', 'dgp', 'annual', 'illuminance', 'df', 'imageless-glare'." }
                     },
                     "required": ["analysisType"]
                 }
@@ -44,20 +44,10 @@ const availableTools = [
                 "parameters": {
                     "type": "OBJECT",
                     "properties": {
-                        "analysisType": { "type": "STRING", "description": "The type of analysis to validate the configuration for. Must be one of: 'illuminance', 'rendering', 'dgp', 'df', 'annual-3ph', 'sda-ase', 'annual-5ph', 'imageless-glare'." }
+                        "dimension": { "type": "STRING", "description": "The dimension to change. Must be one of 'width', 'length', or 'height'." },
+                        "value": { "type": "NUMBER", "description": "The new value for the dimension in meters." }
                     },
-                    "required": ["analysisType"]
-                }
-            },
-            {
-                "name": "highlightResultPoint",
-                "description": "Visually highlights sensor points in the 3D view that correspond to the minimum, maximum, or clears existing highlights.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "recipeType": { "type": "STRING", "description": "The recipe for which to generate the package. Must be one of: 'illuminance', 'rendering', 'dgp', 'df', 'annual-3ph', 'sda-ase', 'annual-5ph', 'imageless-glare', 'spectral-lark'." }
-                    },
-                    "required": ["recipeType"]
+                    "required": ["dimension", "value"]
                 }
             },
             {
@@ -513,10 +503,11 @@ async function handleSendMessage(event) {
  */
 async function _executeToolCall(toolCall) {
     const { name, args } = toolCall.functionCall;
-    console.log(`🤖 Executing tool: ${name}`, args);
+    console.log(`👾 Executing tool: ${name}`, args);
 
-    const updateUI = (elementId, value, property = 'value') => {
-        const element = dom[elementId];
+    const updateUI = (elementId, value, property = 'value', parentElement = null) => {
+        const context = parentElement || document;
+        const element = context.querySelector(`#${elementId}`);
         if (element) {
             element[property] = value;
             element.dispatchEvent(new Event('input', { bubbles: true }));
@@ -572,9 +563,13 @@ async function _executeToolCall(toolCall) {
             case 'setGlobalRadianceParameter': {
                 const globalPanel = document.querySelector('[data-template-id="template-global-sim-params"]');
                 if (!globalPanel) throw new Error("Global Simulation Parameters panel is not open.");
-                const paramId = `${args.parameter}-${globalPanel.id.split('-').pop()}`;
-                updateUI(paramId, args.value);
-                return { success: true, message: `Set global parameter -${args.parameter} to ${args.value}.` };
+                // The global panel has static IDs, so we don't need a suffix.
+                const paramId = args.parameter; 
+                if (updateUI(paramId, args.value, 'value', globalPanel)) {
+                    return { success: true, message: `Set global parameter -${args.parameter} to ${args.value}.` };
+                } else {
+                     throw new Error(`Could not find UI control for global parameter '${args.parameter}'.`);
+                }
             }
             case 'configureDaylightingSystem': {
                 updateUI('daylighting-enabled-toggle', args.enable, 'checked');
@@ -597,7 +592,8 @@ async function _executeToolCall(toolCall) {
                 let paramsSet = 0;
                 for (const key in args.parameters) {
                     const elId = `${key}-${panelSuffix}`;
-                    if (updateUI(elId, args.parameters[key])) {
+                    // Pass the specific panel element as the context for the query
+                    if (updateUI(elId, args.parameters[key], 'value', panel)) {
                         paramsSet++;
                     }
                 }
@@ -700,10 +696,10 @@ async function _executeToolCall(toolCall) {
                runButton.click();
                 return { success: true, message: `Initiating the ${args.recipeType} simulation.` };
             }
-            case 'validateProjectState': {
-                const projectData = await project.gatherAllProjectData();
-                const errors = [];
-                const warnings = [];
+            case 'highlightResultPoint': {
+                if (!resultsManager.getActiveData() || resultsManager.getActiveData().length === 0) {
+                    throw new Error("No results data is loaded to highlight.");
+                }
                 const { analysisType } = args;
 
                 // --- General Sanity Checks ---

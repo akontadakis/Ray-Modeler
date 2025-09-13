@@ -30,9 +30,18 @@ function _parseFileContent(content, fileName = '') {
     let results = { data: [], glareResult: null, annualGlareResults: {} };
 
     if (extension === 'dgp' || extension === 'ga') {
-        const parsedGlare = _parseAnnualGlareFile(content, extension);
-        results.data = parsedGlare.data;
-        results.annualGlareResults = parsedGlare.annualGlareResults;
+    const parsedGlare = _parseAnnualGlareFile(content, extension);
+    results.data = parsedGlare.data;
+    results.annualGlareResults = parsedGlare.annualGlareResults;
+    } else if (fileName.toLowerCase().endsWith('circadian_summary.json')) {
+        results.circadianMetrics = JSON.parse(content);
+        results.data = []; // No grid data from summary file
+    } else if (fileName.toLowerCase().endsWith('circadian_per_point.csv')) {
+        results.perPointCircadianData = _parseCircadianCsv(content);
+        // Default the main "data" view to the photopic lux column
+        if (results.perPointCircadianData.Photopic_lux) {
+            results.data = results.perPointCircadianData.Photopic_lux;
+        }
     } else {
         const glareResult = _parseEvalglareContent(content);
         if (glareResult) {
@@ -170,7 +179,32 @@ function _parseIllFileContent(arrayBuffer) {
     }
 
     if (averageData.length === 0) {
-        throw new Error("No data could be parsed from the .ill file.");
+    throw new Error("No data could be parsed from the .ill file.");
     }
+
     return { data: averageData, annualData };
+}
+
+/**
+* Parses the CSV file containing per-point circadian data.
+* @param {string} content The raw CSV text.
+* @returns {object} An object where keys are column headers and values are arrays of numbers.
+*/
+function _parseCircadianCsv(content) {
+    const lines = content.trim().split(/\r?\n/);
+    if (lines.length < 2) return {}; // Need at least a header and one data row
+
+        const headers = lines[0].split(',').map(h => h.trim());
+        const data = {};
+        headers.forEach(h => data[h] = []);
+
+    for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',');
+            if (values.length !== headers.length) continue; // Skip malformed rows
+                headers.forEach((header, j) => {
+                data[header].push(parseFloat(values[j]));
+            });
+    }
+    
+    return data;
 }

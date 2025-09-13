@@ -404,39 +404,34 @@ roomContainer.add(floorGroup);
  * Creates the sensor grid geometry for all selected surfaces.
  */
 export function createSensorGrid() {
-  const dom = getDom();
-  clearGroup(sensorGridObject);
-  clearGroup(taskAreaHelpersGroup); // Clear the old helpers
+    clearGroup(sensorGridObject);
+    const dom = getDom();
+    const { W, L, H } = readParams();
+    const gridParams = getSensorGridParams();
+    if (!gridParams) return;
 
-  const { W, L, H } = readParams();
-  const gridContainer = new THREE.Group();
-  gridContainer.position.set(-W / 2, 0, -L / 2);
-  const gridParams = getSensorGridParams();
+    const gridContainer = new THREE.Group();
+    gridContainer.position.set(-W / 2, 0, -L / 2);
 
-  // Prevent crash if the function is called before UI elements are ready
-  if (!gridParams) return;
+    // Visualize Illuminance Grids (Spheres)
+    if (gridParams.illuminance.enabled && gridParams.illuminance.showIn3D) {
+        const surfaces = ['floor', 'ceiling', 'north', 'south', 'east', 'west'];
+        surfaces.forEach(surface => {
+            if (dom[`grid-${surface}-toggle`]?.checked) {
+                createGridForSurface(surface, W, L, H, gridContainer, 'illuminance', gridParams);
+            }
+        });
+        // Add visual helpers for task/surrounding areas
+        _createTaskAreaVisuals(W, L, gridContainer, gridParams);
+    }
 
-  // Visualize Illuminance Grids (Spheres)
-  if (gridParams.illuminance.enabled && gridParams.illuminance.showIn3D) {
-    if (dom['grid-floor-toggle'].checked) createGridForSurface('floor', W, L, H, gridContainer, 'illuminance', gridParams);
-    if (dom['grid-ceiling-toggle'].checked) createGridForSurface('ceiling', W, L, H, gridContainer, 'illuminance', gridParams);
-    if (dom['grid-north-toggle'].checked) createGridForSurface('north', W, L, H, gridContainer, 'illuminance', gridParams);
-    if (dom['grid-south-toggle'].checked) createGridForSurface('south', W, L, H, gridContainer, 'illuminance', gridParams);
-    if (dom['grid-east-toggle'].checked) createGridForSurface('east', W, L, H, gridContainer, 'illuminance', gridParams);
-    if (dom['grid-west-toggle'].checked) createGridForSurface('west', W, L, H, gridContainer, 'illuminance', gridParams);
-  }
+    // Visualize View Grids (Arrows on floor)
+    if (gridParams.view.enabled && gridParams.view.showIn3D) {
+        createGridForSurface('floor', W, L, H, gridContainer, 'view', gridParams);
+    }
 
-  // Visualize View Grids (Arrows on floor)
-  // Decouple visualization from the main "enabled" toggle, which is for simulation.
-  // The user expects to see the grid if the "Show in 3D" box is checked.
-  if (gridParams?.view.showIn3D) {
-  createGridForSurface('floor', W, L, H, gridContainer, 'view', gridParams);
-  }
-
-  // Add the new visual helpers for the task/surrounding areas
-  _createTaskAreaVisuals(W, L, gridContainer, gridParams);
-  sensorGridObject.add(gridContainer, taskAreaHelpersGroup);
-  }
+    sensorGridObject.add(gridContainer);
+}
 
 /**
  * Generates an array of centered point coordinates along a single axis.
@@ -470,100 +465,77 @@ function generateCenteredPoints(totalLength, spacing) {
  * @returns {THREE.Vector3[]} An array of sensor positions.
  */
 function _generateGridPositions(surface, W, L, H) {
-    const dom = getDom();
-    const gridParams = getSensorGridParams(); // Get the full parameters object
-    let spacing, offset, points1, points2, positionFunc;
+    const gridParams = getSensorGridParams();
     const positions = [];
 
-    // --- Special handling for Floor with Task/Surrounding Areas ---
-    if (surface === 'floor' && gridParams?.illuminance.enabled && dom['grid-floor-toggle']?.checked) {
-        spacing = parseFloat(dom[`floor-grid-spacing`].value);
-        offset = parseFloat(dom[`floor-grid-offset`].value);
-        const floorParams = gridParams.illuminance.floor;
+    const generatePointsInRect = (x, z, width, depth, spacing) => {
+        if (spacing <= 0 || width <= 0 || depth <= 0) return [];
+        const rectPositions = [];
+        const numX = Math.floor(width / spacing);
+        const numZ = Math.floor(depth / spacing);
+        if (numX === 0 || numZ === 0) return [];
+        const startX = x + (width - (numX > 1 ? (numX - 1) * spacing : 0)) / 2;
+        const startZ = z + (depth - (numZ > 1 ? (numZ - 1) * spacing : 0)) / 2;
+        for (let i = 0; i < numX; i++) {
+            for (let j = 0; j < numZ; j++) {
+                rectPositions.push({ x: startX + i * spacing, z: startZ + j * spacing });
+            }
+        }
+        return rectPositions;
+    };
 
-        if (floorParams?.isTaskArea) {
-            const task = floorParams.task;
-
-            // Helper to generate points within a rectangular area, respecting spacing
-            const generatePointsInRect = (x, z, width, depth, spacing) => {
-                if (spacing <= 0 || width <= 0 || depth <= 0) return [];
-                const rectPositions = [];
-                const numX = Math.floor(width / spacing);
-                const numZ = Math.floor(depth / spacing);
-                if (numX === 0 || numZ === 0) return [];
-
-                const startX = x + (width - (numX > 1 ? (numX - 1) * spacing : 0)) / 2;
-                const startZ = z + (depth - (numZ > 1 ? (numZ - 1) * spacing : 0)) / 2;
-
-                for (let i = 0; i < numX; i++) {
-                    for (let j = 0; j < numZ; j++) {
-                        rectPositions.push({ x: startX + i * spacing, z: startZ + j * spacing });
-                    }
-                }
-                return rectPositions;
-            };
-
-            // Generate points for the task area
-            const taskPoints = generatePointsInRect(task.x, task.z, task.width, task.depth, spacing);
-            taskPoints.forEach(p => positions.push(new THREE.Vector3(p.x, offset, p.z)));
-
-            // Generate points for the surrounding area band
-            if (floorParams.hasSurrounding) {
-                const band = floorParams.surroundingWidth;
-                const outerX = Math.max(0, task.x - band);
-                const outerZ = Math.max(0, task.z - band);
-                const outerW = Math.min(W - outerX, task.width + 2 * band);
-                const outerD = Math.min(L - outerZ, task.depth + 2 * band);
-
-                const outerPoints = generatePointsInRect(outerX, outerZ, outerW, outerD, spacing);
-
-                for (const p of outerPoints) {
-                    const isInsideTask = (p.x >= task.x && p.x <= task.x + task.width && p.z >= task.z && p.z <= task.z + task.depth);
-                    if (!isInsideTask) {
-                        positions.push(new THREE.Vector3(p.x, offset, p.z));
-                    }
+    const strategies = {
+        floor: () => {
+            const params = gridParams.illuminance.floor;
+            if (!params.isTaskArea) {
+                const pointsX = generateCenteredPoints(W, params.spacing);
+                const pointsZ = generateCenteredPoints(L, params.spacing);
+                for (const x of pointsX) for (const z of pointsZ) positions.push(new THREE.Vector3(x, params.offset, z));
+            } else {
+                const task = params.task;
+                generatePointsInRect(task.x, task.z, task.width, task.depth, params.spacing)
+                    .forEach(p => positions.push(new THREE.Vector3(p.x, params.offset, p.z)));
+                if (params.hasSurrounding) {
+                    const band = params.surroundingWidth;
+                    const outerX = Math.max(0, task.x - band);
+                    const outerZ = Math.max(0, task.z - band);
+                    const outerW = Math.min(W - outerX, task.width + 2 * band);
+                    const outerD = Math.min(L - outerZ, task.depth + 2 * band);
+                    generatePointsInRect(outerX, outerZ, outerW, outerD, params.spacing).forEach(p => {
+                        if (p.x < task.x || p.x > task.x + task.width || p.z < task.z || p.z > task.z + task.depth) {
+                            positions.push(new THREE.Vector3(p.x, params.offset, p.z));
+                        }
+                    });
                 }
             }
-          } else {
-              // Default behavior: grid the entire floor
-              points1 = generateCenteredPoints(W, spacing);
-              points2 = generateCenteredPoints(L, spacing);
-              for (const p1 of points1) {
-                  for (const p2 of points2) {
-                      positions.push(new THREE.Vector3(p1, offset, p2));
-                  }
-              }
-          }
-          return positions;
-      }
-
-      // --- Original logic for other surfaces ---
-      if (surface === 'ceiling') {
-        spacing = parseFloat(dom[`ceiling-grid-spacing`].value);
-        offset = parseFloat(dom[`ceiling-grid-offset`].value);
-        points1 = generateCenteredPoints(W, spacing);
-        points2 = generateCenteredPoints(L, spacing);
-        positionFunc = (p1, p2) => new THREE.Vector3(p1, H + offset, p2);
-    } else { // Walls
-        spacing = parseFloat(dom['wall-grid-spacing'].value);
-        offset = parseFloat(dom['wall-grid-offset'].value);
-        points2 = generateCenteredPoints(H, spacing);
-        const wallLength = (surface === 'north' || surface === 'south') ? W : L;
-        points1 = generateCenteredPoints(wallLength, spacing);
-        switch (surface) {
-            case 'north': positionFunc = (p1, p2) => new THREE.Vector3(p1, p2, offset); break;
-            case 'south': positionFunc = (p1, p2) => new THREE.Vector3(p1, p2, L - offset); break;
-            case 'west': positionFunc = (p1, p2) => new THREE.Vector3(offset, p2, p1); break;
-            case 'east': positionFunc = (p1, p2) => new THREE.Vector3(W - offset, p2, p1); break;
-            default: return [];
+        },
+        ceiling: () => {
+            const params = gridParams.illuminance.ceiling;
+            const pointsX = generateCenteredPoints(W, params.spacing);
+            const pointsZ = generateCenteredPoints(L, params.spacing);
+            for (const x of pointsX) for (const z of pointsZ) positions.push(new THREE.Vector3(x, H + params.offset, z));
+        },
+        walls: (orientation) => {
+            const params = gridParams.illuminance.walls;
+            const wallLength = (orientation === 'north' || orientation === 'south') ? W : L;
+            const points1 = generateCenteredPoints(wallLength, params.spacing);
+            const points2 = generateCenteredPoints(H, params.spacing);
+            const positionFuncs = {
+                north: (p1, p2) => new THREE.Vector3(p1, p2, params.offset),
+                south: (p1, p2) => new THREE.Vector3(p1, p2, L - params.offset),
+                west:  (p1, p2) => new THREE.Vector3(params.offset, p2, p1),
+                east:  (p1, p2) => new THREE.Vector3(W - params.offset, p2, p1),
+            };
+            for (const p1 of points1) for (const p2 of points2) positions.push(positionFuncs[orientation](p1, p2));
         }
+    };
+
+    if (surface === 'ceiling' || surface === 'floor') {
+        strategies[surface]();
+    } else if (['north', 'south', 'east', 'west'].includes(surface)) {
+        strategies.walls(surface);
     }
 
-    for (const p1 of points1) {
-        for (const p2 of points2) {
-            positions.push(positionFunc(p1, p2));
-        }
-    }
     return positions;
 }
 

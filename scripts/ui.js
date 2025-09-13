@@ -386,7 +386,6 @@ const ids = [
     'ai-assistant-button', 'panel-ai-assistant', 'ai-chat-messages', 'ai-chat-form', 'ai-chat-input', 'ai-chat-send',
     'ai-settings-btn', 'ai-settings-modal', 'ai-settings-close-btn', 'ai-settings-form', 'ai-provider-select', 'ai-model-select', 'ai-api-key-input', 'openrouter-info-box',
 
-
     // Project Access Prompt
     'project-access-prompt', 'select-folder-btn', 'dismiss-prompt-btn',
 
@@ -426,9 +425,14 @@ const ids = [
     'proactive-suggestion-container',
 
     // Lighting Energy Dashboard
-    'lighting-energy-dashboard', 'lpd-val', 'energy-val', 'energy-savings-val'
-];
+    'lighting-energy-dashboard', 'lpd-val', 'energy-val', 'energy-savings-val',
 
+    // Circadian Dashboard
+    'circadian-metrics-dashboard', 'cs-gauge', 'cs-value', 'eml-value', 'cct-value', 'well-compliance-checklist',
+
+    // Metric Selector for 3D View
+    'metric-selector-container', 'metric-selector'
+];
 
     ids.forEach(id => { const el = document.getElementById(id); if(el) dom[id] = el; });
     
@@ -1104,6 +1108,12 @@ export async function setupEventListeners() {
     dom['view-mode-b-btn']?.addEventListener('click', () => setViewMode('b'));
     dom['view-mode-diff-btn']?.addEventListener('click', () => setViewMode('diff'));
 
+    dom['metric-selector']?.addEventListener('change', (e) => {
+        resultsManager.setActiveMetricType(e.target.value);
+        updateSensorGridColors(resultsManager.getActiveData());
+        updateResultsDashboard();
+    });
+
 
     // --- HDR Viewer Button Listener ---
     dom['view-hdr-btn']?.addEventListener('click', () => {
@@ -1377,7 +1387,11 @@ function render2DHeatmap() {
 
         // Set the gizmo's visibility based on the default checkbox state.
         setGizmoVisibility(dom['gizmo-toggle'].checked);
-    }, { once: true }); // The event should only fire once.
+        }, { once: true }); // The event should only fire once.
+
+
+        // --- AI Settings Modal ---
+        _setupAiSettingsModal();
 
 
         // --- Electron-Specific Listeners ---
@@ -1448,6 +1462,46 @@ function render2DHeatmap() {
 }
 
 // --- UI LOGIC & EVENT HANDLERS ---
+
+// --- UI LOGIC & EVENT HANDLERS ---
+
+/**
+
+Populates and shows the 3D view metric selector based on available spectral data.
+* @param {object} spectralData - The spectral results object from the results manager.
+*/
+function updateMetricSelector(spectralData) {
+    const selector = dom['metric-selector'];
+    const container = dom['metric-selector-container'];
+    if (!selector || !container) return;
+
+    selector.innerHTML = '';
+
+    const metricMap = {
+        'illuminance': 'Illuminance (lux)',
+        'Photopic_lux': 'Photopic Illuminance (lux)',
+        'EML': 'Equivalent Melanopic Lux (EML)',
+        'CS': 'Circadian Stimulus (CS)',
+        'CCT': 'Correlated Color Temperature (CCT)'
+    };
+
+    for (const key in spectralData) {
+    if (metricMap[key]) {
+    const option = document.createElement('option');
+        option.value = key;
+        option.textContent = metricMap[key];
+        selector.appendChild(option);
+        }
+    }
+
+    if (selector.options.length > 0) {
+        container.classList.remove('hidden');
+        selector.value = resultsManager.activeMetricType || 'illuminance';
+    } else {
+        container.classList.add('hidden');
+    }
+}
+
 /**
 * Toggles the visibility of an individual floating panel, allowing multiple
 * panels to be open at once with a clear visual offset.
@@ -1590,6 +1644,7 @@ export function initializePanelControls(win) {
 
     const header = win.querySelector('.window-header');
     const collapseIcon = win.querySelector('.collapse-icon');
+    const content = win.querySelector('.window-content');
     const resizeHandles = win.querySelectorAll('.resize-handle-edge, .resize-handle-corner');
     const closeIcon = win.querySelector('.window-icon-close');
     const maxIcon = win.querySelector('.window-icon-max');
@@ -1598,14 +1653,41 @@ export function initializePanelControls(win) {
     win.addEventListener('mousedown', () => { maxZ++; win.style.zIndex = maxZ; }, true);
 
     // Collapse/Expand button
-    if (collapseIcon) {
+    if (collapseIcon && content) {
         collapseIcon.addEventListener('click', (e) => {
             e.stopPropagation();
-            const isExpanding = win.classList.contains('collapsed');
-            win.classList.toggle('collapsed');
-            if (isExpanding) ensureWindowInView(win);
-            if (win.id === 'panel-project' && !win.classList.contains('collapsed') && map) {
-                setTimeout(() => map.invalidateSize(), 10);
+            const isCollapsed = win.classList.contains('collapsed');
+
+            if (isCollapsed) {
+                // EXPANDING
+                win.classList.remove('collapsed');
+                content.style.display = '';
+                resizeHandles.forEach(h => h.style.display = '');
+
+                requestAnimationFrame(() => {
+                    // Restore height and min-height from data attributes.
+                    win.style.height = win.dataset.preCollapseHeight || '';
+                    win.style.minHeight = win.dataset.preCollapseMinHeight || ''; // Restore min-height
+                    delete win.dataset.preCollapseHeight;
+                    delete win.dataset.preCollapseMinHeight; // Clean up
+                    ensureWindowInView(win);
+                    if (win.id === 'panel-project' && map) {
+                        setTimeout(() => map.invalidateSize(), 10);
+                    }
+                });
+            } else {
+                // COLLAPSING
+                // Store the current computed height and any inline min-height for reliability.
+                win.dataset.preCollapseHeight = getComputedStyle(win).height;
+                win.dataset.preCollapseMinHeight = win.style.minHeight; // Store existing min-height
+
+                win.classList.add('collapsed');
+                content.style.display = 'none';
+                resizeHandles.forEach(h => h.style.display = 'none');
+
+                // Set height to auto and explicitly override min-height to allow the panel to shrink.
+                win.style.height = 'auto';
+                win.style.minHeight = '0px'; // This is the crucial fix.
             }
         });
     }
@@ -1676,30 +1758,57 @@ export function makeDraggable(element, handle) {
             if (e.target.closest('.window-controls') || e.target.classList.contains('resize-handle')) return;
             e.preventDefault();
             const transform = getComputedStyle(element).transform;
-            const matrix = transform !== 'none' ? new DOMMatrix(transform) : new DOMMatrix();
-            xOffset = matrix.m41; yOffset = matrix.m42;
+            
+            if (transform === 'none') {
+                // If not positioned by transform, use offsetLeft/Top as the starting point.
+                // This correctly handles newly created panels positioned by standard CSS.
+                xOffset = element.offsetLeft;
+                yOffset = element.offsetTop;
+            } else {
+                // If already transformed, read the position from the matrix.
+                const matrix = new DOMMatrix(transform);
+                xOffset = matrix.m41;
+                yOffset = matrix.m42;
+            }
+            
             initialX = e.clientX - xOffset; initialY = e.clientY - yOffset;
             controls.enabled = false;
             document.onmouseup = () => { document.onmouseup = null; document.onmousemove = null; controls.enabled = true; };
             document.onmousemove = (e) => {
                 e.preventDefault();
                 if (element.classList.contains('maximized')) return;
-                xOffset = e.clientX - initialX; yOffset = e.clientY - initialY;
 
-            // Constrain the panel within the viewport
-            const viewportWidth = window.innerWidth;
-            const viewportHeight = window.innerHeight;
+                // Once dragging begins, ensure transform is the sole positioning method going forward.
+                if (element.style.top || element.style.left) {
+                    element.style.top = '';
+                    element.style.left = '';
+                }
+                
+              xOffset = e.clientX - initialX; yOffset = e.clientY - initialY;
+
+            // Constrain the panel within its container using viewport-relative coordinates for robustness
+            const container = element.parentElement;
+            const containerRect = container.getBoundingClientRect();
             const elementWidth = element.offsetWidth;
             const elementHeight = element.offsetHeight;
 
-            // Clamp X and Y offsets
-            const clampedX = Math.max(0, Math.min(xOffset, viewportWidth - elementWidth));
-            const clampedY = Math.max(0, Math.min(yOffset, viewportHeight - elementHeight));
+            // The desired 'left' position of the element in viewport coordinates is containerRect.left + xOffset
+            // We clamp this desired viewport position to stay within the container's bounds.
+            const minLeftEdge = containerRect.left;
+            const maxLeftEdge = containerRect.right - elementWidth;
+            const desiredLeftEdge = containerRect.left + xOffset;
+            const clampedLeftEdge = Math.max(minLeftEdge, Math.min(desiredLeftEdge, maxLeftEdge));
 
-            element.style.transform = `translate3d(${clampedX}px, ${clampedY}px, 0)`;
+            // Convert the clamped viewport position back to a transform value (relative to the container)
+            const finalX = clampedLeftEdge - containerRect.left;
+
+            // For vertical clamping, we can still use the simpler method against the viewport height
+            const clampedY = Math.max(0, Math.min(yOffset, window.innerHeight - elementHeight));
+
+            element.style.transform = `translate3d(${finalX}px, ${clampedY}px, 0)`;
         };
     };
-}
+  }
 
 export function makeResizable(element, handles) {
     handles.forEach(handle => {
@@ -1765,12 +1874,13 @@ export function makeResizable(element, handles) {
                 newWidth = Math.max(minWidth, newWidth);
                 newHeight = Math.max(minHeight, newHeight);
 
-                // Constrain position within viewport
-                const viewportWidth = window.innerWidth;
-                const viewportHeight = window.innerHeight;
+                // Constrain position within the container
+                const container = element.parentElement;
+                const maxX = container.clientWidth - newWidth;
+                const maxY = window.innerHeight - newHeight;
 
-                newLeft = Math.max(0, Math.min(newLeft, viewportWidth - newWidth));
-                newTop = Math.max(0, Math.min(newTop, viewportHeight - newHeight));
+                newLeft = Math.max(0, Math.min(newLeft, maxX));
+                newTop = Math.max(0, Math.min(newTop, maxY));
 
                 // Apply final styles
                 element.style.width = newWidth + 'px';
@@ -1778,7 +1888,7 @@ export function makeResizable(element, handles) {
                 element.style.transform = `translate3d(${newLeft}px, ${newTop}px, 0)`;
             };
 
-            document.onmouseup = function() {
+                document.onmouseup = function() {
                 document.onmousemove = null;
                 document.onmouseup = null;
                 controls.enabled = true;
@@ -2794,7 +2904,7 @@ async function handleResultsFile(file, key) {
         const lightingMetrics = resultsManager.datasets[loadedKey].lightingMetrics;
         const energyMetrics = resultsManager.datasets[loadedKey].lightingEnergyMetrics;
         updateAnnualMetricsDashboard(metrics, lightingMetrics);
-        if (energyMetrics) {
+            if (energyMetrics) {
             const { updateLightingEnergyDashboard } = await import('./annualDashboard.js');
             updateLightingEnergyDashboard(energyMetrics);
         }
@@ -2802,6 +2912,20 @@ async function handleResultsFile(file, key) {
     } else {
         clearAnnualDashboard();
         clearTimeSeriesExplorer();
+    }
+
+    // Check for and update circadian metrics dashboard
+    const loadedDataset = resultsManager.datasets[loadedKey];
+    if (loadedDataset && loadedDataset.circadianMetrics) {
+        const { updateCircadianDashboard } = await import('./annualDashboard.js');
+        updateCircadianDashboard(loadedDataset.circadianMetrics);
+    }
+
+    // Check for per-point spectral data and populate the metric selector
+    if (loadedDataset && loadedDataset.spectralResults && Object.keys(loadedDataset.spectralResults).length > 0) {
+        updateMetricSelector(loadedDataset.spectralResults);
+    } else {
+        dom['metric-selector-container']?.classList.add('hidden');
     }
 
     // Show summary for dataset B if it was just loaded
@@ -3644,7 +3768,7 @@ async function handleRenderPreview() {
     }
 
     const btn = dom['render-section-preview-btn'];
-    const btnSpan = btn.querySelector('span');
+     const btnSpan = btn.querySelector('span');
     const originalText = btnSpan.textContent;
     btn.disabled = true;
     btnSpan.textContent = 'Rendering...';
@@ -3676,6 +3800,71 @@ async function handleRenderPreview() {
         btn.disabled = false;
         btnSpan.textContent = originalText;
     }
+}
+
+/**
+ * Sets up event listeners and logic for the AI Assistant settings modal.
+ * @private
+ */
+function _setupAiSettingsModal() {
+    const {
+        'ai-settings-btn': settingsBtn,
+        'ai-settings-modal': modal,
+        'ai-settings-close-btn': closeBtn,
+        'ai-settings-form': form,
+        'ai-provider-select': providerSelect,
+        'ai-model-select': modelSelect,
+        'ai-api-key-input': apiKeyInput,
+        'openrouter-info-box': orInfoBox
+    } = dom;
+
+    if (!settingsBtn || !modal || !closeBtn || !form) return;
+
+    const models = {
+        gemini: ['gemini-pro', 'gemini-1.5-pro-latest', 'gemini-1.5-flash-latest'],
+        openrouter: [
+            'google/gemini-pro', 'google/gemini-flash-1.5', 'openai/gpt-4o', 'anthropic/claude-3-haiku'
+        ]
+    };
+
+    const updateModelList = () => {
+        const provider = providerSelect.value;
+        modelSelect.innerHTML = '';
+        models[provider].forEach(modelName => {
+            const option = document.createElement('option');
+            option.value = modelName;
+            option.textContent = modelName;
+            modelSelect.appendChild(option);
+        });
+        orInfoBox.classList.toggle('hidden', provider !== 'openrouter');
+    };
+
+    const openModal = () => {
+        updateModelList();
+        // Load saved settings from localStorage
+        const savedProvider = localStorage.getItem('ai_provider') || 'gemini';
+        providerSelect.value = savedProvider;
+        updateModelList(); // Update again to set correct list
+        modelSelect.value = localStorage.getItem('ai_model') || models[savedProvider][0];
+        apiKeyInput.value = localStorage.getItem('ai_api_key') || '';
+        modal.classList.replace('hidden', 'flex');
+        modal.style.zIndex = getNewZIndex();
+    };
+
+    const closeModal = () => modal.classList.replace('flex', 'hidden');
+
+    settingsBtn.addEventListener('click', openModal);
+    closeBtn.addEventListener('click', closeModal);
+    providerSelect.addEventListener('change', updateModelList);
+
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        localStorage.setItem('ai_provider', providerSelect.value);
+        localStorage.setItem('ai_model', modelSelect.value);
+        localStorage.setItem('ai_api_key', apiKeyInput.value);
+        showAlert('AI settings saved successfully.', 'Settings Saved');
+        closeModal();
+    });
 }
 
 /**

@@ -125,6 +125,84 @@ function transformAndFormatPoint(localPoint, W, L, cosA, sinA) {
   return `${rx.toFixed(4)} ${ry.toFixed(4)} ${p.z.toFixed(4)}`; // Z is height
 }
 
+/**
+ * Transforms a point from Three.js scene coordinates (Y-up) to a Radiance world coordinate array (Z-up).
+ * @param {Array<number>} threePoint - An array representing the point in Three.js coordinates [X_width, Y_height, Z_depth].
+ * @param {number} W - Room width.
+ * @param {number} L - Room length.
+ * @param {number} cosA - Cosine of the room orientation angle.
+ * @param {number} sinA - Sine of the room orientation angle.
+ * @returns {Array<number>} A Radiance coordinate array [rotated_x, rotated_y, height_z].
+ */
+export function transformThreePointToRadianceArray(threePoint, W, L, cosA, sinA) {
+    const [threeX_width, threeY_height, threeZ_depth] = threePoint;
+
+    // Center the point on Radiance's XY (ground) plane for rotation
+    const centered_x = threeX_width - W / 2;
+    const centered_y = threeZ_depth - L / 2; // Use Three.js Z (depth) for Radiance Y
+
+    // Rotate around the Z-axis (up axis in Radiance)
+    const rx = centered_x * cosA - centered_y * sinA;
+    const ry = centered_x * sinA + centered_y * cosA;
+
+    // Return the final Radiance coordinate array
+    return [rx, ry, threeY_height];
+}
+
+/**
+ * Transforms a vector from Three.js scene coordinates (Y-up) to a Radiance world vector array (Z-up).
+ * @param {Array<number>} threeVector - An array representing the vector in Three.js coordinates [x, y, z].
+ * @param {number} cosA - Cosine of the room orientation angle.
+ * @param {number} sinA - Sine of the room orientation angle.
+ * @returns {Array<number>} A Radiance vector array [rotated_x, rotated_y, z].
+ */
+export function transformThreeVectorToRadianceArray(threeVector, cosA, sinA) {
+    const [threeX, threeY, threeZ] = threeVector;
+
+    // Map Three.js vector components [x, y_height, z_depth] to Radiance's [x, y_depth, z_height]
+    const rad_x = threeX;
+    const rad_y_depth = threeZ;
+    const rad_z_height = threeY;
+
+    // Rotate the vector components on the XY (ground) plane
+    const rotatedX = rad_x * cosA - rad_y_depth * sinA;
+    const rotatedY = rad_x * sinA + rad_y_depth * cosA;
+
+    return [rotatedX, rotatedY, rad_z_height];
+}
+
+/**
+ * Generates the content for a Radiance .vf (view file).
+ * @param {object} viewpointData - The viewpoint data object from the project.
+ * @param {object} roomData - The room geometry data object.
+ * @returns {string} The content for the .vf file.
+ */
+export function generateViewpointFileContent(viewpointData, roomData) {
+    const { 'view-type': viewType, 'view-pos-x': vpx, 'view-pos-y': vpy, 'view-pos-z': vpz, 'view-dir-x': vdx, 'view-dir-y': vdy, 'view-dir-z': vdz, 'view-fov': fov } = viewpointData;
+    const { width: W, length: L, 'room-orientation': roomOrientation } = roomData;
+
+    const alphaRad = THREE.MathUtils.degToRad(roomOrientation);
+    const cosA = Math.cos(alphaRad);
+    const sinA = Math.sin(alphaRad);
+
+    const pos_Three = [vpx, vpy, vpz];
+    const dir_Three = [vdx, vdy, vdz];
+
+    const rad_vp_array = transformThreePointToRadianceArray(pos_Three, W, L, cosA, sinA);
+    const rad_vd_array = transformThreeVectorToRadianceArray(dir_Three, cosA, sinA);
+
+    const rad_vp = rad_vp_array.map(c => c.toFixed(4)).join(' ');
+    const rad_vd = rad_vd_array.map(c => c.toFixed(4)).join(' ');
+
+    const viewTypeMap = { 'v': '-vtv', 'h': '-vth', 'c': '-vtc', 'l': '-vtl', 'a': '-vta' };
+    const radViewType = viewTypeMap[viewType] || '-vtv';
+
+    const vfov = (viewType === 'h' || viewType === 'a') ? 180 : fov;
+    const hfov = vfov;
+
+    return `${radViewType} -vp ${rad_vp} -vd ${rad_vd} -vu 0 0 1 -vh ${hfov} -vv ${vfov}`;
+}
+
 export function generateRadFileContent(options = {}) {
   const { channelSet } = options; // e.g., 'c1-3', 'c4-6', 'c7-9' for spectral runs
   const dom = getDom();

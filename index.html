@@ -152,7 +152,6 @@
     </div>
 
     <main id="window-container" class="relative">
-        
         <div id="panel-project" class="floating-window ui-panel hidden">
             <div class="window-header">
                 <span>Project Setup</span>
@@ -170,27 +169,26 @@
                         <div><label for="building-type" class="label">Building Type</label><select id="building-type"><option value="" disabled selected>Select Building Type</option><option>Office</option><option>Classroom</option><option>Laboratory</option><option>Libraries</option><option>Lobbies</option><option>Residential</option><option>Creative Arts</option></select></div>
                         <div><label for="radiance-path" class="label">Radiance Installation Path</label><input type="text" id="radiance-path" placeholder="Path is OS-dependent..."></div>
                     </div>
-                    <div class="form-column">
-                        <div style="flex-grow: 1; display: flex; flex-direction: column;">
-                            <label class="label">Climate Data Source</label>
-                            <div class="flex items-center">
-                                <button id="upload-epw-btn" class="btn btn-secondary"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="mr-2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg><span>Upload EPW File</span></button>
-                                <p id="epw-file-name" class="text-sm text-gray-500 ml-4 truncate max-w-[150px]"></p>
-                            </div>
-                            <input type="file" id="epw-file-input" class="hidden" accept=".epw" style="display: none;">
+                <div class="form-column">
+                    <div style="flex-grow: 1; display: flex; flex-direction: column;">
+                        <label class="label">Climate Data Source</label>
+                        <div class="flex items-center">
+                            <button id="upload-epw-btn" class="btn btn-secondary"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="mr-2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg><span>Upload EPW File</span></button>
+                            <p id="epw-file-name" class="text-sm text-gray-500 ml-4 truncate max-w-[150px]"></p>
                         </div>
-                        <div id="location-inputs-container" style="display: none;">
-                            <label class="label">Location</label>
-                            <div class="location-grid">
-                                <input type="text" id="latitude" placeholder="Latitude e.g., 40.71">
-                                <input type="text" id="longitude" placeholder="Longitude e.g., -74.00">
-                            </div>
+                        <input type="file" id="epw-file-input" class="hidden" accept=".epw" style="display: none;">
+                    </div>
+                    <div id="location-inputs-container" style="display: none;">
+                        <label class="label">Location</label>
+                        <div class="location-grid">
+                            <input type="text" id="latitude" placeholder="Latitude e.g., 40.71">
+                            <input type="text" id="longitude" placeholder="Longitude e.g., -74.00">
                         </div>
-                        <div style="flex-grow: 1; display: flex; flex-direction: column;">
-                            <label class="label">Map</label>
-                            <div id="map"></div>
-                        </div>
-
+                    </div>
+                    <div style="flex-grow: 1; display: flex; flex-direction: column;">
+                        <label class="label">Map</label>
+                        <div id="map"></div>
+                    </div>
                         <div class="space-y-3 pt-4 mt-4 border-t border-[--grid-color]">
                             <label for="occupancy-toggle" class="flex items-center cursor-pointer w-full">
                                 <input type="checkbox" id="occupancy-toggle">
@@ -232,16 +230,16 @@
                     </div>
                 </div>
             </div>
-                <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+        <div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+    </div>
+<div id="panel-dimensions" class="floating-window ui-panel hidden">
+  <div class="window-header">
+    <span>Dimensions</span>
+        <div class="window-controls">
+            <div class="window-icon-max"></div>
+                <div class="collapse-icon"></div>
+                <div class="window-icon-close"></div>
             </div>
-        <div id="panel-dimensions" class="floating-window ui-panel hidden">
-            <div class="window-header">
-                <span>Dimensions</span>
-                <div class="window-controls">
-                    <div class="window-icon-max"></div>
-                    <div class="collapse-icon"></div>
-                    <div class="window-icon-close"></div>
-                </div>
             </div>
             <div class="window-content space-y-4">
                 <div><label class="label" for="width">Width (X)</label><div class="flex items-center space-x-4 mt-1"><input type="range" id="width" min="1" max="20" value="3.4" step="0.1"><span id="width-val" class="data-value font-mono w-12 text-left">3.4m</span></div></div>
@@ -251,12 +249,12 @@
                 <div class="pt-4 mt-4 border-t border-[--grid-color]">
                 <div>
                     <label class="label" for="surface-thickness">Surface Thickness</label>
-                    <div class="flex items-center space-x-4 mt-1">
-                        <input type="range" id="surface-thickness" min="0.00" max="1.0" value="0.15" step="0.01">
-                        <span id="surface-thickness-val" class="data-value font-mono w-12 text-left">0.20m</span>
-                    </div>
+                <div class="flex items-center space-x-4 mt-1">
+                    <input type="range" id="surface-thickness" min="0.00" max="1.0" value="0.20" step="0.01">
+                    <span id="surface-thickness-val" class="data-value font-mono w-12 text-left">0.20m</span>
                 </div>
             </div>
+        </div>
         </div>
         <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
         </div>
@@ -424,11 +422,11 @@
                 <div><label class="label" for="win-depth-pos-e">Window Depth Position (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="win-depth-pos-e" min="0" max="0.2" value="0.1" step="0.01"><span id="win-depth-pos-e-val" class="data-value font-mono w-12 text-left">0.10m</span></div></div>
             </div>
            <div id="manual-controls-e" class="hidden space-y-5">
-            <div><label class="label" for="win-width-e">Win. Width (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="win-width-e" min="0.1" max="20" value="1.5" step="0.1"><span id="win-width-e-val" class="data-value font-mono w-12 text-left">1.5m</span></div></div>
-            <div><label class="label" for="win-height-e">Win. Height (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="win-height-e" min="0.1" max="10" value="1.2" step="0.1"><span id="win-height-e-val" class="data-value font-mono w-12 text-left">1.2m</span></div></div>
-            <div><label class="label" for="sill-height-e">Sill Height (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="sill-height-e" min="0" max="10" value="0.05" step="0.1"><span id="sill-height-e-val" class="data-value font-mono w-12 text-left">1.0m</span></div></div>
-            <div><label class="label" for="win-depth-pos-e-manual">Window Depth Position (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="win-depth-pos-e-manual" min="0" max="0.2" value="0.1" step="0.01"><span id="win-depth-pos-e-val-manual" class="data-value font-mono w-12 text-left">0.10m</span></div></div>
-        </div>
+                <div><label class="label" for="win-width-e">Win. Width (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="win-width-e" min="0.1" max="20" value="1.5" step="0.1"><span id="win-width-e-val" class="data-value font-mono w-12 text-left">1.5m</span></div></div>
+                <div><label class="label" for="win-height-e">Win. Height (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="win-height-e" min="0.1" max="10" value="1.2" step="0.1"><span id="win-height-e-val" class="data-value font-mono w-12 text-left">1.2m</span></div></div>
+                <div><label class="label" for="sill-height-e">Sill Height (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="sill-height-e" min="0" max="10" value="1.0" step="0.1"><span id="sill-height-e-val" class="data-value font-mono w-12 text-left">1.0m</span></div></div>
+                <div><label class="label" for="win-depth-pos-e-manual">Window Depth Position (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="win-depth-pos-e-manual" min="0" max="0.2" value="0.1" step="0.01"><span id="win-depth-pos-e-val-manual" class="data-value font-mono w-12 text-left">0.10m</span></div></div>
+            </div>
         <div class="shading-section-container space-y-4 pt-4 mt-4 border-t border-dashed border-[--grid-color]">
             <h4 class="font-semibold text-sm uppercase text-gray-700">East Wall Shading</h4>
                 <label class="flex items-center cursor-pointer" for="shading-e-toggle"><input type="checkbox" id="shading-e-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Shading on this Wall</span></label>
@@ -551,16 +549,26 @@
             </div>
                     <div class="mt-2">
                         <label class="label" for="frame-depth">Frame Depth (m)</label>
-                        <div class="flex items-center space-x-3 mt-1"><input type="range" id="frame-depth" min="0.00" max="1.00" value="0.05" step="0.01"><span id="frame-depth-val" class="data-value font-mono w-12 text-left">0.01m</span></div>
+                        <div class="flex items-center space-x-3 mt-1"><input type="range" id="frame-depth" min="0.00" max="1.00" value="0.05" step="0.01"><span id="frame-depth-val" class="data-value font-mono w-12 text-left">0.05m</span></div>
                     </div>
                 </div>
             </div>
-        </div>
-            <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-        </div>
+        </div> 
+        <div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+    </div>
 
-        <div id="panel-lighting" class="floating-window ui-panel hidden">
-          <div class="window-header">
+
+
+
+
+
+
+
+
+
+
+     <div id="panel-lighting" class="floating-window ui-panel hidden">
+        <div class="window-header">
               <span>Artificial Lighting</span>
               <div class="window-controls">
                   <div class="window-icon-max"></div>
@@ -630,13 +638,14 @@
                           <div><label for="spot-rgb-b" class="label !mb-1">Blue</label><input type="number" id="spot-rgb-b" value="800"></div>
                       </div>
                       <h4 class="font-semibold text-xs uppercase text-[--text-secondary] pt-2">Directionality</h4>
-                      <div><label for="spot-cone-angle" class="label !mb-1">Cone Angle (°)</label><input type="number" id="spot-cone-angle" value="45"></div>
-                      <div>
-                          <label class="label !mb-1">Direction Vector (dx, dy, dz)<span class="info-icon">i<span class="info-popover">The vector's direction aims the light. Its length creates a 'focal length' effect (1/(r+e)² falloff). Use Normalize to disable this for a standard 1/r² falloff.</span></span></label>
-                          <div class="grid grid-cols-3 gap-2"><input type="number" id="spot-dir-x" value="0" step="0.1"><input type="number" id="spot-dir-y" value="0" step="0.1"><input type="number" id="spot-dir-z" value="-1" step="0.1"></div>
-                          <label for="spot-normalize-toggle" class="flex items-center cursor-pointer mt-3"><input type="checkbox" id="spot-normalize-toggle" checked><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Normalize Vector</span></label>
-                      </div>
+                      <div><label for="spot-cone-angle" class="label !mb-1">Cone Angle (°)</label><input type="number" id="spot-cone-angle" value="45">
+                    </div>
+                  <div>
+                      <label class="label !mb-1">Direction Vector (dx, dy, dz)<span class="info-icon">i<span class="info-popover">The vector's direction aims the light. Its length creates a 'focal length' effect (1/(r+e)² falloff). Use Normalize to disable this for a standard 1/r² falloff.</span></span></label>
+                      <div class="grid grid-cols-3 gap-2"><input type="number" id="spot-dir-x" value="0" step="0.1"><input type="number" id="spot-dir-y" value="0" step="0.1"><input type="number" id="spot-dir-z" value="-1" step="0.1"></div>
+                      <label for="spot-normalize-toggle" class="flex items-center cursor-pointer mt-3"><input type="checkbox" id="spot-normalize-toggle" checked><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Normalize Vector</span></label>
                   </div>
+              </div>
 
                   <div id="params-glow" class="light-param-section hidden space-y-3">
                       <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Emission (W/sr/m²)</h4>
@@ -753,9 +762,9 @@
                       <div id="daylight-sensor-controls-container">
                           <div id="daylight-sensor-1-controls" class="space-y-3 pt-3 border-t border-dashed border-[--grid-color]">
                             <h5 class="font-semibold text-sm">Daylight Sensor 1</h5>
-                            <div><label class="label text-xs">Position X</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="daylight-sensor1-x" min="0" max="20" value="1.0" step="0.1"><span id="daylight-sensor1-x-val" class="data-value font-mono w-12 text-left">1.0m</span></div></div>
-                            <div><label class="label text-xs">Position Y (Height)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="daylight-sensor1-y" min="0" max="10" value="0.8" step="0.1"><span id="daylight-sensor1-y-val" class="data-value font-mono w-12 text-left">0.8m</span></div></div>
-                            <div><label class="label text-xs">Position Z (Depth)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="daylight-sensor1-z" min="0" max="20" value="1.5" step="0.1"><span id="daylight-sensor1-z-val" class="data-value font-mono w-12 text-left">1.5m</span></div></div>
+                            <div><label class="label text-xs" for="daylight-sensor1-x">Position X</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="daylight-sensor1-x" min="0" max="20" value="1.0" step="0.1"><span id="daylight-sensor1-x-val" class="data-value font-mono w-12 text-left">1.0m</span></div></div>
+                            <div><label class="label text-xs" for="daylight-sensor1-y">Position Y (Height)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="daylight-sensor1-y" min="0" max="10" value="0.8" step="0.1"><span id="daylight-sensor1-y-val" class="data-value font-mono w-12 text-left">0.8m</span></div></div>
+                            <div><label class="label text-xs" for="daylight-sensor1-z">Position Z (Depth)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="daylight-sensor1-z" min="0" max="20" value="1.5" step="0.1"><span id="daylight-sensor1-z-val" class="data-value font-mono w-12 text-left">1.5m</span></div></div>
                             <div class="pt-2">
                                 <label class="label text-xs">Direction Vector (Normal)</label>
                                 <div><label class="label text-xs">Direction X</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="daylight-sensor1-dir-x" min="-1" max="1" value="0" step="0.05"><span id="daylight-sensor1-dir-x-val" class="data-value font-mono w-12 text-left">0.00</span></div></div>
@@ -793,16 +802,20 @@
                           <div><label class="label text-xs flex justify-between" for="daylighting-min-power-frac"><span>Min Input Power Fraction</span><span id="daylighting-min-power-frac-val" class="data-value font-mono">0.30</span></label><input type="range" id="daylighting-min-power-frac" min="0" max="1" value="0.3" step="0.01"></div>
                           <div><label class="label text-xs flex justify-between" for="daylighting-min-light-frac"><span>Min Light Output Fraction</span><span id="daylighting-min-light-frac-val" class="data-value font-mono">0.20</span></label><input type="range" id="daylighting-min-light-frac" min="0" max="1" value="0.2" step="0.01"></div>
                       </div>
-                      <div id="daylight-stepped-params" class="hidden space-y-3">
-                          <div><label for="daylighting-steps" class="label">Number of Steps (Excl. Off)</label><input type="number" id="daylighting-steps" value="3" min="1" step="1"></div>
-                      </div>
-                      <div class="param-section"><label for="daylighting-availability-schedule" class="label">Availability Schedule (.csv) (Optional)</label><input type="file" id="daylighting-availability-schedule" accept=".csv" class="w-full text-sm"></div>
+                     <div id="daylight-stepped-params" class="hidden space-y-3">
+                        <div><label for="daylighting-steps" class="label">Number of Steps (Excl. Off)</label><input type="number" id="daylighting-steps" value="3" min="1" step="1"></div>
                     </div>
+                    <div class="param-section"><label for="daylighting-availability-schedule" class="label">Availability Schedule (.csv) (Optional)</label><input type="file" id="daylighting-availability-schedule" accept=".csv" class="w-full text-sm"></div>
+                  </div>
             </div>
-                <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-            </div>
-            <div id="panel-materials" class="floating-window ui-panel hidden">
-            <div class="window-header">
+            <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+        </div>
+
+
+
+
+        <div id="panel-materials" class="floating-window ui-panel hidden">
+          <div class="window-header">
                 <span>Material Properties</span>
                 <div class="window-controls">
                     <div class="window-icon-max"></div>
@@ -820,15 +833,15 @@
                             <button id="wall-mode-srd" class="btn" data-mode="srd">Spectral</button>
                         </div>
                     </div>
-                    <div id="wall-refl-controls">
-                        <label class="label text-xs !mb-0">Reflectance</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="wall-refl" min="0" max="1" value="0.5" step="0.01"><span id="wall-refl-val" class="data-value font-mono w-12 text-left">0.50</span></div>
-                    </div>
-                    <div id="wall-srd-controls" class="hidden">
-                        <label for="wall-srd-file" class="label text-xs">Spectral Reflectance File (.dat)</label><input type="file" id="wall-srd-file" accept=".dat,.txt" class="w-full text-sm">
-                    </div>
-                    <div><label class="label text-xs">Specularity</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="wall-spec" min="0" max="1" value="0.00" step="0.01"><span id="wall-spec-val" class="data-value font-mono w-12 text-left">0.00</span></div></div>
-                    <div><label class="label text-xs">Roughness</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="wall-rough" min="0" max="1" value="0.00" step="0.01"><span id="wall-rough-val" class="data-value font-mono w-12 text-left">0.00</span></div></div>
+                <div id="wall-refl-controls">
+                    <label class="label text-xs !mb-0" for="wall-refl">Reflectance</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="wall-refl" min="0" max="1" value="0.5" step="0.01"><span id="wall-refl-val" class="data-value font-mono w-12 text-left">0.50</span></div>
                 </div>
+                <div id="wall-srd-controls" class="hidden">
+                    <label for="wall-srd-file" class="label text-xs">Spectral Reflectance File (.dat)</label><input type="file" id="wall-srd-file" accept=".dat,.txt" class="w-full text-sm">
+                </div>
+                <div><label class="label text-xs" for="wall-spec">Specularity</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="wall-spec" min="0" max="1" value="0.00" step="0.01"><span id="wall-spec-val" class="data-value font-mono w-12 text-left">0.00</span></div></div>
+                <div><label class="label text-xs" for="wall-rough">Roughness</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="wall-rough" min="0" max="1" value="0.00" step="0.01"><span id="wall-rough-val" class="data-value font-mono w-12 text-left">0.00</span></div></div>
+            </div>
                 <div class="space-y-3 pt-4 border-t border-[--grid-color]"><h3 class="font-semibold text-sm uppercase">Floor</h3>
                     <div><label class="label text-xs">Material Type</label><select id="floor-mat-type" class="w-full mt-1"><option selected>Plastic</option><option>Glass</option><option>Metal</option></select></div>
                     <div>
@@ -863,132 +876,170 @@
                     </div>
                     <div><label class="label text-xs">Specularity</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="ceiling-spec" min="0" max="1" value="0.00" step="0.01"><span id="ceiling-spec-val" class="data-value font-mono w-12 text-left">0.00</span></div></div><div><label class="label text-xs">Roughness</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="ceiling-rough" min="0" max="1" value="0.00" step="0.01"><span id="ceiling-rough-val" class="data-value font-mono w-12 text-left">0.00</span></div></div>
                 </div>
-                <div class="space-y-3 pt-4 border-t border-[--grid-color]"><h3 class="font-semibold text-sm uppercase">Frame</h3><div><label class="label text-xs">Material Type</label><select id="frame-mat-type" class="w-full mt-1"><option selected>Plastic</option><option>Glass</option><option>Metal</option></select></div><label class="label text-xs !mb-0">Reflectance</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="frame-refl" min="0" max="1" value="0.1" step="0.01"><span id="frame-refl-val" class="data-value font-mono w-12 text-left">0.10</span></div><div><label class="label text-xs">Specularity</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="frame-spec" min="0" max="1" value="0.00" step="0.01"><span id="frame-spec-val" class="data-value font-mono w-12 text-left">0.00</span></div></div><div><label class="label text-xs">Roughness</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="frame-rough" min="0" max="1" value="0.00" step="0.01"><span id="frame-rough-val" class="data-value font-mono w-12 text-left">0.00</span></div></div></div>
-                <div class="space-y-3 pt-4 border-t border-[--grid-color]"><h3 class="font-semibold text-sm uppercase">Shading</h3><div><label class="label text-xs">Material Type</label><select id="shading-mat-type" class="w-full mt-1"><option selected>Plastic</option><option>Glass</option><option>Metal</option></select></div><label class="label text-xs !mb-0">Reflectance</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="shading-refl" min="0" max="1" value="0.1" step="0.01"><span id="shading-refl-val" class="data-value font-mono w-12 text-left">0.10</span></div><div><label class="label text-xs">Specularity</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="shading-spec" min="0" max="1" value="0.00" step="0.01"><span id="shading-spec-val" class="data-value font-mono w-12 text-left">0.00</span></div></div><div><label class="label text-xs">Roughness</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="shading-rough" min="0" max="1" value="0.00" step="0.01"><span id="shading-rough-val" class="data-value font-mono w-12 text-left">0.00</span></div></div></div>
-                <div class="space-y-3 pt-4 border-t border-[--grid-color]"><h3 class="font-semibold text-sm uppercase">Glazing</h3><div><label class="label text-xs">Transmittance</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="glazing-trans" min="0" max="1" value="0.7" step="0.01"><span id="glazing-trans-val" class="data-value font-mono w-12 text-left">0.70</span></div></div><label for="bsdf-toggle" class="flex items-center cursor-pointer pt-2"><input type="checkbox" id="bsdf-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Add BSDF</span></label><div id="bsdf-controls" class="hidden mt-2"><label for="bsdf-file" class="label text-xs">BSDF XML File</label><input type="file" id="bsdf-file" accept=".xml" class="w-full text-sm mt-1"></div></div>
+                <div class="space-y-3 pt-4 border-t border-[--grid-color]">
+                    <h3 class="font-semibold text-sm uppercase">Frame</h3><div><label class="label text-xs">Material Type</label><select id="frame-mat-type" class="w-full mt-1"><option selected>Plastic</option><option>Glass</option><option>Metal</option></select></div><label class="label text-xs !mb-0">Reflectance</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="frame-refl" min="0" max="1" value="0.1" step="0.01"><span id="frame-refl-val" class="data-value font-mono w-12 text-left">0.10</span></div><div><label class="label text-xs">Specularity</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="frame-spec" min="0" max="1" value="0.00" step="0.01"><span id="frame-spec-val" class="data-value font-mono w-12 text-left">0.00</span></div></div><div><label class="label text-xs">Roughness</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="frame-rough" min="0" max="1" value="0.00" step="0.01"><span id="frame-rough-val" class="data-value font-mono w-12 text-left">0.00</span></div></div></div>
+                <div class="space-y-3 pt-4 border-t border-[--grid-color]">
+                    <h3 class="font-semibold text-sm uppercase">Shading</h3><div>
+                        <label class="label text-xs">Material Type</label>
+                        <select id="shading-mat-type" class="w-full mt-1">
+                            <option selected>Plastic</option><option>Glass</option>
+                            <option>Metal</option>
+                        </select>
+                </div>
+                <div>
+                    <label class="label text-xs !mb-0">Reflectance</label>
+                    <div class="flex items-center space-x-3 mt-1"><input type="range" id="shading-refl" min="0" max="1" value="0.5" step="0.01"><span id="shading-refl-val" class="data-value font-mono w-12 text-left">0.50</span></div>
+                </div>
+                <div>
+                    <label class="label text-xs">Specularity</label>
+                    <div class="flex items-center space-x-3 mt-1"><input type="range" id="shading-spec" min="0" max="1" value="0.00" step="0.01"><span id="shading-spec-val" class="data-value font-mono w-12 text-left">0.00</span></div>
+                </div>
+                <div>
+                    <label class="label text-xs">Roughness</label>
+                    <div class="flex items-center space-x-3 mt-1"><input type="range" id="shading-rough" min="0" max="1" value="0.00" step="0.01"><span id="shading-rough-val" class="data-value font-mono w-12 text-left">0.00</span></div>
+                </div>
             </div>
-            <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-        </div>
+        <div class="space-y-3 pt-4 border-t border-[--grid-color]">
+            <h3 class="font-semibold text-sm uppercase">Glazing</h3>
+            <div>
+                <label class="label text-xs">Transmittance</label>
+                    <div class="flex items-center space-x-3 mt-1">
+                        <input type="range" id="glazing-trans" min="0" max="1" value="0.7" step="0.01">
+                        <span id="glazing-trans-val" class="data-value font-mono w-12 text-left">0.70</span>
+                    </div>
+                </div>
+                <label for="bsdf-toggle" class="flex items-center cursor-pointer pt-2">
+                    <input type="checkbox" id="bsdf-toggle">
+                    <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Add BSDF</span>
+                </label>
+                <div id="bsdf-controls" class="hidden mt-2">
+                    <label for="bsdf-file" class="label text-xs">BSDF XML File</label>
+                    <input type="file" id="bsdf-file" accept=".xml" class="w-full text-sm mt-1">
+                </div>
+            </div>
+        </div> <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+</div>
 
-    <div id="panel-sensor" class="floating-window ui-panel hidden">
-        <div class="window-header">
-            <span>Sensor Grid</span>
-            <div class="window-controls">
-                <div class="window-icon-max"></div>
-                <div class="collapse-icon"></div>
-                <div class="window-icon-close"></div>
+<div id="panel-sensor" class="floating-window ui-panel hidden">
+            <div class="window-header">
+                <span>Sensor Grid</span>
+                <div class="window-controls">
+                    <div class="window-icon-max"></div>
+                    <div class="collapse-icon"></div>
+                    <div class="window-icon-close"></div>
+                </div>
             </div>
-        </div>
-        <div class="window-content space-y-5">
-        <div class="space-y-3">
-            <label for="illuminance-grid-toggle" class="flex items-center cursor-pointer w-full">
-                <input type="checkbox" id="illuminance-grid-toggle" checked>
-                <span class="ml-3 font-semibold text-sm uppercase">Illuminance Grid</span>
-            </label>
-            <div id="illuminance-grid-controls" class="space-y-5 pt-4 border-t border-[--grid-color]">
+            <div class="window-content space-y-5">
                 <div class="space-y-3">
-                    <h3 class="font-semibold text-sm uppercase">Surface Selection</h3>
-                    <div class="grid grid-cols-2 gap-3">
-                    <label for="grid-floor-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-floor-toggle" checked><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Floor</span></label>
-                    <label for="grid-ceiling-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-ceiling-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Ceiling</span></label>
-                    <label for="grid-north-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-north-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">North Wall</span></label>
-                    <label for="grid-south-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-south-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">South Wall</span></label>
-                    <label for="grid-east-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-east-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">East Wall</span></label>
-                    <label for="grid-west-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-west-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">West Wall</span></label>
-                </div>
-            </div>
-            <div id="floor-grid-controls" class="space-y-3 pt-4 border-t border-[--grid-color]">
-                <h3 class="font-semibold text-sm uppercase">Floor Grid</h3>
-                <div class="pt-2">
-                    <label for="show-floor-grid-3d-toggle" class="flex items-center cursor-pointer">
-                        <input type="checkbox" id="show-floor-grid-3d-toggle">
-                        <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Show in 3D View</span>
+                    <label for="illuminance-grid-toggle" class="flex items-center cursor-pointer w-full">
+                        <input type="checkbox" id="illuminance-grid-toggle" checked>
+                        <span class="ml-3 font-semibold text-sm uppercase">Illuminance Grid</span>
                     </label>
-                </div>
-                <div><label class="label" for="floor-grid-spacing">Spacing (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="floor-grid-spacing" min="0.05" max="2.0" value="0.50" step="0.05"><span id="floor-grid-spacing-val" class="data-value font-mono w-12 text-left">0.50m</span></div></div>
-                <div><label class="label" for="floor-grid-offset">Height Offset (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="floor-grid-offset" min="0" max="10" value="0.8" step="0.05"><span id="floor-grid-offset-val" class="data-value font-mono w-12 text-left">0.8m</span></div></div>
-                <div class="pt-2 mt-2 border-t border-dashed border-[--grid-color]">
-                    <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">EN 12464-1 Specification</h4>
-                    <p class="info-box !text-xs !py-2 !px-3">Define Task Area parameters. These values are used by EN 12464-1 recipes and for documentation.</p>
-                </div>
-                <div class="space-y-3 pt-2 mt-2 border-t border-dashed border-[--grid-color]">
-                    <label for="task-area-toggle" class="flex items-center cursor-pointer">
-                        <input type="checkbox" id="task-area-toggle">
-                        <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Define Specific Task Area</span>
-                    </label>
-                    <div id="task-area-controls" class="hidden space-y-3 pl-4">
-                        <div><label class="label text-xs" for="task-area-start-x">Start X</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="task-area-start-x" min="0" max="20" value="0.5" step="0.1"><span id="task-area-start-x-val" class="data-value font-mono w-12 text-left">0.5m</span></div></div>
-                        <div><label class="label text-xs" for="task-area-start-z">Start Z</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="task-area-start-z" min="0" max="20" value="0.5" step="0.1"><span id="task-area-start-z-val" class="data-value font-mono w-12 text-left">0.5m</span></div></div>
-                        <div><label class="label text-xs" for="task-area-width">Width</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="task-area-width" min="0.5" max="20" value="2.0" step="0.1"><span id="task-area-width-val" class="data-value font-mono w-12 text-left">2.0m</span></div></div>
-                        <div><label class="label text-xs" for="task-area-depth">Depth</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="task-area-depth" min="0.5" max="20" value="1.0" step="0.1"><span id="task-area-depth-val" class="data-value font-mono w-12 text-left">1.0m</span></div></div>
-                        <div class="mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                            <label class="label text-xs">Task Area Visualizer</label>
-                            <div id="task-area-visualizer-container" class="relative mt-2 aspect-video bg-[--grid-color] rounded overflow-hidden cursor-move">
-                                <canvas id="task-area-canvas"></canvas>
+                    <div id="illuminance-grid-controls" class="space-y-5 pt-4 border-t border-[--grid-color]">
+                        <div class="space-y-3">
+                            <h3 class="font-semibold text-sm uppercase">Surface Selection</h3>
+                            <div class="grid grid-cols-2 gap-3">
+                                <label for="grid-floor-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-floor-toggle" checked><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Floor</span></label>
+                                <label for="grid-ceiling-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-ceiling-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Ceiling</span></label>
+                                <label for="grid-north-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-north-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">North Wall</span></label>
+                                <label for="grid-south-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-south-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">South Wall</span></label>
+                                <label for="grid-east-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-east-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">East Wall</span></label>
+                                <label for="grid-west-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="grid-west-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">West Wall</span></label>
+                            </div>
+                        </div>
+                        <div id="floor-grid-controls" class="space-y-3 pt-4 border-t border-[--grid-color]">
+                            <h3 class="font-semibold text-sm uppercase">Floor Grid</h3>
+                            <div class="pt-2">
+                                <label for="show-floor-grid-3d-toggle" class="flex items-center cursor-pointer">
+                                    <input type="checkbox" id="show-floor-grid-3d-toggle">
+                                    <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Show in 3D View</span>
+                                </label>
+                            </div>
+                            <div><label class="label" for="floor-grid-spacing">Spacing (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="floor-grid-spacing" min="0.05" max="2.0" value="0.50" step="0.05"><span id="floor-grid-spacing-val" class="data-value font-mono w-12 text-left">0.50m</span></div></div>
+                            <div><label class="label" for="floor-grid-offset">Height Offset (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="floor-grid-offset" min="0" max="10" value="0.8" step="0.05"><span id="floor-grid-offset-val" class="data-value font-mono w-12 text-left">0.8m</span></div></div>
+                            <div class="pt-2 mt-2 border-t border-dashed border-[--grid-color]">
+                                <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">EN 12464-1 Specification</h4>
+                                <p class="info-box !text-xs !py-2 !px-3">Define Task Area parameters. These values are used by EN 12464-1 recipes and for documentation.</p>
+                            </div>
+                            <div class="space-y-3 pt-2 mt-2 border-t border-dashed border-[--grid-color]">
+                                <label for="task-area-toggle" class="flex items-center cursor-pointer">
+                                    <input type="checkbox" id="task-area-toggle">
+                                    <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Define Specific Task Area</span>
+                                </label>
+                                <div id="task-area-controls" class="hidden space-y-3 pl-4">
+                                    <div><label class="label text-xs" for="task-area-start-x">Start X</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="task-area-start-x" min="0" max="20" value="0.5" step="0.1"><span id="task-area-start-x-val" class="data-value font-mono w-12 text-left">0.5m</span></div></div>
+                                    <div><label class="label text-xs" for="task-area-start-z">Start Z</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="task-area-start-z" min="0" max="20" value="0.5" step="0.1"><span id="task-area-start-z-val" class="data-value font-mono w-12 text-left">0.5m</span></div></div>
+                                    <div><label class="label text-xs" for="task-area-width">Width</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="task-area-width" min="0.5" max="20" value="2.0" step="0.1"><span id="task-area-width-val" class="data-value font-mono w-12 text-left">2.0m</span></div></div>
+                                    <div><label class="label text-xs" for="task-area-depth">Depth</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="task-area-depth" min="0.5" max="20" value="1.0" step="0.1"><span id="task-area-depth-val" class="data-value font-mono w-12 text-left">1.0m</span></div></div>
+                                    <div class="mt-4 pt-4 border-t border-dashed border-[--grid-color]">
+                                        <label class="label text-xs">Task Area Visualizer</label>
+                                        <div id="task-area-visualizer-container" class="relative mt-2 aspect-video bg-[--grid-color] rounded overflow-hidden cursor-move">
+                                            <canvas id="task-area-canvas"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="space-y-3 pt-2 mt-2 border-t border-dashed border-[--grid-color]">
+                                <label for="surrounding-area-toggle" class="flex items-center cursor-pointer">
+                                    <input type="checkbox" id="surrounding-area-toggle" disabled>
+                                    <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Include Surrounding Area</span>
+                                </label>
+                                <div id="surrounding-area-controls" class="hidden space-y-3 pl-4">
+                                    <div><label class="label text-xs">Band Width</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="surrounding-area-width" min="0.1" max="2.0" value="0.5" step="0.1"><span id="surrounding-area-width-val" class="data-value font-mono w-12 text-left">0.5m</span></div></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="ceiling-grid-controls" class="hidden space-y-3 pt-4 border-t border-[--grid-color]">
+                            <h3 class="font-semibold text-sm uppercase">Ceiling Grid</h3>
+                            <div>
+                                <label class="label" for="ceiling-grid-spacing">Spacing (m)</label>
+                                <div class="flex items-center space-x-3 mt-1">
+                                    <input type="range" id="ceiling-grid-spacing" min="0.05" max="2.0" value="0.50" step="0.05">
+                                    <span id="ceiling-grid-spacing-val" class="data-value font-mono w-12 text-left">0.50m</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="label" for="ceiling-grid-offset">Offset from Ceiling (m)</label>
+                                <div class="flex items-center space-x-3 mt-1">
+                                    <input type="range" id="ceiling-grid-offset" min="-1.0" max="0" value="-0.2" step="0.05">
+                                    <span id="ceiling-grid-offset-val" class="data-value font-mono w-12 text-left">-0.2m</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="wall-grid-controls" class="hidden space-y-3 pt-4 border-t border-[--grid-color]">
+                            <h3 class="font-semibold text-sm uppercase">Wall Grids</h3>
+                            <div>
+                                <label class="label" for="wall-grid-spacing">Spacing (m)</label>
+                                <div class="flex items-center space-x-3 mt-1">
+                                    <input type="range" id="wall-grid-spacing" min="0.05" max="2.0" value="0.50" step="0.05">
+                                    <span id="wall-grid-spacing-val" class="data-value font-mono w-12 text-left">0.50m</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="label" for="wall-grid-offset">Wall Offset (m)</label>
+                                <div class="flex items-center space-x-3 mt-1">
+                                    <input type="range" id="wall-grid-offset" min="0.05" max="1.0" value="0.1" step="0.05">
+                                    <span id="wall-grid-offset-val" class="data-value font-mono w-12 text-left">0.1m</span>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="space-y-3 pt-2 mt-2 border-t border-dashed border-[--grid-color]">
-                    <label for="surrounding-area-toggle" class="flex items-center cursor-pointer">
-                        <input type="checkbox" id="surrounding-area-toggle" disabled>
-                        <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Include Surrounding Area</span>
-                    </label>
-                    <div id="surrounding-area-controls" class="hidden space-y-3 pl-4">
-                    <div><label class="label text-xs">Band Width</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="surrounding-area-width" min="0.1" max="2.0" value="0.5" step="0.1"><span id="surrounding-area-width-val" class="data-value font-mono w-12 text-left">0.5m</span></div></div>
-                </div>
-            </div>
-        </div>
-        <div id="ceiling-grid-controls" class="hidden space-y-3 pt-4 border-t border-[--grid-color]">
-            <h3 class="font-semibold text-sm uppercase">Ceiling Grid</h3>
-            <div>
-                <label class="label" for="ceiling-grid-spacing">Spacing (m)</label>
-                <div class="flex items-center space-x-3 mt-1">
-                    <input type="range" id="ceiling-grid-spacing" min="0.05" max="2.0" value="0.50" step="0.05">
-                    <span id="ceiling-grid-spacing-val" class="data-value font-mono w-12 text-left">0.50m</span>
-                </div>
-            </div>
-            <div>
-                <label class="label" for="ceiling-grid-offset">Offset from Ceiling (m)</label>
-                <div class="flex items-center space-x-3 mt-1">
-                    <input type="range" id="ceiling-grid-offset" min="-1.0" max="0" value="-0.2" step="0.05">
-                    <span id="ceiling-grid-offset-val" class="data-value font-mono w-12 text-left">-0.2m</span>
-                </div>
-            </div>
-        </div>
-        <div id="wall-grid-controls" class="hidden space-y-3 pt-4 border-t border-[--grid-color]">
-            <h3 class="font-semibold text-sm uppercase">Wall Grids</h3>
-            <div>
-                <label class="label" for="wall-grid-spacing">Spacing (m)</label>
-                <div class="flex items-center space-x-3 mt-1">
-                    <input type="range" id="wall-grid-spacing" min="0.05" max="2.0" value="0.50" step="0.05">
-                    <span id="wall-grid-spacing-val" class="data-value font-mono w-12 text-left">0.50m</span>
-                </div>
-            </div>
-            <div>
-                <label class="label" for="wall-grid-offset">Wall Offset (m)</label>
-                <div class="flex items-center space-x-3 mt-1">
-                    <input type="range" id="wall-grid-offset" min="0.05" max="1.0" value="0.1" step="0.05">
-                    <span id="wall-grid-offset-val" class="data-value font-mono w-12 text-left">0.1m</span>
-                </div>
-            </div>
-        </div>
-    </div>
-    </div>
-    <div class="space-y-3 pt-4 border-t border-[--grid-color]">
-            <label for="view-grid-toggle" class="flex items-center cursor-pointer w-full">
-                <input type="checkbox" id="view-grid-toggle">
-            <span class="ml-3 font-semibold text-sm uppercase">View Grid (for Glare)</span>
+                <div class="space-y-3 pt-4 border-t border-[--grid-color]">
+                    <label for="view-grid-toggle" class="flex items-center cursor-pointer w-full">
+                        <input type="checkbox" id="view-grid-toggle">
+                        <span class="ml-3 font-semibold text-sm uppercase">View Grid (for Glare)</span>
                     </label>
                     <div id="view-grid-controls" class="hidden space-y-5 pt-4 border-t border-[--grid-color]">
                         <p class="info-box !text-xs !py-2 !px-3">Generates a .ray file for imageless glare analysis with points on a horizontal plane.</p>
-                    <div class="pt-2">
-                        <label for="show-view-grid-3d-toggle" class="flex items-center cursor-pointer">
-                        <input type="checkbox" id="show-view-grid-3d-toggle">
-                        <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Show in 3D View</span>                        </label>
-                    </div>
-                    <div><label class="label" for="view-grid-spacing">Spacing (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="view-grid-spacing" min="0.05" max="2.0" value="0.75" step="0.05"><span id="view-grid-spacing-val" class="data-value font-mono w-12 text-left">0.75m</span></div></div>
-                    <div><label class="label" for="view-grid-offset">Height Offset (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="view-grid-offset" min="0" max="10" value="1.2" step="0.1"><span id="view-grid-offset-val" class="data-value font-mono w-12 text-left">1.2m</span></div></div>
+                        <div class="pt-2">
+                            <label for="show-view-grid-3d-toggle" class="flex items-center cursor-pointer">
+                                <input type="checkbox" id="show-view-grid-3d-toggle">
+                                <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Show in 3D View</span>
+                            </label>
+                        </div>
+                        <div><label class="label" for="view-grid-spacing">Spacing (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="view-grid-spacing" min="0.05" max="2.0" value="0.75" step="0.05"><span id="view-grid-spacing-val" class="data-value font-mono w-12 text-left">0.75m</span></div></div>
+                        <div><label class="label" for="view-grid-offset">Height Offset (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="view-grid-offset" min="0" max="10" value="1.2" step="0.1"><span id="view-grid-offset-val" class="data-value font-mono w-12 text-left">1.2m</span></div></div>
                         <div class="pt-4 border-t border-dashed border-[--grid-color] space-y-3">
                             <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">View Directions</h4>
                             <div><label class="label" for="view-grid-directions">Number of Directions</label><input type="number" id="view-grid-directions" min="1" value="6" step="1" class="w-full mt-1"></div>
@@ -1001,13 +1052,11 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
                 </div>
             </div>
-            <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
         </div>
-
-    <div id="panel-viewpoint" class="floating-window ui-panel hidden">
+        </div> <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+    </div> <div id="panel-viewpoint" class="floating-window ui-panel hidden">
         <div class="window-header">
             <span>Viewpoint</span>
             <div class="window-controls">
@@ -1109,16 +1158,14 @@
                     <div class="flex items-center space-x-4 mt-1">
                                   <input type="range" id="view-dist" min="1" max="50" value="5" step="0.1">
                                   <span id="view-dist-val" class="data-value font-mono w-12 text-left">5.0m</span>
-                              </div>
-                          </div>
-                      </div>
-                  </div>
-                  </div>
-                  <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-              </div>
-                      <div id="panel-view-options" class="floating-window ui-panel hidden">
-                          <div class="window-header">
-                              <span>View Options</span><span>View Options</span>
+                            </div>
+                        </div>
+                </div>
+            </div>
+        </div> <div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+    </div> <div id="panel-view-options" class="floating-window ui-panel hidden">
+                  <div class="window-header">
+                      <span>View Options</span>
                 <div class="window-controls">
                     <div class="window-icon-max"></div>
                     <div class="collapse-icon"></div>
@@ -1156,11 +1203,20 @@
                     </div>
                 </div>
             </div>
-            <div class="space-y-3 pt-4 border-t border-[--grid-color]"><label for="h-section-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="h-section-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Horizontal Section</span></label><div id="h-section-controls" class="hidden"><label class="label text-xs" for="h-section-dist">Section Height</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="h-section-dist" min="0" max="3" value="1.5" step="0.1"><span id="h-section-dist-val" class="data-value font-mono w-12 text-left">1.5m</span></div></div></div>
-            <div class="space-y-3 pt-4 border-t border-[--grid-color]"><label for="v-section-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="v-section-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Vertical Section</span></label><div id="v-section-controls" class="hidden"><label class="label text-xs" for="v-section-dist">Section Position (from West)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="v-section-dist" min="0" max="4" value="2.0" step="0.1"><span id="v-section-dist-val" class="data-value font-mono w-12 text-left">2.0m</span></div></div></div>
-
-                <div id="live-preview-section" class="hidden space-y-3 pt-4 mt-4 border-t-2 border-[--grid-color]">
-                    <h3 class="font-semibold text-sm uppercase">Live Section Preview</h3>
+            <div class="space-y-3 pt-4 border-t border-[--grid-color]">
+                <label for="h-section-toggle" class="flex items-center cursor-pointer">
+                    <input type="checkbox" id="h-section-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Horizontal Section</span></label><div id="h-section-controls" class="hidden">
+                <label class="label text-xs">Section Height</label>
+                <div class="flex items-center space-x-3 mt-1">
+                    <input type="range" id="h-section-dist" min="0" max="3" value="1.5" step="0.1">
+                    <span id="h-section-dist-val" class="data-value font-mono w-12 text-left">1.5m</span>
+                </div>
+            </div>
+        </div>
+            <div class="space-y-3 pt-4 border-t border-[--grid-color]"><label for="v-section-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="v-section-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Vertical Section</span></label><div id="v-section-controls" class="hidden"><label class="label text-xs">Section Position (from West)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="v-section-dist" min="0" max="4" value="2.0" step="0.1"><span id="v-section-dist-val" class="data-value font-mono w-12 text-left">2.0m</span></div></div>
+        </div>
+            <div id="live-preview-section" class="hidden space-y-3 pt-4 mt-4 border-t-2 border-[--grid-color]">
+                <h3 class="font-semibold text-sm uppercase">Live Section Preview</h3>
                     <p class="info-box !text-xs !py-2 !px-3">Render a preview from the current camera view using the loaded EPW weather data.</p>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
@@ -1175,14 +1231,11 @@
                     <button id="render-section-preview-btn" class="btn btn-primary w-full mt-2">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="mr-2 inline-block"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                         <span>Render Preview</span>
-                    </button>
-                </div>
-            </div>
-        <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-        </div>
-        
-            <div id="project-access-prompt" class="fixed top-20 left-1/2 -translate-x-1/2 z-[100] ui-panel !p-3 flex items-center gap-4 hidden">
-                <p class="text-sm">Please select a project folder to enable direct saving and file access.</p>
+              </button>
+          </div>
+        </div> <div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+    </div> <div id="project-access-prompt" class="fixed top-20 left-1/2 -translate-x-1/2 z-[100] ui-panel !p-3 flex items-center gap-4 hidden">
+            <p class="text-sm">Please select a project folder to enable direct saving and file access.</p>
                 <button id="select-folder-btn" class="btn btn-primary btn-sm">Select Folder</button>
                 <button id="dismiss-prompt-btn" class="text-gray-400 hover:text-gray-200" aria-label="Dismiss">&times;</button>
             </div>
@@ -1216,13 +1269,12 @@
                                 <span id="hdr-luminance-value">--</span> cd/m²
                             </div>
                         </div>
-                    </div>
                 </div>
-            <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-        </div>
+                <div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+            </div>
 
-            <div id="temporal-map-panel" class="floating-window ui-panel hidden" style="width: 800px; height: 400px;">
-                <div class="window-header">
+        <div id="temporal-map-panel" class="floating-window ui-panel hidden" style="width: 800px; height: 400px;">
+              <div class="window-header">
                     <span>Temporal Map - Sensor Point #<span id="temporal-map-point-id">--</span></span>
                     <div class="window-controls">
                         <div class="window-icon-max"></div>
@@ -1231,14 +1283,12 @@
                     </div>
                 </div>
                 <div class="window-content !p-4 flex flex-col items-center justify-center">
-                    <div id="temporal-map-canvas-container" class="w-full h-full relative">
-                        <canvas id="temporal-map-canvas" class="w-full h-full"></canvas>
-                    </div>
-                </div>
-            <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-        </div>
+                <canvas id="temporal-map-canvas" class="w-full h-full"></canvas>
+              </div>
+          <div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+      </div>
 
-            <div id="glare-rose-panel" class="floating-window ui-panel hidden" style="width: 450px; height: 550px;">
+      <div id="glare-rose-panel" class="floating-window ui-panel hidden" style="width: 450px; height: 550px;">
                 <div class="window-header">
                     <span>Annual Glare Rose</span>
                     <div class="window-controls">
@@ -1256,14 +1306,14 @@
                         <input type="range" id="glare-rose-threshold" min="0.2" max="0.6" value="0.4" step="0.01">
                         <p class="info-box !text-xs !py-2 !px-3">The diagram shows the number of occupied hours where DGP exceeds the threshold, binned by sun direction.</p>
                     </div>
-                    <div id="glare-rose-canvas-container" class="w-full h-full relative flex-grow mt-4">
-                        <canvas id="glare-rose-canvas"></canvas>
-                    </div>
-                </div>
-            <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-        </div>
+                    <canvas id="glare-rose-canvas"></canvas>
+                  </div>
+              </div>
+          <div class="resize-handle-edge right"></div>
+<div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+          </div>
 
-            <div id="combined-analysis-panel" class="floating-window ui-panel hidden" style="width: 600px; height: 650px;">
+          <div id="combined-analysis-panel" class="floating-window ui-panel hidden" style="width: 600px; height: 650px;">
                 <div class="window-header">
                     <span>Combined Daylight & Glare Analysis</span>
                     <div class="window-controls">
@@ -1283,12 +1333,12 @@
                     </div>
                     <div id="combined-analysis-canvas-container" class="w-full h-full relative flex-grow mt-4">
                         <canvas id="combined-analysis-canvas"></canvas>
-                    </div>
-                </div>
-            <div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+                  </div>
+              </div>
+            <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
         </div>
 
-      <div id="panel-info" class="floating-window ui-panel hidden" style="width: 600px; height: 70vh;">
+        <div id="panel-info" class="floating-window ui-panel hidden" style="width: 600px; height: 70vh;">
           <div class="window-header">
                   <span>Application Information & Help</span>
                   <div class="window-controls">
@@ -1394,13 +1444,9 @@
                         <li><strong>Glare Rose Diagram:</strong> For annual <code>.dgp</code> files, this generates a polar chart showing the number of occupied hours that exceed a DGP threshold, organized by the sun's position in the sky.</li>
                         <li><strong>Combined Daylight vs. Glare Plot:</strong> When both annual illuminance and glare files are loaded, this scatter plot is available. Each point represents a sensor, plotting its percentage of useful daylight hours against its percentage of glare hours.</li>
                         <li><strong>HDR Viewer:</strong> Loads and displays rendered <code>.hdr</code> images. Features include exposure controls, a false-color mode based on luminance, and a mouse-over probe to get exact cd/m² values. It can also overlay detected glare sources from a report.</li>
-                    </ul>
-                
-        <div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-        </div>
-      </div>
-
-      <div id="simulation-console-panel" class="floating-window ui-panel hidden" style="width: 700px; height: 450px;">
+                </ul>
+            </div> <div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+        </div> <div id="simulation-console-panel" class="floating-window ui-panel hidden" style="width: 700px; height: 450px;">
           <div class="window-header">
               <span>Simulation Console</span>
               <div class="window-controls">
@@ -1410,15 +1456,12 @@
               </div>
           </div>
           <div class="window-content !p-0 flex flex-col">
-              <div id="simulation-output" class="flex-grow p-3 font-mono text-xs bg-[--grid-color] overflow-y-auto whitespace-pre-wrap"></div>
-              <div class="p-2 border-t border-[--grid-color]">
-                  <span id="simulation-status" class="text-sm">Status: Idle</span>
-              </div>
+          <div id="simulation-output" class="flex-grow p-3 font-mono text-xs bg-[--grid-color] overflow-y-auto whitespace-pre-wrap"></div>
+          <div class="p-2 border-t border-[--grid-color]">
+              <span id="simulation-status" class="text-sm">Status: Idle</span>
           </div>
-          <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-      </div>
-
-        <div id="panel-ai-assistant" class="floating-window ui-panel hidden">
+        </div> <div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+    </div> <div id="panel-ai-assistant" class="floating-window ui-panel hidden">
             <div class="window-header">
                 <span>AI Assistant</span>
                 <div class="window-controls">
@@ -1434,16 +1477,13 @@
                 <div id="ai-chat-messages" class="flex-grow p-4 space-y-4 overflow-y-auto">
                     </div>
                 <div class="p-4 border-t border-[--grid-color]">
-                    <form id="ai-chat-form" class="flex gap-2">
-                        <input type="text" id="ai-chat-input" placeholder="Ask about Radiance or this app..." class="flex-grow" autocomplete="off">
-                        <button type="submit" id="ai-chat-send" class="btn btn-primary">Send</button>
-                    </form>
-                </div>
-            </div>
-            <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-            </div>
-
-            <div id="proactive-suggestion-container" class="fixed bottom-24 right-8 z-[10001] flex flex-col items-end gap-2 w-full max-w-sm pointer-events-none"></div>
+                <form id="ai-chat-form" class="flex gap-2">
+                    <input type="text" id="ai-chat-input" placeholder="Ask about Radiance or this app..." class="flex-grow" autocomplete="off">
+                    <button type="submit" id="ai-chat-send" class="btn btn-primary">Send</button>
+              </form>
+          </div>
+        </div> <div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+    </div> <div id="proactive-suggestion-container" class="fixed bottom-24 right-8 z-[10001] flex flex-col items-end gap-2 w-full max-w-sm pointer-events-none"></div>
             </main>
 
         <div id="sidebar-wrapper">
@@ -1457,10 +1497,10 @@
                 <ul id="simulation-module-list" class="module-list mt-6"></ul>
             </div>
         </aside>
-        <aside id="analysis-sidebar" class="ui-panel closed">
-            <button id="toggle-analysis-btn" title="Toggle Analysis Sidebar" class="sidebar-toggle-btn ui-panel" aria-label="Toggle Analysis Sidebar">
-                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
-            </button>
+            <aside id="analysis-sidebar" class="ui-panel closed">
+                <button id="toggle-analysis-btn" title="Toggle Analysis Sidebar" class="sidebar-toggle-btn ui-panel" aria-label="Toggle Analysis Sidebar">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                </button>
              <div class="sidebar-content">
                         <h2 class="text-lg font-bold">Analysis Modules</h2>
                         <p class="text-sm text-gray-500 mb-6">Load a simulation results file to visualize data on the 3D model.</p>
@@ -1527,11 +1567,17 @@
                                             <div><span class="block text-xs">Max</span><span id="results-max-val-b" class="data-value font-mono">--</span></div>
                                         </div>
                                     </div>
-                                </div>
+                            </div>
 
-                                <div id="color-scale-section" class="param-section">
-                                    <div id="standard-color-scale">
-                                        <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Color Scale (lux)</h4>
+                            <div id="metric-selector-container" class="param-section hidden">
+                                <label for="metric-selector" class="label">3D View Metric</label>
+                                <select id="metric-selector" class="w-full mt-1">
+                                </select>
+                            </div>
+
+                            <div id="color-scale-section" class="param-section">
+                                <div id="standard-color-scale">
+                                    <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Color Scale (lux)</h4>
                                         <canvas id="results-legend" height="20" class="w-full mt-2 rounded border border-[--grid-color]"></canvas>
                                     </div>
                                     <div id="difference-color-scale" class="hidden">
@@ -1605,70 +1651,69 @@
                                 <button id="results-dashboard-btn" class="btn btn-primary w-full mt-4">Results Dashboard</button>
                             </div>
                         </div>
-                </div>
-        </aside>
-        <div id="results-analysis-panel" class="floating-window ui-panel hidden">
-            <div class="window-header">
-                <span>Results Analysis</span>
-                <div class="window-controls">
-                    <div class="window-icon-max"></div>
-                    <div class="collapse-icon"></div>
-                    <div class="window-icon-close"></div>
-                </div>
-            </div>
-            <div class="window-content space-y-5">
-                <div class="param-section">
-                    <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Summary Statistics</h4>
-                    <div id="results-summary-stats" class="grid grid-cols-4 gap-2 text-center mt-2">
-                        <div><span class="block text-xs">Min</span><span id="stats-min-val" class="data-value font-mono">--</span></div>
-                        <div><span class="block text-xs">Max</span><span id="stats-max-val" class="data-value font-mono">--</span></div>
-                        <div><span class="block text-xs">Average</span><span id="stats-avg-val" class="data-value font-mono">--</span></div>
-                        <div><span class="block text-xs">Uniformity</span><span id="stats-uniformity-val" class="data-value font-mono">--</span></div>
+                    </div>
+                </aside>
+            <div id="results-analysis-panel" class="floating-window ui-panel hidden">
+                <div class="window-header">
+                    <span>Results Analysis</span>
+                    <div class="window-controls">
+                        <div class="window-icon-max"></div>
+                        <div class="collapse-icon"></div>
+                        <div class="window-icon-close"></div>
                     </div>
                 </div>
-                <div class="param-section">
-                    <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Analysis Tools</h4>
-                    <div class="btn-group mt-2">
-                        <button id="highlight-min-btn" class="btn btn-secondary">Highlight Min</button>
-                        <button id="highlight-max-btn" class="btn btn-secondary">Highlight Max</button>
-                        <button id="clear-highlights-btn" class="btn btn-secondary">Clear</button>
-                    </div>
-                </div>
-                <div class="param-section">
-                    <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Illuminance Distribution</h4>
-                    <div class="mt-2"><canvas id="illuminance-histogram"></canvas></div>
-                </div>
-                <div class="param-section">
-                    <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">False-Color Scale</h4>
-                    <canvas id="interactive-legend" height="20" class="w-full mt-2 rounded border border-[--grid-color]"></canvas>
-                    <div class="flex justify-between text-xs font-mono mt-1">
-                        <span id="legend-min-val">0</span>
-                        <span id="legend-max-val">1000</span>
-                    </div>
-                    <div class="space-y-3 mt-3">
-                        <div>
-                            <label class="label text-xs flex justify-between" for="scale-min-input">
-                                <span>Scale Min</span>
-                                <input type="number" id="scale-min-input-num" class="param-input-num-sm">
-                            </label>
-                            <input type="range" id="scale-min-input" min="0" max="5000" value="0" step="10">
-                        </div>
-                        <div>
-                            <label class="label text-xs flex justify-between" for="scale-max-input">
-                                <span>Scale Max</span>
-                                <input type="number" id="scale-max-input-num" class="param-input-num-sm">
-                            </label>
-                            <input type="range" id="scale-max-input" min="0" max="5000" value="1000" step="10">
+                <div class="window-content space-y-5">
+                    <div class="param-section">
+                        <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Summary Statistics</h4>
+                        <div id="results-summary-stats" class="grid grid-cols-4 gap-2 text-center mt-2">
+                            <div><span class="block text-xs">Min</span><span id="stats-min-val" class="data-value font-mono">--</span></div>
+                            <div><span class="block text-xs">Max</span><span id="stats-max-val" class="data-value font-mono">--</span></div>
+                            <div><span class="block text-xs">Average</span><span id="stats-avg-val" class="data-value font-mono">--</span></div>
+                            <div><span class="block text-xs">Uniformity</span><span id="stats-uniformity-val" class="data-value font-mono">--</span></div>
                         </div>
                     </div>
+                    <div class="param-section">
+                        <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Analysis Tools</h4>
+                        <div class="btn-group mt-2">
+                            <button id="highlight-min-btn" class="btn btn-secondary">Highlight Min</button>
+                            <button id="highlight-max-btn" class="btn btn-secondary">Highlight Max</button>
+                            <button id="clear-highlights-btn" class="btn btn-secondary">Clear</button>
+                        </div>
+                    </div>
+                    <div class="param-section">
+                        <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Illuminance Distribution</h4>
+                        <div class="mt-2"><canvas id="illuminance-histogram"></canvas></div>
+                    </div>
+                    <div class="param-section">
+                        <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">False-Color Scale</h4>
+                        <canvas id="interactive-legend" height="20" class="w-full mt-2 rounded border border-[--grid-color]"></canvas>
+                        <div class="flex justify-between text-xs font-mono mt-1">
+                            <span id="legend-min-val">0</span>
+                            <span id="legend-max-val">1000</span>
+                        </div>
+                        <div class="space-y-3 mt-3">
+                            <div>
+                                <label class="label text-xs flex justify-between" for="scale-min-input">
+                                    <span>Scale Min</span>
+                                    <input type="number" id="scale-min-input-num" class="param-input-num-sm">
+                                </label>
+                                <input type="range" id="scale-min-input" min="0" max="5000" value="0" step="10">
+                            </div>
+                            <div>
+                                <label class="label text-xs flex justify-between" for="scale-max-input">
+                                    <span>Scale Max</span>
+                                    <input type="number" id="scale-max-input-num" class="param-input-num-sm">
+                                </label>
+                                <input type="range" id="scale-max-input" min="0" max="5000" value="1000" step="10">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="param-section">
+                        <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">2D Floor Plan Heatmap</h4>
+                        <div class="mt-2 aspect-square bg-[--grid-color] rounded overflow-hidden">
+                            <canvas id="heatmap-canvas" class="w-full h-full"></canvas>
+                    </div>
                 </div>
-                <div class="param-section">
-                    <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">2D Floor Plan Heatmap</h4>
-                    <div class="mt-2 aspect-square bg-[--grid-color] rounded overflow-hidden">
-                        <canvas id="heatmap-canvas" class="w-full h-full"></canvas>
-                </div>
-            </div>
-            
                 </div>
 
                 <div id="annual-time-series-explorer" class="hidden space-y-5 pt-4 border-t border-dashed border-[--grid-color]">
@@ -1687,10 +1732,10 @@
                             <input type="range" id="time-scrubber" min="0" max="8759" value="4380" step="1">
                         </div>
                     </div>
-                </div>
-            <div id="spectral-metrics-dashboard" class="hidden space-y-5 pt-4 border-t border-dashed border-[--grid-color]">
-              <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Spectral Lighting Metrics</h4>
-              <div class="grid grid-cols-3 gap-4 text-center">
+              </div>
+              <div id="spectral-metrics-dashboard" class="hidden space-y-5 pt-4 border-t border-dashed border-[--grid-color]">
+                <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Spectral Lighting Metrics</h4>
+                <div class="grid grid-cols-3 gap-4 text-center">
                         <div>
                             <h5 class="font-semibold text-sm">Photopic</h5>
                             <p class="data-value font-mono text-lg mt-2"><span id="metric-photopic-val">--</span> lux</p>
@@ -1704,15 +1749,15 @@
                             <p class="data-value font-mono text-lg mt-2"><span id="metric-neuropic-val">--</span> W/m²</p>
                         </div>
                     </div>
-                <p class="info-box !text-xs !py-2 !px-3">These are space-averaged values from the sensor grid. Load the respective text file (e.g., photopic_illuminance.txt) to see the 3D visualization.</p>
-            </div>
-        </div>
-            </div>
-        </aside>
-    </div>
+                    <p class="info-box !text-xs !py-2 !px-3">These are space-averaged values from the sensor grid. Load the respective text file (e.g., photopic_illuminance.txt) to see the 3D visualization.</p>
+                </div>
+          </div>
+          </div>
+      </div>
+  </div>
 
-    <div id="sensor-context-menu" class="hidden absolute z-[1000] ui-panel !p-1">
-        <button id="set-viewpoint-here-btn" class="btn btn-secondary !py-2 !px-4 !text-sm">Set Viewpoint Here</button>
+  <div id="sensor-context-menu" class="hidden absolute z-[1000] ui-panel !p-1">
+      <button id="set-viewpoint-here-btn" class="btn btn-secondary !py-2 !px-4 !text-sm">Set Viewpoint Here</button>
     </div>
     <div id="custom-alert" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center">
         <div class="ui-panel p-6 w-full max-w-sm mx-auto bg-[--bg-main]"><h3 id="custom-alert-title" class="text-lg font-bold mb-4">Notification</h3><p id="custom-alert-message" class="text-sm mb-6"></p><button id="custom-alert-close" class="btn btn-primary w-full">Close</button></div>
@@ -1731,6 +1776,38 @@
                 </svg>
                 <p>Upload EPW file or drag and drop</p>
             </div>
+        </div>
+    </div>
+    <div id="ai-settings-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[10002] hidden items-center justify-center">
+        <div class="ui-panel p-6 w-full max-w-md mx-auto bg-[--bg-main] relative">
+            <button id="ai-settings-close-btn" class="absolute top-3 right-3 text-[--text-secondary] hover:text-[--text-primary]" aria-label="Close AI Settings">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+            <h3 class="text-lg font-bold mb-4">AI Assistant Settings</h3>
+            <form id="ai-settings-form" class="space-y-4">
+            <div>
+                <label for="ai-provider-select" class="label">AI Provider</label>
+                <select id="ai-provider-select" class="w-full">
+                    <option value="gemini">Google Gemini</option>
+                    <option value="openrouter">OpenRouter</option>
+                </select>
+            </div>
+            <div>
+                <label for="ai-model-select" class="label">Model</label>
+                <select id="ai-model-select" class="w-full"></select>
+            </div>
+            <div>
+                <label for="ai-api-key-input" class="label">API Key</label>
+                <input type="password" id="ai-api-key-input" placeholder="Enter your API key" class="w-full">
+            </div>
+            <div id="openrouter-info-box" class="info-box !text-xs hidden">
+                <b>Note:</b> To use free models on OpenRouter, you may need to adjust your
+                <a href="https://openrouter.ai/settings/privacy" target="_blank" class="text-[--text-secondary] underline">privacy settings</a>
+                to allow your data to be used for model improvement.
+            </div>
+            <button type="submit" class="btn btn-primary w-full mt-4">Save Settings</button>
+            </form>
+        </div>
         </div>
     </div>
     <div id="ai-settings-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[10002] hidden items-center justify-center">
@@ -1797,13 +1874,13 @@
 
         <template id="aperture-wall-template">
             <div class="aperture-controls space-y-5 pt-4 border-t border-[--grid-color]">
-                <h3 class="font-semibold text-sm uppercase" data-template-text="heading">WALL_DIRECTION Wall Apertures</h3>
-                <div>
-                    <label class="label" data-template-for="win-count"># of Windows</label>
-                    <div class="flex items-center space-x-3 mt-1"><input type="range" data-template-id="win-count" min="1" max="10" value="1" step="1"><span data-template-id="win-count-val" class="data-value font-mono w-12 text-left">1</span></div>
-                </div>
-                <div>
-                    <label class="label">Mode</label>
+            <h3 class="font-semibold text-sm uppercase" data-template-text="heading">WALL_DIRECTION Wall Apertures</h3>
+            <div>
+                <label class="label" data-template-for="win-count"># of Windows</label>
+                <div class="flex items-center space-x-3 mt-1"><input type="range" data-template-id="win-count" min="0" max="10" value="0" step="1"><span data-template-id="win-count-val" class="data-value font-mono w-12 text-left">0</span></div>
+            </div>
+            <div>
+                <label class="label">Mode</label>
                     <div class="btn-group mt-1"><button data-template-id="mode-wwr-btn" class="btn active">WWR</button><button data-template-id="mode-manual-btn" class="btn">Manual</button></div>
                 </div>
                 <div data-template-id="wwr-controls" class="space-y-5">
@@ -2117,20 +2194,36 @@
                 </template>
 
                 <div id="lighting-energy-dashboard" class="hidden space-y-5 pt-4 border-t border-dashed border-[--grid-color]">
-                    <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Lighting Energy Metrics</h4>
-                    <div class="grid grid-cols-3 gap-4 text-center">
+                </div>
+
+                <div id="circadian-metrics-dashboard" class="hidden space-y-5 pt-4 border-t border-dashed border-[--grid-color]">
+                    <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Circadian Health Metrics</h4>
+                    <p class="info-box !text-xs !py-2 !px-3">Average metrics from the sensor grid based on the spectral simulation. Calculated from <code>circadian_summary.json</code>.</p>
+                    <div class="grid grid-cols-2 gap-4 text-center items-center">
                         <div>
-                            <h5 class="font-semibold text-sm">LPD</h5>
-                            <p class="data-value font-mono text-lg mt-2"><span id="lpd-val">--</span> W/m²</p>
+                            <h5 class="font-semibold text-sm">Circadian Stimulus (CS)</h5>
+                            <div class="relative w-32 h-16 mx-auto mt-2">
+                                <canvas id="cs-gauge"></canvas>
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <span id="cs-value" class="data-value font-mono text-2xl">--</span>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <h5 class="font-semibold text-sm">Annual Use</h5>
-                            <p class="data-value font-mono text-lg mt-2"><span id="energy-val">--</span> kWh</p>
+                        <div class="space-y-3 text-left">
+                            <div>
+                                <h5 class="font-semibold text-sm">EML</h5>
+                                <p class="data-value font-mono text-lg"><span id="eml-value">--</span> lux</p>
+                            </div>
+                            <div>
+                                <h5 class="font-semibold text-sm">CCT</h5>
+                                <p class="data-value font-mono text-lg"><span id="cct-value">--</span> K</p>
+                            </div>
                         </div>
-                        <div>
-                            <h5 class="font-semibold text-sm">Savings</h5>
-                            <p class="data-value font-mono text-lg mt-2"><span id="energy-savings-val">--</span> %</p>
-                        </div>
+                    </div>
+                    <div class="param-section">
+                        <h5 class="font-semibold text-xs uppercase text-[--text-secondary]">WELL v2 L03 Compliance</h5>
+                        <ul id="well-compliance-checklist" class="mt-2 space-y-1 text-sm">
+                        </ul>
                     </div>
                 </div>
 
@@ -2729,11 +2822,12 @@
                             <div class="accordion-content" style="display: none;"></div>
                         </div>
                         <div class="execution-section mt-4 pt-4 border-t-2 border-[--grid-color]">
-                            <button data-action="generate" class="btn btn-primary w-full">Generate Illuminance Check Package</button>
-                        </div>
-                    </div>
-                </div>
-            </template>
+                          <button data-action="generate" class="btn btn-primary w-full">Generate Illuminance Check Package</button>
+                      </div>
+                  </div>
+                  <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+              </div>
+          </template>
 
         <template id="template-recipe-lighting-energy">
             <div class="floating-window ui-panel">
@@ -2760,11 +2854,12 @@
                     </div>
                     <div class="execution-section mt-4 pt-4 border-t-2 border-[--grid-color]">
                         <h4 class="text-base font-semibold mb-3">Execution</h4>
-                        <button data-action="generate" class="btn btn-primary w-full">Generate Energy Analysis Package</button>
-                    </div>
-                </div>
-            </div>
-        </template>
+                      <button data-action="generate" class="btn btn-primary w-full">Generate Energy Analysis Package</button>
+                  </div>
+              </div>
+              <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+          </div>
+      </template>
 
         <template id="template-recipe-en-ugr">
             <div class="floating-window ui-panel">
@@ -2791,11 +2886,12 @@
                             <div class="accordion-content" style="display: none;"></div>
                         </div>
                         <div class="execution-section mt-4 pt-4 border-t-2 border-[--grid-color]">
-                            <button data-action="generate" class="btn btn-primary w-full">Generate UGR Check Package</button>
-                        </div>
-                    </div>
-                </div>
-            </template>
+                          <button data-action="generate" class="btn btn-primary w-full">Generate UGR Check Package</button>
+                      </div>
+                  </div>
+                  <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+              </div>
+          </template>
 
         </div>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

@@ -1,7 +1,7 @@
 // scripts/project.js
 
 import * as THREE from 'three';
-import { generateRadFileContent } from './radiance.js';
+import { generateRadFileContent, generateViewpointFileContent, transformThreePointToRadianceArray, transformThreeVectorToRadianceArray } from './radiance.js';
 import { updateScene } from './geometry.js';
 import { recreateSimulationPanels } from './simulation.js';
 // Import the manager instance (reverted to the simpler direct import)
@@ -249,237 +249,213 @@ async gatherAllProjectData() {
     }
 
     async generateSimulationPackage(panelElement) {
-    // 1. Check if a project directory is open
-    if (!this.dirHandle) {
         const { showAlert } = await import('./ui.js');
-        showAlert('Please save or load a project directory first before generating scripts.', 'Project Directory Not Set');
-        return null;
-    }
-
-    // 2. Gather data and generate script content
-    const projectData = await this.gatherAllProjectData();
-    const projectName = projectData.projectInfo['project-name']?.replace(/\s+/g, '_') || 'scene';
-    this.projectName = projectName;
-
-    const globalParams = projectData.simulationParameters.global || {};
-    const recipeOverrides = {};
-    const panelTemplateId = panelElement.dataset.templateId;
-    const panelIdSuffix = panelElement.id.replace(`${panelTemplateId}-panel-`, '');
-
-    panelElement.querySelectorAll('input, select').forEach(input => {
-        const key = input.id.replace(`-${panelIdSuffix}`, '');
-        if (input.type === 'file') {
-            if (this.simulationFiles[key]) {
-                recipeOverrides[key] = { name: this.simulationFiles[key].name, content: this.simulationFiles[key].content };
-            } else {
-                recipeOverrides[key] = null;
-            }
-        } else {
-            recipeOverrides[key] = (input.type === 'checkbox' || input.type === 'radio') ? input.checked : input.value;
-        }
-    });
-
-    projectData.mergedSimParams = { ...globalParams, ...recipeOverrides };
-    
-    // Import UI helpers to generate necessary files on-the-fly
-    const { getViewpointFileContent, generateAndStoreOccupancyCsv } = await import('./ui.js');
-    generateAndStoreOccupancyCsv(); // Ensure occupancy schedule is up-to-date
-
-    const recipeType = panelElement.dataset.templateId;
-    const scriptsToGenerate = generateScripts(projectData, recipeType);
-    const { showAlert } = await import('./ui.js');
-
-    if (scriptsToGenerate.length === 0) {
-        showAlert('Could not generate any scripts for this recipe.', 'Generation Failed');
-        return null;
-    }
-
-    // 3. Write files directly to the project directory
-    try {
-        const scriptsDirHandle = await this.dirHandle.getDirectoryHandle('07_scripts', { create: true });
-
-        const writeFile = async (handle, filename, content) => {
-            if (content === null || content === undefined) return;
-            const fileHandle = await handle.getFileHandle(filename, { create: true });
-            const writable = await fileHandle.createWritable();
-            await writable.write(content);
-            await writable.close();
-        };
-
-        // Write all generated scripts
-        for (const script of scriptsToGenerate) {
-            await writeFile(scriptsDirHandle, script.fileName, script.content);
-        }
-
-        const makeExecutableContent = `#!/bin/bash\n# Makes all .sh scripts in this directory executable.\nchmod +x ./*.sh\necho "All scripts are now executable."`;
-        await writeFile(scriptsDirHandle, 'make_executable.sh', makeExecutableContent);
-
-        showAlert(`Scripts saved successfully to the '07_scripts' folder in your project directory.`, 'Scripts Generated');
-
-       // 4. Return the script details for the UI
-        const shScript = scriptsToGenerate.find(s => s.fileName.endsWith('.sh'));
-        const batScript = scriptsToGenerate.find(s => s.fileName.endsWith('.bat'));
-
-        const displayContent = shScript ? shScript.content : (batScript ? batScript.content : null);
-
-        if (!displayContent) return null;
-
-        return {
-            content: displayContent,
-            shFile: shScript ? shScript.fileName : null,
-            batFile: batScript ? batScript.fileName : null
-        };
-
-    } catch (error) {
-        console.error("Failed to write scripts to project directory:", error);
-        showAlert(`Error saving scripts: ${error.message}`, 'File System Error');
-        return null;
-    }
-}
-
-async downloadProjectFile() {
-    const { showAlert } = await import('./ui.js');
-
-    // 1. Check for a valid save location (either an Electron path or a Browser handle).
-    // If none exists, prompt the user to select one.
-    if (!this.dirPath && !this.dirHandle) {
-         const gotLocation = await this.requestProjectDirectory();
-         // Abort the save if the user cancels the directory selection dialog.
-         if (!gotLocation) return;
-    }
-
-    try {
         const { generateRadFileContent, generateRayFileContent } = await import('./radiance.js');
+    
+        // 1. Check if a project directory is open
+        if (!this.dirHandle) {
+            showAlert('Please save or load a project directory first before generating scripts.', 'Project Directory Not Set');
+            return null;
+        }
+    
+        // 2. Gather data and generate script content
         const projectData = await this.gatherAllProjectData();
-        const projectName = this.projectName || 'project';
+        const projectName = projectData.projectInfo['project-name']?.replace(/\s+/g, '_') || 'scene';
+        this.projectName = projectName;
+    
+        const globalParams = projectData.simulationParameters.global || {};
+        const recipeOverrides = {};
+        const panelTemplateId = panelElement.dataset.templateId;
+        const panelIdSuffix = panelElement.id.replace(`${panelTemplateId}-panel-`, '');
+    
+        panelElement.querySelectorAll('input, select').forEach(input => {
+            const key = input.id.replace(`-${panelIdSuffix}`, '');
+            if (input.type === 'file') {
+                if (this.simulationFiles[key]) {
+                    recipeOverrides[key] = { name: this.simulationFiles[key].name, content: this.simulationFiles[key].content };
+                } else {
+                    recipeOverrides[key] = null;
+                }
+            } else {
+                recipeOverrides[key] = (input.type === 'checkbox' || input.type === 'radio') ? input.checked : input.value;
+            }
+        });
+    
+        projectData.mergedSimParams = { ...globalParams, ...recipeOverrides };
 
-        // 2. Generate all file contents in memory first.
+        // Generate all necessary input files in memory first.
         const { materials, geometry } = generateRadFileContent();
-        const viewpointContent = this._generateViewpointFileContent(projectData);
-        const fisheyeContent = viewpointContent.replace(/-vtv/g, '-vth').replace(/-vh \d+/g, '-vh 180').replace(/-vv \d+/g, '-vv 180');
+        const viewpointContent = generateViewpointFileContent(projectData.viewpoint, projectData.geometry.room);
+        const fisheyeVpData = { ...projectData.viewpoint, 'view-type': 'h' };
+        const fisheyeContent = generateViewpointFileContent(fisheyeVpData, projectData.geometry.room);
         const allPtsContent = await this._generateSensorPointsContent('all');
         const taskPtsContent = await this._generateSensorPointsContent('task');
         const surroundingPtsContent = await this._generateSensorPointsContent('surrounding');
-        const daylightingPtsContent = this._generateDaylightingPointsContent();
-        const rayContent = generateRayFileContent();
-
-        // Sanitize the project data for JSON serialization by removing large file contents.
-        const dataForJson = JSON.parse(JSON.stringify(projectData));
-        dataForJson.epwFileContent = null; 
-         if (dataForJson.simulationFiles) {
-            Object.values(dataForJson.simulationFiles).forEach(file => { if (file) file.content = null; });
+        const rayContent = await generateRayFileContent();
+    
+        const recipeType = panelElement.dataset.templateId;
+        const scriptsToGenerate = generateScripts(projectData, recipeType);
+    
+        if (scriptsToGenerate.length === 0) {
+            showAlert('Could not generate any scripts for this recipe.', 'Generation Failed');
+            return null;
         }
-        const projectJsonContent = JSON.stringify(dataForJson, null, 2);
-
-        // 3. Structure all generated content into a list of file objects.
-        let filesToWrite = [
-            { path: ['01_geometry', `${projectName}.rad`], content: geometry },
-            { path: ['02_materials', `${projectName}_materials.rad`], content: materials },
-            { path: ['03_views', 'viewpoint.vf'], content: viewpointContent },
-            { path: ['03_views', 'viewpoint_fisheye.vf'], content: fisheyeContent },
-            { path: ['08_results', 'grid.pts'], content: allPtsContent },
-            { path: ['08_results', 'task_grid.pts'], content: taskPtsContent },
-            { path: ['08_results', 'surrounding_grid.pts'], content: surroundingPtsContent },
-            { path: ['08_results', 'view_grid.ray'], content: rayContent },
-            { path: [`${projectName}.json`], content: projectJsonContent }
-        ];
-        if (daylightingPtsContent) {
-            filesToWrite.push({ path: ['08_results', 'daylighting_sensors.pts'], content: daylightingPtsContent });
-        }
-        if (projectData.epwFileContent && projectData.projectInfo.epwFileName) {
-            filesToWrite.push({ path: ['04_skies', projectData.projectInfo.epwFileName], content: projectData.epwFileContent });
-        }
-        if (projectData.simulationFiles) {
-            for (const key in projectData.simulationFiles) {
-                const fileData = projectData.simulationFiles[key];
-                if (fileData?.name && fileData.content) {
-                    const targetDir = key.includes('bsdf') ? '05_bsdf' : key.includes('schedule') ? '10_schedules' : '11_files';
-                    filesToWrite.push({ path: [targetDir, fileData.name], content: fileData.content });
-                }
-            }
-        }
-        // Filter out any files that might not have content.
-        filesToWrite = filesToWrite.filter(f => f.content !== null && f.content !== undefined);
-
-        // 4. Write the files using the appropriate method based on the environment.
-        if (window.electronAPI && this.dirPath) {
-            // Electron Method: Send all data to the main process for efficient file writing.
-            await window.electronAPI.saveProject({ projectPath: this.dirPath, files: filesToWrite });
-        } else if (this.dirHandle) {
-            // Browser Method: Use the File System Access API to write files one by one.
-            for (const file of filesToWrite) {
-                let currentHandle = this.dirHandle;
-                // Create subdirectories as needed.
-                for (let i = 0; i < file.path.length - 1; i++) {
-                    currentHandle = await currentHandle.getDirectoryHandle(file.path[i], { create: true });
-                }
-                const fileHandle = await currentHandle.getFileHandle(file.path[file.path.length - 1], { create: true });
+    
+        // 3. Write all files (inputs and scripts) directly to the project directory
+        try {
+            const getHandle = (path) => this.dirHandle.getDirectoryHandle(path, { create: true });
+    
+            const writeFile = async (dirHandle, filename, content) => {
+                if (content === null || content === undefined) return;
+                const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
                 const writable = await fileHandle.createWritable();
-
-                let contentToWrite = file.content;
-                // Safeguard: If content is a plain object, stringify it before writing.
-                if (typeof contentToWrite === 'object' && contentToWrite !== null && !(contentToWrite instanceof Blob) && !(contentToWrite instanceof ArrayBuffer) && !ArrayBuffer.isView(contentToWrite)) {
-                    console.warn(`Content for ${file.path.join('/')} was an object. Auto-stringifying.`, contentToWrite);
-                    contentToWrite = JSON.stringify(contentToWrite, null, 2);
-                }
-
-                await writable.write(contentToWrite);
+                await writable.write(content);
                 await writable.close();
+            };
+    
+            // Write geometry, materials, views, and sensor points
+            await writeFile(await getHandle('01_geometry'), `${projectName}.rad`, geometry);
+            await writeFile(await getHandle('02_materials'), `${projectName}_materials.rad`, materials);
+            await writeFile(await getHandle('03_views'), 'viewpoint.vf', viewpointContent);
+            await writeFile(await getHandle('03_views'), 'viewpoint_fisheye.vf', fisheyeContent);
+            await writeFile(await getHandle('08_results'), 'grid.pts', allPtsContent);
+            await writeFile(await getHandle('08_results'), 'task_grid.pts', taskPtsContent);
+            await writeFile(await getHandle('08_results'), 'surrounding_grid.pts', surroundingPtsContent);
+            await writeFile(await getHandle('08_results'), 'view_grid.ray', rayContent);
+    
+            // Write all generated scripts
+            const scriptsDirHandle = await getHandle('07_scripts');
+            for (const script of scriptsToGenerate) {
+                await writeFile(scriptsDirHandle, script.fileName, script.content);
             }
-        } else {
-             throw new Error("No valid directory path or handle is available for saving.");
-        }
-        
-        showAlert(`Project '${projectName}' saved successfully.`, 'Project Saved');
-
-    } catch (error) {
-        if (error.name !== 'AbortError') {
-            console.error("Failed to save project:", error);
-            showAlert(`Error saving project: ${error.message}`, 'Save Error');
+    
+            const makeExecutableContent = `#!/bin/bash\n# Makes all .sh scripts in this directory executable.\nchmod +x ./*.sh\necho "All scripts are now executable."`;
+            await writeFile(scriptsDirHandle, 'make_executable.sh', makeExecutableContent);
+    
+            showAlert(`Scripts and input files saved successfully to your project directory.`, 'Package Generated');
+    
+            // 4. Return the script details for the UI
+            const shScript = scriptsToGenerate.find(s => s.fileName.endsWith('.sh'));
+            const batScript = scriptsToGenerate.find(s => s.fileName.endsWith('.bat'));
+            const displayContent = shScript ? shScript.content : (batScript ? batScript.content : null);
+    
+            if (!displayContent) return null;
+    
+            return {
+                content: displayContent,
+                shFile: shScript ? shScript.fileName : null,
+                batFile: batScript ? batScript.fileName : null
+            };
+    
+        } catch (error) {
+            console.error("Failed to write simulation package to project directory:", error);
+            showAlert(`Error saving package: ${error.message}`, 'File System Error');
+            return null;
         }
     }
-}
 
-    _generateViewpointFileContent(projectData) {
-        const { viewpoint: vp, geometry: { room } } = projectData;
-        const { 'view-type': viewType, 'view-pos-x': vpx, 'view-pos-y': vpy, 'view-pos-z': vpz, 'view-dir-x': vdx, 'view-dir-y': vdy, 'view-dir-z': vdz, 'view-fov': fov } = vp;
+    async downloadProjectFile() {
+        const { showAlert } = await import('./ui.js');
+    
+        // 1. Check for a valid save location (either an Electron path or a Browser handle).
+        // If none exists, prompt the user to select one.
+        if (!this.dirPath && !this.dirHandle) {
+             const gotLocation = await this.requestProjectDirectory();
+             // Abort the save if the user cancels the directory selection dialog.
+             if (!gotLocation) return;
+        }
+    
+        try {
+            const { generateRadFileContent, generateRayFileContent } = await import('./radiance.js');
+            const projectData = await this.gatherAllProjectData();
+            const projectName = this.projectName || 'project';
 
-        const W = room.width;
-        const L = room.length;
-        const alphaRad = THREE.MathUtils.degToRad(room['room-orientation']);
-        const cosA = Math.cos(alphaRad);
-        const sinA = Math.sin(alphaRad);
-
-        const transformPointToRadiance = (localPoint_WHL, W, L, cosA, sinA) => {
-            const localPoint_WLH = [localPoint_WHL[0], localPoint_WHL[2], localPoint_WHL[1]];
-            const p = { x: localPoint_WLH[0], y: localPoint_WLH[1], z: localPoint_WLH[2] };
-            const centered_x = p.x - W / 2;
-            const centered_y = p.y - L / 2;
-            const rx = centered_x * cosA - centered_y * sinA;
-            const ry = centered_x * sinA + centered_y * cosA;
-            return `${rx.toFixed(4)} ${ry.toFixed(4)} ${p.z.toFixed(4)}`;
-        };
-        
-        const transformDirectionToRadiance = (localVector_XYZ, cosA, sinA) => {
-            const v = { x: localVector_XYZ[0], y: localVector_XYZ[2], z: localVector_XYZ[1] };
-            const rx = v.x * cosA - v.y * sinA;
-            const ry = v.x * sinA + v.y * cosA;
-            return `${rx.toFixed(4)} ${ry.toFixed(4)} ${v.z.toFixed(4)}`;
-        };
-
-        const pos_WHL = [vpx, vpy, vpz];
-        const dir_XYZ = [vdx, vdy, vdz];
-        
-        const rad_vp = transformPointToRadiance(pos_WHL, W, L, cosA, sinA);
-        const rad_vd = transformDirectionToRadiance(dir_XYZ, cosA, sinA);
-
-        const viewTypeMap = { 'v': '-vtv', 'h': '-vth', 'c': '-vtc', 'l': '-vtl', 'a': '-vta' };
-        const radViewType = viewTypeMap[viewType] || '-vtv';
-        
-        const vfov = (viewType === 'h' || viewType === 'a') ? 180 : fov;
-        const hfov = vfov;
-
-        return `${radViewType} -vp ${rad_vp} -vd ${rad_vd} -vu 0 0 1 -vh ${hfov} -vv ${vfov}`;
+            // 2. Generate all file contents in memory first.
+            const { materials, geometry } = generateRadFileContent();
+            const viewpointContent = generateViewpointFileContent(projectData.viewpoint, projectData.geometry.room);
+            const fisheyeVpData = { ...projectData.viewpoint, 'view-type': 'h' };
+            const fisheyeContent = generateViewpointFileContent(fisheyeVpData, projectData.geometry.room);
+            const allPtsContent = await this._generateSensorPointsContent('all');
+            const taskPtsContent = await this._generateSensorPointsContent('task');
+            const surroundingPtsContent = await this._generateSensorPointsContent('surrounding');
+            const daylightingPtsContent = this._generateDaylightingPointsContent();
+            const rayContent = generateRayFileContent();
+    
+            // Sanitize the project data for JSON serialization by removing large file contents.
+            const dataForJson = JSON.parse(JSON.stringify(projectData));
+            dataForJson.epwFileContent = null; 
+             if (dataForJson.simulationFiles) {
+                Object.values(dataForJson.simulationFiles).forEach(file => { if (file) file.content = null; });
+            }
+            const projectJsonContent = JSON.stringify(dataForJson, null, 2);
+    
+            // 3. Structure all generated content into a list of file objects.
+            let filesToWrite = [
+                { path: ['01_geometry', `${projectName}.rad`], content: geometry },
+                { path: ['02_materials', `${projectName}_materials.rad`], content: materials },
+                { path: ['03_views', 'viewpoint.vf'], content: viewpointContent },
+                { path: ['03_views', 'viewpoint_fisheye.vf'], content: fisheyeContent },
+                { path: ['08_results', 'grid.pts'], content: allPtsContent },
+                { path: ['08_results', 'task_grid.pts'], content: taskPtsContent },
+                { path: ['08_results', 'surrounding_grid.pts'], content: surroundingPtsContent },
+                { path: ['08_results', 'view_grid.ray'], content: rayContent },
+                { path: [`${projectName}.json`], content: projectJsonContent }
+            ];
+            if (daylightingPtsContent) {
+                filesToWrite.push({ path: ['08_results', 'daylighting_sensors.pts'], content: daylightingPtsContent });
+            }
+            if (projectData.epwFileContent && projectData.projectInfo.epwFileName) {
+                filesToWrite.push({ path: ['04_skies', projectData.projectInfo.epwFileName], content: projectData.epwFileContent });
+            }
+            if (projectData.simulationFiles) {
+                for (const key in projectData.simulationFiles) {
+                    const fileData = projectData.simulationFiles[key];
+                    if (fileData?.name && fileData.content) {
+                        const targetDir = key.includes('bsdf') ? '05_bsdf' : key.includes('schedule') ? '10_schedules' : '11_files';
+                        filesToWrite.push({ path: [targetDir, fileData.name], content: fileData.content });
+                    }
+                }
+            }
+            // Filter out any files that might not have content.
+            filesToWrite = filesToWrite.filter(f => f.content !== null && f.content !== undefined);
+    
+            // 4. Write the files using the appropriate method based on the environment.
+            if (window.electronAPI && this.dirPath) {
+                // Electron Method: Send all data to the main process for efficient file writing.
+                await window.electronAPI.saveProject({ projectPath: this.dirPath, files: filesToWrite });
+            } else if (this.dirHandle) {
+                // Browser Method: Use the File System Access API to write files one by one.
+                for (const file of filesToWrite) {
+                    let currentHandle = this.dirHandle;
+                    // Create subdirectories as needed.
+                    for (let i = 0; i < file.path.length - 1; i++) {
+                        currentHandle = await currentHandle.getDirectoryHandle(file.path[i], { create: true });
+                    }
+                    const fileHandle = await currentHandle.getFileHandle(file.path[file.path.length - 1], { create: true });
+                    const writable = await fileHandle.createWritable();
+    
+                    let contentToWrite = file.content;
+                    // Safeguard: If content is a plain object, stringify it before writing.
+                    if (typeof contentToWrite === 'object' && contentToWrite !== null && !(contentToWrite instanceof Blob) && !(contentToWrite instanceof ArrayBuffer) && !ArrayBuffer.isView(contentToWrite)) {
+                        console.warn(`Content for ${file.path.join('/')} was an object. Auto-stringifying.`, contentToWrite);
+                        contentToWrite = JSON.stringify(contentToWrite, null, 2);
+                    }
+    
+                    await writable.write(contentToWrite);
+                    await writable.close();
+                }
+            } else {
+                 throw new Error("No valid directory path or handle is available for saving.");
+            }
+            
+            showAlert(`Project '${projectName}' saved successfully.`, 'Project Saved');
+    
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                console.error("Failed to save project:", error);
+                showAlert(`Error saving project: ${error.message}`, 'Save Error');
+            }
+        }
     }
 
     async _generateSensorPointsContent(gridType = 'all') {
@@ -492,23 +468,9 @@ async downloadProjectFile() {
     const cosA = Math.cos(alphaRad);
     const sinA = Math.sin(alphaRad);
 
-    const transformPoint = (localPoint) => {
-        // Map from local room coords [W,L,H] to Radiance coords [X,Y,Z]
-        const p = { x: localPoint[0], y: localPoint[1], z: localPoint[2] };
-        const centered_x = p.x - W / 2;
-        const centered_y = p.y - L / 2; // Radiance Y is Three.js Z
-        const rx = centered_x * cosA - centered_y * sinA;
-        const ry = centered_x * sinA + centered_y * cosA;
-        return [rx, ry, p.z]; // Radiance Z is Three.js Y
-    };
-
-    const transformVector = (localVector) => {
-         // Map from local room normal [x,y,z] to Radiance normal [X,Y,Z]
-        const v = { x: localVector[0], y: localVector[1], z: localVector[2] };
-        const rx = v.x * cosA - v.y * sinA;
-        const ry = v.x * sinA + v.y * cosA;
-        return [rx, ry, v.z];
-    };
+    // Use the new, centralized utility functions from radiance.js
+    const transformPoint = (localPoint) => transformThreePointToRadianceArray(localPoint, W, L, cosA, sinA);
+    const transformVector = (localVector) => transformThreeVectorToRadianceArray(localVector, cosA, sinA);
 
     const generatePointsInRect = (x, z, width, depth, spacing) => {
         if (spacing <= 0 || width <= 0 || depth <= 0) return [];
@@ -597,19 +559,22 @@ async downloadProjectFile() {
                 offset = parseFloat(dom[`${name}-grid-offset`].value);
                 points1 = generateCenteredPoints(W, spacing);
                 points2 = generateCenteredPoints(L, spacing);
-                normalVector = (name === 'floor') ? [0, 0, 1] : [0, 0, -1];
-                positionFunc = (p1, p2) => [p1, p2, name === 'floor' ? offset : H + offset];
+                // CORRECTED: Define normals in Three.js coordinate system (Y-up)
+                normalVector = (name === 'floor') ? [0, 1, 0] : [0, -1, 0];
+                positionFunc = (p1, p2) => [p1, name === 'floor' ? offset : H + offset, p2]; // Y is height
             } else {
                 spacing = parseFloat(dom['wall-grid-spacing'].value);
                 offset = parseFloat(dom['wall-grid-offset'].value);
-                points2 = generateCenteredPoints(H, spacing);
+                points2 = generateCenteredPoints(H, spacing); // Height is vertical span
                 const wallLength = (name === 'north' || name === 'south') ? W : L;
-                points1 = generateCenteredPoints(wallLength, spacing);
+                points1 = generateCenteredPoints(wallLength, spacing); // Width/Length is horizontal span
+
+                // CORRECTED: Define normals in Three.js coordinate system (Y-up) and adjust positionFunc
                 switch (name) {
-                    case 'north': normalVector = [0, 1, 0]; positionFunc = (p1, p2) => [p1, offset, p2]; break;
-                    case 'south': normalVector = [0, -1, 0]; positionFunc = (p1, p2) => [p1, L - offset, p2]; break;
-                    case 'west': normalVector = [1, 0, 0]; positionFunc = (p1, p2) => [offset, p1, p2]; break;
-                    case 'east': normalVector = [-1, 0, 0]; positionFunc = (p1, p2) => [W - offset, p1, p2]; break;
+                    case 'north': normalVector = [0, 0, 1]; positionFunc = (p1, p2) => [p1, p2, offset]; break;
+                    case 'south': normalVector = [0, 0, -1]; positionFunc = (p1, p2) => [p1, p2, L - offset]; break;
+                    case 'west':  normalVector = [1, 0, 0]; positionFunc = (p1, p2) => [offset, p2, p1]; break;
+                    case 'east':  normalVector = [-1, 0, 0]; positionFunc = (p1, p2) => [W - offset, p2, p1]; break;
                 }
             }
             for (const p1 of points1) {
@@ -646,31 +611,20 @@ async downloadProjectFile() {
         const cosA = Math.cos(alphaRad);
         const sinA = Math.sin(alphaRad);
 
-        const transformPoint = (localPoint) => {
-            const p = { x: localPoint.x, y: localPoint.z, z: localPoint.y }; // map to radiance coords
-            const centered_x = p.x - W / 2;
-            const centered_y = p.y - L / 2;
-            const rx = centered_x * cosA - centered_y * sinA;
-            const ry = centered_x * sinA + centered_y * cosA;
-            return [rx, ry, p.z];
-        };
+        const points = lightingState.daylighting.sensors.map(sensor => {
+            // The sensor object contains {x, y, z} position and {x, y, z} direction
+            const posThree = [sensor.x, sensor.y, sensor.z];
+            const dirThree = [sensor.direction.x, sensor.direction.y, sensor.direction.z];
 
-    const transformDirection = (localDir) => {
-        // Convert Three.js vector {x, y, z} to Radiance's coordinate system {x, z, y} BEFORE rotation.
-        const radDir = { x: localDir.x, y: localDir.z, z: localDir.y };
+            // Use the new, centralized utility functions
+            const worldPosArray = transformThreePointToRadianceArray(posThree, W, L, cosA, sinA);
+            const worldNormArray = transformThreeVectorToRadianceArray(dirThree, cosA, sinA);
 
-        // Now, rotate around the Z-axis (up in Radiance)
-        const rdx = radDir.x * cosA - radDir.y * sinA;
-        const rdy = radDir.x * sinA + radDir.y * cosA;
+            const worldPos = worldPosArray.map(c => c.toFixed(4)).join(' ');
+            const worldNorm = worldNormArray.map(c => c.toFixed(4)).join(' ');
 
-        return [rdx, rdy, radDir.z]; // Return rotated Radiance vector
-    };
-
-    const points = lightingState.daylighting.sensors.map(sensor => {
-        const worldPos = transformPoint(sensor); // sensor object contains position
-        const worldNorm = transformDirection(sensor.direction);
-        return `${worldPos.map(c => c.toFixed(4)).join(' ')} ${worldNorm.map(c => c.toFixed(4)).join(' ')}`;
-    });
+            return `${worldPos} ${worldNorm}`;
+        });
 
     return "# Radiance Daylighting Control Sensor Points (X Y Z Vx Vy Vz)\n" + points.join('\n');
 }
@@ -904,7 +858,9 @@ async downloadProjectFile() {
                 setChecked('view-grid-toggle', sg.view.enabled); setChecked('show-view-grid-3d-toggle', sg.view.showIn3D); setValue('view-grid-spacing', sg.view.spacing);
                 setValue('view-grid-offset', sg.view.offset); setValue('view-grid-directions', sg.view.numDirs);
                 if(sg.view.startVec) {
-                    setValue('view-grid-start-vec-x', sg.view.startVec.x); setValue('view-grid-start-vec-y', sg.view.startVec.y); setValue('view-grid-start-vec-z', sg.view.startVec.z);
+                    setValue('view-grid-start-vec-x', sg.view.startVec.x);
+                    setValue('view-grid-start-vec-y', sg.view.startVec.y);
+                    setValue('view-grid-start-vec-z', sg.view.startVec.z);
                 }
             }
         }

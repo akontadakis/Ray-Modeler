@@ -24,6 +24,7 @@ export let horizontalClipPlane, verticalClipPlane;
 export let daylightingSensorsGroup;
 export let isFirstPersonView = false;
 export let currentViewType = 'v'; // Default to perspective
+let preFpvCamera; // To store the camera state before entering FPV
 
 // --- CORE FUNCTIONS ---
 
@@ -138,12 +139,9 @@ export function animate() {
     // so we can just render it. This ensures effects like fisheye always work.
     composer.render();
 
-    // The label renderer needs to know which camera is conceptually active.
-    const isParallelFPV = currentViewType === 'l';
-    const currentLabelCamera = isFirstPersonView
-        ? (isParallelFPV ? fpvOrthoCamera : viewpointCamera)
-        : activeCamera;
-    labelRenderer.render(scene, currentLabelCamera);
+    // The label renderer now simply uses the globally active camera,
+    // which is correctly managed by toggleFirstPersonView and setActiveCamera.
+    labelRenderer.render(scene, activeCamera);
 
     if (controls.enabled) {
         controls.update();
@@ -273,13 +271,15 @@ function _setupCameras(container) {
     const aspect = container.clientWidth / container.clientHeight;
     const frustumSize = 15;
 
+    const initialCameraPosition = new THREE.Vector3(5, 5, 10);
+
     // Perspective Camera (for 3D views)
     perspectiveCamera = new THREE.PerspectiveCamera(75, aspect, 0.1, 1000);
-    perspectiveCamera.position.set(5, 5, 10);
+    perspectiveCamera.position.copy(initialCameraPosition);
 
     // Orthographic Camera (for 2D views like Top, Front, etc.)
     orthoCamera = new THREE.OrthographicCamera(frustumSize * aspect / -2, frustumSize * aspect / 2, frustumSize / 2, frustumSize / -2, 0.1, 1000);
-    orthoCamera.position.set(5, 5, 10);
+    orthoCamera.position.copy(initialCameraPosition);
     
     // Viewpoint Camera (for first-person view and Radiance renderings)
     viewpointCamera = new THREE.PerspectiveCamera(60, 1, 0.1, 50);
@@ -408,24 +408,25 @@ export function updateLiveViewType(viewType) {
  * @param {string} viewType - The currently selected view type (e.g., 'v', 'l', 'h').
  */
 export function toggleFirstPersonView(viewType) {
-isFirstPersonView = !isFirstPersonView;
-const isParallel = viewType === 'l';
+    isFirstPersonView = !isFirstPersonView;
+    const isParallel = viewType === 'l';
 
-controls.enabled = !isFirstPersonView;
+    controls.enabled = !isFirstPersonView;
 
-if (isFirstPersonView) {
-    transformControls.detach();
-    if (viewCamHelper) viewCamHelper.visible = false;
-    if (axesObject) axesObject.visible = false;
-    renderPass.camera = isParallel ? fpvOrthoCamera : viewpointCamera;
+    if (isFirstPersonView) {
+        preFpvCamera = activeCamera; // Store the camera that was active before FPV
+        transformControls.detach();
+        if (viewCamHelper) viewCamHelper.visible = false;
+        if (axesObject) axesObject.visible = false;
+        // Set the FPV camera as the globally active one for all renderers
+        setActiveCamera(isParallel ? fpvOrthoCamera : viewpointCamera);
     } else {
         transformControls.attach(viewpointCamera);
         if (axesObject) axesObject.visible = true;
-        // The UI layer is now responsible for updating the gizmo's visibility
-        // after FPV mode is exited.
-        renderPass.camera = activeCamera;
+        // Restore the camera that was active before entering FPV
+        setActiveCamera(preFpvCamera || perspectiveCamera);
     }
 
-// Return the new state so the UI layer can handle UI updates.
-return isFirstPersonView;
+    // Return the new state so the UI layer can handle UI updates.
+    return isFirstPersonView;
 }

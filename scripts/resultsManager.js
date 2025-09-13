@@ -44,12 +44,13 @@ class ResultsManager {
     if (key in this.datasets) {
         this.datasets[key] = {
             fileName: null,
-            data: [],
+            data: [], // This will hold the "active" data for display
             annualData: [],
-            annualDirectData: [], // NEW: Clear direct data as well
+            annualDirectData: [],
             glareResult: null,
             annualGlareResults: {},
-            spectralResults: {},
+            spectralResults: {}, // Will store photopic, eml, cs, cct arrays
+            circadianMetrics: null, // Will store summary JSON object
             lightingEnergyMetrics: null,
             lightingMetrics: null,
             stats: null
@@ -114,24 +115,27 @@ class ResultsManager {
                     const lowerFileName = file.name.toLowerCase();
                     let isSpectral = false;
 
-                    if (lowerFileName.includes('photopic')) {
-                        this.datasets[key].spectralResults.photopic = parsedData.data;
-                        this.datasets[key].data = parsedData.data; // Set photopic as the default viewable data
-                        this.activeMetricType = 'photopic';
-                        isSpectral = true;
-                    } else if (lowerFileName.includes('melanopic')) {
-                        this.datasets[key].spectralResults.melanopic = parsedData.data;
-                        isSpectral = true;
-                    } else if (lowerFileName.includes('neuropic')) {
-                    this.datasets[key].spectralResults.neuropic = parsedData.data;
-                    isSpectral = true;
+                    if (parsedData.circadianMetrics) {
+                    // This was a circadian_summary.json file
+                    this.datasets[key].circadianMetrics = parsedData.circadianMetrics;
+                    } else if (parsedData.perPointCircadianData) {
+                        // This was a circadian_per_point.csv file
+                        this.datasets[key].spectralResults = parsedData.perPointCircadianData;
+                        // Set the default viewable data to photopic lux
+                        this.datasets[key].data = parsedData.perPointCircadianData.Photopic_lux;
+                        this.activeMetricType = 'Photopic_lux';
                     } else if (lowerFileName.includes('_direct.ill')) { // NEW: Detect direct-only .ill files
                     this.datasets[key].annualDirectData = parsedData.annualData || [];
                     } else if (parsedData.lightingEnergyMetrics) {
                         this.datasets[key].lightingEnergyMetrics = parsedData.lightingEnergyMetrics;
                     } else {
                         // Standard (non-spectral) data handling
-                        this.datasets[key].data = parsedData.data || [];
+                        const illuminanceData = parsedData.data || [];
+                        this.datasets[key].data = illuminanceData;
+                        this.datasets[key].spectralResults['illuminance'] = illuminanceData;
+                        this.activeMetricType = 'illuminance';
+
+                        this.datasets[key].annualData = parsedData.annualData || [];
                         this.datasets[key].annualData = parsedData.annualData || [];
                         this.datasets[key].glareResult = parsedData.glareResult || null;
                         this.datasets[key].annualGlareResults = parsedData.annualGlareResults || {};
@@ -629,12 +633,34 @@ class ResultsManager {
                 pointId: p
             });
         }
-        return combinedData;
+            return combinedData;
+}
+
+/**
+ * Sets the active metric for 3D visualization and recalculates stats.
+ * @param {'illuminance' | 'Photopic_lux' | 'EML' | 'CS' | 'CCT'} metricType - The metric to display.
+ */
+setActiveMetricType(metricType) {
+    this.activeMetricType = metricType;
+
+    for (const key of ['a', 'b']) {
+        const dataset = this.datasets[key];
+        if (dataset && dataset.spectralResults && dataset.spectralResults[metricType]) {
+            dataset.data = dataset.spectralResults[metricType];
+            dataset.stats = this._calculateStats(dataset.data);
+        }
     }
 
+    this.calculateDifference();
 
-    updateColorScale(min, max, palette) {
-        this.colorScale.min = min;
+    const activeStats = this.getActiveStats();
+    if(activeStats) {
+        this.updateColorScale(activeStats.min, activeStats.max, this.colorScale.palette);
+    }
+}
+
+
+updateColorScale(min, max, palette) {
         this.colorScale.max = max;
         this.colorScale.palette = palette;
     }

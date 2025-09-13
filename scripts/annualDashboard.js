@@ -11,6 +11,7 @@ let savingsGauge = null;
 let powerGauge = null;
 let glareRoseChart = null;
 let combinedAnalysisChart = null;
+let csGauge = null;
 let lpdGauge = null;
 let energyGauge = null;
 let energySavingsGauge = null;
@@ -422,6 +423,7 @@ export function clearAnnualDashboard() {
     if (savingsGauge) savingsGauge.destroy();
     if (powerGauge) powerGauge.destroy();
     clearLightingEnergyDashboard(); // Also clear the new dashboard
+    clearCircadianDashboard();
     sdaGauge = null;
     aseGauge = null;
     udiChart = null;
@@ -608,4 +610,63 @@ function setupTemporalMapTooltip(canvas, data, margin, cellWidth, cellHeight) {
     canvas.onmouseleave = () => {
         temporalMapTooltip.classList.add('hidden');
     };
+}
+
+/**
+* Clears and hides the circadian metrics dashboard.
+*/
+export function clearCircadianDashboard() {
+    document.getElementById('circadian-metrics-dashboard')?.classList.add('hidden');
+    if (csGauge) csGauge.destroy();
+    csGauge = null;
+
+    const csVal = document.getElementById('cs-value');
+    const emlVal = document.getElementById('eml-value');
+    const cctVal = document.getElementById('cct-value');
+    const wellList = document.getElementById('well-compliance-checklist');
+
+    if (csVal) csVal.textContent = '--';
+    if (emlVal) emlVal.textContent = '--';
+    if (cctVal) cctVal.textContent = '--';
+    if (wellList) wellList.innerHTML = '';
+}
+
+/**
+* Updates the UI with circadian lighting metrics.
+* @param {object | null} metrics - The calculated circadian metrics from resultsManager.
+*/
+export function updateCircadianDashboard(metrics) {
+    clearCircadianDashboard();
+    if (!metrics) return;
+
+    const dashboard = document.getElementById('circadian-metrics-dashboard');
+    if (!dashboard) return;
+
+    dashboard.classList.remove('hidden');
+    
+    const cs = metrics.avg_cs || 0;
+    const eml = metrics.avg_eml || 0;
+    const cct = metrics.avg_cct || 0;
+    
+    document.getElementById('cs-value').textContent = cs.toFixed(3);
+    document.getElementById('eml-value').textContent = eml.toFixed(0);
+    document.getElementById('cct-value').textContent = cct.toFixed(0);
+    
+    // Create CS Gauge (0 to 0.7 scale)
+    const csPercentage = (cs / 0.7) * 100;
+    csGauge = createGauge('cs-gauge', csPercentage, '#8b5cf6');
+
+    // WELL v2 L03 Compliance Check
+    const wellList = document.getElementById('well-compliance-checklist');
+    const checkCompliance = (threshold, label) => {
+        const pass = eml >= threshold;
+        const li = document.createElement('li');
+        li.className = `flex items-center ${pass ? 'text-green-500' : 'text-red-500'}`;
+        li.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${pass ? 'M5 13l4 4L19 7' : 'M6 18L18 6M6 6l12 12'}" /></svg> ${label}`;
+        wellList.appendChild(li);
+    };
+
+    wellList.innerHTML = '';
+    checkCompliance(125, 'Min Threshold: 125 EML');
+    checkCompliance(200, 'Enhanced Threshold: 200 EML');
 }
