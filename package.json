@@ -43,12 +43,21 @@
       "icon": "assets/icon.icns"
     },
     "win": {
-      "target": "nsis",
-      "icon": "assets/icon.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+        "icon": "assets/icon.ico",
+        "target": [
+          {
+            "target": "nsis",
+            "arch": [
+              "x64",
+              "arm64"
+            ]
+          }
+        ],
+        "artifactName": "${productName} Setup ${version}-${arch}.${ext}"
+      },
+      "nsis": {
+        "oneClick": false,
+        "allowToChangeInstallationDirectory": true
     }
   }
 }

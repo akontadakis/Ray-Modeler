@@ -26,8 +26,10 @@ Designed for lighting designers, architects, and building science researchers, R
     - [Desktop Integration (Electron)](#desktop-integration-electron)
   - [🛠️ For Developers: Building from Source](#️-for-developers-building-from-source)
     - [Prerequisites](#prerequisites)
-    - [Build for macOS 🍎](#build-for-macos-)
-    - [Build for Windows 💻](#build-for-windows-)
+    - [Setup and Development](#setup-and-development)
+    - [Building for Distribution](#building-for-distribution)
+      - [Build for macOS 🍎](#build-for-macos-)
+      - [Build for Windows 💻 (from any platform)](#build-for-windows--from-any-platform)
     - [Cross-Platform Building](#cross-platform-building)
   - [🛠️ Technology Stack](#️-technology-stack)
   - [License 📄](#license-)
@@ -408,85 +410,69 @@ Ray Modeler operates as an Electron-based desktop application, enabling direct i
 
 ## 🛠️ For Developers: Building from Source
 
-You can build a distributable, single-click installer for macOS and Windows distribution using `electron-builder`.
+You can run the application in a local development environment or build a distributable, single-click installer for macOS and Windows using `electron-builder`.
 
 ### Prerequisites
 
 Before you begin, ensure you have the following installed on your system:
 
 - **Node.js and npm**: [Download & Install Node.js](https://nodejs.org/en) (npm is included).
-
 - **Git**: [Download & Install Git](https://git-scm.com/).
 
-1. **Project Setup**
+### Setup and Development
 
-Clone the repository and install the necessary development dependencies.
+1. **Clone the Repository and Install Dependencies**
 
-```Bash
-# Clone the Repository
-git clone https://github.com/your-username/ray-modeler.git
+    ```bash
+    # Clone the repository
+    git clone [https://github.com/your-username/ray-modeler.git](https://github.com/your-username/ray-modeler.git)
+    
+    # Navigate into the project directory
+    cd ray-modeler
+    
+    # Install the necessary npm packages
+    npm install
+    ```
 
-cd ray-modeler
+2. **Run the App in Development Mode**
 
-# Install Dependencies
-npm install
+    To run the full Electron application with all features (including file system access and simulation execution), use the start script:
 
-# Update
-npm update
-```
+    ```bash
+    npm start
+    ```
 
-2. **Running in Development Mode**
+    This will launch the application in a development window with access to developer tools.
 
-To run the application locally in a browser (without Electron features), serve the files from a local web server.
+### Building for Distribution
 
-```Bash
-# Using Python 3
-python -m http.server
+The following commands use `electron-builder` to package the application into a distributable format. The final installer/application files will be located in the `dist/` directory.
 
-# Or with Node.js live-server
-npm install -g live-server
-live-server
-```
+#### Build for macOS 🍎
 
-*Open in Browser*:
-
-Navigate to (<http://localhost:8000>) (or the address provided by your server) in your web browser.
-
-To run the full Electron application for development:
-
-```Bash
-npm start
-```
-
-3. **Building for Distribution**
-
-The following commands use `electron-builder` to package the application into a distributable format. Output files will be in the `dist/` directory.
-
-### Build for macOS 🍎
-
-This command creates a `.dmg` disk image, which is the standard for distributing Mac applications.
-
-1. Run the Mac build script:
+This command bundles the application into a standard `.dmg` disk image for macOS.
 
 ```bash
 npm run build:mac
 ```
 
-This creates a `.dmg` disk image and a `.app` bundle in the `dist/` folder.
+#### Build for Windows 💻 (from any platform)
 
-### Build for Windows 💻
+This command creates NSIS installers (`.exe`) for both **x64** and **arm64** Windows architectures.
 
-This command creates an NSIS installer (`.exe`), which guides users through the installation process.
+**Prerequisite for macOS/Linux users**: To build a Windows app on a non-Windows machine, you must have [Wine](https://www.winehq.org/) installed. You can install it easily with Homebrew:
+
+```Bash
+brew install --cask wine-stable
+```
+
+Once Wine is installed, run the build script:
 
 ```Bash
 npm run build:win
 ```
 
-This creates an NSIS installer (.exe) and an unpacked portable version in the dist/ folder.
-
-*Note on Cross-Platform Building*:
-
-While possible, it's recommended to build for a target platform on that same platform.
+This will generate two installers in the dist/ folder, for example: Ray Modeler Setup 1.1.0-x64.exe and Ray Modeler Setup 1.1.0-arm64.exe.
 
 ### Cross-Platform Building
 
