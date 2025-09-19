@@ -68,6 +68,14 @@ Ray Modeler is packed with features that automate and enhance the Radiance workf
   
 - **AI Assistant**: An integrated, context-aware AI chat powered by generative AI (Google Gemini or models via OpenRouter) that can answer questions and directly manipulate the scene, run simulations, and control the UI using natural language commands.
 
+- **Automated Report Generation**: Generate comprehensive HTML reports with a single click. The report includes project details, a 3D scene snapshot, key performance metrics (sDA, ASE, DGP), and all generated dashboard charts (UDI, Glare Rose), ready for printing or saving as a PDF.
+
+- **Interactive Data Table**: Inspect raw simulation data in a sortable, filterable table. Click on any row to instantly highlight the corresponding sensor point in the 3D model, linking numerical data directly to its spatial context.
+
+- **Daylight Autonomy Heatmaps**: Visualize annual performance not just as point-in-time illuminance, but also as Daylight Autonomy (DA), showing the percentage of occupied hours that each sensor point meets a specific illuminance threshold.
+
+- **Daylighting Control Zone Visualization**: Instantly visualize which luminaires are controlled by which photosensors. The 3D gizmos for light sources are color-coded based on their assigned control zone, providing immediate feedback on the daylighting strategy.
+
 ## 🚀 Getting Started
 
 To use Ray Modeler, you will need a modern web browser and a local installation of the Radiance Lighting Simulation Suite.
@@ -241,6 +249,7 @@ The panels on the left toolbar are used to define the scene.
     - **Dimming Curve**: Minimum power fraction and minimum light output fraction for continuous dimming systems.
     - **Stepped Dimming**: The number of steps for stepped control systems.
     - **Availability Schedule**: An optional `.csv` schedule file can be provided to define when the daylighting system is active.
+    - **Control Zone Visualization**: A toggle to color-code the 3D luminaire gizmos based on which photosensor controls them (e.g., Zone 1 in blue, Zone 2 in green). This provides immediate visual feedback to verify that the control strategy is configured as intended.
 
 - *EN 12464-1 Luminaire Specification*: To support lighting for workplaces compliance, each light source can be defined with a **Maintenance Factor (MF)**, **Color Rendering Index ($R_a$)**, and **Correlated Color Temperature (TCP)**.
 
@@ -380,6 +389,12 @@ The Analysis Sidebar uses a background Web Worker to parse various Radiance resu
 - **HDR Viewer**: Loads and displays rendered .hdr images. Features include exposure controls, a false-color mode based on luminance, a mouse-over probe to get exact cd/m² values, and an overlay for detected glare sources.
 
 - **Spectral Metrics Dashboard**: When results from the Lark spectral recipe are loaded, this dashboard displays space-averaged values for key non-visual lighting metrics, including Photopic Illuminance (lux), Melanopic EDI (m-EDI lux), and Neuropic Irradiance (W/m²).
+
+- **Interactive Data Table**: When results are loaded, an interactive table becomes available. Users can sort data by point ID or value, and apply filters (e.g., `> 500`, `<= 100`) to isolate specific data points. Clicking a row in the table highlights the corresponding sensor in the 3D view.
+
+- **2D Daylight Autonomy Heatmap**: In addition to illuminance, the 2D floor plan heatmap can display Daylight Autonomy (DA). This mode shows the percentage of occupied hours that each point on the grid meets a user-defined illuminance threshold, providing a clear spatial overview of annual daylight performance.
+
+- **Automated HTML Report Generation**: A "Generate Report" button in the analysis panel compiles all project information, a 3D snapshot, key metrics (sDA, ASE, DGP), and all dashboard charts into a single, self-contained HTML file. This report can be opened in a new tab for printing or saving as a PDF.
 
 ### Desktop Integration (Electron)
 

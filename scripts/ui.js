@@ -20,6 +20,8 @@ let updateScheduled = false;
 export let selectedWallId = null;
 let isWallSelectionLocked = false;
 const suggestionMemory = new Set(); // Prevents spamming suggestions during a session
+let tableData = []; // Holds data for the interactive table
+let currentSort = { column: 'id', direction: 'asc' }; // Default sort state
 
 // --- START: Added state for Task Area Visualizer ---
 let taskAreaCtx, taskAreaCanvas;
@@ -342,18 +344,23 @@ const ids = [
     'ies-color-r', 'ies-color-g', 'ies-color-b', 'placement-mode-individual', 'placement-mode-grid', 
     'light-pos-x', 'light-pos-y', 'light-pos-z', 'light-rot-x', 'light-rot-y', 'light-rot-z', 
     'grid-layout-inputs', 'grid-rows', 'grid-cols', 'grid-row-spacing', 'grid-col-spacing',
+    'lighting-power-section', 'lighting-spec-section',
 
     // Daylighting Controls
     'ies-photometry-viewer', 'ies-polar-plot-canvas', 'ies-info-display',
     'luminaire-wattage', 'lpd-display',
-    'daylighting-enabled-toggle', 'daylighting-controls-wrapper', 'daylighting-control-type',
-    'daylighting-setpoint', 'daylight-continuous-params', 'daylighting-min-power-frac',
-    'daylighting-min-power-frac-val', 'daylighting-min-light-frac', 'daylighting-min-light-frac-val',
+    'luminaire-wattage', 'lpd-display',
+    'daylighting-enabled-toggle', 'daylighting-controls-wrapper', 'daylighting-control-type', 'daylighting-visualize-zones-toggle',
+    'daylighting-zoning-strategy-controls', 'daylighting-zone-strategy-rows', 'daylighting-zone-strategy-cols',
+    'daylight-sensor-count',
+    'daylighting-setpoint', 'daylight-continuous-params', 'daylighting-min-power-frac', 'daylighting-min-power-frac-val', 'daylighting-min-light-frac', 'daylighting-min-light-frac-val',
     'daylight-stepped-params', 'daylighting-steps', 'daylighting-availability-schedule',
-    'daylight-sensor1-x', 'daylight-sensor1-x-val',
-    'daylight-sensor1-y', 'daylight-sensor1-y-val',
+    'daylight-sensor-controls-container', 'daylight-sensor-1-controls', 'daylight-sensor-2-controls',
+    'daylight-sensor1-x', 'daylight-sensor1-x-val', 'daylight-sensor1-y', 'daylight-sensor1-y-val',
     'daylight-sensor1-z', 'daylight-sensor1-z-val',
-    'daylight-sensor-gizmo-toggle',
+    'daylight-sensor1-gizmo-toggle',
+    'daylight-sensor2-gizmo-toggle',
+    'daylight-sensor1-dir-x', 'daylight-sensor1-dir-x-val',
     'daylight-sensor1-dir-y', 'daylight-sensor1-dir-y-val',
     'daylight-sensor1-dir-z', 'daylight-sensor1-dir-z-val',
     'daylight-sensor1-percent', 'daylight-sensor1-percent-val',
@@ -367,6 +374,7 @@ const ids = [
 
     // EN 12464-1 Specific
     'maintenance-factor', 'maintenance-factor-val',
+    'light-source-ra', 'light-source-tcp',
 
     // Results Panel
     'results-file-input-a', 'results-file-name-a', 'compare-mode-toggle', 'comparison-file-loader',
@@ -377,6 +385,10 @@ const ids = [
     'difference-color-scale', 'difference-legend', 'diff-legend-min-label', 'diff-legend-max-label',
     'results-dashboard', 'results-legend', 'legend-min-label', 'legend-max-label',
     'results-scale-min', 'results-scale-min-num',
+
+    // Data Table
+    'data-table-btn', 'data-table-panel', 'data-table-filter-input',
+    'results-data-table', 'data-table-head', 'data-table-body',
 
     // Spectral Metrics Dashboard
     'spectral-metrics-dashboard', 'metric-photopic-val', 'metric-melanopic-val', 'metric-neuropic-val',
@@ -391,6 +403,7 @@ const ids = [
 
     // Results Analysis Panel
     'stats-uniformity-val', 'highlight-min-btn', 'highlight-max-btn', 'clear-highlights-btn', 'heatmap-canvas',
+    'heatmap-controls-container', 'heatmap-mode-selector', 'da-threshold-controls', 'da-threshold-slider', 'da-threshold-val',
 
     // Annual Time-Series Explorer
     'annual-time-series-explorer', 'time-series-chart', 'time-scrubber', 'time-scrubber-display',
@@ -423,6 +436,8 @@ const ids = [
 
     // AI Proactive Suggestions
     'proactive-suggestion-container',
+
+    'generate-report-btn',
 
     // Lighting Energy Dashboard
     'lighting-energy-dashboard', 'lpd-val', 'energy-val', 'energy-savings-val',
@@ -625,52 +640,6 @@ function updateFovControlsForViewType(viewType) {
 */
 function updateGizmoVisibility() {
     setGizmoVisibility(dom['gizmo-toggle'].checked);
-}
-
-/**
-* Toggles the UI for single vs. dual daylighting sensor setups.
-* @private
-*/
-function _toggleSensorCountControls() {
-    const count = parseInt(dom['daylight-sensor-count'].value, 10);
-    const header = dom['daylight-sensor-placement-header'];
-    const sensor2Controls = dom['daylight-sensor-2-controls'];
-    const percent1Slider = dom['daylight-sensor1-percent'];
-
-    if (count === 2) {
-        header.textContent = 'Control Sensor Placement (Reference Point)';
-        sensor2Controls.classList.remove('hidden');
-        percent1Slider.disabled = false;
-        // Set a sensible default if switching to 2 sensors
-        percent1Slider.value = 0.5;
-    } else { // count is 1
-        header.textContent = 'Control Sensor Placement';
-        sensor2Controls.classList.add('hidden');
-        percent1Slider.disabled = true;
-        percent1Slider.value = 1.0; // Force to 100% control
-    }
-    updateAllLabels();
-    scheduleUpdate('daylight-sensor-count');
-}
-
-/**
-* Enforces that the sum of the two sensor control fraction sliders does not exceed 1.0.
-* @param {Event} event - The input event from one of the sliders.
-* @private
-*/
-function _handleFractionSliders(event) {
-    const slider1 = dom['daylight-sensor1-percent'];
-    const slider2 = dom['daylight-sensor2-percent'];
-    const changedSlider = event.target;
-    const otherSlider = (changedSlider === slider1) ? slider2 : slider1;
-
-    let val1 = parseFloat(slider1.value);
-    let val2 = parseFloat(slider2.value);
-
-    if (val1 + val2 > 1.0) {
-        otherSlider.value = 1.0 - parseFloat(changedSlider.value);
-    }
-    updateAllLabels();
 }
 
 // --- START: New functions for Task Area Visualizer ---
@@ -1112,20 +1081,54 @@ export async function setupEventListeners() {
         resultsManager.setActiveMetricType(e.target.value);
         updateSensorGridColors(resultsManager.getActiveData());
         updateResultsDashboard();
+        populateDataTable(); // Update table when metric changes
     });
 
+    // --- Interactive Data Table Listeners ---
+  dom['data-table-body']?.addEventListener('click', (e) => {
+      const row = e.target.closest('tr');
+      if (row && row.dataset.pointIndex !== undefined) {
+          const index = parseInt(row.dataset.pointIndex, 10);
+          highlightSensorByIndex(index);
+
+          // Highlight the clicked row in the table
+          dom['data-table-body'].querySelectorAll('tr').forEach(r => r.classList.remove('active'));
+          row.classList.add('active');
+      }
+  });
+
+  dom['data-table-head']?.addEventListener('click', (e) => {
+      const th = e.target.closest('th');
+      if (th && th.dataset.column) {
+          const column = th.dataset.column;
+          if (currentSort.column === column) {
+              currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+          } else {
+              currentSort.column = column;
+              currentSort.direction = 'asc';
+          }
+          populateDataTable(); // Re-sort and re-populate the table
+      }
+  });
+
+  dom['data-table-filter-input']?.addEventListener('input', filterDataTable);
 
     // --- HDR Viewer Button Listener ---
     dom['view-hdr-btn']?.addEventListener('click', () => {
         if (resultsManager.hdrResult) {
             // Also pass any available glare data from the active dataset
             const glareResult = resultsManager.getActiveGlareResult();
-            openHdrViewer(resultsManager.hdrResult.texture, glareResult);
-        }
-});
+                openHdrViewer(resultsManager.hdrResult.texture, glareResult);
+            }
+    });
 
-const updateColorScaleAndViz = () => {
-    if (!dom['results-scale-min'] || !dom['results-scale-max'] || !dom['results-palette']) return;
+    dom['generate-report-btn']?.addEventListener('click', async () => {
+        const { generateReport } = await import('./reportGenerator.js');
+        generateReport();
+    });
+
+    const updateColorScaleAndViz = () => {
+        if (!dom['results-scale-min'] || !dom['results-scale-max'] || !dom['results-palette']) return;
         const min = parseFloat(dom['results-scale-min'].value);
         const max = parseFloat(dom['results-scale-max'].value);
         const palette = dom['results-palette'].value;
@@ -1213,6 +1216,20 @@ const updateColorScaleAndViz = () => {
         }
     });
 
+    dom['heatmap-mode-selector']?.addEventListener('change', () => {
+    const isDaMode = dom['heatmap-mode-selector'].value === 'da';
+    dom['da-threshold-controls']?.classList.toggle('hidden', !isDaMode);
+    render2DHeatmap();
+    });
+
+    dom['da-threshold-slider']?.addEventListener('input', (e) => {
+        const val = e.target.value;
+        if (dom['da-threshold-val']) {
+            dom['da-threshold-val'].textContent = `${val} lux`;
+        }
+        render2DHeatmap();
+    });
+
     function updateResultsAnalysisPanel() {
         const stats = resultsManager.stats;
         dom['stats-min-val'].textContent = stats.min.toFixed(1);
@@ -1220,6 +1237,22 @@ const updateColorScaleAndViz = () => {
         dom['stats-avg-val'].textContent = stats.avg.toFixed(1);
         const uniformity = stats.min > 0 ? (stats.min / stats.avg).toFixed(2) : 'N/A';
         dom['stats-uniformity-val'].textContent = uniformity;
+
+        // Show/hide heatmap mode controls based on annual data availability
+        const hasAnnual = resultsManager.hasAnnualData(resultsManager.activeView);
+        const heatmapControls = dom['heatmap-controls-container'];
+        if (heatmapControls) {
+            heatmapControls.classList.toggle('hidden', !hasAnnual);
+            // Reset to illuminance mode if annual data is not available or cleared
+            if (!hasAnnual) {
+                dom['heatmap-mode-selector'].value = 'illuminance';
+                dom['da-threshold-controls'].classList.add('hidden');
+            } else {
+                // Ensure DA controls are visible/hidden based on current selection
+                const isDaMode = dom['heatmap-mode-selector'].value === 'da';
+                dom['da-threshold-controls']?.classList.toggle('hidden', !isDaMode);
+            }
+        }
 
         const histogramCtx = dom['illuminance-histogram']?.getContext('2d');
         if (histogramCtx) {
@@ -1263,11 +1296,28 @@ const updateColorScaleAndViz = () => {
 /**
 * Renders a top-down 2D heatmap of the floor sensor grid.
 */
-function render2DHeatmap() {
+async function render2DHeatmap() {
     const canvas = dom['heatmap-canvas'];
     const sensorGroup = scene.getObjectByName('sensorPoints');
-    if (!canvas || !sensorGroup || resultsManager.resultsData.length === 0) {
-        return;
+    if (!canvas || !sensorGroup) {
+    return;
+    }
+
+    // Determine which data to render based on the heatmap mode selector
+    const mode = dom['heatmap-mode-selector']?.value || 'illuminance';
+    let heatmapData;
+
+    if (mode === 'da' && resultsManager.hasAnnualData(resultsManager.activeView)) {
+    const threshold = parseFloat(dom['da-threshold-slider'].value);
+    heatmapData = await resultsManager.calculateDaylightAutonomy(threshold);
+    } else {
+    heatmapData = resultsManager.getActiveData();
+    }
+
+    if (!heatmapData || heatmapData.length === 0) {
+    const ctxClear = canvas.getContext('2d');
+    ctxClear.clearRect(0, 0, canvas.width, canvas.height);
+    return;
     }
 
     const ctx = canvas.getContext('2d');
@@ -1292,13 +1342,13 @@ function render2DHeatmap() {
             // We only want points near the floor (y ≈ 0 in room container space)
             // Use a small tolerance for floating point inaccuracies
             if (Math.abs(pos.y - parseFloat(dom['floor-grid-offset'].value)) < 0.01) {
-                 floorPoints.push({
-                    x: pos.x,
-                    z: pos.z,
-                    value: resultsManager.resultsData[dataIndex]
-                });
-            }
-            dataIndex++;
+             floorPoints.push({
+                x: pos.x,
+                z: pos.z,
+                value: heatmapData[dataIndex]
+            });
+        }
+        dataIndex++;
         }
     });
 
@@ -1322,7 +1372,11 @@ function render2DHeatmap() {
         // Invert Z-axis because canvas Y is down, but room Z is forward
         const canvasY = offsetY + (roomLength - point.z) * scale;
 
-        ctx.fillStyle = resultsManager.getColorForValue(point.value);
+        const color = (mode === 'da')
+            ? resultsManager.getColorForValue(point.value, 0, 100)
+            : resultsManager.getColorForValue(point.value);
+
+        ctx.fillStyle = color;
         // Draw a rectangle centered on the point's location
         ctx.fillRect(canvasX - pointSize / 2, canvasY - pointSize / 2, pointSize, pointSize);
     });
@@ -1370,13 +1424,39 @@ function render2DHeatmap() {
         updateTimeScrubberDisplay(hour);
 
     // --- Daylighting Sensor Gizmo Listener ---
-    // The event handler now just triggers a scene update. The logic is consolidated in geometry.js.
-    dom['daylight-sensor-gizmo-toggle']?.addEventListener('change', () => scheduleUpdate());
+    sensorTransformControls.addEventListener('objectChange', () => {
+        if (!sensorTransformControls.object) return;
 
-    // --- Daylighting Sensor Count and Fraction Listeners ---
-    dom['daylight-sensor-count']?.addEventListener('change', _toggleSensorCountControls);
-    dom['daylight-sensor1-percent']?.addEventListener('input', _handleFractionSliders);
-    dom['daylight-sensor2-percent']?.addEventListener('input', _handleFractionSliders);
+        const controlledObject = sensorTransformControls.object;
+        const isSensor1 = controlledObject.name === 'daylightingSensor1';
+        const isSensor2 = controlledObject.name === 'daylightingSensor2';
+
+        if (!isSensor1 && !isSensor2) return;
+
+        const sensorIndex = isSensor1 ? 1 : 2;
+        const newPosition = controlledObject.position;
+
+        // Temporarily detach listeners to prevent feedback loops
+        const sliders = [
+            dom[`daylight-sensor${sensorIndex}-x`],
+            dom[`daylight-sensor${sensorIndex}-y`],
+            dom[`daylight-sensor${sensorIndex}-z`]
+        ];
+        sliders.forEach(slider => slider?.removeEventListener('input', handleInputChange));
+
+        // Update slider values directly
+        if (dom[`daylight-sensor${sensorIndex}-x`]) dom[`daylight-sensor${sensorIndex}-x`].value = newPosition.x.toFixed(2);
+        if (dom[`daylight-sensor${sensorIndex}-y`]) dom[`daylight-sensor${sensorIndex}-y`].value = newPosition.y.toFixed(2);
+        if (dom[`daylight-sensor${sensorIndex}-z`]) dom[`daylight-sensor${sensorIndex}-z`].value = newPosition.z.toFixed(2);
+
+        // Manually update the text labels next to the sliders
+        updateAllLabels();
+
+        // Re-attach listeners after a delay
+        setTimeout(() => {
+            sliders.forEach(slider => slider?.addEventListener('input', handleInputChange));
+        }, 100);
+    });
 
     promptForProjectDirectory();
 
@@ -1389,10 +1469,8 @@ function render2DHeatmap() {
         setGizmoVisibility(dom['gizmo-toggle'].checked);
         }, { once: true }); // The event should only fire once.
 
-
         // --- AI Settings Modal ---
         _setupAiSettingsModal();
-
 
         // --- Electron-Specific Listeners ---
         // Listen for the 'run-simulation-button' which is dynamically created
@@ -1457,17 +1535,51 @@ function render2DHeatmap() {
     const hourlyData = resultsManager.getIlluminanceForHour(hour);
     if (hourlyData) {
         updateSensorGridColors(hourlyData);
-    }
-});
+        }
+    });
+
+    // --- Daylighting Sensor Gizmo Listener ---
+  sensorTransformControls.addEventListener('objectChange', () => {
+      if (!sensorTransformControls.object) return;
+
+      const controlledObject = sensorTransformControls.object;
+      const isSensor1 = controlledObject.name === 'daylightingSensor1';
+      const isSensor2 = controlledObject.name === 'daylightingSensor2';
+
+      if (!isSensor1 && !isSensor2) return;
+
+      const sensorIndex = isSensor1 ? 1 : 2;
+      const newPosition = controlledObject.position;
+
+      // Temporarily detach listeners to prevent feedback loops
+      const sliders = [
+          dom[`daylight-sensor${sensorIndex}-x`],
+          dom[`daylight-sensor${sensorIndex}-y`],
+          dom[`daylight-sensor${sensorIndex}-z`]
+      ];
+      sliders.forEach(slider => slider?.removeEventListener('input', handleInputChange));
+
+      // Update slider values directly
+      if (dom[`daylight-sensor${sensorIndex}-x`]) dom[`daylight-sensor${sensorIndex}-x`].value = newPosition.x.toFixed(2);
+      if (dom[`daylight-sensor${sensorIndex}-y`]) dom[`daylight-sensor${sensorIndex}-y`].value = newPosition.y.toFixed(2);
+      if (dom[`daylight-sensor${sensorIndex}-z`]) dom[`daylight-sensor${sensorIndex}-z`].value = newPosition.z.toFixed(2);
+
+      // Manually update the text labels next to the sliders
+      updateAllLabels();
+
+      // Re-attach listeners after a delay
+      setTimeout(() => {
+          sliders.forEach(slider => slider?.addEventListener('input', handleInputChange));
+      }, 100);
+  });
+
+  promptForProjectDirectory();
 }
 
 // --- UI LOGIC & EVENT HANDLERS ---
 
-// --- UI LOGIC & EVENT HANDLERS ---
-
 /**
-
-Populates and shows the 3D view metric selector based on available spectral data.
+* Populates and shows the 3D view metric selector based on available spectral data.
 * @param {object} spectralData - The spectral results object from the results manager.
 */
 function updateMetricSelector(spectralData) {
@@ -1506,8 +1618,8 @@ function updateMetricSelector(spectralData) {
 * Toggles the visibility of an individual floating panel, allowing multiple
 * panels to be open at once with a clear visual offset.
 * @param {string} panelId The ID of the panel to toggle.
- * @param {string} btnId The ID of the button that controls the panel.
- */
+* @param {string} btnId The ID of the button that controls the panel.
+*/
 export function togglePanelVisibility(panelId, btnId) {
     const panel = document.getElementById(panelId);
     const btn = document.getElementById(btnId);
@@ -1537,6 +1649,11 @@ export function togglePanelVisibility(panelId, btnId) {
             panel.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
             panel.dataset.positioned = 'true';
         }
+
+        // Force re-initialization by removing the flag
+        delete panel.dataset.controlsInitialized;
+
+        initializePanelControls(panel);
 
         // Make sure the panel is within the viewport
         ensureWindowInView(panel);
@@ -2155,27 +2272,42 @@ export function validateInputs(changedId = null) {
     const surfaceThickness = parseFloat(dom['surface-thickness'].value);
 
     // Set constraints for Horizontal and Vertical section sliders
-    if(dom['h-section-dist']) dom['h-section-dist'].max = H;
-    if(dom['v-section-dist']) dom['v-section-dist'].max = W;
+    if (dom['h-section-dist']) dom['h-section-dist'].max = H;
+    if (dom['v-section-dist']) dom['v-section-dist'].max = W;
 
     // Set constraints for POSITION (vp) sliders to keep the camera inside the room
-    if(dom['view-pos-x']) { dom['view-pos-x'].min = 0; dom['view-pos-x'].max = W; }
-    if(dom['view-pos-y']) { dom['view-pos-y'].min = 0; dom['view-pos-y'].max = H; }
-    if(dom['view-pos-z']) { dom['view-pos-z'].min = 0; dom['view-pos-z'].max = L; }
+    if (dom['view-pos-x']) {
+        dom['view-pos-x'].min = 0;
+        dom['view-pos-x'].max = W;
+    }
+    if (dom['view-pos-y']) {
+        dom['view-pos-y'].min = 0;
+        dom['view-pos-y'].max = H;
+    }
+    if (dom['view-pos-z']) {
+        dom['view-pos-z'].min = 0;
+        dom['view-pos-z'].max = L;
+    }
 
     // Set constraints for TARGET (vd) sliders to represent a unit vector component
     ['view-dir-x', 'view-dir-y', 'view-dir-z'].forEach(id => {
-        if(dom[id]) {
+        if (dom[id]) {
             dom[id].min = -1;
             dom[id].max = 1;
             dom[id].step = 0.01;
-            }
+        }
     });
 
-    // Set constraints for Daylighting Sensor sliders
+    // Set constraints for Daylighting Sensor sliders using a centered coordinate system
     for (let i = 1; i <= 2; i++) {
-        if (dom[`daylight-sensor${i}-x`]) dom[`daylight-sensor${i}-x`].max = W;
-        if (dom[`daylight-sensor${i}-z`]) dom[`daylight-sensor${i}-z`].max = L;
+        if (dom[`daylight-sensor${i}-x`]) {
+            dom[`daylight-sensor${i}-x`].min = -W / 2;
+            dom[`daylight-sensor${i}-x`].max = W / 2;
+        }
+        if (dom[`daylight-sensor${i}-z`]) {
+            dom[`daylight-sensor${i}-z`].min = -L / 2;
+            dom[`daylight-sensor${i}-z`].max = L / 2;
+        }
         if (dom[`daylight-sensor${i}-y`]) dom[`daylight-sensor${i}-y`].max = H;
     }
 
@@ -2204,7 +2336,7 @@ export function validateInputs(changedId = null) {
     }
 
     wallDirections.forEach(dir => {
-        const wallW = (dir === 'n' || 's') ? W : L;
+        const wallW = (dir === 'n' || dir === 's') ? W : L;
 
         // Add guards to prevent errors if DOM elements are not ready
         const winWidthInput = dom[`win-width-${dir}`];
@@ -2227,29 +2359,36 @@ export function validateInputs(changedId = null) {
                 winHeightInput.value = Math.max(0, H - parseFloat(sillHeightInput.value));
             }
         }
-        
+
         const wwrSillInput = dom[`wwr-sill-height-${dir}`];
         if (wwrSillInput) {
-            const { wh: wwr_wh } = getWindowParamsForWall(dir.toUpperCase());
+            const {
+                wh: wwr_wh
+            } = getWindowParamsForWall(dir.toUpperCase());
             wwrSillInput.max = Math.max(0, H - wwr_wh);
             if (parseFloat(wwrSillInput.value) > parseFloat(wwrSillInput.max)) {
                 wwrSillInput.value = wwrSillInput.max;
             }
         }
-        
+
         const overhangDistSlider = dom[`overhang-dist-above-${dir}`];
         if (overhangDistSlider) {
-            const { wh, sh } = getWindowParamsForWall(dir.toUpperCase());
+            const {
+                wh,
+                sh
+            } = getWindowParamsForWall(dir.toUpperCase());
             const spaceAboveWindow = H - (sh + wh);
             overhangDistSlider.max = Math.max(0, spaceAboveWindow).toFixed(2);
             if (parseFloat(overhangDistSlider.value) > parseFloat(overhangDistSlider.max)) {
                 overhangDistSlider.value = overhangDistSlider.max;
             }
         }
-        
+
         const winCountInput = dom[`win-count-${dir}`];
         if (winCountInput) {
-            const { ww: ww_for_count } = getWindowParamsForWall(dir.toUpperCase());
+            const {
+                ww: ww_for_count
+            } = getWindowParamsForWall(dir.toUpperCase());
             const maxWindows = (ww_for_count > 0) ? Math.floor((wallW + 0.1) / (ww_for_count + 0.1)) : 1;
             winCountInput.max = Math.max(1, maxWindows);
             if (parseInt(winCountInput.value) > parseInt(winCountInput.max)) {
@@ -2265,6 +2404,36 @@ export function validateInputs(changedId = null) {
             }
         }
     });
+
+    // Constrain Lighting Grid parameters to fit within the room
+    if (dom['placement-mode-grid']?.classList.contains('active')) {
+        const rows = parseInt(dom['grid-rows'].value, 10);
+        const cols = parseInt(dom['grid-cols'].value, 10);
+        const rowSpacing = parseFloat(dom['grid-row-spacing'].value);
+        const colSpacing = parseFloat(dom['grid-col-spacing'].value);
+
+        // Dynamically set the max value for the spacing sliders based on the number of rows/cols
+        dom['grid-row-spacing'].max = (rows > 1) ? (L / (rows - 1)).toFixed(2) : L;
+        dom['grid-col-spacing'].max = (cols > 1) ? (W / (cols - 1)).toFixed(2) : W;
+
+        // Dynamically set the max value for the row/col sliders based on the spacing
+        dom['grid-rows'].max = (rowSpacing > 0) ? Math.floor(L / rowSpacing) + 1 : 50;
+        dom['grid-cols'].max = (colSpacing > 0) ? Math.floor(W / colSpacing) + 1 : 50;
+
+        // After updating the max limits, clamp the current values if they are now out of bounds
+        if (parseFloat(dom['grid-row-spacing'].value) > parseFloat(dom['grid-row-spacing'].max)) {
+            dom['grid-row-spacing'].value = dom['grid-row-spacing'].max;
+        }
+        if (parseFloat(dom['grid-col-spacing'].value) > parseFloat(dom['grid-col-spacing'].max)) {
+            dom['grid-col-spacing'].value = dom['grid-col-spacing'].max;
+        }
+        if (parseInt(dom['grid-rows'].value, 10) > parseInt(dom['grid-rows'].max, 10)) {
+            dom['grid-rows'].value = dom['grid-rows'].max;
+        }
+        if (parseInt(dom['grid-cols'].value, 10) > parseInt(dom['grid-cols'].max, 10)) {
+            dom['grid-cols'].value = dom['grid-cols'].max;
+        }
+    }
 
     updateAllLabels();
 }
@@ -2711,6 +2880,9 @@ function setViewMode(mode) {
         updateSensorGridColors(activeData);
     }
 
+    // Update the data table if it's visible
+    populateDataTable();
+
     // Refresh the entire results dashboard to show the correct stats and legends
     updateResultsDashboard();
 }
@@ -2839,6 +3011,10 @@ let timeSeriesChart = null;
 */
 export async function clearAllResultsDisplay() {
     // Clear all previous results visualizations from all panels
+    if (dom['data-table-btn']) dom['data-table-btn'].classList.add('hidden');
+    if (dom['data-table-panel']) dom['data-table-panel'].classList.add('hidden');
+    if (dom['data-table-body']) dom['data-table-body'].innerHTML = '';
+    if (dom['data-table-head']) dom['data-table-head'].innerHTML = '';
     if (dom['results-dashboard']) dom['results-dashboard'].classList.add('hidden');
     if (dom['glare-analysis-dashboard']) dom['glare-analysis-dashboard'].classList.add('hidden');
     if (dom['view-hdr-btn']) dom['view-hdr-btn'].classList.add('hidden');
@@ -2848,17 +3024,18 @@ export async function clearAllResultsDisplay() {
     if (dom['results-file-name-b']) dom['results-file-name-b'].textContent = '';
     if (dom['results-file-input-a']) dom['results-file-input-a'].value = '';
     if (dom['results-file-input-b']) dom['results-file-input-b'].value = '';
+    if (dom['generate-report-btn']) dom['generate-report-btn'].classList.add('hidden');
 
     clearAnnualDashboard();
     clearTimeSeriesExplorer();
     // NEW: Also clear the lighting energy dashboard
-    const { clearLightingEnergyDashboard } = await import('./annualDashboard.js');
-    clearLightingEnergyDashboard();
-    updateSpectralMetricsDashboard(null); // Clear the spectral dashboard
+        const { clearLightingEnergyDashboard } = await import('./annualDashboard.js');
+        clearLightingEnergyDashboard();
+        updateSpectralMetricsDashboard(null); // Clear the spectral dashboard
 
-    // Explicitly clear any 3D sensor grid visualization from previous results
-    glareHighlighter.clear();
-    updateSensorGridColors(null);
+        // Explicitly clear any 3D sensor grid visualization from previous results
+        glareHighlighter.clear();
+        updateSensorGridColors(null);
 }
 
 /**
@@ -2947,20 +3124,25 @@ async function handleResultsFile(file, key) {
     }
 
     // Set the view to the newly loaded dataset and update everything
-                    setViewMode(loadedKey);
-                    if (dom['results-dashboard']) dom['results-dashboard'].classList.remove('hidden');
+    setViewMode(loadedKey);
+    if (dom['results-dashboard']) dom['results-dashboard'].classList.remove('hidden');
 
-                    // --- TRIGGER PROACTIVE SUGGESTIONS ---
-                    import('./ai-assistant.js').then(({ triggerProactiveSuggestion }) => {
-                        if (resultsManager.hasAnnualData(loadedKey)) {
-                            triggerProactiveSuggestion('annual_illuminance_loaded');
-                        }
-                        if (resultsManager.hasAnnualGlareData(loadedKey)) {
-                            triggerProactiveSuggestion('annual_glare_loaded');
-                        }
-                    });
+    // Show the data table button and populate the table
+    if (dom['data-table-btn']) dom['data-table-btn'].classList.remove('hidden');
+        currentSort = { column: 'id', direction: 'asc' }; // Reset sort
+        populateDataTable();
 
-                    // Show annual glare controls if that data type was loaded
+    // --- TRIGGER PROACTIVE SUGGESTIONS ---
+    import('./ai-assistant.js').then(({ triggerProactiveSuggestion }) => {
+        if (resultsManager.hasAnnualData(loadedKey)) {
+            triggerProactiveSuggestion('annual_illuminance_loaded');
+            }
+        if (resultsManager.hasAnnualGlareData(loadedKey)) {
+            triggerProactiveSuggestion('annual_glare_loaded');
+            }
+    });
+
+    // Show annual glare controls if that data type was loaded
     if (resultsManager.hasAnnualGlareData(loadedKey)) {
         if (dom['annual-glare-controls']) dom['annual-glare-controls'].classList.remove('hidden');
     }
@@ -2969,9 +3151,13 @@ async function handleResultsFile(file, key) {
     const hasIll = resultsManager.hasAnnualData('a') || resultsManager.hasAnnualData('b');
     const hasDgp = resultsManager.hasAnnualGlareData('a') || resultsManager.hasAnnualGlareData('b');
     if (hasIll && hasDgp) {
-        if(dom['combined-analysis-btn']) dom['combined-analysis-btn'].style.display = 'block';
+    if(dom['combined-analysis-btn']) dom['combined-analysis-btn'].style.display = 'block';
     } else {
         if(dom['combined-analysis-btn']) dom['combined-analysis-btn'].style.display = 'none';
+    }
+
+    if (dom['generate-report-btn']) {
+        dom['generate-report-btn'].classList.remove('hidden');
     }
 
 
@@ -3987,4 +4173,141 @@ export function displayProactiveSuggestion(htmlContent) {
             closeBtn.click();
         }
     }, 15000);
+}
+
+/**
+* Highlights a single sensor point in the 3D view by its index.
+* @param {number | null} index - The index of the sensor point to highlight, or null to clear.
+*/
+export function highlightSensorByIndex(index) {
+    // First, reset all sensor colors to their correct data-driven values
+    const activeData = resultsManager.getActiveData();
+    if (activeData) {
+    updateSensorGridColors(activeData);
+    }
+
+    if (index === null || index < 0) return; // Stop if we're just clearing
+
+    let cumulativeIndex = 0;
+    for (const mesh of sensorMeshes) {
+    if (index < cumulativeIndex + mesh.count) {
+        const instanceIndex = index - cumulativeIndex;
+        // Apply a unique highlight color (purple) to the selected instance
+        mesh.setColorAt(instanceIndex, new THREE.Color(0x9c27b0));
+        mesh.instanceColor.needsUpdate = true;
+        return; // Exit after highlighting
+    }
+    cumulativeIndex += mesh.count;
+    }
+}
+
+/**
+* Populates the interactive data table with the currently active results.
+* This function handles sorting and rendering the table rows.
+*/
+function populateDataTable() {
+    const tableBody = dom['data-table-body'];
+    const tableHead = dom['data-table-head'];
+    
+    if (!tableBody || !tableHead) return;
+
+    const activeData = resultsManager.getActiveData();
+    const activeMetric = resultsManager.activeMetricType;
+
+        if (!activeData || activeData.length === 0) {
+        tableHead.innerHTML = '<tr><th>Point ID</th><th>Value</th></tr>';
+        tableBody.innerHTML = '<tr><td colspan="2" class="p-4 text-center text-[--text-secondary]">No grid data loaded.</td></tr>';
+        return;
+        }
+
+        // Map metric keys to user-friendly names for table headers
+        const metricMap = {
+        'illuminance': 'Illuminance (lux)', 'Photopic_lux': 'Photopic (lux)',
+        'EML': 'EML (lux)', 'CS': 'Circadian Stimulus', 'CCT': 'CCT (K)'
+        };
+        const metricName = metricMap[activeMetric] || activeMetric.replace(/_/g, ' ');
+
+        // Update table headers with sort indicators
+        const sortIndicator = (col) => {
+        if (currentSort.column === col) {
+        return currentSort.direction === 'asc' ? ' ▲' : ' ▼';
+        }
+            return ' ↕';
+        };
+        tableHead.innerHTML = `
+            <tr>
+                <th data-column="id" class="cursor-pointer p-2 hover:bg-[--grid-color]">Point ID${sortIndicator('id')}</th>
+                <th data-column="value" class="cursor-pointer p-2 hover:bg-[--grid-color]">${metricName}${sortIndicator('value')}</th>
+            </tr>
+        `;
+
+        // Create a new array of objects for sorting, preserving original data
+        tableData = activeData.map((value, index) => ({ id: index, value: value }));
+
+        // Apply the current sorting
+        if (currentSort.column) {
+            tableData.sort((a, b) => {
+            const valA = a[currentSort.column];
+            const valB = b[currentSort.column];
+            const direction = currentSort.direction === 'asc' ? 1 : -1;
+            if (valA < valB) return -1 * direction;
+            if (valA > valB) return 1 * direction;
+            return 0;
+            });
+        }
+
+    // Generate and insert table rows
+    tableBody.innerHTML = tableData.map(item => `
+        <tr data-point-index="${item.id}" class="hover:bg-[--grid-color] cursor-pointer">
+            <td class="p-2">${item.id}</td>
+            <td class="p-2">${item.value.toFixed(2)}</td>
+        </tr>
+    `).join('');
+
+    filterDataTable(); // Re-apply any existing filter
+}
+
+/**
+* Filters the visible rows in the data table based on the filter input field.
+*/
+function filterDataTable() {
+    const input = dom['data-table-filter-input'];
+    const tableBody = dom['data-table-body'];
+        if (!input || !tableBody) return;
+
+        const filterText = input.value.trim().replace(/\s+/g, '');
+        const rows = tableBody.querySelectorAll('tr');
+
+        if (!filterText) {
+        rows.forEach(row => row.style.display = '');
+        return;
+        }
+
+    // Regex to parse operators and values (e.g., >=500, <100)
+    const match = filterText.match(/^([<>=!]=?)\s*(-?\d+.?\d*)$/);
+        if (!match) {
+        rows.forEach(row => row.style.display = ''); // Show all if filter is invalid
+        return;
+        }
+
+    const operator = match[1];
+    const filterValue = parseFloat(match[2]);
+
+    rows.forEach(row => {
+    const cell = row.cells[1]; // Value is always in the second column
+        if (cell) {
+        const cellValue = parseFloat(cell.textContent);
+        let show = false;
+        switch (operator) {
+        case '>':  show = cellValue > filterValue; break;
+        case '<':  show = cellValue < filterValue; break;
+        case '>=': show = cellValue >= filterValue; break;
+        case '<=': show = cellValue <= filterValue; break;
+        case '=':
+        case '==': show = cellValue === filterValue; break;
+        case '!=': show = cellValue !== filterValue; break;
+        }
+        row.style.display = show ? '' : 'none';
+        }
+    });
 }

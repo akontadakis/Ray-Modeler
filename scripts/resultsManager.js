@@ -136,7 +136,6 @@ class ResultsManager {
                         this.activeMetricType = 'illuminance';
 
                         this.datasets[key].annualData = parsedData.annualData || [];
-                        this.datasets[key].annualData = parsedData.annualData || [];
                         this.datasets[key].glareResult = parsedData.glareResult || null;
                         this.datasets[key].annualGlareResults = parsedData.annualGlareResults || {};
                     }
@@ -634,33 +633,97 @@ class ResultsManager {
             });
         }
             return combinedData;
-}
+    }
 
-/**
- * Sets the active metric for 3D visualization and recalculates stats.
- * @param {'illuminance' | 'Photopic_lux' | 'EML' | 'CS' | 'CCT'} metricType - The metric to display.
- */
-setActiveMetricType(metricType) {
-    this.activeMetricType = metricType;
+    /**
+    * Calculates Daylight Autonomy (DA) for each sensor point.
+    * DA is the percentage of occupied hours that a point is above a given illuminance threshold.
+    * @param {number} thresholdLux - The illuminance threshold in lux.
+    * @param {string} [key=null] - The dataset key to use. If null, uses the active view.
+    * @returns {Promise<number[]|null>} A promise that resolves to an array of DA percentages, or null.
+    */
+    async calculateDaylightAutonomy(thresholdLux, key = null) {
+        const activeKey = key || this.activeView;
+        const dataset = this.datasets[activeKey];
 
-    for (const key of ['a', 'b']) {
-        const dataset = this.datasets[key];
-        if (dataset && dataset.spectralResults && dataset.spectralResults[metricType]) {
-            dataset.data = dataset.spectralResults[metricType];
-            dataset.stats = this._calculateStats(dataset.data);
+        if (!this.hasAnnualData(activeKey)) {
+            console.warn(`Daylight Autonomy calculation skipped for dataset '${activeKey}': No annual data.`);
+            return null;
+        }
+
+        const annualData = dataset.annualData;
+        const numPoints = annualData.length;
+        const daPercentages = new Array(numPoints).fill(0);
+
+        // Get occupancy mask
+        let occupiedMask = null;
+        const scheduleFile = project.simulationFiles['occupancy-schedule'];
+        const occupiedHoursDefault = { start: 8, end: 18 };
+
+        if (scheduleFile?.content) {
+            const scheduleValues = scheduleFile.content.trim().split(/\r?\n/).map(v => parseInt(v, 10));
+            if (scheduleValues.length === 8760) {
+                occupiedMask = scheduleValues.map(v => v === 1);
+            }
+        }
+
+        // Fallback to default if no mask was created
+        if (!occupiedMask) {
+            occupiedMask = new Array(8760).fill(false);
+            for (let h = 0; h < 8760; h++) {
+                const date = new Date(2023, 0, 1 + Math.floor(h / 24));
+                const dayOfWeek = date.getDay(); // 0=Sun, 6=Sat
+                const hourOfDay = h % 24;
+                if (hourOfDay >= occupiedHoursDefault.start && hourOfDay < occupiedHoursDefault.end && dayOfWeek > 0 && dayOfWeek < 6) {
+                    occupiedMask[h] = true;
+                }
+            }
+        }
+
+        const totalOccupiedHours = occupiedMask.reduce((acc, val) => acc + (val ? 1 : 0), 0);
+        if (totalOccupiedHours === 0) {
+            console.warn("No occupied hours found in schedule; cannot calculate DA.");
+            return daPercentages; // Return array of zeros
+        }
+
+        for (let p = 0; p < numPoints; p++) {
+            let hoursAboveThreshold = 0;
+            for (let h = 0; h < 8760; h++) {
+                if (occupiedMask[h] && annualData[p][h] >= thresholdLux) {
+                    hoursAboveThreshold++;
+                }
+            }
+            daPercentages[p] = (hoursAboveThreshold / totalOccupiedHours) * 100;
+        }
+
+        return daPercentages;
+    }
+
+    /**
+     * Sets the active metric for 3D visualization and recalculates stats.
+     * @param {'illuminance' | 'Photopic_lux' | 'EML' | 'CS' | 'CCT'} metricType - The metric to display.
+     */
+    setActiveMetricType(metricType) {
+        this.activeMetricType = metricType;
+
+        for (const key of ['a', 'b']) {
+            const dataset = this.datasets[key];
+            if (dataset && dataset.spectralResults && dataset.spectralResults[metricType]) {
+                dataset.data = dataset.spectralResults[metricType];
+                dataset.stats = this._calculateStats(dataset.data);
+            }
+        }
+
+        this.calculateDifference();
+
+        const activeStats = this.getActiveStats();
+        if(activeStats) {
+            this.updateColorScale(activeStats.min, activeStats.max, this.colorScale.palette);
         }
     }
 
-    this.calculateDifference();
-
-    const activeStats = this.getActiveStats();
-    if(activeStats) {
-        this.updateColorScale(activeStats.min, activeStats.max, this.colorScale.palette);
-    }
-}
-
-
-updateColorScale(min, max, palette) {
+    updateColorScale(min, max, palette) {
+        this.colorScale.min = min;
         this.colorScale.max = max;
         this.colorScale.palette = palette;
     }
@@ -668,10 +731,12 @@ updateColorScale(min, max, palette) {
     /**
      * Gets an interpolated color for a value based on the current scale.
      * @param {number} value - The numerical value (e.g., illuminance).
+     * @param {number|null} [minOverride=null] - Optional minimum for the color scale.
+     * @param {number|null} [maxOverride=null] - Optional maximum for the color scale.
      * @returns {string} A hex color string (e.g., '#RRGGBB').
      */
-    getColorForValue(value) {
-        if (this.activeView === 'diff') {
+    getColorForValue(value, minOverride = null, maxOverride = null) {
+        if (this.activeView === 'diff' && minOverride === null && maxOverride === null) {
             const stats = this.differenceData.stats;
             if (!stats) return '#808080'; // Return grey if no diff data
 
@@ -696,10 +761,12 @@ updateColorScale(min, max, palette) {
             const g = Math.round(c1[1] + (c2[1] - c1[1]) * fraction);
             const b = Math.round(c1[2] + (c2[2] - c1[2]) * fraction);
             const toHex = (c) => ('0' + c.toString(16)).slice(-2);
-            return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+           return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 
         } else {
-            const { min, max, palette } = this.colorScale;
+            const min = minOverride ?? this.colorScale.min;
+            const max = maxOverride ?? this.colorScale.max;
+            const { palette } = this.colorScale;
             const currentPalette = palettes[palette] || palettes.viridis;
             const clampedValue = Math.max(min, Math.min(value, max));
             const normalized = (max - min > 0) ? (clampedValue - min) / (max - min) : 0;

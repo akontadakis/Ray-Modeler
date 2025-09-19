@@ -368,6 +368,33 @@ function createUdiChart(canvasId, udiData) {
 }
 
 /**
+ * Gets the base64 encoded image string for a given chart instance.
+ * @param {Chart} chartInstance - The Chart.js instance.
+ * @returns {string|null} The base64 data URL or null if the chart doesn't exist.
+ */
+function getChartAsBase64(chartInstance) {
+    if (chartInstance && typeof chartInstance.toBase64Image === 'function') {
+        return chartInstance.toBase64Image();
+    }
+    return null;
+}
+
+/**
+ * Gathers all visible dashboard charts as base64 image strings.
+ * @returns {object} An object containing the base64 strings for each chart.
+ */
+export function getDashboardChartsAsBase64() {
+    return {
+        udiChart: getChartAsBase64(udiChart),
+        sdaGauge: getChartAsBase64(sdaGauge),
+        aseGauge: getChartAsBase64(aseGauge),
+        glareRoseChart: getChartAsBase64(glareRoseChart),
+        combinedAnalysisChart: getChartAsBase64(combinedAnalysisChart),
+        csGauge: getChartAsBase64(csGauge),
+    };
+}
+
+/**
 * Clears and hides the lighting energy dashboard.
 */
 export function clearLightingEnergyDashboard() {

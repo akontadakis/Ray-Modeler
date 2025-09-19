@@ -55,6 +55,7 @@ function generateLightSourceDefinitions(lightingData, roomData) {
     let lightRad = '# Artificial Light Source Definitions\n';
     const matIdentifier = `${lightingData.type}_mat`;
     const geomIdentifier = `${lightingData.type}_geom`;
+    let iesBasename = '';
 
     // 1. Define the light material ONCE at the origin.
     let matArgs = '';
@@ -67,10 +68,12 @@ function generateLightSourceDefinitions(lightingData, roomData) {
         case 'glow': matArgs = `4 ${scaledRgb(lightingData.rgb)} ${lightingData.max_radius}`; break;
         case 'illum': matArgs = `2 ${lightingData.alternate_material || 'void'} ${scaledRgb(lightingData.rgb)}`; break;
         case 'ies':
-             const totalMultiplier = (lightingData.ies_multiplier || 1.0) * mf;
-             lightRad += `!ies2rad -m ${totalMultiplier.toPrecision(4)} ../05_bsdf/${lightingData.ies_file}.ies\n`;
-             break;
-    }
+                const totalMultiplier = (lightingData.ies_multiplier || 1.0) * mf;
+                // Get the basename of the file (e.g., "my_light" from "my_light.ies")
+                iesBasename = lightingData.ies_file.replace(/\\.ies$/i, '');
+                lightRad += `!ies2rad -m ${totalMultiplier.toPrecision(4)} ../05_bsdf/${lightingData.ies_file}\n`;
+                break;
+        }
 
     if (lightingData.type !== 'ies') {
         lightRad += `void ${lightingData.type} ${matIdentifier}\n0\n0\n${matArgs}\n\n`;
@@ -98,8 +101,10 @@ function generateLightSourceDefinitions(lightingData, roomData) {
 
     // 3. Use xform to instance, place, and rotate the geometry for each light in the grid/array.
     positions.forEach((pos, i) => {
-        const instanceIdentifier = lightingData.type === 'ies' ? `${lightingData.ies_file}` : geomIdentifier;
-        lightRad += `!xform -rz ${-rotationY * radToThreeRot} -t ${pos.x} ${pos.y} ${pos.z} -rx ${rotX} -ry ${rotY} -rz ${rotZ} ${instanceIdentifier}\n`;
+        const instanceIdentifier = lightingData.type === 'ies' ? iesBasename : geomIdentifier;
+        // The room's rotation (-rz) is removed. It's handled by the viewpoint vectors.
+        // The IES identifier is now the corrected basename.
+        lightRad += `!xform -t ${pos.x} ${pos.y} ${pos.z} -rx ${rotX} -ry ${rotY} -rz ${rotZ} ${instanceIdentifier}\n`;
     });
 
     return lightRad;

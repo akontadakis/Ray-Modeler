@@ -182,32 +182,11 @@ async gatherAllProjectData() {
                         transmittance: getValue('glazing-trans', parseFloat),
                         bsdfEnabled: getChecked('bsdf-toggle'),
                         bsdfFile: getChecked('bsdf-toggle') && this.simulationFiles['bsdf-file'] ? { inputId: 'bsdf-file', name: this.simulationFiles['bsdf-file'].name } : null
-                    }
+                    },
                 };
             })(),
             lighting: lightingManager.getCurrentState(),
-            sensorGrids: {
-                floor: { enabled: getChecked('grid-floor-toggle'), spacing: getValue('floor-grid-spacing', parseFloat), offset: getValue('floor-grid-offset', parseFloat), showIn3D: getChecked('show-floor-grid-3d-toggle') },
-                ceiling: { enabled: getChecked('grid-ceiling-toggle'), spacing: getValue('ceiling-grid-spacing', parseFloat), offset: getValue('ceiling-grid-offset', parseFloat) },
-                walls: { 
-                    enabled: ['north', 'south', 'east', 'west'].some(dir => getChecked(`grid-${dir}-toggle`)),
-                    spacing: getValue('wall-grid-spacing', parseFloat),
-                    offset: getValue('wall-grid-offset', parseFloat),
-                    surfaces: { n: getChecked('grid-north-toggle'), s: getChecked('grid-south-toggle'), e: getChecked('grid-east-toggle'), w: getChecked('grid-west-toggle') }
-                },
-                view: {
-                    enabled: getChecked('view-grid-toggle'),
-                    showIn3D: getChecked('show-view-grid-3d-toggle'),
-                    spacing: getValue('view-grid-spacing', parseFloat),
-                    offset: getValue('view-grid-offset', parseFloat),
-                    numDirs: getValue('view-grid-directions', parseInt),
-                    startVec: {
-                        x: getValue('view-grid-start-vec-x', parseFloat),
-                        y: getValue('view-grid-start-vec-y', parseFloat),
-                        z: getValue('view-grid-start-vec-z', parseFloat)
-                    }
-                }
-            },
+            sensorGrids: ui.getSensorGridParams(),
             viewpoint: {
                 'view-type': getValue('view-type'), 'gizmo-toggle': getChecked('gizmo-toggle'),
                 'view-pos-x': getValue('view-pos-x', parseFloat), 'view-pos-y': getValue('view-pos-y', parseFloat), 'view-pos-z': getValue('view-pos-z', parseFloat),

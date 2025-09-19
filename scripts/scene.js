@@ -430,3 +430,14 @@ export function toggleFirstPersonView(viewType) {
     // Return the new state so the UI layer can handle UI updates.
     return isFirstPersonView;
 }
+
+/**
+ * Captures a snapshot of the current 3D view.
+ * @returns {string} A base64 encoded data URL of the canvas image.
+ */
+export function captureSceneSnapshot() {
+    // Force a render of the current frame to ensure it's up-to-date
+    composer.render();
+    // Return the data URL from the main renderer's canvas
+    return renderer.domElement.toDataURL('image/png');
+}
