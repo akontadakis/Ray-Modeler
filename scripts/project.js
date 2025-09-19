@@ -451,6 +451,46 @@ async gatherAllProjectData() {
         }
     }
 
+        async runLivePreviewRender() {
+        if (!window.electronAPI || !window.electronAPI.runLiveRender) {
+            throw new Error("Live rendering is not supported in this environment.");
+        }
+
+        const { getDom } = await import('./ui.js');
+        const { generateRadFileContent, generateViewpointFileContent } = await import('./radiance.js');
+        const dom = getDom();
+
+        const projectData = await this.gatherAllProjectData();
+        const date = dom['preview-date']._flatpickr.selectedDates[0];
+        const time = dom['preview-time'].value;
+
+        if (!date || !time) {
+            throw new Error("Please select a valid date and time for the preview.");
+        }
+
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        const [hour, minute] = time.split(':');
+        const decimalTime = parseInt(hour, 10) + parseInt(minute, 10) / 60;
+
+        const { materials, geometry } = generateRadFileContent();
+        const viewpointContent = generateViewpointFileContent(projectData.viewpoint, projectData.geometry.room);
+
+        const payload = {
+            epwContent: this.epwFileContent,
+            geometryContent: geometry,
+            materialsContent: materials,
+            viewpointContent: viewpointContent,
+            month,
+            day,
+            time: decimalTime
+        };
+
+        // Call the backend to perform the render
+        const result = await window.electronAPI.runLiveRender(payload);
+        return result;
+    }
+    
     async _generateSensorPointsContent(gridType = 'all') {
     const { dom, showAlert, getSensorGridParams } = await import('./ui.js');
     const points = [];

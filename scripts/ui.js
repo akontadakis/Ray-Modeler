@@ -338,6 +338,8 @@ const ids = [
     'h-section-toggle', 'h-section-controls', 'h-section-dist', 'h-section-dist-val',
     'v-section-toggle', 'v-section-controls', 'v-section-dist', 'v-section-dist-val',
 
+    'live-preview-section', 'preview-date', 'preview-time', 'render-section-preview-btn',
+
     'occupancy-toggle', 'occupancy-controls', 'occupancy-schedule-filename',
     'occupancy-time-range-display', 'occupancy-time-slider-container',
     'occupancy-time-range-start', 'occupancy-time-range-end', 'generate-occupancy-btn',
@@ -1004,15 +1006,17 @@ export async function setupEventListeners() {
         scheduleUpdate();
     });
 
-    dom['transparent-toggle']?.addEventListener('change', () => {
-        dom['transparency-controls']?.classList.toggle('hidden', !dom['transparent-toggle'].checked);
-        scheduleUpdate();
-    });
-
     // Date picker for the Live Section Preview
     flatpickr("#preview-date", {
         dateFormat: "M j",
         defaultDate: "Jun 21",
+    });
+
+    dom['render-section-preview-btn']?.addEventListener('click', handleRenderPreview);
+
+    dom['transparent-toggle']?.addEventListener('change', () => {
+        dom['transparency-controls']?.classList.toggle('hidden', !dom['transparent-toggle'].checked);
+        scheduleUpdate();
     });
 
     // Date picker for the EN 17037 Sunlight Exposure check
@@ -2090,6 +2094,8 @@ function setupEpwUploadModal() {
                    // This allows other modules to know that a new EPW has been loaded
                     dom['upload-epw-btn'].dispatchEvent(new CustomEvent('epwLoaded'));
 
+                    _updateLivePreviewVisibility();
+
                     // Trigger proactive suggestion for annual analysis
                     const { triggerProactiveSuggestion } = await import('./ai-assistant.js');
                     triggerProactiveSuggestion('epw_loaded');
@@ -2184,9 +2190,15 @@ function handleInputChange(e) {
         }
     }
 
-    // Live update for LPD
-    if (['luminaire-wattage', 'width', 'length', 'grid-rows', 'grid-cols'].includes(id) || id.startsWith('placement-mode-')) {
-        _updateLpdDisplay();
+    // Check for low ambient bounces in any recipe panel
+    const qualityPresetPanel = e.target.closest('.floating-window');
+    if (qualityPresetPanel && id.startsWith('ab') && !suggestionMemory.has('low_ambient_bounces')) {
+        if (parseInt(val, 10) < 2) {
+            import('./ai-assistant.js').then(({ triggerProactiveSuggestion }) => {
+                triggerProactiveSuggestion('low_ambient_bounces');
+            });
+            suggestionMemory.add('low_ambient_bounces');
+        }
     }
 
     debouncedScheduleUpdate(id);
@@ -2717,9 +2729,11 @@ export async function handleShadingTypeChange(dir, triggerUpdate = true) {
         if (controlEl) controlEl.classList.toggle('hidden', type !== t);
     });
 
-    if (type === 'louver') {
-        const { triggerProactiveSuggestion } = await import('./ai-assistant.js');
-        triggerProactiveSuggestion('louver_shading_enabled');
+    if (type === 'louver' && !suggestionMemory.has('louver_shading_enabled')) {
+        import('./ai-assistant.js').then(({ triggerProactiveSuggestion }) => {
+            triggerProactiveSuggestion('louver_shading_enabled');
+        });
+        suggestionMemory.add('louver_shading_enabled');
     }
 
     if (scene && triggerUpdate) {
@@ -3893,9 +3907,57 @@ function showApertureControlsFor(id) {
 * @private
 */
 function _updateLivePreviewVisibility() {
+    if (!project.epwFileContent) return; // Don't show if no EPW is loaded
     const hEnabled = dom['h-section-toggle']?.checked;
     const vEnabled = dom['v-section-toggle']?.checked;
     dom['live-preview-section']?.classList.toggle('hidden', !hEnabled && !vEnabled);
+}
+
+/**
+* Handles the click event for the 'Render Preview' button.
+* Orchestrates the live rendering process and displays the result.
+*/
+async function handleRenderPreview() {
+    if (!project.epwFileContent) {
+        showAlert('Please load an EPW weather file in the Project Setup panel before rendering a preview.', 'Weather Data Missing');
+        return;
+    }
+    if (!window.electronAPI) {
+        showAlert('Live preview rendering is only available in the Electron desktop application.', 'Feature Not Available');
+        return;
+    }
+
+    const btn = dom['render-section-preview-btn'];
+     const btnSpan = btn.querySelector('span');
+    const originalText = btnSpan.textContent;
+    btn.disabled = true;
+    btnSpan.textContent = 'Rendering...';
+
+    try {
+        const result = await project.runLivePreviewRender();
+
+        if (result && result.hdrPath) {
+            const { openHdrViewer } = await import('./hdrViewer.js');
+
+            const loader = new RGBELoader();
+            // In Electron, we can load from a file path directly if the main process makes it accessible
+            // or returns the data. Assuming the backend returns a loadable path or data URL.
+            loader.load(result.hdrPath, (texture) => {
+                openHdrViewer(texture);
+            }, undefined, (err) => {
+                console.error("Failed to load rendered HDR:", err);
+                showAlert('Could not load the rendered preview image.', 'Error');
+            });
+        } else {
+            showAlert('Live preview rendering failed. Check the console for details.', 'Render Failed');
+        }
+    } catch (error) {
+        console.error("Error during live preview:", error);
+        showAlert(`An error occurred: ${error.message}`, 'Error');
+    } finally {
+        btn.disabled = false;
+        btnSpan.textContent = originalText;
+    }
 }
 
 /**
@@ -3925,55 +3987,6 @@ function _updateLpdDisplay() {
     const totalPower = wattage * numLuminaires;
     const lpd = totalPower / area;
     dom['lpd-display'].textContent = `${lpd.toFixed(2)} W/m²`;
-}
-
-/**
-* Handles the click event for the 'Render Preview' button.
-* Orchestrates the live rendering process and displays the result.
-*/
-async function handleRenderPreview() {
-    if (!project.epwFileContent) {
-        showAlert('Please load an EPW weather file in the Project Setup panel before rendering a preview.', 'Weather Data Missing');
-        return;
-    }
-    if (!window.electronAPI) {
-        showAlert('Live preview rendering is only available in the Electron desktop application.', 'Feature Not Available');
-        return;
-    }
-
-    const btn = dom['render-section-preview-btn'];
-     const btnSpan = btn.querySelector('span');
-    const originalText = btnSpan.textContent;
-    btn.disabled = true;
-    btnSpan.textContent = 'Rendering...';
-
-    try {
-        const { runLivePreviewRender } = await import('./project.js');
-        const result = await runLivePreviewRender();
-
-        if (result && result.hdrPath) {
-            const { openHdrViewer } = await import('./hdrViewer.js');
-            const { RGBELoader } = await import('three/examples/jsm/loaders/RGBELoader.js');
-
-            const loader = new RGBELoader();
-            // In Electron, we can load from a file path directly if the main process makes it accessible
-            // or returns the data. Assuming the backend returns a loadable path or data URL.
-            loader.load(result.hdrPath, (texture) => {
-                openHdrViewer(texture);
-            }, undefined, (err) => {
-                console.error("Failed to load rendered HDR:", err);
-                showAlert('Could not load the rendered preview image.', 'Error');
-            });
-        } else {
-            showAlert('Live preview rendering failed. Check the console for details.', 'Render Failed');
-        }
-    } catch (error) {
-        console.error("Error during live preview:", error);
-        showAlert(`An error occurred: ${error.message}`, 'Error');
-    } finally {
-        btn.disabled = false;
-        btnSpan.textContent = originalText;
-    }
 }
 
 /**

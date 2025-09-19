@@ -156,108 +156,108 @@ const availableTools = [
             },
             {
                 "name": "toggleUIPanel",
-                "description": "Opens or closes a primary UI panel from the left toolbar, such as 'Project Setup' or 'Dimensions'.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "panelName": { "type": "STRING", "description": "The friendly name of the panel to toggle. Must be one of: 'project', 'dimensions', 'apertures', 'lighting', 'materials', 'sensors', 'viewpoint', 'viewOptions', 'info', 'aiAssistant'." },
-                        "state": { "type": "STRING", "description": "The desired state for the panel. Must be 'open' or 'close'." }
-                    },
-                    "required": ["panelName", "state"]
-                }
-            },
-            {
-               "name": "runSimulation",
-                "description": "Initiates a simulation by programmatically clicking the 'Run Simulation' button within an open and configured recipe panel.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "recipeType": { "type": "STRING", "description": "The type of recipe to run. Must match the recipe's internal type, e.g., 'illuminance', 'rendering', 'dgp', 'annual-3ph'." }
-                    },
-                    "required": ["recipeType"]
-                }
-            },
-            {
-                "name": "highlightResultPoint",
-                "description": "Visually highlights sensor points in the 3D view that correspond to the minimum, maximum, or clears existing highlights.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "type": { "type": "STRING", "description": "The type of highlight to apply. Must be one of 'min', 'max', or 'clear'." }
-                    },
-                    "required": ["type"]
-                }
-            },
-            {
-                "name": "displayResultsForTime",
-                "description": "Updates the 3D visualization to show the illuminance distribution for a specific hour of the year from a loaded annual simulation file.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "hour": { "type": "NUMBER", "description": "The hour of the year to display, from 0 to 8759." }
-                    },
-                    "required": ["hour"]
-                }
-            },
-            {
-                "name": "queryResultsData",
-                "description": "Performs a simple query on the currently loaded results data and returns the numerical answer. Does not modify the UI.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "queryType": { "type": "STRING", "description": "The type of query to perform. Must be one of 'average', 'min', 'max', 'countBelow', 'countAbove'." },
-                        "threshold": { "type": "NUMBER", "description": "The illuminance threshold in lux. Required only for 'countBelow' and 'countAbove' queries." }
-                    },
-                   "required": ["queryType"]
-                }
-            },
-            {
-                "name": "getDatasetStatistics",
-                "description": "Retrieves the summary statistics (min, max, average, count) for a specific dataset (A or B), regardless of which one is currently active in the UI.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "dataset": { "type": "STRING", "description": "The dataset to query. Must be 'a' or 'b'." }
-                    },
-                    "required": ["dataset"]
-                }
-            },
-            {
-                "name": "saveProject",
-                "description": "Saves the current project state by triggering a file download for the user.",
-                "parameters": { "type": "OBJECT", "properties": {} }
-            },
-            {
-                "name": "loadResultsFile",
-                "description": "Opens the system's file dialog for the user to select a results file to load into a specific dataset.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "dataset": { "type": "STRING", "description": "The dataset to load the file into. Must be 'a' or 'b'." }
-                    },
-                    "required": ["dataset"]
-                }
-            },
-            {
-                "name": "clearResults",
-                "description": "Clears all loaded simulation results data and resets the analysis UI panels.",
-                "parameters": { "type": "OBJECT", "properties": {} }
-            },
-            {
-                "name": "setMaterialProperty",
-                "description": "Sets a specific material property for a surface in the scene, such as reflectance or roughness.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "surface": { "type": "STRING", "description": "The surface to modify. Must be one of 'wall', 'floor', 'ceiling', 'frame', 'shading', or 'glazing'." },
-                        "property": { "type": "STRING", "description": "The property to change. Must be one of 'reflectance', 'specularity', 'roughness', or 'transmittance' (for glazing only)." },
-                        "value": { "type": "NUMBER", "description": "The new value for the property, typically between 0.0 and 1.0." }
-                    },
-                    "required": ["surface", "property", "value"]
-                }
+            "description": "Opens or closes a primary UI panel from the left toolbar, such as 'Project Setup' or 'Dimensions'.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "panelName": { "type": "STRING", "description": "The friendly name of the panel to toggle. Must be one of: 'project', 'dimensions', 'apertures', 'lighting', 'materials', 'sensors', 'viewpoint', 'viewOptions', 'info', 'aiAssistant'." },
+                    "state": { "type": "STRING", "description": "The desired state for the panel. Must be 'open' or 'close'." }
+                },
+                "required": ["panelName", "state"]
             }
-        ]
-    }
+        },
+        {
+           "name": "runSimulation",
+            "description": "Initiates a simulation by programmatically clicking the 'Run Simulation' button within an open and configured recipe panel.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "recipeType": { "type": "STRING", "description": "The type of recipe to run. Must match the recipe's internal type, e.g., 'illuminance', 'rendering', 'dgp', 'annual-3ph'." }
+                },
+                "required": ["recipeType"]
+            }
+        },
+        {
+            "name": "highlightResultPoint",
+            "description": "Visually highlights sensor points in the 3D view that correspond to the minimum, maximum, or clears existing highlights.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "type": { "type": "STRING", "description": "The type of highlight to apply. Must be one of 'min', 'max', or 'clear'." }
+                },
+                "required": ["type"]
+            }
+        },
+        {
+            "name": "displayResultsForTime",
+            "description": "Updates the 3D visualization to show the illuminance distribution for a specific hour of the year from a loaded annual simulation file.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "hour": { "type": "NUMBER", "description": "The hour of the year to display, from 0 to 8759." }
+                },
+                "required": ["hour"]
+            }
+        },
+        {
+            "name": "queryResultsData",
+            "description": "Performs a simple query on the currently loaded results data and returns the numerical answer. Does not modify the UI.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "queryType": { "type": "STRING", "description": "The type of query to perform. Must be one of 'average', 'min', 'max', 'countBelow', 'countAbove'." },
+                    "threshold": { "type": "NUMBER", "description": "The illuminance threshold in lux. Required only for 'countBelow' and 'countAbove' queries." }
+                },
+               "required": ["queryType"]
+            }
+        },
+        {
+            "name": "getDatasetStatistics",
+            "description": "Retrieves the summary statistics (min, max, average, count) for a specific dataset (A or B), regardless of which one is currently active in the UI.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "dataset": { "type": "STRING", "description": "The dataset to query. Must be 'a' or 'b'." }
+                },
+                "required": ["dataset"]
+            }
+        },
+        {
+            "name": "saveProject",
+            "description": "Saves the current project state by triggering a file download for the user.",
+            "parameters": { "type": "OBJECT", "properties": {} }
+        },
+        {
+            "name": "loadResultsFile",
+            "description": "Opens the system's file dialog for the user to select a results file to load into a specific dataset.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "dataset": { "type": "STRING", "description": "The dataset to load the file into. Must be 'a' or 'b'." }
+                },
+                "required": ["dataset"]
+            }
+        },
+        {
+            "name": "clearResults",
+            "description": "Clears all loaded simulation results data and resets the analysis UI panels.",
+            "parameters": { "type": "OBJECT", "properties": {} }
+        },
+        {
+            "name": "setMaterialProperty",
+            "description": "Sets a specific material property for a surface in the scene, such as reflectance or roughness.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "surface": { "type": "STRING", "description": "The surface to modify. Must be one of 'wall', 'floor', 'ceiling', 'frame', 'shading', or 'glazing'." },
+                    "property": { "type": "STRING", "description": "The property to change. Must be one of 'reflectance', 'specularity', 'roughness', or 'transmittance' (for glazing only)." },
+                    "value": { "type": "NUMBER", "description": "The new value for the property, typically between 0.0 and 1.0." }
+                },
+                "required": ["surface", "property", "value"]
+            }
+        }
+    ]
+}
 ];
 
 // A shared map of recipe types to their template IDs. Used by multiple AI tools.
@@ -628,19 +628,35 @@ async function _executeToolCall(toolCall) {
                     throw new Error(`Failed to generate simulation package for ${args.recipeType}.`);
                 }
             }
-            case 'validateProjectState': {
-                const results = await _performValidationChecks(args.analysisType);
-                let message;
-                if (results.errors.length === 0 && results.warnings.length === 0) {
-                    message = `Validation successful! The project appears to be correctly configured for a(n) ${args.analysisType} analysis.`;
-                } else {
-                    message = `Validation complete. Found ${results.errors.length} error(s) and ${results.warnings.length} warning(s).`;
-                }
-                return { success: true, message: message, details: results };
+           case 'validateProjectState': {
+            const validationResult = await _performValidationChecks(args.analysisType);
+            let message;
+            if (validationResult.errors.length === 0 && validationResult.warnings.length === 0) {
+                message = `Validation successful! The project appears to be correctly configured for a(n) ${args.analysisType} analysis.`;
+            } else {
+                message = `Validation complete. Found ${validationResult.errors.length} error(s) and ${validationResult.warnings.length} warning(s).`;
             }
-            case 'showAnalysisDashboard': {
-                if (args.dashboardType === 'glareRose') {
-                    await openGlareRoseDiagram();
+            // Return the structured data so the AI can list the issues.
+            return { success: true, message: message, validationResult: validationResult };
+        }
+        case 'openSimulationRecipe': {
+            const templateId = recipeMap[args.recipeType];
+            if (!templateId) throw new Error(`Unknown recipe type: ${args.recipeType}`);
+
+            // Proactive check: If opening DGP recipe, ensure viewpoint is correct.
+            if (args.recipeType === 'dgp' && dom['view-type']?.value !== 'h' && dom['view-type']?.value !== 'a') {
+                triggerProactiveSuggestion('dgp_recipe_bad_viewpoint');
+            }
+
+            const panel = openRecipePanelByType(templateId);
+            if (panel) {
+                return { success: true, message: `Opened the ${args.recipeType} recipe panel.` };
+            } else {
+                throw new Error(`Could not open the ${args.recipeType} recipe panel.`);
+            }
+        }
+        case 'showAnalysisDashboard': {
+            if (args.dashboardType === 'glareRose') {
                     return { success: true, message: `Opening the Glare Rose diagram.` };
                 } else if (args.dashboardType === 'combinedAnalysis') {
                     await openCombinedAnalysisPanel();
@@ -855,9 +871,9 @@ async function _executeToolCall(toolCall) {
                 }
             }
             default:
-                throw new Error(`Unknown tool: ${name}`);
-        }
-    } catch (error) {
+            throw new Error(`Unknown tool: ${name}`);
+            }
+        } catch (error) {
         console.error(`Error executing tool '${name}':`, error);
         return { success: false, message: `Error: ${error.message}` };
     }
@@ -883,8 +899,8 @@ async function _performValidationChecks(analysisType) {
     const globalPanel = document.querySelector('[data-template-id="template-global-sim-params"]');
     if (globalPanel) {
         const abInput = globalPanel.querySelector('[id^="ab-"]');
-        if (abInput && parseInt(abInput.value, 10) === 0) {
-            warnings.push("Ambient Bounces (-ab) is set to 0 in Global Parameters. No indirect light will be calculated, which may lead to black images or unrealistic results.");
+        if (abInput && parseInt(abInput.value, 10) < 1) {
+            warnings.push("Global parameter 'Ambient Bounces (-ab)' is set to 0. No indirect light will be calculated, which can lead to inaccurate results for most daylighting simulations.");
         }
     }
 
@@ -912,17 +928,33 @@ async function _performValidationChecks(analysisType) {
             }
             break;
 
-        case 'illuminance':
-            const sensorParams = getSensorGridParams();
-            if (!sensorParams?.illuminance?.enabled) {
-                errors.push("An illuminance map requires an active sensor grid. Please enable the 'Illuminance Grid' and select at least one surface in the Sensor Grid panel.");
-            }
-            break;
-    }
+            case 'illuminance':
+            case 'df':
+            case 'en-illuminance':
+                const sensorParams = getSensorGridParams();
+                if (!sensorParams?.illuminance?.enabled) {
+                    errors.push("An illuminance map requires an active sensor grid. Please enable the 'Illuminance Grid' and select at least one surface in the Sensor Grid panel.");
+                }
+                if (analysisType === 'en-illuminance' && !sensorParams?.illuminance.floor.isTaskArea) {
+                    errors.push("The 'EN 12464-1 Illuminance' recipe requires a 'Specific Task Area' to be defined in the Sensor Grid panel.");
+                }
+                break;
 
-    return { success: true, errors, warnings };
+            case 'imageless-glare':
+                const viewGridParams = getSensorGridParams();
+                if (!viewGridParams?.view?.enabled) {
+                    errors.push("An imageless annual glare analysis requires a 'View Grid' to be enabled in the Sensor Grid panel.");
+                }
+                break;
+            case 'en-ugr':
+                if (!project.lighting || !project.lighting.enabled) {
+                    warnings.push("The 'EN 12464-1 UGR' recipe is typically used for electric lighting. Artificial lighting is currently disabled.");
+                }
+                break;
+        }
+
+        return { success: true, errors, warnings };
 }
-
 
 /**
  * Calls the selected generative AI provider's API, now with tool-use capabilities.
@@ -972,31 +1004,32 @@ async function callGenerativeAI(apiKey, provider, model, systemPrompt) {
         return "I cannot provide a response due to safety filters. Please try rephrasing your query.";
     }
 
-    const toolCalls = candidate.content?.parts?.filter(part => part.functionCall).map(part => part.functionCall);
+    const toolCalls = candidate.content?.parts?.filter(part => part.functionCall);
 
-    // If the AI wants to use a tool, execute it
+    // If the AI wants to use one or more tools, execute them in parallel
     if (toolCalls && toolCalls.length > 0) {
         // Add the model's tool call request to history
         chatHistory.push(candidate.content);
-        
-        const toolCall = toolCalls[0]; // Handle one tool at a time for simplicity
-        const toolResult = await _executeToolCall({ functionCall: toolCall });
 
-        // Add the result of the tool execution to history
+        // Execute all tool calls concurrently
+        const toolPromises = toolCalls.map(part => _executeToolCall(part));
+        const toolResults = await Promise.all(toolPromises);
+
+        // Add the results of all tool executions to history
         chatHistory.push({
             role: 'tool',
-            parts: [{
+            parts: toolResults.map((result, i) => ({
                 functionResponse: {
-                    name: toolCall.name,
+                    name: toolCalls[i].functionCall.name,
                     response: {
-                        name: toolCall.name,
-                        content: toolResult,
-                    }
-                }
-            }]
+                        name: toolCalls[i].functionCall.name,
+                        content: result,
+                    },
+                },
+            })),
         });
 
-        // Make a second API call with the tool result to get the final text response
+        // Make a second API call with the tool results to get the final text response
         const secondResponse = await fetch(apiUrl, {
             method: 'POST',
             headers: headers,
@@ -1127,30 +1160,30 @@ export function triggerProactiveSuggestion(context) {
         case 'daylighting_controls_enabled':
             suggestionHTML = `Daylighting controls enabled. An annual simulation is needed to evaluate performance. Would you like to open the <strong data-action="open_recipe:annual-3ph">Annual Daylight (3-Phase)</strong> recipe?`;
             break;
-        case 'bsdf_enabled':
-            suggestionHTML = `BSDF file enabled. This is used for advanced multi-phase simulations. Would you like to open the <strong data-action="open_recipe:annual-5ph">Annual Daylight (5-Phase)</strong> recipe?`;
-            break;
-       case 'task_area_enabled':
-            suggestionHTML = `Task Area grid defined. This is required for the <strong data-action="open_recipe:en-illuminance">EN 12464-1 Illuminance</strong> recipe. Would you like to open it?`;
-            break;
-        case 'ies_file_loaded':
-            suggestionHTML = `IES file loaded. You can view the photometric plot in the lighting panel and adjust the light's position and rotation.`;
-            break;
-        case 'unrealistic_reflectance':
-            suggestionHTML = `A material reflectance is outside the typical range (0.1 to 0.85). Unusually high or low values can be physically unrealistic and may increase simulation time.`;
-            break;
-        case 'louver_shading_enabled':
-            suggestionHTML = `Louvers configured. For the most accurate annual analysis of complex shading, consider using the <strong data-action="open_recipe:annual-5ph">5-Phase method</strong>.`;
-            break;
-        case 'low_ambient_bounces':
-            suggestionHTML = `Ambient Bounces (-ab) is set to a low value. This will limit or prevent indirect light calculation, which can lead to unrealistic, dark, or splotchy results.`;
-            break;
-        case 'dgp_recipe_bad_viewpoint':
-            suggestionHTML = `The DGP recipe requires a fisheye view. Would you like to <strong data-action="set_view_fisheye">change the viewpoint to Fisheye</strong> to ensure correct results?`;
-            break;
-        default:
-            return; // No suggestion for this context
-    }
+            case 'bsdf_enabled':
+                suggestionHTML = `BSDF file enabled. This is used for advanced multi-phase simulations. Would you like to open the <strong data-action="open_recipe:annual-5ph">Annual Daylight (5-Phase)</strong> recipe?`;
+        break;
+        case 'task_area_enabled':
+                suggestionHTML = `Task Area grid defined. This is required for the <strong data-action="open_recipe:en-illuminance">EN 12464-1 Illuminance</strong> recipe. Would you like to open it?`;
+                break;
+            case 'ies_file_loaded':
+                suggestionHTML = `IES file loaded. You can view the photometric plot in the lighting panel and adjust the light's position and rotation.`;
+                break;
+            case 'unrealistic_reflectance':
+                suggestionHTML = `A material reflectance is outside the typical range (0.1 to 0.85). Unusually high or low values can be physically unrealistic and may increase simulation time.`;
+                break;
+            case 'louver_shading_enabled':
+                suggestionHTML = `Louvers configured. For the most accurate annual analysis of complex shading, consider using the <strong data-action="open_recipe:annual-5ph">5-Phase method</strong>.`;
+                break;
+            case 'low_ambient_bounces':
+                suggestionHTML = `Ambient Bounces (-ab) is set to a low value. This will limit or prevent indirect light calculation, which can lead to unrealistic, dark, or splotchy results.`;
+                break;
+            case 'dgp_recipe_bad_viewpoint':
+                suggestionHTML = `The DGP recipe requires a fisheye view. Would you like to <strong data-action="set_view_fisheye">change the viewpoint to Fisheye</strong> to ensure correct results?`;
+                break;
+            default:
+                return; // No suggestion for this context
+}
 
     // Dynamically import and call the UI function to display the suggestion
     import('./ui.js').then(({ displayProactiveSuggestion }) => {

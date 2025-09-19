@@ -42,8 +42,15 @@ class ReportGenerator {
      */
     async _gatherData() {
         const projectData = await project.gatherAllProjectData();
-        const activeDataKey = resultsManager.activeView === 'diff' ? 'a' : resultsManager.activeView;
-        const activeDataset = resultsManager.datasets[activeDataKey];
+
+        // Determine the most relevant dataset for the report.
+        // Prioritize the active view, but fall back gracefully if it's 'diff' or empty.
+        let reportDataKey = resultsManager.activeView;
+        if (reportDataKey === 'diff' || !resultsManager.datasets[reportDataKey]?.stats) {
+            reportDataKey = resultsManager.datasets.a?.stats ? 'a' : 'b';
+        }
+
+        const activeDataset = resultsManager.datasets[reportDataKey];
 
         if (!activeDataset) {
             throw new Error("No active dataset found to generate a report from.");
@@ -51,9 +58,9 @@ class ReportGenerator {
 
         this.data = {
             projectData,
-            stats: resultsManager.getActiveStats(),
-            annualMetrics: resultsManager.hasAnnualData(activeDataKey) ? resultsManager.calculateAnnualMetrics(activeDataKey, {}) : null,
-            glareResult: resultsManager.getActiveGlareResult(),
+            stats: activeDataset.stats,
+            annualMetrics: resultsManager.hasAnnualData(reportDataKey) ? resultsManager.calculateAnnualMetrics(reportDataKey, {}) : null,
+            glareResult: activeDataset.glareResult,
             circadianMetrics: activeDataset.circadianMetrics,
             charts: getDashboardChartsAsBase64(),
             sceneImage: captureSceneSnapshot(),
