@@ -44,6 +44,8 @@ Ray Modeler is packed with features that automate and enhance the Radiance workf
 
 - **Advanced Glazing Systems**: Model glazing using simple transmittance values or incorporate complex fenestration data via Bidirectional Scattering Distribution Function (BSDF) `.xml` files. The application correctly converts intuitive transmittance to physically-based transmissivity for simulations.
 
+- **Interactive BSDF Viewer**: Demystify complex glazing by providing immediate visual feedback. When a BSDF `.xml` file is loaded, the application can parse the Klems matrix and render an interactive 2D polar plot showing the angular distribution of transmitted light for any incident angle.
+
 - **Electric Lighting Design**: Place and configure multiple Radiance light source types (light, spotlight, glow, illum) or import real-world luminaire data using IES photometric files in individual or grid-based layouts.
 
 - **Daylighting Controls**: Simulate energy savings by implementing photosensor-controlled lighting systems with continuous, stepped, or off modes.
