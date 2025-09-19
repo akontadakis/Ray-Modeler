@@ -2,7 +2,6 @@
 
 import { resultsManager, palettes } from './resultsManager.js';
 import { getNewZIndex, ensureWindowInView, initializePanelControls, showAlert } from './ui.js';
-import ChartDataLabels from 'chartjs-plugin-datalabels';
 
 // Store chart instances to destroy/update them later
 let sdaGauge = null;

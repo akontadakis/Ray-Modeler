@@ -928,21 +928,8 @@ export function updateDaylightingSensorVisuals() {
         daylightingSensorMeshes.push(sensorGroup);
     }
 
-    // Attach gizmo to the selected sensor
-    const gizmo1Checked = dom['daylight-sensor1-gizmo-toggle']?.checked;
-    const gizmo2Checked = dom['daylight-sensor2-gizmo-toggle']?.checked;
-    let objectToAttach = null;
-    if (gizmo1Checked && daylightingSensorMeshes.length > 0) {
-        objectToAttach = daylightingSensorMeshes[0];
-    } else if (gizmo2Checked && daylightingSensorMeshes.length > 1) {
-        objectToAttach = daylightingSensorMeshes[1];
-    }
-
-    if (objectToAttach) {
-        sensorTransformControls.attach(objectToAttach);
-    } else {
-        sensorTransformControls.detach();
-    }
+        // Attach the gizmo to the appropriate sensor based on the current UI toggle state.
+        attachGizmoToSelectedSensor();
 }
 
 /**
@@ -1025,5 +1012,29 @@ function _createTaskAreaVisuals(W, L, container, gridParams) {
             // Add to the main container, it will be rendered underneath the task area plane
             container.add(surroundingAreaVisual);
         }
+    }
+}
+
+/**
+ * Attaches the daylighting sensor gizmo to the sensor selected via the UI toggles.
+ * This function assumes the sensor meshes already exist and are correctly positioned.
+ */
+export function attachGizmoToSelectedSensor() {
+    // This function assumes the sensor meshes already exist and are correct.
+    const dom = getDom(); // We need the DOM to see which toggle is checked.
+    const gizmo1Checked = dom['daylight-sensor1-gizmo-toggle']?.checked;
+    const gizmo2Checked = dom['daylight-sensor2-gizmo-toggle']?.checked;
+
+    let objectToAttach = null;
+    if (gizmo1Checked && daylightingSensorMeshes[0]) {
+        objectToAttach = daylightingSensorMeshes[0];
+    } else if (gizmo2Checked && daylightingSensorMeshes[1]) {
+        objectToAttach = daylightingSensorMeshes[1];
+    }
+
+    if (objectToAttach && sensorTransformControls.object !== objectToAttach) {
+        sensorTransformControls.attach(objectToAttach);
+    } else if (!objectToAttach) {
+        sensorTransformControls.detach();
     }
 }

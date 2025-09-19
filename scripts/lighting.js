@@ -1,6 +1,10 @@
 // scripts/lighting.js
 
 import * as THREE from 'three';
+import { sensorTransformControls } from './scene.js';
+import { attachGizmoToSelectedSensor } from './geometry.js';
+import { updateAllLabels } from './ui.js';
+
 
 /**
  * Parses the text content of an IESNA LM-63 photometric data file.
@@ -229,7 +233,8 @@ class LightingManager {
      */
     _createVisual(lightDef) {
         const placeGizmo = (position, gridInfo = null) => {
-            const gizmo = this._createSingleGizmo(lightDef, gridInfo);
+            // Pass the luminaire's final calculated position to the gizmo creation function
+            const gizmo = this._createSingleGizmo(lightDef, position, gridInfo);
             this._positionAndRotateGizmo(gizmo, position, lightDef.rotation);
             this.lightsGroup.add(gizmo);
         };
@@ -272,54 +277,21 @@ class LightingManager {
     /**
      * Creates a single visual gizmo for a light source, including geometry and helpers.
      * @param {object} lightDef - The light definition.
+     * @param {object} position - The {x, y, z} position of the luminaire in room coordinates.
+     * @param {object} [gridInfo=null] - Optional grid information.
      * @returns {THREE.Group} The complete gizmo group.
      * @private
      */
-    _createSingleGizmo(lightDef, gridInfo = null) {
-    const gizmo = new THREE.Group();
-    const style = getComputedStyle(document.documentElement);
-    let color = style.getPropertyValue('--light-source-color').trim();
+    _createSingleGizmo(lightDef, position, gridInfo = null) {
+        const gizmo = new THREE.Group();
 
-    // Zone Visualization Logic
-    const visualizeZones = this.dom['daylighting-visualize-zones-toggle']?.checked;
-    const daylightingEnabled = lightDef.daylighting?.enabled;
+        // The color is now determined by the luminaire's physical position
+        const color = this._getGizmoColor(lightDef, position);
 
-        if (visualizeZones && daylightingEnabled && gridInfo && lightDef.daylighting.sensors) {
-            const { sensors } = lightDef.daylighting;
-            const { r, numRows } = gridInfo;
-            // Define fallback colors in case CSS variables are not set
-            const zone1Color = style.getPropertyValue('--zone1-color')?.trim() || '#3b82f6'; // Blue
-            const zone2Color = style.getPropertyValue('--zone2-color')?.trim() || '#16a34a'; // Green
-
-            if (sensors.length === 1) {
-                color = zone1Color;
-            } else if (sensors.length === 2) {
-            const strategy = lightDef.daylighting.zoningStrategy || 'rows';
-            const percent1 = sensors[0].percentControlled;
-
-                if (strategy === 'rows') {
-                    const { r, numRows } = gridInfo;
-                    const numRowsZone1 = Math.round(numRows * percent1);
-                    // Zone is split based on the row index
-                    if (r < numRowsZone1) {
-                        color = zone1Color;
-                    } else {
-                        color = zone2Color;
-                    }
-                } else { // strategy === 'cols'
-                    const { c, numCols } = gridInfo;
-                    const numColsZone1 = Math.round(numCols * percent1);
-                    // Zone is split based on the column index
-                    if (c < numColsZone1) {
-                        color = zone1Color;
-                    } else {
-                        color = zone2Color;
-                    }
-                }
-            }
-        }
-
-        const material = new THREE.MeshBasicMaterial({ color: new THREE.Color(color), wireframe: true });
+        const material = new THREE.MeshBasicMaterial({
+            color: new THREE.Color(color),
+            wireframe: true
+        });
 
         const geometry = this._createGizmoGeometry(lightDef);
         gizmo.add(new THREE.Mesh(geometry, material));
@@ -333,42 +305,47 @@ class LightingManager {
         return gizmo;
     }
     
-    /**
- * Determines the appropriate color for a light gizmo, considering daylighting zone visualization.
- * @param {object} lightDef - The light definition.
- * @param {object|null} gridInfo - Information about the gizmo's position in a grid.
- * @returns {string} The CSS color string.
- * @private
- */
-_getGizmoColor(lightDef, gridInfo) {
-    const style = getComputedStyle(document.documentElement);
-    const visualizeZones = this.dom['daylighting-visualize-zones-toggle']?.checked;
-    const daylightingEnabled = lightDef.daylighting?.enabled;
+/**
+     * Determines the appropriate color for a light gizmo based on its physical position and the daylighting zone strategy.
+     * @param {object} lightDef - The light definition.
+     * @param {object} position - The {x, y, z} position of the luminaire in room coordinates.
+     * @returns {string} The CSS color string.
+     * @private
+     */
+    _getGizmoColor(lightDef, position) {
+        const style = getComputedStyle(document.documentElement);
+        const visualizeZones = this.dom['daylighting-visualize-zones-toggle']?.checked;
+        const daylightingEnabled = lightDef.daylighting?.enabled;
 
-    if (visualizeZones && daylightingEnabled && gridInfo && lightDef.daylighting.sensors) {
-        const { sensors, zoningStrategy = 'rows' } = lightDef.daylighting;
-        const zone1Color = style.getPropertyValue('--zone1-color')?.trim() || '#3b82f6'; // Blue
-        const zone2Color = style.getPropertyValue('--zone2-color')?.trim() || '#16a34a'; // Green
+        // Only apply zone colors if visualization is enabled
+        if (visualizeZones && daylightingEnabled && lightDef.daylighting.sensors) {
+            const { sensors, zoningStrategy = 'rows' } = lightDef.daylighting;
+            const zone1Color = style.getPropertyValue('--zone1-color')?.trim() || '#3b82f6';
+            const zone2Color = style.getPropertyValue('--zone2-color')?.trim() || '#16a34a';
 
-        if (sensors.length === 1) {
-            return zone1Color;
-        }
-        if (sensors.length === 2) {
-            const percent1 = sensors[0].percentControlled;
-            if (zoningStrategy === 'rows') {
-                const { r, numRows } = gridInfo;
-                const numRowsZone1 = Math.round(numRows * percent1);
-                return (r < numRowsZone1) ? zone1Color : zone2Color;
-            } else { // strategy === 'cols'
-                const { c, numCols } = gridInfo;
-                const numColsZone1 = Math.round(numCols * percent1);
-                return (c < numColsZone1) ? zone1Color : zone2Color;
+            if (sensors.length === 1) {
+                return zone1Color; // If only one sensor, all lights are in its zone.
+            }
+            if (sensors.length === 2) {
+                const percent1 = sensors[0].percentControlled;
+                const W = parseFloat(this.dom.width.value);
+                const L = parseFloat(this.dom.length.value);
+
+                if (zoningStrategy === 'rows') {
+                    // 'Rows' splits the room along its length (Z-axis). Zone 1 is the "front" part.
+                    const dividerZ = L * percent1;
+                    return (position.z < dividerZ) ? zone1Color : zone2Color;
+                } else { // strategy === 'cols'
+                    // 'Columns' splits the room along its width (X-axis). Zone 1 is the "left" part.
+                    const dividerX = W * percent1;
+                    return (position.x < dividerX) ? zone1Color : zone2Color;
+                }
             }
         }
-    }
 
-    return style.getPropertyValue('--light-source-color').trim() || '#ffff00'; // Default
-}
+        // Default color if visualization is off or misconfigured
+        return style.getPropertyValue('--light-source-color').trim() || '#ffff00';
+    }
 
     /**
      * Creates the appropriate THREE.BufferGeometry for a light gizmo.
@@ -505,6 +482,40 @@ _getGizmoColor(lightDef, gridInfo) {
             'daylight-sensor2-gizmo-toggle': { event: 'change', handler: () => this._handleGizmoToggle('daylight-sensor2-gizmo-toggle') },
         };
 
+        // --- Gizmo Drag Listener ---
+        // This listener syncs the 3D gizmo's position back to the UI sliders when a drag operation finishes.
+        sensorTransformControls.addEventListener('dragging-changed', (event) => {
+            if (event.value === false) { // Event fires when dragging stops
+                if (!sensorTransformControls.object) return;
+
+                const controlledObject = sensorTransformControls.object;
+                const isSensor1 = controlledObject.name === 'daylightingSensor1';
+                const isSensor2 = controlledObject.name === 'daylightingSensor2';
+
+                if (!isSensor1 && !isSensor2) return;
+
+                const W = parseFloat(this.dom.width.value);
+                const L = parseFloat(this.dom.length.value);
+                const sensorIndex = isSensor1 ? 1 : 2;
+                const finalPosition = controlledObject.position;
+
+                const sliderX = finalPosition.x - W / 2;
+                const sliderZ = finalPosition.z - L / 2;
+
+                // Update slider values directly
+                if (this.dom[`daylight-sensor${sensorIndex}-x`]) this.dom[`daylight-sensor${sensorIndex}-x`].value = sliderX.toFixed(2);
+                if (this.dom[`daylight-sensor${sensorIndex}-y`]) this.dom[`daylight-sensor${sensorIndex}-y`].value = finalPosition.y.toFixed(2);
+                if (this.dom[`daylight-sensor${sensorIndex}-z`]) this.dom[`daylight-sensor${sensorIndex}-z`].value = sliderZ.toFixed(2);
+
+                updateAllLabels();
+
+                // Trigger an 'input' event to notify the rest of the app of the change.
+                if (this.dom[`daylight-sensor${sensorIndex}-x`]) {
+                    this.dom[`daylight-sensor${sensorIndex}-x`].dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            }
+        });
+
         for (const id in listeners) {
             this.dom[id]?.addEventListener(listeners[id].event, listeners[id].handler);
         }
@@ -540,12 +551,17 @@ _getGizmoColor(lightDef, gridInfo) {
      */
     _handleGizmoToggle(changedId) {
         const toggles = ['daylight-sensor1-gizmo-toggle', 'daylight-sensor2-gizmo-toggle'];
-        if (this.dom[changedId].checked) {
+        const isChecked = this.dom[changedId].checked;
+
+        // Ensure only one toggle is active at a time
+        if (isChecked) {
             toggles.forEach(id => {
                 if (id !== changedId) this.dom[id].checked = false;
             });
         }
-        this._scheduleUpdate();
+
+        // Directly attach/detach the gizmo without a full scene redraw.
+        attachGizmoToSelectedSensor();
     }
     
     /**
@@ -626,42 +642,62 @@ _getGizmoColor(lightDef, gridInfo) {
         this._scheduleUpdate();
     }
 
-    /** Toggles the UI for single vs. dual daylighting sensor setups. @private */
+     /** Toggles the UI for single vs. dual daylighting sensor setups. @private */
     _toggleSensorCountControls() {
         const count = parseInt(this.dom['daylight-sensor-count']?.value, 10);
         this.dom['daylight-sensor-2-controls']?.classList.toggle('hidden', count !== 2);
         this.dom['daylighting-zoning-strategy-controls']?.classList.toggle('hidden', count !== 2);
-        const percent1Slider = this.dom['daylight-sensor1-percent'];
-        if (percent1Slider) {
-            percent1Slider.disabled = (count === 1);
-            if (count === 1) percent1Slider.value = 1.0;
-            percent1Slider.dispatchEvent(new Event('input', { bubbles: true }));
+
+        const s1 = this.dom['daylight-sensor1-percent'];
+        const s2 = this.dom['daylight-sensor2-percent'];
+
+        if (s1 && s2) {
+            if (count === 1) {
+                s1.disabled = true;
+                s1.value = 1.0;
+                s2.disabled = true;
+                s2.value = 0.0; // Ensure second sensor fraction is zero
+            } else { // count === 2
+                s1.disabled = false;
+                s2.disabled = false;
+                // When switching to 2 sensors, ensure values are valid (e.g., reset to 50/50)
+                if (parseFloat(s1.value) === 1.0) {
+                    s1.value = 0.5;
+                    s2.value = 0.5;
+                }
+            }
+            // Trigger UI updates for labels and the 3D scene
+            updateAllLabels();
+            this._scheduleUpdate();
         }
-        this._scheduleUpdate();
     }
     
     /** Enforces that the two sensor control fraction sliders sum to 1.0. @private */
     _handleFractionSliders(event) {
-    const s1 = this.dom['daylight-sensor1-percent'];
-    const s2 = this.dom['daylight-sensor2-percent'];
-    if (!s1 || !s2) return;
+        // Prevent recursive calls while we programmatically update the sliders
+        if (this._isUpdatingFractions) return;
+        this._isUpdatingFractions = true;
 
-    // Prevent recursion if this handler is triggered by the dispatched event below
-    if (this._isUpdatingFractions) return;
-    this._isUpdatingFractions = true;
+        const s1 = this.dom['daylight-sensor1-percent'];
+        const s2 = this.dom['daylight-sensor2-percent'];
+        if (!s1 || !s2) {
+            this._isUpdatingFractions = false;
+            return;
+        }
 
-    const changed = event.target;
-    const other = (changed === s1) ? s2 : s1;
+        const changedSlider = event.target;
+        const otherSlider = (changedSlider === s1) ? s2 : s1;
+        const changedValue = parseFloat(changedSlider.value);
 
-    if (parseFloat(s1.value) + parseFloat(s2.value) > 1.0) {
-        const changedVal = parseFloat(changed.value);
-        other.value = (1.0 - changedVal).toFixed(2);
-        // Dispatch event for any other listeners
-        other.dispatchEvent(new Event('input', { bubbles: true }));
+        // Update the other slider to ensure the sum is always exactly 1.0
+        otherSlider.value = (1.0 - changedValue).toFixed(2);
+
+        // Manually update the text labels for both sliders, as one was changed without an input event
+        updateAllLabels();
+
+        // Allow this handler to run again
+        this._isUpdatingFractions = false;
     }
-
-    this._isUpdatingFractions = false;
-}
 
     /** Manages active state for the zone strategy buttons and schedules an update. @private */
     _handleZoneStrategyChange(event) {

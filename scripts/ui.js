@@ -33,6 +33,11 @@ let initialTaskRect = { x: 0, z: 0, w: 0, d: 0 };
 const HANDLE_SIZE = 8; // Size of resize handles in pixels
 // --- END: Added state for Task Area Visualizer ---
 
+// --- START: Added state for Daylighting Zone Visualizer ---
+let zoneCtx, zoneCanvas;
+let isDraggingZoneDivider = false;
+// --- END: Added state for Daylighting Zone Visualizer ---
+
 // Debounce utility to prevent rapid-fire updates from sliders
 let debounceTimer;
 function debounce(func, delay) {
@@ -371,6 +376,7 @@ const ids = [
     'daylight-sensor2-dir-y', 'daylight-sensor2-dir-y-val',
     'daylight-sensor2-dir-z', 'daylight-sensor2-dir-z-val',
     'daylight-sensor2-percent', 'daylight-sensor2-percent-val',
+    'daylighting-zone-visualizer-container', 'daylighting-zone-canvas',
 
     // EN 12464-1 Specific
     'maintenance-factor', 'maintenance-factor-val',
@@ -1026,13 +1032,15 @@ export async function setupEventListeners() {
                 dom['fpv-toggle-btn']?.classList.replace('btn-secondary', 'btn-primary');
                 // When exiting FPV, update gizmo visibility based on the checkbox.
                 setGizmoVisibility(dom['gizmo-toggle'].checked);
-            }
-        });
+        }
+    });
 
     setupTaskAreaVisualizer(); // Initialize the new visualizer
+    setupDaylightingZoneVisualizer(); // Initialize the new zone visualizer
 
     dom['custom-alert-close']?.addEventListener('click', hideAlert);
     dom['gizmo-toggle']?.addEventListener('change', (e) => setGizmoVisibility(e.target.checked));
+
 
     // --- 3D Scene Interaction ---
     renderer.domElement.addEventListener('click', onSensorClick, false);
@@ -1424,38 +1432,40 @@ async function render2DHeatmap() {
         updateTimeScrubberDisplay(hour);
 
     // --- Daylighting Sensor Gizmo Listener ---
-    sensorTransformControls.addEventListener('objectChange', () => {
-        if (!sensorTransformControls.object) return;
+    sensorTransformControls.addEventListener('dragging-changed', (event) => {
+        // Only update the UI when the user has finished dragging the gizmo.
+        if (event.value === false) {
+            if (!sensorTransformControls.object) return;
 
-        const controlledObject = sensorTransformControls.object;
-        const isSensor1 = controlledObject.name === 'daylightingSensor1';
-        const isSensor2 = controlledObject.name === 'daylightingSensor2';
+            const controlledObject = sensorTransformControls.object;
+            const isSensor1 = controlledObject.name === 'daylightingSensor1';
+            const isSensor2 = controlledObject.name === 'daylightingSensor2';
 
-        if (!isSensor1 && !isSensor2) return;
+            if (!isSensor1 && !isSensor2) return;
 
-        const sensorIndex = isSensor1 ? 1 : 2;
-        const newPosition = controlledObject.position;
+            const W = parseFloat(dom.width.value);
+            const L = parseFloat(dom.length.value);
+            const sensorIndex = isSensor1 ? 1 : 2;
+            const finalPosition = controlledObject.position;
 
-        // Temporarily detach listeners to prevent feedback loops
-        const sliders = [
-            dom[`daylight-sensor${sensorIndex}-x`],
-            dom[`daylight-sensor${sensorIndex}-y`],
-            dom[`daylight-sensor${sensorIndex}-z`]
-        ];
-        sliders.forEach(slider => slider?.removeEventListener('input', handleInputChange));
+            // Convert from the scene's corner-based coordinate system to the slider's center-based system.
+            const sliderX = finalPosition.x - W / 2;
+            const sliderZ = finalPosition.z - L / 2;
 
-        // Update slider values directly
-        if (dom[`daylight-sensor${sensorIndex}-x`]) dom[`daylight-sensor${sensorIndex}-x`].value = newPosition.x.toFixed(2);
-        if (dom[`daylight-sensor${sensorIndex}-y`]) dom[`daylight-sensor${sensorIndex}-y`].value = newPosition.y.toFixed(2);
-        if (dom[`daylight-sensor${sensorIndex}-z`]) dom[`daylight-sensor${sensorIndex}-z`].value = newPosition.z.toFixed(2);
+            // Update the slider values with the final position.
+            if (dom[`daylight-sensor${sensorIndex}-x`]) dom[`daylight-sensor${sensorIndex}-x`].value = sliderX.toFixed(2);
+            if (dom[`daylight-sensor${sensorIndex}-y`]) dom[`daylight-sensor${sensorIndex}-y`].value = finalPosition.y.toFixed(2);
+            if (dom[`daylight-sensor${sensorIndex}-z`]) dom[`daylight-sensor${sensorIndex}-z`].value = sliderZ.toFixed(2);
 
-        // Manually update the text labels next to the sliders
-        updateAllLabels();
+            // Manually update the text labels next to the sliders.
+            updateAllLabels();
 
-        // Re-attach listeners after a delay
-        setTimeout(() => {
-            sliders.forEach(slider => slider?.addEventListener('input', handleInputChange));
-        }, 100);
+            // Programmatically trigger an 'input' event on one of the sliders.
+            // This is crucial to notify the rest of the application (e.g., updateScene) of the change.
+            if (dom[`daylight-sensor${sensorIndex}-x`]) {
+                dom[`daylight-sensor${sensorIndex}-x`].dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        }
     });
 
     promptForProjectDirectory();
@@ -4226,6 +4236,200 @@ function populateDataTable() {
 
     filterDataTable(); // Re-apply any existing filter
 }
+
+// --- START: New functions for Daylighting Zone Visualizer ---
+
+/**
+* Updates the zone fraction sliders based on interactions with the 2D canvas.
+* @param {number} percent - The new fraction for sensor 1 (0 to 1).
+*/
+function updateZoneSlidersFromCanvas(percent) {
+    const s1 = dom['daylight-sensor1-percent'];
+    const s2 = dom['daylight-sensor2-percent'];
+    if (!s1 || !s2) return;
+
+    // To prevent event loops, temporarily remove listeners
+    const sliders = [s1, s2];
+    sliders.forEach(s => s.removeEventListener('input', drawDaylightingZoneVisualizer));
+
+    s1.value = percent.toFixed(2);
+    s2.value = (1.0 - percent).toFixed(2);
+
+    // Manually trigger updates for UI labels and the 3D scene
+    updateAllLabels();
+    // Dispatching the event ensures the LightingManager's own handler is called
+    s1.dispatchEvent(new Event('input', { bubbles: true }));
+
+    // Restore listeners
+    setTimeout(() => {
+        sliders.forEach(s => s.addEventListener('input', drawDaylightingZoneVisualizer));
+    }, 0);
+}
+
+/**
+* Draws the room outline and colored zones on the 2D canvas.
+*/
+function drawDaylightingZoneVisualizer() {
+    if (!zoneCtx || !dom['daylighting-enabled-toggle']?.checked) return;
+
+    const container = dom['daylighting-zone-visualizer-container'];
+    const dpr = window.devicePixelRatio || 1;
+    const rect = container.getBoundingClientRect();
+    zoneCanvas.width = rect.width * dpr;
+    zoneCanvas.height = rect.height * dpr;
+    zoneCtx.scale(dpr, dpr);
+
+    const W = parseFloat(dom.width.value);
+    const L = parseFloat(dom.length.value);
+    const percent1 = parseFloat(dom['daylight-sensor1-percent'].value);
+    const isCols = dom['daylighting-zone-strategy-cols'].classList.contains('active');
+
+    const padding = 10;
+    const canvasW = zoneCanvas.clientWidth - padding * 2;
+    const canvasH = zoneCanvas.clientHeight - padding * 2;
+    const scale = Math.min(canvasW / W, canvasH / L);
+    const roomDrawW = W * scale;
+    const roomDrawH = L * scale;
+    const offsetX = (zoneCanvas.clientWidth - roomDrawW) / 2;
+    const offsetY = (zoneCanvas.clientHeight - roomDrawH) / 2;
+
+    zoneCtx.clearRect(0, 0, zoneCanvas.clientWidth, zoneCanvas.clientHeight);
+
+    // Draw zones
+    const style = getComputedStyle(document.documentElement);
+    const zone1Color = style.getPropertyValue('--zone1-color-viz').trim() || 'rgba(59, 130, 246, 0.5)';
+    const zone2Color = style.getPropertyValue('--zone2-color-viz').trim() || 'rgba(22, 163, 74, 0.5)';
+    const dividerColor = style.getPropertyValue('--text-primary').trim() || '#ffffff';
+
+    zoneCtx.fillStyle = zone1Color;
+    if (isCols) {
+        zoneCtx.fillRect(offsetX, offsetY, roomDrawW * percent1, roomDrawH);
+    } else {
+        zoneCtx.fillRect(offsetX, offsetY, roomDrawW, roomDrawH * percent1);
+    }
+
+    zoneCtx.fillStyle = zone2Color;
+    if (isCols) {
+        zoneCtx.fillRect(offsetX + roomDrawW * percent1, offsetY, roomDrawW * (1 - percent1), roomDrawH);
+    } else {
+        zoneCtx.fillRect(offsetX, offsetY + roomDrawH * percent1, roomDrawW, roomDrawH * (1 - percent1));
+    }
+
+    // Draw room outline
+    zoneCtx.strokeStyle = style.getPropertyValue('--text-secondary').trim();
+    zoneCtx.lineWidth = 1;
+    zoneCtx.strokeRect(offsetX, offsetY, roomDrawW, roomDrawH);
+
+    // Draw divider
+    zoneCtx.strokeStyle = dividerColor;
+    zoneCtx.lineWidth = 3;
+    zoneCtx.beginPath();
+    if (isCols) {
+        const dividerX = offsetX + roomDrawW * percent1;
+        zoneCtx.moveTo(dividerX, offsetY);
+        zoneCtx.lineTo(dividerX, offsetY + roomDrawH);
+    } else {
+        const dividerY = offsetY + roomDrawH * percent1;
+        zoneCtx.moveTo(offsetX, dividerY);
+        zoneCtx.lineTo(offsetX + roomDrawW, dividerY);
+    }
+    zoneCtx.stroke();
+}
+
+/**
+* Handles the mouse down event on the zone canvas to initiate dragging.
+*/
+function onZoneMouseDown(e) {
+    const isCols = dom['daylighting-zone-strategy-cols'].classList.contains('active');
+    const W = parseFloat(dom.width.value);
+    const L = parseFloat(dom.length.value);
+    const percent1 = parseFloat(dom['daylight-sensor1-percent'].value);
+    const padding = 10;
+    const canvasW = e.target.clientWidth - padding * 2;
+    const canvasH = e.target.clientHeight - padding * 2;
+    const scale = Math.min(canvasW / W, canvasH / L);
+    const roomDrawW = W * scale;
+    const roomDrawH = L * scale;
+    const offsetX = (e.target.clientWidth - roomDrawW) / 2;
+    const offsetY = (e.target.clientHeight - roomDrawH) / 2;
+
+    const dividerPos = isCols ? offsetX + roomDrawW * percent1 : offsetY + roomDrawH * percent1;
+    const mousePos = isCols ? e.offsetX : e.offsetY;
+
+    if (Math.abs(mousePos - dividerPos) < 5) { // 5px tolerance for grabbing the divider
+        isDraggingZoneDivider = true;
+    }
+}
+
+/**
+* Handles the mouse move event to update the zone divider and cursor style.
+*/
+function onZoneMouseMove(e) {
+    const container = dom['daylighting-zone-visualizer-container'];
+    const isCols = dom['daylighting-zone-strategy-cols'].classList.contains('active');
+    const W = parseFloat(dom.width.value);
+    const L = parseFloat(dom.length.value);
+    const percent1 = parseFloat(dom['daylight-sensor1-percent'].value);
+    const padding = 10;
+    const canvasW = e.target.clientWidth - padding * 2;
+    const canvasH = e.target.clientHeight - padding * 2;
+    const scale = Math.min(canvasW / W, canvasH / L);
+    const roomDrawW = W * scale;
+    const roomDrawH = L * scale;
+    const offsetX = (e.target.clientWidth - roomDrawW) / 2;
+    const offsetY = (e.target.clientHeight - roomDrawH) / 2;
+
+    const dividerPos = isCols ? offsetX + roomDrawW * percent1 : offsetY + roomDrawH * percent1;
+    const mousePos = isCols ? e.offsetX : e.offsetY;
+
+    container.style.cursor = Math.abs(mousePos - dividerPos) < 5 ? (isCols ? 'ew-resize' : 'ns-resize') : 'pointer';
+
+    if (!isDraggingZoneDivider) return;
+
+    let newPercent;
+    if (isCols) {
+        newPercent = (e.offsetX - offsetX) / roomDrawW;
+    } else {
+        newPercent = (e.offsetY - offsetY) / roomDrawH;
+    }
+    newPercent = Math.max(0, Math.min(1, newPercent)); // Clamp between 0 and 1
+
+    updateZoneSlidersFromCanvas(newPercent);
+    drawDaylightingZoneVisualizer();
+}
+
+/**
+* Handles the mouse up event to end the drag operation.
+*/
+function onZoneMouseUp() {
+    isDraggingZoneDivider = false;
+}
+
+/**
+* Sets up all event listeners for the daylighting zone visualizer.
+*/
+function setupDaylightingZoneVisualizer() {
+    zoneCanvas = dom['daylighting-zone-canvas'];
+    if (!zoneCanvas) return;
+    zoneCtx = zoneCanvas.getContext('2d');
+
+    const inputsToWatch = ['width', 'length', 'daylight-sensor1-percent', 'daylight-sensor2-percent'];
+    inputsToWatch.forEach(id => dom[id]?.addEventListener('input', drawDaylightingZoneVisualizer));
+
+    const togglesToWatch = ['daylighting-enabled-toggle', 'daylighting-zone-strategy-rows', 'daylighting-zone-strategy-cols'];
+    togglesToWatch.forEach(id => dom[id]?.addEventListener('click', drawDaylightingZoneVisualizer));
+
+    dom['daylight-sensor-count']?.addEventListener('change', drawDaylightingZoneVisualizer);
+
+    zoneCanvas.addEventListener('mousedown', onZoneMouseDown);
+    zoneCanvas.addEventListener('mousemove', onZoneMouseMove);
+    zoneCanvas.addEventListener('mouseup', onZoneMouseUp);
+    zoneCanvas.addEventListener('mouseleave', onZoneMouseUp);
+
+    new ResizeObserver(drawDaylightingZoneVisualizer).observe(dom['daylighting-zone-visualizer-container']);
+}
+
+// --- END: New functions for Daylighting Zone Visualizer ---
 
 /**
 * Filters the visible rows in the data table based on the filter input field.
