@@ -4,8 +4,56 @@ import { getDom, getAllWindowParams, getAllShadingParams, getSensorGridParams } 
 import { project } from './project.js';
 import * as THREE from 'three';
 
+// Klems Full Basis outgoing angles (center points) for plotting
+const KLEMS_ANGLES = [
+    { theta: 5, phi: 0, patch: 1 }, { theta: 15, phi: 0, patch: 8 }, { theta: 15, phi: 45, patch: 8 },
+    { theta: 15, phi: 90, patch: 8 }, { theta: 15, phi: 135, patch: 8 }, { theta: 15, phi: 180, patch: 8 },
+    { theta: 15, phi: 225, patch: 8 }, { theta: 15, phi: 270, patch: 8 }, { theta: 15, phi: 315, patch: 8 },
+    { theta: 25, phi: 0, patch: 16 }, { theta: 25, phi: 22.5, patch: 16 }, { theta: 25, phi: 45, patch: 16 },
+    { theta: 25, phi: 67.5, patch: 16 }, { theta: 25, phi: 90, patch: 16 }, { theta: 25, phi: 112.5, patch: 16 },
+    { theta: 25, phi: 135, patch: 16 }, { theta: 25, phi: 157.5, patch: 16 }, { theta: 25, phi: 180, patch: 16 },
+    { theta: 25, phi: 202.5, patch: 16 }, { theta: 25, phi: 225, patch: 16 }, { theta: 25, phi: 247.5, patch: 16 },
+    { theta: 25, phi: 270, patch: 16 }, { theta: 25, phi: 292.5, patch: 16 }, { theta: 25, phi: 315, patch: 16 },
+    { theta: 25, phi: 337.5, patch: 16 }, { theta: 35, phi: 0, patch: 24 }, { theta: 35, phi: 15, patch: 24 },
+    { theta: 35, phi: 30, patch: 24 }, { theta: 35, phi: 45, patch: 24 }, { theta: 35, phi: 60, patch: 24 },
+    { theta: 35, phi: 75, patch: 24 }, { theta: 35, phi: 90, patch: 24 }, { theta: 35, phi: 105, patch: 24 },
+    { theta: 35, phi: 120, patch: 24 }, { theta: 35, phi: 135, patch: 24 }, { theta: 35, phi: 150, patch: 24 },
+    { theta: 35, phi: 165, patch: 24 }, { theta: 35, phi: 180, patch: 24 }, { theta: 35, phi: 195, patch: 24 },
+    { theta: 35, phi: 210, patch: 24 }, { theta: 35, phi: 225, patch: 24 }, { theta: 35, phi: 240, patch: 24 },
+    { theta: 35, phi: 255, patch: 24 }, { theta: 35, phi: 270, patch: 24 }, { theta: 35, phi: 285, patch: 24 },
+    { theta: 35, phi: 300, patch: 24 }, { theta: 35, phi: 315, patch: 24 }, { theta: 35, phi: 330, patch: 24 },
+    { theta: 35, phi: 345, patch: 24 }, { theta: 45, phi: 0, patch: 24 }, { theta: 45, phi: 15, patch: 24 },
+    { theta: 45, phi: 30, patch: 24 }, { theta: 45, phi: 45, patch: 24 }, { theta: 45, phi: 60, patch: 24 },
+    { theta: 45, phi: 75, patch: 24 }, { theta: 45, phi: 90, patch: 24 }, { theta: 45, phi: 105, patch: 24 },
+    { theta: 45, phi: 120, patch: 24 }, { theta: 45, phi: 135, patch: 24 }, { theta: 45, phi: 150, patch: 24 },
+    { theta: 45, phi: 165, patch: 24 }, { theta: 45, phi: 180, patch: 24 }, { theta: 45, phi: 195, patch: 24 },
+    { theta: 45, phi: 210, patch: 24 }, { theta: 45, phi: 225, patch: 24 }, { theta: 45, phi: 240, patch: 24 },
+    { theta: 45, phi: 255, patch: 24 }, { theta: 45, phi: 270, patch: 24 }, { theta: 45, phi: 285, patch: 24 },
+    { theta: 45, phi: 300, patch: 24 }, { theta: 45, phi: 315, patch: 24 }, { theta: 45, phi: 330, patch: 24 },
+    { theta: 45, phi: 345, patch: 24 }, { theta: 55, phi: 0, patch: 24 }, { theta: 55, phi: 15, patch: 24 },
+    { theta: 55, phi: 30, patch: 24 }, { theta: 55, phi: 45, patch: 24 }, { theta: 55, phi: 60, patch: 24 },
+    { theta: 55, phi: 75, patch: 24 }, { theta: 55, phi: 90, patch: 24 }, { theta: 55, phi: 105, patch: 24 },
+    { theta: 55, phi: 120, patch: 24 }, { theta: 55, phi: 135, patch: 24 }, { theta: 55, phi: 150, patch: 24 },
+    { theta: 55, phi: 165, patch: 24 }, { theta: 55, phi: 180, patch: 24 }, { theta: 55, phi: 195, patch: 24 },
+    { theta: 55, phi: 210, patch: 24 }, { theta: 55, phi: 225, patch: 24 }, { theta: 55, phi: 240, patch: 24 },
+    { theta: 55, phi: 255, patch: 24 }, { theta: 55, phi: 270, patch: 24 }, { theta: 55, phi: 285, patch: 24 },
+    { theta: 55, phi: 300, patch: 24 }, { theta: 55, phi: 315, patch: 24 }, { theta: 55, phi: 330, patch: 24 },
+    { theta: 55, phi: 345, patch: 24 }, { theta: 65, phi: 0, patch: 20 }, { theta: 65, phi: 18, patch: 20 },
+    { theta: 65, phi: 36, patch: 20 }, { theta: 65, phi: 54, patch: 20 }, { theta: 65, phi: 72, patch: 20 },
+    { theta: 65, phi: 90, patch: 20 }, { theta: 65, phi: 108, patch: 20 }, { theta: 65, phi: 126, patch: 20 },
+    { theta: 65, phi: 144, patch: 20 }, { theta: 65, phi: 162, patch: 20 }, { theta: 65, phi: 180, patch: 20 },
+    { theta: 65, phi: 198, patch: 20 }, { theta: 65, phi: 216, patch: 20 }, { theta: 65, phi: 234, patch: 20 },
+    { theta: 65, phi: 252, patch: 20 }, { theta: 65, phi: 270, patch: 20 }, { theta: 65, phi: 288, patch: 20 },
+    { theta: 65, phi: 306, patch: 20 }, { theta: 65, phi: 324, patch: 20 }, { theta: 65, phi: 342, patch: 20 },
+    { theta: 75, phi: 0, patch: 12 }, { theta: 75, phi: 30, patch: 12 }, { theta: 75, phi: 60, patch: 12 },
+    { theta: 75, phi: 90, patch: 12 }, { theta: 75, phi: 120, patch: 12 }, { theta: 75, phi: 150, patch: 12 },
+    { theta: 75, phi: 180, patch: 12 }, { theta: 75, phi: 210, patch: 12 }, { theta: 75, phi: 240, patch: 12 },
+    { theta: 75, phi: 270, patch: 12 }, { theta: 75, phi: 300, patch: 12 }, { theta: 75, phi: 330, patch: 12 },
+    { theta: 85, phi: 0, patch: 6 }, { theta: 85, phi: 60, patch: 6 }, { theta: 85, phi: 120, patch: 6 },
+    { theta: 85, phi: 180, patch: 6 }, { theta: 85, phi: 240, patch: 6 }, { theta: 85, phi: 300, patch: 6 },
+    { theta: 90, phi: 0, patch: 1 }
+];
 
-// The spectral bin definitions for the Lark v3.0 methodology.
 const SPECTRAL_BINS = {
     'lark-9': [
         { start: 380, end: 424 }, { start: 425, end: 454 }, { start: 455, end: 479 },
@@ -46,11 +94,72 @@ export function _parseAndBinSpectralData(fileContent, binConfigKey = 'lark-9') {
             return 0; // Default to 0 if no data points fall within a bin.
         }
         const sum = valuesInBin.reduce((acc, p) => acc + p.value, 0);
-        return sum / valuesInBin.length;
+       return sum / valuesInBin.length;
     });
 
     return binnedValues;
 }
+
+
+/**
+ * Parses a BSDF XML file to extract Klems basis transmission data.
+ * @param {string} xmlContent - The raw text content of the BSDF XML file.
+ * @returns {object} A structured object with parsed BSDF data.
+ */
+export function _parseBsdfXml(xmlContent) {
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlContent, "text/xml");
+
+    if (xmlDoc.getElementsByTagName("parsererror").length > 0) {
+        throw new Error("Invalid XML format.");
+    }
+
+    const dataDefinition = xmlDoc.querySelector("DataDefinition");
+    if (!dataDefinition) throw new Error("Could not find <DataDefinition> element.");
+
+    const basisText = dataDefinition.querySelector("AngleBasis")?.textContent;
+    if (!basisText || !basisText.includes("LBNL/Klems Full")) {
+        throw new Error("Only 'LBNL/Klems Full' angle basis is currently supported.");
+    }
+
+    const incidentDataNodes = xmlDoc.querySelectorAll("IncidentData");
+    const parsedData = {
+        basis: basisText,
+        data: []
+    };
+
+    incidentDataNodes.forEach(node => {
+        const angleNode = node.querySelector("Angle");
+        if (!angleNode) return;
+
+        const theta = parseFloat(angleNode.querySelector("Theta")?.textContent);
+        const phi = parseFloat(angleNode.querySelector("Phi")?.textContent);
+
+        const dataNode = node.querySelector('WavelengthData[Wavelength="Visible"] WavelengthDataBlock[WavelengthDataIdentifier="Transmission Front"]');
+        if (!dataNode) return;
+
+        const dataString = dataNode.textContent;
+        const values = dataString.trim().split(/\s+/).map(parseFloat);
+
+        if (values.length >= KLEMS_ANGLES.length) {
+            const transmittanceData = values.map((value, i) => ({
+                ...KLEMS_ANGLES[i],
+                value
+            }));
+
+            parsedData.data.push({
+                incoming: { theta, phi },
+                transmittance: transmittanceData
+            });
+        }
+    });
+
+    // Sort incident angles for a clean UI dropdown
+    parsedData.data.sort((a, b) => a.incoming.theta - b.incoming.theta || a.incoming.phi - b.incoming.phi);
+
+    return parsedData;
+}
+
 
 /**
  * Generates a 6-sided box as a series of Radiance polygons.

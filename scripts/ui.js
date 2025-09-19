@@ -22,6 +22,7 @@ let isWallSelectionLocked = false;
 const suggestionMemory = new Set(); // Prevents spamming suggestions during a session
 let tableData = []; // Holds data for the interactive table
 let currentSort = { column: 'id', direction: 'asc' }; // Default sort state
+let parsedBsdfData = null; // Holds parsed BSDF data to avoid re-parsing
 
 // --- START: Added state for Task Area Visualizer ---
 let taskAreaCtx, taskAreaCanvas;
@@ -146,6 +147,10 @@ function handleFileSelection(file, baseId, displayElement) {
             displayElement.textContent = '';
             displayElement.title = '';
         }
+        if (baseId === 'bsdf-file') {
+            dom['view-bsdf-btn']?.classList.add('hidden');
+            parsedBsdfData = null; // Clear cached data
+        }
         return;
     }
 
@@ -158,6 +163,10 @@ function handleFileSelection(file, baseId, displayElement) {
     reader.onload = (e) => {
         project.addSimulationFile(baseId, file.name, e.target.result);
         showAlert(`File "${file.name}" loaded into project.`, 'File Loaded');
+        if (baseId === 'bsdf-file') {
+            dom['view-bsdf-btn']?.classList.remove('hidden');
+            parsedBsdfData = null; // Clear cached data
+        }
     };
     reader.onerror = () => {
         console.error("Error reading file:", file.name);
@@ -293,7 +302,8 @@ const ids = [
     'wall-mode-refl', 'wall-mode-srd', 'wall-refl-controls', 'wall-srd-controls', 'wall-srd-file',
     'floor-mode-refl', 'floor-mode-srd', 'floor-refl-controls', 'floor-srd-controls', 'floor-srd-file',
     'ceiling-mode-refl', 'ceiling-mode-srd', 'ceiling-refl-controls', 'ceiling-srd-controls', 'ceiling-srd-file',
-    'bsdf-toggle', 'bsdf-controls',
+    'bsdf-toggle', 'bsdf-controls', 'view-bsdf-btn', 'bsdf-viewer-panel', 'bsdf-info-display', 
+    'bsdf-incident-angle-select', 'bsdf-polar-plot-canvas',
 
     // Sensor Panel
     'illuminance-grid-color', 'view-grid-color', 'bsdf-file',
@@ -1547,6 +1557,7 @@ async function render2DHeatmap() {
         updateSensorGridColors(hourlyData);
         }
     });
+    dom['view-bsdf-btn']?.addEventListener('click', openBsdfViewer);
 }
 
 // --- UI LOGIC & EVENT HANDLERS ---
@@ -4473,5 +4484,128 @@ function filterDataTable() {
         }
         row.style.display = show ? '' : 'none';
         }
+    });
+}
+
+/**
+* Opens the BSDF viewer panel and triggers parsing and rendering of the BSDF data.
+*/
+async function openBsdfViewer() {
+    const { _parseBsdfXml } = await import('./radiance.js');
+    const bsdfFile = project.simulationFiles['bsdf-file'];
+
+    if (!bsdfFile || !bsdfFile.content) {
+        showAlert('No BSDF file is loaded into the project.', 'File Not Found');
+        return;
+    }
+
+    const panel = dom['bsdf-viewer-panel'];
+    panel.classList.remove('hidden');
+    panel.style.zIndex = getNewZIndex();
+    ensureWindowInView(panel);
+
+    // Use cached data if available to avoid re-parsing
+    if (!parsedBsdfData) {
+        dom['bsdf-info-display'].textContent = 'Parsing XML data...';
+        try {
+            // Use a timeout to allow the UI to update before a potentially blocking parse
+            await new Promise(resolve => setTimeout(resolve, 10));
+            parsedBsdfData = _parseBsdfXml(bsdfFile.content);
+        } catch (error) {
+            console.error("Error parsing BSDF XML:", error);
+            showAlert(`Failed to parse BSDF file: ${error.message}`, 'Parsing Error');
+            parsedBsdfData = null;
+            dom['bsdf-info-display'].textContent = `Error: ${error.message}`;
+            return;
+        }
+    }
+
+    if (!parsedBsdfData || !parsedBsdfData.data.length) {
+        showAlert('Could not find valid Klems transmission data in the BSDF file.', 'Data Not Found');
+        dom['bsdf-info-display'].textContent = 'No valid Klems transmission data found.';
+        return;
+    }
+
+    dom['bsdf-info-display'].textContent = `Basis: ${parsedBsdfData.basis}`;
+    const select = dom['bsdf-incident-angle-select'];
+    select.innerHTML = '';
+    parsedBsdfData.data.forEach((incident, index) => {
+        const option = document.createElement('option');
+        option.value = index;
+        option.textContent = `Θ=${incident.incoming.theta}°, Φ=${incident.incoming.phi}°`;
+        select.appendChild(option);
+    });
+
+    select.onchange = () => renderBsdfPlot(parsedBsdfData, select.value);
+    
+    // Ensure canvas is ready before drawing
+    requestAnimationFrame(() => renderBsdfPlot(parsedBsdfData, 0));
+}
+
+/**
+* Renders the BSDF transmission data as a polar plot on the canvas.
+* @param {object} bsdfData - The parsed BSDF data object.
+* @param {number} incidentIndex - The index of the incident angle to display.
+*/
+function renderBsdfPlot(bsdfData, incidentIndex) {
+    const canvas = dom['bsdf-polar-plot-canvas'];
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    // High-DPI scaling
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    const size = Math.min(rect.width, rect.height);
+    const center = { x: rect.width / 2, y: rect.height / 2 };
+    const radius = size * 0.45;
+
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    const style = getComputedStyle(document.documentElement);
+    const gridColor = style.getPropertyValue('--grid-color').trim();
+    const textColor = style.getPropertyValue('--text-secondary').trim();
+
+    // Draw polar grid
+    ctx.strokeStyle = gridColor;
+    ctx.fillStyle = textColor;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '10px Inter';
+    for (let i = 1; i <= 3; i++) {
+        const r = radius * (i / 3);
+        ctx.beginPath();
+        ctx.arc(center.x, center.y, r, 0, 2 * Math.PI);
+        ctx.stroke();
+        ctx.fillText(`${i * 30}°`, center.x, center.y - r - 8);
+    }
+    for (let i = 0; i < 8; i++) {
+        const angle = i * Math.PI / 4;
+        ctx.beginPath();
+        ctx.moveTo(center.x, center.y);
+        ctx.lineTo(center.x + radius * Math.cos(angle), center.y + radius * Math.sin(angle));
+        ctx.stroke();
+    }
+
+    // Plot data points
+    const dataSet = bsdfData.data[incidentIndex]?.transmittance;
+    if (!dataSet) return;
+
+    const maxVal = Math.max(...dataSet.map(d => d.value), 0.01);
+
+    dataSet.forEach(point => {
+        if (point.value <= 0) return;
+        const r = (point.theta / 90) * radius;
+        const angleRad = THREE.MathUtils.degToRad(point.phi - 90); // Align 0=top
+        const x = center.x + r * Math.cos(angleRad);
+        const y = center.y + r * Math.sin(angleRad);
+
+        const intensity = point.value / maxVal;
+        const pointRadius = 2 + intensity * 6;
+        ctx.fillStyle = `rgba(59, 130, 246, ${0.2 + intensity * 0.8})`;
+        ctx.beginPath();
+        ctx.arc(x, y, pointRadius, 0, 2 * Math.PI);
+        ctx.fill();
     });
 }

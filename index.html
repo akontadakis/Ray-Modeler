@@ -954,6 +954,7 @@
                 <div id="bsdf-controls" class="hidden mt-2">
                     <label for="bsdf-file" class="label text-xs">BSDF XML File</label>
                     <input type="file" id="bsdf-file" accept=".xml" class="w-full text-sm mt-1">
+                    <button id="view-bsdf-btn" class="btn btn-secondary w-full mt-2 hidden">View BSDF</button>
                 </div>
             </div>
         </div> <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
@@ -2955,6 +2956,29 @@
           </template>
 
         </div>
+
+    <div id="bsdf-viewer-panel" class="floating-window ui-panel hidden" style="width: 500px; height: 650px;">
+        <div class="window-header">
+            <span>BSDF Viewer</span>
+            <div class="window-controls">
+                <div class="window-icon-max"></div>
+                <div class="collapse-icon"></div>
+                <div class="window-icon-close"></div>
+            </div>
+        </div>
+        <div class="window-content !p-4 flex flex-col">
+            <div class="param-section">
+                <div id="bsdf-info-display" class="info-box !text-xs !py-2 !px-3 mb-4">Loading BSDF data...</div>
+                <label for="bsdf-incident-angle-select" class="label">Incident Angle (Theta, Phi)</label>
+                <select id="bsdf-incident-angle-select" class="w-full mt-1"></select>
+            </div>
+            <div class="relative aspect-square bg-[--grid-color] rounded p-2 mt-4 flex-grow">
+                <canvas id="bsdf-polar-plot-canvas"></canvas>
+            </div>
+        </div>
+        <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
     <script type="importmap">
