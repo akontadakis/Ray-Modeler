@@ -97,7 +97,7 @@ function generateRadBox(topVerts, thickness, material, name, transformFunc) {
 
   const f = (verts) => verts.map(v => transformFunc(v)).join('\n');
 let radString = `\n# Box: ${name}\n`;
-radString += `${material} polygon ${name}_top\n0\n0\n12\n`   + f([v1t, v4t, v3t, v2t]) + `\n\n`;
+radString += `${material} polygon ${name}_top\n0\n0\n12\n`   + f([v1t, v2t, v3t, v4t]) + `\n\n`;
 radString += `${material} polygon ${name}_bottom\n0\n0\n12\n`+ f([v1b, v4b, v3b, v2b]) + `\n\n`;
 radString += `${material} polygon ${name}_front\n0\n0\n12\n` + f([v4t, v3t, v3b, v4b]) + `\n\n`;
 radString += `${material} polygon ${name}_back\n0\n0\n12\n`  + f([v2t, v1t, v1b, v2b]) + `\n\n`;
@@ -204,8 +204,9 @@ export function generateViewpointFileContent(viewpointData, roomData) {
 }
 
 export function generateRadFileContent(options = {}) {
-  const { channelSet } = options; // e.g., 'c1-3', 'c4-6', 'c7-9' for spectral runs
+  const { channelSet, clippingPlanes } = options; // e.g., 'c1-3', 'c4-6', 'c7-9' for spectral runs
   const dom = getDom();
+
   // --- Headers and Setup ---
   let geoHeader = `# Radiance scene geometry generated on ${new Date().toISOString()}\n`;
   geoHeader += `# Room Orientation: ${dom['room-orientation'].value} degrees from North (Radiance -Y)\n`;
@@ -285,7 +286,7 @@ export function generateRadFileContent(options = {}) {
   radGeometry += generateRadBox(floorTopVerts, surfaceThickness, 'floor_mat', 'floor', transformAndFormat);
 
   // --- Ceiling ---
-  const ceilTopVerts = [[0, L, H], [W, L, H], [W, 0, H], [0, 0, H]];
+  const ceilTopVerts = [[0, 0, H], [W, 0, H], [W, L, H], [0, L, H]];
   radGeometry += generateRadBox(ceilTopVerts, surfaceThickness, 'ceiling_mat', 'ceiling', transformAndFormat);
 
   function quadVerts(orientation, u0, u1, v0, v1) {
@@ -495,11 +496,11 @@ for (const [orientation, winParams] of Object.entries(allWindows)) {
                       p_front2 = [center[0] + ww / 2, center[1] - dh, center[2] + dv];
                       p_back1 = [center[0] - ww / 2, center[1] + dh, center[2] - dv];
                       p_back2 = [center[0] + ww / 2, center[1] + dh, center[2] - dv];
-                  } else {
-                      p_front1 = [center[0] - dh, center[1], center[2] - ww / 2];
-                      p_front2 = [center[0] - dh, center[1], center[2] + ww / 2];
-                      p_back1 = [center[0] + dh, center[1], center[2] - ww / 2];
-                      p_back2 = [center[0] + dh, center[1], center[2] + ww / 2];
+                  } else { // E or W
+                    p_front1 = [center[0] - dh, center[1] - ww / 2, center[2] + dv];
+                    p_front2 = [center[0] - dh, center[1] + ww / 2, center[2] + dv];
+                    p_back1 = [center[0] + dh, center[1] - ww / 2, center[2] - dv];
+                    p_back2 = [center[0] + dh, center[1] + ww / 2, center[2] - dv];
                   }
                   shadingGeometry += generateRadBox([p_back1, p_back2, p_front2, p_front1], slatThick, 'shading_mat', `louver_${winId}_${j}`, transformAndFormat);
               }
@@ -519,12 +520,12 @@ for (const [orientation, winParams] of Object.entries(allWindows)) {
                   if (orientation === 'N' || orientation === 'S') {
                       p_front.set(center[0] - dx, center[1] - dy, center[2]);
                       p_back.set(center[0] + dx, center[1] + dy, center[2]);
-                  } else { // E or W
-                      p_front.set(center[0] - dy, center[1] - dx, center[2]);
-                      p_back.set(center[0] + dy, center[1] + dx, center[2]);
-                  }
-                  const topVerts = [
-                      [p_back.x, p_back.y, center[2] - wh / 2],
+                    } else { // E or W
+                    p_front.set(center[0] - dy, center[1] + dx, center[2]);
+                    p_back.set(center[0] + dy, center[1] - dx, center[2]);
+                }
+                const topVerts = [
+                    [p_back.x, p_back.y, center[2] - wh / 2],
                       [p_back.x, p_back.y, center[2] + wh / 2],
                       [p_front.x, p_front.y, center[2] + wh / 2],
                       [p_front.x, p_front.y, center[2] - wh / 2]

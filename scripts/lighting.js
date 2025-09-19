@@ -35,13 +35,17 @@ class IESParser {
         const [ , lumensPerLamp, , numVAngles, numHAngles] = dataLine;
         if (numVAngles <= 0 || numHAngles <= 0) throw new Error("IES file format error: Invalid number of angles.");
 
-        const verticalAngles = this._readAngleData(lines, lineIndex, numVAngles);
-        lineIndex += numVAngles;
-        
-        // Skip horizontal angles as they are not used for the 2D polar plot
-        lineIndex += numHAngles;
+        // All subsequent lines contain angle and candela data as a stream of numbers.
+        const dataValues = lines.slice(lineIndex).join(' ').trim().split(/\s+/).map(Number);
+        if (dataValues.length < numVAngles + numHAngles + numVAngles) {
+            throw new Error("IES file format error: Not enough data points.");
+        }
 
-        const candelaValues = this._readCandelaData(lines, lineIndex, numVAngles, numHAngles);
+        const verticalAngles = dataValues.slice(0, numVAngles);
+        // Horizontal angles are read to correctly index into the candela values, but are not used for the 2D plot.
+        const candelaStartIndex = numVAngles + numHAngles;
+        // For a 2D plot, we only use the candela values for the first horizontal angle.
+        const candelaValues = dataValues.slice(candelaStartIndex, candelaStartIndex + numVAngles);
 
         const maxCandela = Math.max(...candelaValues);
         if (maxCandela <= 0) throw new Error("No valid candela values found for plotting.");
@@ -96,9 +100,11 @@ class LightingManager {
         /** @private @type {boolean} */
         this.isInitialized = false;
         /** @private @type {boolean} */
-        this.updateScheduled = false;
+       this.updateScheduled = false;
         /** @private @type {?{name: string, content: string}} */
         this.iesFileData = null;
+        /** @private @type {boolean} */
+        this.isUpdatingFractions = false;
 
         this.lightsGroup.name = 'LightingGizmos';
     }
@@ -327,6 +333,43 @@ class LightingManager {
         return gizmo;
     }
     
+    /**
+ * Determines the appropriate color for a light gizmo, considering daylighting zone visualization.
+ * @param {object} lightDef - The light definition.
+ * @param {object|null} gridInfo - Information about the gizmo's position in a grid.
+ * @returns {string} The CSS color string.
+ * @private
+ */
+_getGizmoColor(lightDef, gridInfo) {
+    const style = getComputedStyle(document.documentElement);
+    const visualizeZones = this.dom['daylighting-visualize-zones-toggle']?.checked;
+    const daylightingEnabled = lightDef.daylighting?.enabled;
+
+    if (visualizeZones && daylightingEnabled && gridInfo && lightDef.daylighting.sensors) {
+        const { sensors, zoningStrategy = 'rows' } = lightDef.daylighting;
+        const zone1Color = style.getPropertyValue('--zone1-color')?.trim() || '#3b82f6'; // Blue
+        const zone2Color = style.getPropertyValue('--zone2-color')?.trim() || '#16a34a'; // Green
+
+        if (sensors.length === 1) {
+            return zone1Color;
+        }
+        if (sensors.length === 2) {
+            const percent1 = sensors[0].percentControlled;
+            if (zoningStrategy === 'rows') {
+                const { r, numRows } = gridInfo;
+                const numRowsZone1 = Math.round(numRows * percent1);
+                return (r < numRowsZone1) ? zone1Color : zone2Color;
+            } else { // strategy === 'cols'
+                const { c, numCols } = gridInfo;
+                const numColsZone1 = Math.round(numCols * percent1);
+                return (c < numColsZone1) ? zone1Color : zone2Color;
+            }
+        }
+    }
+
+    return style.getPropertyValue('--light-source-color').trim() || '#ffff00'; // Default
+}
+
     /**
      * Creates the appropriate THREE.BufferGeometry for a light gizmo.
      * @param {object} lightDef - The light definition.
@@ -599,18 +642,26 @@ class LightingManager {
     
     /** Enforces that the two sensor control fraction sliders sum to 1.0. @private */
     _handleFractionSliders(event) {
-        const s1 = this.dom['daylight-sensor1-percent'];
-        const s2 = this.dom['daylight-sensor2-percent'];
-        if (!s1 || !s2) return;
+    const s1 = this.dom['daylight-sensor1-percent'];
+    const s2 = this.dom['daylight-sensor2-percent'];
+    if (!s1 || !s2) return;
 
-        const changed = event.target;
-        const other = (changed === s1) ? s2 : s1;
+    // Prevent recursion if this handler is triggered by the dispatched event below
+    if (this._isUpdatingFractions) return;
+    this._isUpdatingFractions = true;
 
-        if (parseFloat(s1.value) + parseFloat(s2.value) > 1.0) {
-            other.value = (1.0 - parseFloat(changed.value)).toFixed(2);
-            other.dispatchEvent(new Event('input', { bubbles: true }));
-        }
+    const changed = event.target;
+    const other = (changed === s1) ? s2 : s1;
+
+    if (parseFloat(s1.value) + parseFloat(s2.value) > 1.0) {
+        const changedVal = parseFloat(changed.value);
+        other.value = (1.0 - changedVal).toFixed(2);
+        // Dispatch event for any other listeners
+        other.dispatchEvent(new Event('input', { bubbles: true }));
     }
+
+    this._isUpdatingFractions = false;
+}
 
     /** Manages active state for the zone strategy buttons and schedules an update. @private */
     _handleZoneStrategyChange(event) {
@@ -622,7 +673,36 @@ class LightingManager {
         rowsBtn.classList.toggle('active', isRows);
         colsBtn.classList.toggle('active', !isRows);
 
-        this._scheduleUpdate();
+    this._scheduleUpdate();
+    }
+
+    /**
+     * Handles the selection of a new .ies file.
+     * @param {Event} event - The file input change event.
+     * @private
+     */
+    async _handleIesFileChange(event) {
+        const file = event.target.files[0];
+        if (!file) {
+            this.iesFileData = null;
+            this._setFileDisplayName('ies-file-input', null);
+            this._updateIesViewer(null);
+            this._scheduleUpdate();
+            return;
+        }
+
+        try {
+            const content = await file.text();
+            this.iesFileData = { name: file.name, content: content };
+            this._setFileDisplayName('ies-file-input', file.name);
+            this._updateIesViewer(content);
+            this._scheduleUpdate();
+        } catch (error) {
+            console.error("Error reading IES file:", error);
+            this.iesFileData = null;
+            this._setFileDisplayName('ies-file-input', 'Error reading file');
+            this._updateIesViewer(null);
+        }
     }
 
     // --- PRIVATE: STATE GETTERS ---
@@ -936,11 +1016,12 @@ class LightingManager {
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         const dpr = window.devicePixelRatio || 1;
-        canvas.width = canvas.clientWidth * dpr;
-        canvas.height = canvas.clientHeight * dpr;
+        const width = canvas.clientWidth;
+        const height = canvas.clientHeight;
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
         ctx.scale(dpr, dpr);
-        
-        const { width, height } = canvas.getBoundingClientRect();
+
         const centerX = width / 2;
         const centerY = height / 2;
         const radius = Math.min(centerX, centerY) * 0.9;

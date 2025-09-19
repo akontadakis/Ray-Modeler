@@ -113,12 +113,14 @@ function mapEvToColor(ev) {
  * Creates and displays semi-transparent overlays for each glare source on the HDR image.
  * @param {Array<object>} sources - An array of glare source objects from an evalglare report.
  */
-function drawGlareSourcesOverlay(sources) {
+function drawGlareSourcesOverlay(sources, sourceImageDimension) {
     if (!glareOverlayContainer) return;
     glareOverlayContainer.innerHTML = ''; // Clear previous overlays
 
-    // Assumes the source evalglare image was 1500x1500px, which is a common fisheye dimension.
-    const sourceImageDimension = 1500; 
+    if (!sourceImageDimension) {
+        console.warn("Glare overlay drawn without source image dimension, assuming 1500px.");
+        sourceImageDimension = 1500;
+    }
 
     sources.forEach(source => {
         const overlay = document.createElement('div');
@@ -206,7 +208,28 @@ export function initHdrViewer() {
     const resizeObserver = new ResizeObserver(entries => {
         const entry = entries[0];
         const { width, height } = entry.contentRect;
+        if (width === 0 || height === 0) return;
+
         renderer.setSize(width, height);
+
+        // Update camera to maintain aspect ratio and prevent distortion
+        const textureAspect = planeMesh.scale.x; // Aspect is stored in the plane's x-scale
+        const canvasAspect = width / height;
+
+        if (textureAspect > canvasAspect) {
+            // Canvas is taller than the image, so width is the constraint
+            camera.left = -textureAspect;
+            camera.right = textureAspect;
+            camera.top = textureAspect / canvasAspect;
+            camera.bottom = -textureAspect / canvasAspect;
+        } else {
+            // Canvas is wider than the image, so height is the constraint
+            camera.left = -canvasAspect * 1; // 1 is the plane's height
+            camera.right = canvasAspect * 1;
+            camera.top = 1;
+            camera.bottom = -1;
+        }
+        camera.updateProjectionMatrix();
     });
     resizeObserver.observe(domElements['hdr-canvas-container']);
 
@@ -220,27 +243,49 @@ export function initHdrViewer() {
 * @param {MouseEvent} e - The mousemove event.
 */
 function updateLuminanceProbe(e) {
-if (!currentTexture || !material.uniforms.isFalseColor.value) return;
+    if (!currentTexture || !material.uniforms.isFalseColor.value) {
+        domElements['hdr-luminance-probe'].classList.add('hidden');
+        return;
+    }
 
-const rect = renderer.domElement.getBoundingClientRect();
-const u = (e.clientX - rect.left) / rect.width;
-const v = 1.0 - (e.clientY - rect.top) / rect.height; // Flip V coordinate
+    const rect = renderer.domElement.getBoundingClientRect();
+    const mouse = new THREE.Vector2();
+    // Normalize mouse coordinates to [-1, 1] range for raycasting
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
-// Read pixel data from the original texture (can't read from GPU uniforms)
-const x = Math.floor(u * currentTexture.image.width);
-const y = Math.floor(v * currentTexture.image.height);
-const index = (y * currentTexture.image.width + x) * 4;
-const pixelData = currentTexture.image.data;
+    // Use a raycaster to find the precise UV coordinate on the plane
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObject(planeMesh);
 
-const r = pixelData[index];
-const g = pixelData[index + 1];
-const b = pixelData[index + 2];
+    if (intersects.length > 0) {
+        const uv = intersects[0].uv;
+        if (!uv) return;
 
-const exposedColor = new THREE.Vector3(r, g, b).multiplyScalar(Math.pow(2.0, material.uniforms.exposure.value));
-const luminance = exposedColor.dot(new THREE.Vector3(0.265, 0.670, 0.065)) * 179.0;
+        // Read pixel data from the original texture
+        const x = Math.floor(uv.x * currentTexture.image.width);
+        const y = Math.floor(uv.y * currentTexture.image.height);
+        const index = (y * currentTexture.image.width + x) * 4;
+        const pixelData = currentTexture.image.data;
 
-domElements['hdr-luminance-value'].textContent = luminance.toExponential(2);
-domElements['hdr-luminance-probe'].classList.remove('hidden');
+        const r = pixelData[index];
+        const g = pixelData[index + 1];
+        const b = pixelData[index + 2];
+
+        const exposedColor = new THREE.Vector3(r, g, b).multiplyScalar(Math.pow(2.0, material.uniforms.exposure.value));
+        const luminance = exposedColor.dot(new THREE.Vector3(0.265, 0.670, 0.065)) * 179.0;
+
+        domElements['hdr-luminance-value'].textContent = luminance.toExponential(2);
+
+        // Position the probe element next to the cursor
+        const probe = domElements['hdr-luminance-probe'];
+        probe.style.left = `${e.clientX - rect.left + 15}px`;
+        probe.style.top = `${e.clientY - rect.top + 15}px`;
+        probe.classList.remove('hidden');
+    } else {
+        domElements['hdr-luminance-probe'].classList.add('hidden');
+    }
 }
 
 /**
@@ -271,8 +316,9 @@ export function openHdrViewer(texture, glareResult = null) {
     controls.reset();
 
     // If glare results are provided, draw the overlays
-    if (glareResult && glareResult.sources && glareResult.sources.length > 0) {
-        drawGlareSourcesOverlay(glareResult.sources);
+   if (glareResult && glareResult.sources && glareResult.sources.length > 0) {
+        // Assumes the glareResult object includes the source image dimension. Falls back if not found.
+        drawGlareSourcesOverlay(glareResult.sources, glareResult.sourceImageDimension);
     }
 
     // Show the panel

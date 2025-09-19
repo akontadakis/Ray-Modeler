@@ -232,7 +232,7 @@ async gatherAllProjectData() {
         const { generateRadFileContent, generateRayFileContent } = await import('./radiance.js');
     
         // 1. Check if a project directory is open
-        if (!this.dirHandle) {
+        if (!this.dirHandle && !this.dirPath) {
             showAlert('Please save or load a project directory first before generating scripts.', 'Project Directory Not Set');
             return null;
         }
@@ -280,40 +280,54 @@ async gatherAllProjectData() {
             return null;
         }
     
-        // 3. Write all files (inputs and scripts) directly to the project directory
+        // 3. Structure all files to be written
+        const filesToWrite = [
+            { path: ['01_geometry', `${projectName}.rad`], content: geometry },
+            { path: ['02_materials', `${projectName}_materials.rad`], content: materials },
+            { path: ['03_views', 'viewpoint.vf'], content: viewpointContent },
+            { path: ['03_views', 'viewpoint_fisheye.vf'], content: fisheyeContent },
+            { path: ['08_results', 'grid.pts'], content: allPtsContent },
+            { path: ['08_results', 'task_grid.pts'], content: taskPtsContent },
+            { path: ['08_results', 'surrounding_grid.pts'], content: surroundingPtsContent },
+            { path: ['08_results', 'view_grid.ray'], content: rayContent }
+        ].filter(f => f.content !== null && f.content !== undefined);
+
+        const makeExecutableContent = `#!/bin/bash\n# Makes all .sh scripts in this directory executable.\nchmod +x ./*.sh\necho "All scripts are now executable."`;
+        scriptsToGenerate.push({fileName: 'make_executable.sh', content: makeExecutableContent});
+
+        scriptsToGenerate.forEach(script => {
+            filesToWrite.push({ path: ['07_scripts', script.fileName], content: script.content });
+        });
+
+        // 4. Write all files using the appropriate method for the environment
         try {
-            const getHandle = (path) => this.dirHandle.getDirectoryHandle(path, { create: true });
-    
-            const writeFile = async (dirHandle, filename, content) => {
-                if (content === null || content === undefined) return;
-                const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
-                const writable = await fileHandle.createWritable();
-                await writable.write(content);
-                await writable.close();
-            };
-    
-            // Write geometry, materials, views, and sensor points
-            await writeFile(await getHandle('01_geometry'), `${projectName}.rad`, geometry);
-            await writeFile(await getHandle('02_materials'), `${projectName}_materials.rad`, materials);
-            await writeFile(await getHandle('03_views'), 'viewpoint.vf', viewpointContent);
-            await writeFile(await getHandle('03_views'), 'viewpoint_fisheye.vf', fisheyeContent);
-            await writeFile(await getHandle('08_results'), 'grid.pts', allPtsContent);
-            await writeFile(await getHandle('08_results'), 'task_grid.pts', taskPtsContent);
-            await writeFile(await getHandle('08_results'), 'surrounding_grid.pts', surroundingPtsContent);
-            await writeFile(await getHandle('08_results'), 'view_grid.ray', rayContent);
-    
-            // Write all generated scripts
-            const scriptsDirHandle = await getHandle('07_scripts');
-            for (const script of scriptsToGenerate) {
-                await writeFile(scriptsDirHandle, script.fileName, script.content);
+            if (window.electronAPI && this.dirPath) {
+                // Electron Method
+                await window.electronAPI.saveProject({ projectPath: this.dirPath, files: filesToWrite });
+            } else if (this.dirHandle) {
+                // Browser Method
+                 const writeFile = async (dirHandle, filename, content) => {
+                    if (content === null || content === undefined) return;
+                    const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(content);
+                    await writable.close();
+                };
+
+                for (const file of filesToWrite) {
+                    let currentHandle = this.dirHandle;
+                    for (let i = 0; i < file.path.length - 1; i++) {
+                        currentHandle = await currentHandle.getDirectoryHandle(file.path[i], { create: true });
+                    }
+                    await writeFile(currentHandle, file.path[file.path.length - 1], file.content);
+                }
+            } else {
+                throw new Error("No valid directory path or handle is available for saving.");
             }
-    
-            const makeExecutableContent = `#!/bin/bash\n# Makes all .sh scripts in this directory executable.\nchmod +x ./*.sh\necho "All scripts are now executable."`;
-            await writeFile(scriptsDirHandle, 'make_executable.sh', makeExecutableContent);
     
             showAlert(`Scripts and input files saved successfully to your project directory.`, 'Package Generated');
     
-            // 4. Return the script details for the UI
+            // 5. Return the script details for the UI
             const shScript = scriptsToGenerate.find(s => s.fileName.endsWith('.sh'));
             const batScript = scriptsToGenerate.find(s => s.fileName.endsWith('.bat'));
             const displayContent = shScript ? shScript.content : (batScript ? batScript.content : null);
@@ -357,9 +371,9 @@ async gatherAllProjectData() {
             const allPtsContent = await this._generateSensorPointsContent('all');
             const taskPtsContent = await this._generateSensorPointsContent('task');
             const surroundingPtsContent = await this._generateSensorPointsContent('surrounding');
-            const daylightingPtsContent = this._generateDaylightingPointsContent();
-            const rayContent = generateRayFileContent();
-    
+            const daylightingPtsContent = await this._generateDaylightingPointsContent();
+            const rayContent = await generateRayFileContent();
+
             // Sanitize the project data for JSON serialization by removing large file contents.
             const dataForJson = JSON.parse(JSON.stringify(projectData));
             dataForJson.epwFileContent = null; 

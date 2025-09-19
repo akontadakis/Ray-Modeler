@@ -199,11 +199,13 @@ function _parseCircadianCsv(content) {
         headers.forEach(h => data[h] = []);
 
     for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',');
-            if (values.length !== headers.length) continue; // Skip malformed rows
-                headers.forEach((header, j) => {
-                data[header].push(parseFloat(values[j]));
-            });
+    const values = lines[i].split(',');
+        if (values.length !== headers.length) {
+            continue; // Skip malformed rows
+        }
+        headers.forEach((header, j) => {
+            data[header].push(parseFloat(values[j]));
+        });
     }
     
     return data;

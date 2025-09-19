@@ -2,6 +2,7 @@
 
 import { resultsManager, palettes } from './resultsManager.js';
 import { getNewZIndex, ensureWindowInView, initializePanelControls, showAlert } from './ui.js';
+import ChartDataLabels from 'chartjs-plugin-datalabels';
 
 // Store chart instances to destroy/update them later
 let sdaGauge = null;
@@ -15,6 +16,7 @@ let csGauge = null;
 let lpdGauge = null;
 let energyGauge = null;
 let energySavingsGauge = null;
+let temporalMapPanel = null, temporalMapCanvas = null, temporalMapTooltip = null;
 
 /**
  * Opens the glare rose panel and triggers chart generation.
@@ -433,9 +435,18 @@ clearLightingEnergyDashboard();
     const energyEl = document.getElementById('energy-val');
     const savingsEl = document.getElementById('energy-savings-val');
 
-    if(lpdEl) lpdEl.textContent = metrics.lpd.toFixed(2);
+   if(lpdEl) lpdEl.textContent = metrics.lpd.toFixed(2);
     if(energyEl) energyEl.textContent = metrics.annualEnergy.toFixed(0);
     if(savingsEl) savingsEl.textContent = metrics.savings.toFixed(1);
+
+    // Create gauges (assuming max values for visualization purposes)
+    // LPD: Target might be ~10 W/m^2. Scale accordingly.
+    lpdGauge = createGauge('lpd-gauge', (metrics.lpd / 10) * 100, '#f59e0b');
+    // Energy Savings: value is already a percentage
+    energySavingsGauge = createGauge('energy-savings-gauge', metrics.savings, '#4ade80');
+    // Energy: We need a baseline/max to create a meaningful gauge.
+    // For this example, let's assume a max of 50 kWh/m^2.
+    energyGauge = createGauge('energy-gauge', (metrics.annualEnergy / 50) * 100, '#f87171');
 }
 
 /**
@@ -449,8 +460,6 @@ export function clearAnnualDashboard() {
     if (udiChart) udiChart.destroy();
     if (savingsGauge) savingsGauge.destroy();
     if (powerGauge) powerGauge.destroy();
-    clearLightingEnergyDashboard(); // Also clear the new dashboard
-    clearCircadianDashboard();
     sdaGauge = null;
     aseGauge = null;
     udiChart = null;
