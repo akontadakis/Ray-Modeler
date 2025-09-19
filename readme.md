@@ -448,6 +448,9 @@ Before you begin, ensure you have the following installed on your system:
     
     # Install the necessary npm packages
     npm install
+
+    # Update the npm packages
+    npm update
     ```
 
 2. **Run the App in Development Mode**

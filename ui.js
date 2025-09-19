@@ -1537,6 +1537,43 @@ async function render2DHeatmap() {
         updateSensorGridColors(hourlyData);
         }
     });
+
+    // --- Daylighting Sensor Gizmo Listener ---
+  sensorTransformControls.addEventListener('objectChange', () => {
+      if (!sensorTransformControls.object) return;
+
+      const controlledObject = sensorTransformControls.object;
+      const isSensor1 = controlledObject.name === 'daylightingSensor1';
+      const isSensor2 = controlledObject.name === 'daylightingSensor2';
+
+      if (!isSensor1 && !isSensor2) return;
+
+      const sensorIndex = isSensor1 ? 1 : 2;
+      const newPosition = controlledObject.position;
+
+      // Temporarily detach listeners to prevent feedback loops
+      const sliders = [
+          dom[`daylight-sensor${sensorIndex}-x`],
+          dom[`daylight-sensor${sensorIndex}-y`],
+          dom[`daylight-sensor${sensorIndex}-z`]
+      ];
+      sliders.forEach(slider => slider?.removeEventListener('input', handleInputChange));
+
+      // Update slider values directly
+      if (dom[`daylight-sensor${sensorIndex}-x`]) dom[`daylight-sensor${sensorIndex}-x`].value = newPosition.x.toFixed(2);
+      if (dom[`daylight-sensor${sensorIndex}-y`]) dom[`daylight-sensor${sensorIndex}-y`].value = newPosition.y.toFixed(2);
+      if (dom[`daylight-sensor${sensorIndex}-z`]) dom[`daylight-sensor${sensorIndex}-z`].value = newPosition.z.toFixed(2);
+
+      // Manually update the text labels next to the sliders
+      updateAllLabels();
+
+      // Re-attach listeners after a delay
+      setTimeout(() => {
+          sliders.forEach(slider => slider?.addEventListener('input', handleInputChange));
+      }, 100);
+  });
+
+  promptForProjectDirectory();
 }
 
 // --- UI LOGIC & EVENT HANDLERS ---
@@ -2903,8 +2940,11 @@ export function setupThemeSwitcher() {
 
         // Re-render Mermaid diagrams with the new theme
         if (typeof mermaid !== 'undefined' && mermaid.run) {
+          document.querySelectorAll('.mermaid[data-processed="true"]').forEach(el => {
+            });
+            
             const style = getComputedStyle(document.documentElement);
-        mermaid.initialize({
+            mermaid.initialize({
                 startOnLoad: false,
                 theme: 'base',
                 fontFamily: 'Inter, sans-serif',
@@ -3282,7 +3322,7 @@ function onSensorClick(event) {
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(pointer, activeCamera);
 
-    const intersects = raycaster.intersectObjects(sensorMeshes, true);
+    const intersects = raycaster.intersectObjects([wallSelectionGroup], true);
 
     if (intersects.length > 0) {
         const intersection = intersects[0];

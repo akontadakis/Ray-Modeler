@@ -446,13 +446,12 @@ function _initializePanelLogic(panel) {
         const command = isWindows ? `${scriptFile}` : `./${scriptFile}`;
 
         // If in Electron, run directly. Otherwise, show instructions.
-        if (window.electronAPI && project.dirPath) {
+        if (window.electronAPI && project.dirHandle) {
             const commandCenter = panel.querySelector('.command-center');
             const outputConsole = commandCenter?.querySelector('.simulation-output-console');
-            if (outputConsole) outputConsole.textContent = `Running '${command}'...\n\n`;
 
             window.electronAPI.runScript({
-              projectPath: project.dirPath,
+              projectPath: project.dirHandle.name,
               scriptName: scriptFile
           });
       } else {
