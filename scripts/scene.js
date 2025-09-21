@@ -372,11 +372,13 @@ function _setupControls(domElement) {
                 // Clamp world position to keep gizmo inside room boundaries
                 viewpointCamera.position.x = THREE.MathUtils.clamp(viewpointCamera.position.x, -roomSize.x / 2, roomSize.x / 2);
                 viewpointCamera.position.y = THREE.MathUtils.clamp(viewpointCamera.position.y, 0, roomSize.y);
-                viewpointCamera.position.z = THREE.MathUtils.clamp(viewpointCamera.position.z, -roomSize.z / 2, roomSize.z / 2);
+            viewpointCamera.position.z = THREE.MathUtils.clamp(viewpointCamera.position.z, -roomSize.z / 2, roomSize.z / 2);
 
-                // Removed custom event dispatch; UI now listens directly to transformControls
-            }
-        });
+            // Dispatch a custom event on the renderer's DOM element that the UI can listen to.
+            // This re-establishes the link for updating sliders from the gizmo.
+            renderer.domElement.dispatchEvent(new CustomEvent('gizmoUpdated', { bubbles: true }));
+        }
+    });
 
     // TransformControls for the daylighting sensor
     sensorTransformControls = new TransformControls(activeCamera, domElement);

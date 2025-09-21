@@ -199,34 +199,46 @@ import { sunRayObject } from './scene.js';
 export function castSunRay(startPoint, direction, sceneObjects, maxBounces) {
     const raycaster = new THREE.Raycaster();
     const path = [startPoint];
-    let currentRay = raycaster.ray.clone();
     let bouncesLeft = maxBounces;
     let isInside = false;
     let lastHitObject = null;
     let entryPointIndex = -1;
 
-    // Set initial ray
+   // Set initial ray
     raycaster.set(startPoint, direction);
+    let currentRay = raycaster.ray.clone(); // MOVED: Initialize AFTER setting the raycaster
 
     // Main ray casting loop
     for (let j = 0; j < maxBounces + 10; j++) {
-        const intersects = raycaster.intersectObjects(sceneObjects, true);
-        const firstHit = intersects.find(hit => hit.object !== lastHitObject);
+    const intersects = raycaster.intersectObjects(sceneObjects, true);
 
-        if (!firstHit) {
-            // Ray exits the scene - if inside, add final segment
-            if (isInside) {
+    // Find the first valid, non-self intersection on a mesh with a face
+    const firstHit = intersects.find(hit =>
+        hit.object !== lastHitObject &&
+        hit.object.type === 'Mesh' && 
+        hit.face
+    );
+
+    if (!firstHit) {
+        // Ray exits the scene - if inside, add final segment
+        if (isInside) {
                 path.push(currentRay.origin.clone().add(currentRay.direction.clone().multiplyScalar(10)));
             }
             break;
         }
 
-        path.push(firstHit.point);
-        const hitObject = firstHit.object;
-        lastHitObject = hitObject;
+       path.push(firstHit.point);
+    const hitObject = firstHit.object;
+    lastHitObject = hitObject;
 
-        // Classify the surface to determine ray behavior
-        const surfaceType = SurfaceClassifier.classifySurface(hitObject, firstHit.point, isInside);
+    // --- FIX: Ensure the intersection has a valid face before proceeding ---
+    // If the hit is on a wireframe or other non-faced geometry, terminate the ray here.
+    if (!firstHit.face) {
+        break; 
+    }
+
+    // Classify the surface to determine ray behavior
+    const surfaceType = SurfaceClassifier.classifySurface(hitObject, firstHit.point, isInside);
         const rayBehavior = SurfaceClassifier.getRayBehavior(surfaceType);
 
         switch (rayBehavior) {
@@ -263,25 +275,31 @@ export function castSunRay(startPoint, direction, sceneObjects, maxBounces) {
                     // Get reflection properties for this surface type
                     const reflectionProps = SurfaceClassifier.getReflectionProperties(surfaceType);
 
-                    // Calculate reflection with energy loss and surface roughness
+                    // Calculate reflection with surface roughness
                     const normal = firstHit.face.normal.clone().transformDirection(hitObject.matrixWorld);
                     const incidentDir = currentRay.direction.clone().normalize();
                     const perfectReflection = incidentDir.clone().reflect(normal);
+                    let reflectedDir = perfectReflection.clone(); // Start with a perfect reflection
 
-                    // Add surface roughness effect (slight randomization)
+                    // Add surface roughness effect by perturbing the reflection vector
                     const roughnessFactor = reflectionProps.roughness;
                     if (roughnessFactor > 0) {
-                        const randomAngle = (Math.random() - 0.5) * roughnessFactor * Math.PI;
-                        const perpendicular = new THREE.Vector3().crossVectors(normal, perfectReflection).normalize();
-                        const reflectedDir = perfectReflection.clone().applyAxisAngle(perpendicular, randomAngle);
-                        const reflectedDir2 = reflectedDir.clone().applyAxisAngle(normal, randomAngle * 0.5);
-                        reflectedDir2.multiplyScalar(perfectReflection.length());
+                        const randomPerturbation = new THREE.Vector3(
+                            (Math.random() - 0.5),
+                            (Math.random() - 0.5),
+                            (Math.random() - 0.5)
+                        ).normalize().multiplyScalar(roughnessFactor);
+
+                        reflectedDir.add(randomPerturbation).normalize();
+
+                        // Ensure the perturbed vector still points away from the surface
+                        if (reflectedDir.dot(normal) < 0) {
+                            reflectedDir.reflect(normal); // Re-reflect if it ends up pointing inwards
+                        }
                     }
 
-                    // Apply energy loss based on surface properties
-                    const energyLoss = reflectionProps.energyLoss;
-                    const reflectedDir = perfectReflection.clone().multiplyScalar(1 - energyLoss);
-
+                    // Energy loss is a photometric property, not geometric. For visualization,
+                    // we just need the new direction.
                     const newOrigin = firstHit.point.clone().add(reflectedDir.clone().multiplyScalar(0.001));
                     raycaster.set(newOrigin, reflectedDir);
                     currentRay = raycaster.ray.clone();
@@ -293,20 +311,8 @@ export function castSunRay(startPoint, direction, sceneObjects, maxBounces) {
 
             case RAY_BEHAVIOR.BLOCK:
                 // Ray is blocked (shading devices, frames, exterior surfaces)
-                if (surfaceType === SURFACE_TYPES.SHADING_DEVICE && !isInside) {
-                    // Shading device blocks exterior ray
-                    return null;
-                } else if (isInside) {
-                    // Interior surface that blocks (should not happen for interior surfaces)
-                    return {
-                        path: path,
-                        entryPointIndex: entryPointIndex,
-                        terminated: true
-                    };
-                } else {
-                    // Exterior surface blocks ray
-                    return null;
-                }
+                // For visualization, we want to show the ray up to the blocking point.
+                j = maxBounces + 10; // Force loop exit to return the current path
                 break;
 
             default:
@@ -418,16 +424,18 @@ function clearRays() {
 
 /**
  * Main function to orchestrate the sun ray tracing.
- * @param {object} params - The parameters for the tracing operation.
- */
+* @param {object} params - The parameters for the tracing operation.
+*/
 export function traceSunRays(params) {
-    clearRays();
+clearRays();
 
-    const { epwContent, date, time, rayCount, maxBounces, W, L, H, rotationY } = params;
+const { epwContent, date, time, rayCount, maxBounces, W, L, H, rotationY } = params;
 
-    const sunPos = getSunPositionFromEpw(epwContent, date, time);
-    if (!sunPos || sunPos.altitude <= 0) {
-        alert("Sun is below the horizon at this date/time, or its position could not be calculated.");
+const sunPos = getSunPositionFromEpw(epwContent, date, time);
+if (!sunPos || sunPos.altitude <= 0) {
+// Not showing an alert here as it can be disruptive.
+// The calling function in ui.js can handle user notification if desired.
+console.warn("Sun is below the horizon at the specified time.");
         return;
     }
 
@@ -458,29 +466,33 @@ export function traceSunRays(params) {
             0
         ).applyMatrix4(planeMesh.matrixWorld);
 
-        // Cast sun ray with enhanced surface-aware logic
-        const rayResult = castSunRay(startPoint, sunDirection, sceneObjects, maxBounces);
+// Cast sun ray with enhanced surface-aware logic
+const rayResult = castSunRay(startPoint, sunDirection, sceneObjects, maxBounces);
 
-        if (rayResult) {
-            const { path, entryPointIndex } = rayResult;
+// Process and visualize rays based on their path and interaction
+if (rayResult && rayResult.path.length > 1) {
+    const { path, entryPointIndex } = rayResult;
 
-            if (path.length > 1) {
-                if (entryPointIndex !== -1) {
-                    // Separate exterior and interior ray segments
-                    const exteriorPoints = path.slice(0, entryPointIndex + 1);
-                    const interiorPoints = path.slice(entryPointIndex);
-
-                    if (exteriorPoints.length > 1) {
-                        sunRayObject.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(exteriorPoints), exteriorRayMat));
-                    }
-                    if (interiorPoints.length > 1) {
-                        sunRayObject.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(interiorPoints), interiorRayMat));
-                    }
-                } else {
-                    // Exterior-only ray
-                    sunRayObject.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(path), exteriorRayMat));
-                }
-            }
+    if (entryPointIndex !== -1) {
+        // Ray entered interior - visualize both exterior and interior segments
+        const exteriorPoints = path.slice(0, entryPointIndex + 1); // Include entry point in both segments
+        const interiorPoints = path.slice(entryPointIndex);
+        
+        // Add exterior ray segment if it has length
+        if (exteriorPoints.length > 1) {
+            sunRayObject.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(exteriorPoints), exteriorRayMat));
+        }
+        
+        // Add interior ray segment if it has length
+        if (interiorPoints.length > 1) {
+            sunRayObject.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(interiorPoints), interiorRayMat));
+        }
+    } else {
+        // Ray was blocked before entering interior - visualize exterior segment only
+        if (path.length > 1) {
+            sunRayObject.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(path), exteriorRayMat));
         }
     }
+}
+}
 }

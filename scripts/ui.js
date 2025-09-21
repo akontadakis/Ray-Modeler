@@ -1,7 +1,7 @@
 // scripts/ui.js
 
 import { updateScene, axesObject, updateSensorGridColors, roomObject, shadingObject, sensorMeshes, wallSelectionGroup, highlightWall, clearWallHighlights, updateHighlightColor } from './geometry.js';
-import { activeCamera, perspectiveCamera, orthoCamera, setActiveCamera, onWindowResize, controls, transformControls, sensorTransformControls, viewpointCamera, scene, updateLiveViewType, renderer, toggleFirstPersonView as sceneToggleFPV, isFirstPersonView as sceneIsFPV, fpvOrthoCamera, updateViewpointFromUI, setGizmoVisibility, setGizmoMode as sceneSetGizmoMode, setUpdatingFromSliders, sunRayObject } from './scene.js';
+import { activeCamera, perspectiveCamera, orthoCamera, setActiveCamera, onWindowResize, controls, transformControls, sensorTransformControls, viewpointCamera, scene, updateLiveViewType, renderer, toggleFirstPersonView as sceneToggleFPV, isFirstPersonView as sceneIsFPV, fpvOrthoCamera, updateViewpointFromUI, setGizmoVisibility, setGizmoMode as sceneSetGizmoMode, setUpdatingFromSliders, isUpdatingCameraFromSliders, sunRayObject } from './scene.js';
 import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { project } from './project.js';
@@ -913,19 +913,19 @@ async function handleSunRayTrace() {
         await new Promise(resolve => setTimeout(resolve, 10));
 
         const { traceSunRays } = await import('./sunTracer.js');
-            const params = {
-                epwContent: project.epwFileContent,
-                date: dom['sun-ray-date']._flatpickr.selectedDates[0],
-                time: dom['sun-ray-time'].value,
-                rayCount: parseInt(dom['sun-ray-count'].value, 10),
-                maxBounces: parseInt(dom['sun-ray-bounces'].value, 10),
-                W: parseFloat(dom.width.value),
-                L: parseFloat(dom.length.value),
-                H: parseFloat(dom.height.value),
-                rotationY: parseFloat(dom['room-orientation'].value)
-            };
+           const params = {
+            epwContent: project.epwFileContent,
+            date: dom['sun-ray-date']._flatpickr.selectedDates[0],
+            time: dom['sun-ray-time'].value,
+            rayCount: parseInt(dom['sun-ray-count'].value, 10),
+            maxBounces: parseInt(dom['sun-ray-bounces'].value, 10),
+            W: parseFloat(dom.width.value),
+            L: parseFloat(dom.length.value),
+            H: parseFloat(dom.height.value),
+            rotationY: parseFloat(dom['room-orientation'].value)
+        };
 
-            traceSunRays(params);
+        traceSunRays(params);
 
     } catch (error) {
         console.error("Error during sun ray tracing:", error);
@@ -2750,12 +2750,8 @@ export function updateViewpointFromGizmo() {
     if (dom['view-dir-y']) dom['view-dir-y'].value = localDirection.y.toFixed(2);
     if (dom['view-dir-z']) dom['view-dir-z'].value = localDirection.z.toFixed(2);
 
-// Update the text labels to reflect the new slider values
-updateAllLabels();
-// Dispatch input events on the sliders to ensure handlers pick up the new values
-['view-pos-x','view-pos-y','view-pos-z','view-dir-x','view-dir-y','view-dir-z'].forEach(id => {
-    dom[id]?.dispatchEvent(new Event('input', { bubbles: true }));
-});
+    // Update the text labels to reflect the new slider values
+    updateAllLabels();
 
     // Clear the flag after a short delay to allow the gizmo to resume normal operation
     requestAnimationFrame(() => {
@@ -3364,11 +3360,9 @@ dom['diff-legend-min-label'].textContent = `-${maxAbs.toFixed(0)}`;
 dom['diff-legend-max-label'].textContent = `+${maxAbs.toFixed(0)}`;
 }
 
-export async function updateViewpointFromSliders() {
-    // Import the flag from scene.js to check if we're currently updating from the gizmo
-    const { isUpdatingCameraFromSliders } = await import('./scene.js');
-    
-    // If we're currently updating from the gizmo, don't process slider changes
+export function updateViewpointFromSliders() {
+    // If the camera is currently being updated by the gizmo-to-slider sync,
+    // don't process this slider input to prevent a feedback loop.
     if (isUpdatingCameraFromSliders) {
         return;
     }
@@ -4742,12 +4736,16 @@ async function handleSunRayTrace() {
         await new Promise(resolve => setTimeout(resolve, 10));
 
         const { traceSunRays } = await import('./sunTracer.js');
-        const params = {
+           const params = {
             epwContent: project.epwFileContent,
             date: dom['sun-ray-date']._flatpickr.selectedDates[0],
             time: dom['sun-ray-time'].value,
             rayCount: parseInt(dom['sun-ray-count'].value, 10),
             maxBounces: parseInt(dom['sun-ray-bounces'].value, 10),
+            W: parseFloat(dom.width.value),
+            L: parseFloat(dom.length.value),
+            H: parseFloat(dom.height.value),
+            rotationY: parseFloat(dom['room-orientation'].value)
         };
 
         traceSunRays(params);

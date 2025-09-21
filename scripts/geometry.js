@@ -5,6 +5,7 @@ import { renderer, horizontalClipPlane, verticalClipPlane, sensorTransformContro
 import { getDom, getAllWindowParams, getAllShadingParams, validateInputs, getWindowParamsForWall, getSensorGridParams } from './ui.js';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { resultsManager } from './resultsManager.js';
+import { SURFACE_TYPES } from './sunTracer.js';
 
 // --- GEOMETRY GROUPS ---
 export const roomObject = new THREE.Group();
@@ -182,9 +183,13 @@ export async function updateScene(changedId = null) {
  * @param {THREE.BufferGeometry} geometry The geometry for the mesh.
  * @param {THREE.Group} group The group to add the mesh and wireframe to.
  * @param {THREE.Material} material The material for the mesh's surfaces.
+ * @param {string} [surfaceType] - Optional surface type for ray tracing classification.
  */
-function createSchematicObject(geometry, group, material) {
+function createSchematicObject(geometry, group, material, surfaceType) {
     const mesh = new THREE.Mesh(geometry, material);
+    if (surfaceType) {
+        mesh.userData.surfaceType = surfaceType;
+    }
     applyClippingToMaterial(mesh.material, renderer.clippingPlanes);
 
     const edges = new THREE.EdgesGeometry(geometry);
@@ -265,14 +270,14 @@ function createRoomGeometry() {
     const floorGroup = new THREE.Group();
     floorGroup.rotation.x = -Math.PI / 2;
     floorGroup.position.set(W / 2, -floorThickness / 2 - 0.001, L / 2); // Lower slightly to avoid Z-fighting
-    createSchematicObject(floorGeom, floorGroup, floorMaterial);
+    createSchematicObject(floorGeom, floorGroup, floorMaterial, SURFACE_TYPES.INTERIOR_FLOOR);
     roomContainer.add(floorGroup);
 
     const ceilingGeom = new THREE.BoxGeometry(W + 2 * wallThickness, L + 2 * wallThickness, ceilingThickness);
     const ceilingGroup = new THREE.Group();
     ceilingGroup.rotation.x = -Math.PI / 2;
     ceilingGroup.position.set(W / 2, H + ceilingThickness / 2 + 0.001, L / 2); // Raise slightly to avoid Z-fighting
-    createSchematicObject(ceilingGeom, ceilingGroup, ceilingMaterial);
+    createSchematicObject(ceilingGeom, ceilingGroup, ceilingMaterial, SURFACE_TYPES.INTERIOR_CEILING);
     roomContainer.add(ceilingGroup);
 
     roomObject.add(roomContainer);
@@ -340,7 +345,7 @@ function createRoomGeometry() {
                 const glassHeight = Math.max(0, wh - 2 * ft);
                 if (glassWidth > 0 && glassHeight > 0) {
                     const glass = new THREE.Mesh(new THREE.PlaneGeometry(glassWidth, glassHeight), windowMaterial);
-                    glass.userData.isGlazing = true; // Tag for ray tracer
+                    glass.userData.surfaceType = SURFACE_TYPES.GLAZING; // Tag for ray tracer
                     applyClippingToMaterial(glass.material, renderer.clippingPlanes);
                     glass.position.set(winCenterX, winCenterY, effectiveWinDepthPos); // Position in the middle of the frame depth
                     wallMeshGroup.add(glass);
@@ -367,6 +372,7 @@ function createRoomGeometry() {
                     frameGeometry.translate(0, 0, effectiveWinDepthPos - (frameDepth / 2));
 
                     const frameMesh = new THREE.Mesh(frameGeometry, frameMaterial);
+                    frameMesh.userData.surfaceType = SURFACE_TYPES.FRAME;
                     applyClippingToMaterial(frameMesh.material, renderer.clippingPlanes);
 
                     wallMeshGroup.add(frameMesh);
@@ -386,7 +392,7 @@ function createRoomGeometry() {
                 wallGeometry.translate(0, 0, -wallThickness);
             }
             // ExtrudeGeometry extrudes from Z=0 to Z=depth, so its inner face is already at Z=0.
-            const wallMeshWithHoles = createSchematicObject(wallGeometry, wallMeshGroup, wallMaterial);
+            const wallMeshWithHoles = createSchematicObject(wallGeometry, wallMeshGroup, wallMaterial, SURFACE_TYPES.INTERIOR_WALL);
             wallMeshWithHoles.userData.isSelectableWall = true;
         } else {
             // Create a solid wall using BoxGeometry
@@ -396,7 +402,7 @@ function createRoomGeometry() {
             // the local translation needs to be negative.
             const z_translation = isEW ? -wallThickness / 2 : wallThickness / 2;
             wallGeometry.translate(0, 0, z_translation);
-            const wallMesh = createSchematicObject(wallGeometry, wallMeshGroup, wallMaterial);
+            const wallMesh = createSchematicObject(wallGeometry, wallMeshGroup, wallMaterial, SURFACE_TYPES.INTERIOR_WALL);
             wallMesh.userData.isSelectableWall = true;
         }
         wallContainer.add(wallMeshGroup);
@@ -714,6 +720,7 @@ function createOverhang(winWidth, winHeight, params, color) {
     const material = shared.shadeMat.clone();
     material.color.set(color);
     const overhangMesh = new THREE.Mesh(overhangGeom, material);
+    overhangMesh.userData.surfaceType = SURFACE_TYPES.SHADING_DEVICE;
     applyClippingToMaterial(overhangMesh.material, renderer.clippingPlanes);
 
     overhangMesh.position.y = thick / 2;
@@ -735,6 +742,7 @@ function createLightShelf(winWidth, winHeight, sillHeight, params, color) {
  if ((placeExt || placeBoth) && depthExt > 0) {
         const pivot = new THREE.Group();
         const shelfMesh = new THREE.Mesh(new THREE.BoxGeometry(winWidth, thickExt, depthExt), material);
+        shelfMesh.userData.surfaceType = SURFACE_TYPES.SHADING_DEVICE;
         shelfMesh.position.z = -depthExt / 2;
         pivot.position.y = winHeight - distBelowExt;
         pivot.rotation.x = THREE.MathUtils.degToRad(tiltExt);
@@ -744,6 +752,7 @@ function createLightShelf(winWidth, winHeight, sillHeight, params, color) {
  if ((placeInt || placeBoth) && depthInt > 0) {
         const pivot = new THREE.Group();
         const shelfMesh = new THREE.Mesh(new THREE.BoxGeometry(winWidth, thickInt, depthInt), material);
+        shelfMesh.userData.surfaceType = SURFACE_TYPES.SHADING_DEVICE;
         shelfMesh.position.z = depthInt / 2;
         pivot.position.y = winHeight - distBelowInt;
         pivot.rotation.x = THREE.MathUtils.degToRad(tiltInt);
@@ -773,6 +782,7 @@ function createLouvers(winWidth, winHeight, params, color) {
         for (let i = 0; i < numSlats; i++) {
             const pivot = new THREE.Group();
             const slat = new THREE.Mesh(slatGeom, material);
+            slat.userData.surfaceType = SURFACE_TYPES.SHADING_DEVICE;
             pivot.position.set(0, i * slatSep + slatSep / 2, zOffset);
             pivot.rotation.x = angleRad;
             pivot.add(slat);
@@ -784,6 +794,7 @@ function createLouvers(winWidth, winHeight, params, color) {
         for (let i = 0; i < numSlats; i++) {
             const pivot = new THREE.Group();
             const slat = new THREE.Mesh(slatGeom, material);
+            slat.userData.surfaceType = SURFACE_TYPES.SHADING_DEVICE;
             pivot.position.set(i * slatSep + slatSep / 2 - winWidth / 2, winHeight / 2, zOffset);
             pivot.rotation.y = angleRad;
             pivot.add(slat);
@@ -817,6 +828,7 @@ function createRoller(winWidth, winHeight, params, color) {
     applyClippingToMaterial(material, renderer.clippingPlanes);
 
     const rollerMesh = new THREE.Mesh(rollerGeom, material);
+    rollerMesh.userData.surfaceType = SURFACE_TYPES.SHADING_DEVICE;
 
     // The origin (0,0,0) of this assembly is the window's bottom-center.
     const posX = (leftOpening - rightOpening) / 2;
