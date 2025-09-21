@@ -340,6 +340,7 @@ function createRoomGeometry() {
                 const glassHeight = Math.max(0, wh - 2 * ft);
                 if (glassWidth > 0 && glassHeight > 0) {
                     const glass = new THREE.Mesh(new THREE.PlaneGeometry(glassWidth, glassHeight), windowMaterial);
+                    glass.userData.isGlazing = true; // Tag for ray tracer
                     applyClippingToMaterial(glass.material, renderer.clippingPlanes);
                     glass.position.set(winCenterX, winCenterY, effectiveWinDepthPos); // Position in the middle of the frame depth
                     wallMeshGroup.add(glass);
@@ -639,7 +640,8 @@ export function createShadingDevices() {
         const shadeParams = allShading[orientation];
 
         // Invert depth for E/W walls to match the glazing position
-        const effectiveWinDepthPos = (orientation === 'E' || orientation === 'W') ? -winDepthPos : winDepthPos;
+        // Place shading externally by always using a negative depth offset
+        const effectiveWinDepthPos = -winDepthPos;
 
         if (!shadeParams || winCount === 0 || ww === 0 || wh === 0) continue;
 
@@ -659,17 +661,26 @@ export function createShadingDevices() {
                 deviceGroup = createLouvers(ww, wh, shadeParams.louver, shadeColor);
             } else if (shadeParams.type === 'roller' && shadeParams.roller) {
                 deviceGroup = createRoller(ww, wh, shadeParams.roller, shadeColor);
+        }
+
+        if (deviceGroup) {
+            // The original creation logic is correct for E/W walls but inverted for N/S.
+            // This block corrects the N/S placement by flipping the device's local z-axis.
+            if (orientation === 'N' || orientation === 'S') {
+                deviceGroup.children.forEach(child => {
+                    child.position.z *= 1;
+                });
             }
 
-            if (deviceGroup) {
-                // Position and rotate the device to match its parent wall, then translate to the glazing depth.
-                if (orientation === 'N') {
-                    deviceGroup.position.set(winStartPos + ww / 2, sh, 0);
-                    deviceGroup.rotation.y = Math.PI; // Match North wall's rotation
-                    deviceGroup.translateZ(effectiveWinDepthPos);
-                } else if (orientation === 'S') {
-                    deviceGroup.position.set(winStartPos + ww / 2, sh, L);
-                    deviceGroup.translateZ(effectiveWinDepthPos);
+            // Position and rotate the device to match its parent wall, then translate to the glazing depth.
+            if (orientation === 'N') {
+                deviceGroup.position.set(winStartPos + ww / 2, sh, 0);
+                deviceGroup.rotation.y = Math.PI; // Match North wall's rotation
+                deviceGroup.translateZ(effectiveWinDepthPos);
+            } else if (orientation === 'S') {
+                deviceGroup.position.set(winStartPos + ww / 2, sh, L);
+                deviceGroup.rotation.y = Math.PI; // Match South wall's rotation
+                deviceGroup.translateZ(effectiveWinDepthPos);
                 } else if (orientation === 'W') {
                     deviceGroup.position.set(0, sh, winStartPos + ww / 2);
                     deviceGroup.rotation.y = Math.PI / 2; // Match West wall's rotation
@@ -721,7 +732,7 @@ function createLightShelf(winWidth, winHeight, sillHeight, params, color) {
     material.color.set(color);
     applyClippingToMaterial(material, renderer.clippingPlanes);
 
-    if ((placeExt || placeBoth) && depthExt > 0) {
+ if ((placeExt || placeBoth) && depthExt > 0) {
         const pivot = new THREE.Group();
         const shelfMesh = new THREE.Mesh(new THREE.BoxGeometry(winWidth, thickExt, depthExt), material);
         shelfMesh.position.z = -depthExt / 2;
@@ -730,7 +741,7 @@ function createLightShelf(winWidth, winHeight, sillHeight, params, color) {
         pivot.add(shelfMesh);
         assembly.add(pivot);
     }
-    if ((placeInt || placeBoth) && depthInt > 0) {
+ if ((placeInt || placeBoth) && depthInt > 0) {
         const pivot = new THREE.Group();
         const shelfMesh = new THREE.Mesh(new THREE.BoxGeometry(winWidth, thickInt, depthInt), material);
         shelfMesh.position.z = depthInt / 2;
@@ -751,7 +762,7 @@ function createLouvers(winWidth, winHeight, params, color) {
 
     const assembly = new THREE.Group();
     const material = shared.shadeMat.clone();
-    material.color.set(color);
+   material.color.set(color);
     applyClippingToMaterial(material, renderer.clippingPlanes);
     const zOffset = isExterior ? -distToGlass : distToGlass;
     const angleRad = THREE.MathUtils.degToRad(slatAngle);

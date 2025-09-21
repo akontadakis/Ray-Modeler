@@ -1,7 +1,7 @@
 // scripts/ui.js
 
 import { updateScene, axesObject, updateSensorGridColors, roomObject, shadingObject, sensorMeshes, wallSelectionGroup, highlightWall, clearWallHighlights, updateHighlightColor } from './geometry.js';
-import { activeCamera, perspectiveCamera, orthoCamera, setActiveCamera, onWindowResize, controls, transformControls, sensorTransformControls, viewpointCamera, scene, updateLiveViewType, renderer, toggleFirstPersonView as sceneToggleFPV, isFirstPersonView as sceneIsFPV, fpvOrthoCamera, updateViewpointFromUI, setGizmoVisibility, setGizmoMode as sceneSetGizmoMode } from './scene.js';
+import { activeCamera, perspectiveCamera, orthoCamera, setActiveCamera, onWindowResize, controls, transformControls, sensorTransformControls, viewpointCamera, scene, updateLiveViewType, renderer, toggleFirstPersonView as sceneToggleFPV, isFirstPersonView as sceneIsFPV, fpvOrthoCamera, updateViewpointFromUI, setGizmoVisibility, setGizmoMode as sceneSetGizmoMode, setUpdatingFromSliders, sunRayObject } from './scene.js';
 import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { project } from './project.js';
@@ -337,6 +337,10 @@ const ids = [
     'transparent-toggle', 'transparency-controls', 'surface-opacity', 'surface-opacity-val', 'ground-plane-toggle', 'world-axes-toggle', 'world-axes-size', 'world-axes-size-val',
     'h-section-toggle', 'h-section-controls', 'h-section-dist', 'h-section-dist-val',
     'v-section-toggle', 'v-section-controls', 'v-section-dist', 'v-section-dist-val',
+
+    // Sun Ray Tracer
+    'sun-ray-tracer-toggle', 'sun-ray-tracer-controls', 'sun-ray-date', 'sun-ray-time',
+    'sun-ray-count', 'sun-ray-count-val', 'sun-ray-bounces', 'sun-ray-bounces-val', 'trace-sun-rays-btn',
 
     'live-preview-section', 'preview-date', 'preview-time', 'render-section-preview-btn',
 
@@ -888,6 +892,50 @@ function setupTaskAreaVisualizer() {
 }
 
 // --- END: New functions for Task Area Visualizer ---
+
+/**
+* Gathers parameters and initiates the sun ray tracing visualization.
+*/
+async function handleSunRayTrace() {
+    if (!project.epwFileContent) {
+        showAlert('Please load an EPW weather file in the Project Setup panel before tracing sun rays.', 'Weather Data Missing');
+        return;
+    }
+
+    const btn = dom['trace-sun-rays-btn'];
+    const btnSpan = btn.querySelector('span');
+    const originalText = btnSpan.textContent;
+    btn.disabled = true;
+    btnSpan.textContent = 'Tracing...';
+
+    try {
+        // Use a timeout to allow the UI to update to the "Tracing..." state
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        const { traceSunRays } = await import('./sunTracer.js');
+            const params = {
+                epwContent: project.epwFileContent,
+                date: dom['sun-ray-date']._flatpickr.selectedDates[0],
+                time: dom['sun-ray-time'].value,
+                rayCount: parseInt(dom['sun-ray-count'].value, 10),
+                maxBounces: parseInt(dom['sun-ray-bounces'].value, 10),
+                W: parseFloat(dom.width.value),
+                L: parseFloat(dom.length.value),
+                H: parseFloat(dom.height.value),
+                rotationY: parseFloat(dom['room-orientation'].value)
+            };
+
+            traceSunRays(params);
+
+    } catch (error) {
+        console.error("Error during sun ray tracing:", error);
+        showAlert(`An error occurred: ${error.message}`, 'Error');
+    } finally {
+        btn.disabled = false;
+        btnSpan.textContent = originalText;
+    }
+}
+
 export async function setupEventListeners() {
     // Add the event listener for the lock button
     dom['wall-select-lock-btn']?.addEventListener('click', () => {
@@ -1005,6 +1053,25 @@ export async function setupEventListeners() {
         _updateLivePreviewVisibility();
         scheduleUpdate();
     });
+
+    // Sun Ray Tracer Listeners
+    dom['sun-ray-tracer-toggle']?.addEventListener('change', (e) => {
+        dom['sun-ray-tracer-controls']?.classList.toggle('hidden', !e.target.checked);
+        if (!e.target.checked && sunRayObject) {
+            // When disabling, clear any visible rays
+            while (sunRayObject.children.length > 0) {
+                const child = sunRayObject.children[0];
+                sunRayObject.remove(child);
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+            }
+        }
+    });
+    flatpickr("#sun-ray-date", {
+        dateFormat: "M j",
+        defaultDate: "Jun 21",
+    });
+    dom['trace-sun-rays-btn']?.addEventListener('click', handleSunRayTrace);
 
     // Date picker for the Live Section Preview
     flatpickr("#preview-date", {
@@ -2641,61 +2708,59 @@ function setProjectionMode(mode, updateViewButtons = true) {
     }
 }
 
-
-export function updateViewpointFromSliders() {
-    // This function now gathers all necessary parameters from the DOM
-    // and passes them to the new scene management function.
-    const params = {
-        W: parseFloat(dom.width.value),
-        L: parseFloat(dom.length.value),
-        vpx: parseFloat(dom['view-pos-x'].value),
-        vpy: parseFloat(dom['view-pos-y'].value),
-        vpz: parseFloat(dom['view-pos-z'].value),
-        vdx: parseFloat(dom['view-dir-x'].value),
-        vdy: parseFloat(dom['view-dir-y'].value),
-        vdz: parseFloat(dom['view-dir-z'].value),
-        fov: parseFloat(dom['view-fov'].value),
-        dist: parseFloat(dom['view-dist'].value)
-    };
-    // Call the new function imported from scene.js to update the 3D view
-    updateViewpointFromUI(params);
-}
+updateViewpointFromSliders
 
 export function updateViewpointFromGizmo() {
-    // The camera's position is now clamped within scene.js before this event fires.
-    // This function's only job is to update the UI sliders to match the camera.
-    const roomW = parseFloat(dom.width.value);
-    const roomL = parseFloat(dom.length.value);
+    console.log("DEBUG: Gizmo update received. Updating slider values and scene.");
 
+    const roomW = parseFloat(dom.width.value) || 0;
+    const roomL = parseFloat(dom.length.value) || 0;
+
+    // --- Position Update ---
     const worldPos = viewpointCamera.position;
-
-    // Convert from world coordinates (centered) back to slider coordinates (corner origin)
     const sliderPos = new THREE.Vector3(
         worldPos.x + roomW / 2,
         worldPos.y,
         worldPos.z + roomL / 2
     );
 
-    // scripts/ui.js
-    // Get the camera's direction vector to update the direction sliders
+    // --- Direction Update ---
     const worldDirection = new THREE.Vector3();
     viewpointCamera.getWorldDirection(worldDirection);
 
-    // The worldDirection includes the room's rotation. We must "un-rotate" it
-    // to get the local direction vector that the sliders should represent.
+    // Convert world direction to local direction that matches slider expectations
     const inverseRoomQuaternion = roomObject.quaternion.clone().invert();
     const localDirection = worldDirection.clone().applyQuaternion(inverseRoomQuaternion);
 
-    // Update UI Sliders without firing their 'input' events to prevent a loop
-    dom['view-pos-x'].value = sliderPos.x.toFixed(2);
-    dom['view-pos-y'].value = sliderPos.y.toFixed(2);
-    dom['view-pos-z'].value = sliderPos.z.toFixed(2);
-    dom['view-dir-x'].value = localDirection.x.toFixed(2);
-    dom['view-dir-y'].value = localDirection.y.toFixed(2);
-    dom['view-dir-z'].value = localDirection.z.toFixed(2);
+    // --- Safety Check ---
+    if (isNaN(sliderPos.x) || isNaN(localDirection.x)) {
+        console.error("DEBUG: NaN detected during gizmo update. Aborting UI update.", { sliderPos, localDirection });
+        return;
+    }
 
-    // Manually refresh all text labels to reflect the new slider values
-    updateAllLabels();
+    // --- Set flag to prevent feedback loop ---
+    setUpdatingFromSliders(true);
+
+    // --- UI Update ---
+    // Update slider values without triggering events
+    if (dom['view-pos-x']) dom['view-pos-x'].value = sliderPos.x.toFixed(2);
+    if (dom['view-pos-y']) dom['view-pos-y'].value = sliderPos.y.toFixed(2);
+    if (dom['view-pos-z']) dom['view-pos-z'].value = sliderPos.z.toFixed(2);
+    if (dom['view-dir-x']) dom['view-dir-x'].value = localDirection.x.toFixed(2);
+    if (dom['view-dir-y']) dom['view-dir-y'].value = localDirection.y.toFixed(2);
+    if (dom['view-dir-z']) dom['view-dir-z'].value = localDirection.z.toFixed(2);
+
+// Update the text labels to reflect the new slider values
+updateAllLabels();
+// Dispatch input events on the sliders to ensure handlers pick up the new values
+['view-pos-x','view-pos-y','view-pos-z','view-dir-x','view-dir-y','view-dir-z'].forEach(id => {
+    dom[id]?.dispatchEvent(new Event('input', { bubbles: true }));
+});
+
+    // Clear the flag after a short delay to allow the gizmo to resume normal operation
+    requestAnimationFrame(() => {
+        setUpdatingFromSliders(false);
+    });
 }
 
 export function setWindowMode(dir, mode, triggerUpdate = true) {
@@ -3299,6 +3364,40 @@ dom['diff-legend-min-label'].textContent = `-${maxAbs.toFixed(0)}`;
 dom['diff-legend-max-label'].textContent = `+${maxAbs.toFixed(0)}`;
 }
 
+export async function updateViewpointFromSliders() {
+    // Import the flag from scene.js to check if we're currently updating from the gizmo
+    const { isUpdatingCameraFromSliders } = await import('./scene.js');
+    
+    // If we're currently updating from the gizmo, don't process slider changes
+    if (isUpdatingCameraFromSliders) {
+        return;
+    }
+
+    const params = {
+        W: parseFloat(dom.width.value),
+        L: parseFloat(dom.length.value),
+        vpx: parseFloat(dom['view-pos-x'].value),
+        vpy: parseFloat(dom['view-pos-y'].value),
+        vpz: parseFloat(dom['view-pos-z'].value),
+        vdx: parseFloat(dom['view-dir-x'].value),
+        vdy: parseFloat(dom['view-dir-y'].value),
+        vdz: parseFloat(dom['view-dir-z'].value),
+        fov: parseFloat(dom['view-fov'].value),
+        dist: parseFloat(dom['view-dist'].value)
+    };
+
+    // Set a flag to prevent the 'objectChange' listener from firing a UI update event.
+    setUpdatingFromSliders(true);
+
+    // Call the function from scene.js to update the 3D view
+    updateViewpointFromUI(params);
+
+    // Unset the flag after a short delay. This allows the gizmo to resume updating the UI.
+    requestAnimationFrame(() => {
+        setUpdatingFromSliders(false);
+    });
+}
+
 /**
 * Handles clicks on the 3D scene to detect clicks on sensor points.
 * @param {MouseEvent} event The click event.
@@ -3536,6 +3635,7 @@ function onSensorRightClick(event) {
 
 /**
  * Helper to update a viewpoint slider's value, its text label, and dispatch an event.
+ * This ensures the change is registered by the application's event listeners.
  * @param {string} id - The base ID of the slider (e.g., 'view-pos-x').
  * @param {number} value - The new numeric value for the slider.
  */
@@ -3544,14 +3644,15 @@ function _updateViewpointSliderAndDispatch(id, value) {
     if (!slider) return;
 
     slider.value = value.toFixed(2);
-    
+
     const valEl = dom[`${id}-val`];
     if (valEl) {
         const unit = id.startsWith('view-pos') ? 'm' : '';
         updateValueLabel(valEl, slider.value, unit, id);
     }
-    
+
     // Dispatch an 'input' event to ensure all related logic (like 3D updates) is triggered.
+    // This is crucial for keeping the UI and 3D scene state synchronized.
     slider.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
@@ -4621,4 +4722,41 @@ function renderBsdfPlot(bsdfData, incidentIndex) {
         ctx.arc(x, y, pointRadius, 0, 2 * Math.PI);
         ctx.fill();
     });
-}
+/**
+* Gathers parameters and initiates the sun ray tracing visualization.
+*/
+async function handleSunRayTrace() {
+    if (!project.epwFileContent) {
+        showAlert('Please load an EPW weather file in the Project Setup panel before tracing sun rays.', 'Weather Data Missing');
+        return;
+    }
+
+    const btn = dom['trace-sun-rays-btn'];
+    const btnSpan = btn.querySelector('span');
+    const originalText = btnSpan.textContent;
+    btn.disabled = true;
+    btnSpan.textContent = 'Tracing...';
+
+    try {
+        // Use a timeout to allow the UI to update to the "Tracing..." state
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        const { traceSunRays } = await import('./sunTracer.js');
+        const params = {
+            epwContent: project.epwFileContent,
+            date: dom['sun-ray-date']._flatpickr.selectedDates[0],
+            time: dom['sun-ray-time'].value,
+            rayCount: parseInt(dom['sun-ray-count'].value, 10),
+            maxBounces: parseInt(dom['sun-ray-bounces'].value, 10),
+        };
+
+        traceSunRays(params);
+
+    } catch (error) {
+        console.error("Error during sun ray tracing:", error);
+        showAlert(`An error occurred: ${error.message}`, 'Error');
+    } finally {
+        btn.disabled = false;
+        btnSpan.textContent = originalText;
+    }
+}}

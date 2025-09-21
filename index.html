@@ -260,8 +260,8 @@
             </div>
             </div>
             <div class="window-content space-y-4">
-                <div><label class="label" for="width">Width (X)</label><div class="flex items-center space-x-4 mt-1"><input type="range" id="width" min="1" max="20" value="3.4" step="0.1"><span id="width-val" class="data-value font-mono w-12 text-left">3.4m</span></div></div>
-                <div><label class="label" for="length">Length (Z)</label><div class="flex items-center space-x-4 mt-1"><input type="range" id="length" min="1" max="20" value="5.4" step="0.1"><span id="length-val" class="data-value font-mono w-12 text-left">5.4m</span></div></div>
+                <div><label class="label" for="width">Width (X)</label><div class="flex items-center space-x-4 mt-1"><input type="range" id="width" min="1" max="50" value="3.4" step="0.1"><span id="width-val" class="data-value font-mono w-12 text-left">3.4m</span></div></div>
+                <div><label class="label" for="length">Length (Z)</label><div class="flex items-center space-x-4 mt-1"><input type="range" id="length" min="1" max="50" value="5.4" step="0.1"><span id="length-val" class="data-value font-mono w-12 text-left">5.4m</span></div></div>
                 <div><label class="label" for="height">Height (Y)</label><div class="flex items-center space-x-4 mt-1"><input type="range" id="height" min="1" max="10" value="2.8" step="0.1"><span id="height-val" class="data-value font-mono w-12 text-left">2.8m</span></div></div>
                 <div><label class="label" for="room-orientation">Orientation</label><div class="flex items-center space-x-4 mt-1"><input type="range" id="room-orientation" min="0" max="359" value="0" step="1"><span id="room-orientation-val" class="data-value font-mono w-12 text-left">0°</span></div></div>
                 <div class="pt-4 mt-4 border-t border-[--grid-color]">
@@ -1257,9 +1257,47 @@
             </div>
         </div>
             <div class="space-y-3 pt-4 border-t border-[--grid-color]"><label for="v-section-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="v-section-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Vertical Section</span></label><div id="v-section-controls" class="hidden"><label class="label text-xs">Section Position (from West)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="v-section-dist" min="0" max="4" value="2.0" step="0.1"><span id="v-section-dist-val" class="data-value font-mono w-12 text-left">2.0m</span></div></div>
-        </div>
-            <div id="live-preview-section" class="hidden space-y-3 pt-4 mt-4 border-t-2 border-[--grid-color]">
-                <h3 class="font-semibold text-sm uppercase">Live Section Preview</h3>
+                </div>
+
+                <div id="sun-ray-tracer-section" class="space-y-3 pt-4 border-t border-[--grid-color]">
+                    <label for="sun-ray-tracer-toggle" class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="sun-ray-tracer-toggle">
+                        <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Sun Ray Tracer</span>
+                    </label>
+                    <div id="sun-ray-tracer-controls" class="hidden space-y-3 pl-4">
+                        <p class="info-box !text-xs !py-2 !px-3">Visualize how direct sun rays interact with the model. Requires an EPW file.</p>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="sun-ray-date" class="label text-xs">Date</label>
+                                <input type="text" id="sun-ray-date" class="w-full mt-1 flatpickr-input" placeholder="Select date...">
+                            </div>
+                            <div>
+                                <label for="sun-ray-time" class="label text-xs">Time</label>
+                                <input type="time" id="sun-ray-time" value="12:00" class="w-full mt-1">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="label text-xs flex justify-between" for="sun-ray-count">
+                                <span>Ray Count</span>
+                                <span id="sun-ray-count-val" class="data-value font-mono">200</span>
+                            </label>
+                            <input type="range" id="sun-ray-count" min="10" max="1000" value="200" step="10">
+                        </div>
+                        <div>
+                            <label class="label text-xs flex justify-between" for="sun-ray-bounces">
+                                <span>Interior Bounces</span>
+                                <span id="sun-ray-bounces-val" class="data-value font-mono">2</span>
+                            </label>
+                            <input type="range" id="sun-ray-bounces" min="0" max="10" value="2" step="1">
+                        </div>
+                         <button id="trace-sun-rays-btn" class="btn btn-primary w-full mt-2">
+                            <span>Trace Sun Rays</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="live-preview-section" class="hidden space-y-3 pt-4 mt-4 border-t-2 border-[--grid-color]">
+                    <h3 class="font-semibold text-sm uppercase">Live Section Preview</h3>
                     <p class="info-box !text-xs !py-2 !px-3">Render a preview from the current camera view using the loaded EPW weather data.</p>
                     <div class="grid grid-cols-2 gap-4">
                         <div>

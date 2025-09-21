@@ -9,17 +9,37 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
-export let composer, fisheyePass;
+/**
+ * Debounce utility to limit the rate at which a function gets called.
+ * @param {Function} func The function to debounce.
+ * @param {number} delay The delay in milliseconds.
+ * @returns {Function} The debounced function.
+ */
+function debounce(func, delay) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), delay);
+    };
+}
 
+export let composer, fisheyePass;
 
 // --- MODULE-LEVEL VARIABLES ---
 // Set the default coordinate system to Y-up
 THREE.Object3D.DEFAULT_UP.set(0, 1, 0);
 let renderPass; 
 
+// Flag to manage camera update source and prevent feedback loops
+export let isUpdatingCameraFromSliders = false;
+export function setUpdatingFromSliders(value) {
+    isUpdatingCameraFromSliders = value;
+}
+
 // --- EXPORTED VARIABLES ---
 export let scene, perspectiveCamera, orthoCamera, activeCamera, renderer, labelRenderer, controls;
 export let viewpointCamera, viewCamHelper, transformControls, fpvOrthoCamera, sensorTransformControls;
+export let sunRayObject;
 export let horizontalClipPlane, verticalClipPlane;
 export let daylightingSensorsGroup;
 export let isFirstPersonView = false;
@@ -122,7 +142,9 @@ export function setupScene(container) {
     verticalClipPlane = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0);
 
     // 9. Add Geometry Groups to Scene
-    scene.add(roomObject, shadingObject, sensorGridObject, axesObject, northArrowObject, groundObject, daylightingSensorsGroup, wallSelectionGroup);
+    sunRayObject = new THREE.Group();
+    sunRayObject.name = 'SunRays';
+    scene.add(roomObject, shadingObject, sensorGridObject, axesObject, northArrowObject, groundObject, daylightingSensorsGroup, wallSelectionGroup, sunRayObject);
 
     // 10. Signal that the scene is initialized and ready for interaction.
     container.dispatchEvent(new CustomEvent('sceneReady', { bubbles: true }));
@@ -228,11 +250,18 @@ export function updateViewpointFromUI(params) {
     const worldPos = new THREE.Vector3(pos.x - W / 2, pos.y, pos.z - L / 2);
     
     // Rotate the local direction vector by the room's current rotation to get the world direction
-    const worldDir = localDir.clone().normalize().applyQuaternion(roomObject.quaternion);
-    const target = new THREE.Vector3().addVectors(worldPos, worldDir);
+    const localDirNormalized = localDir.clone().normalize();
 
+    // Create a quaternion representing the desired local rotation for the camera
+    // (i.e., rotating the default forward vector -Z to the desired local direction).
+    const localQuaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), localDirNormalized);
+
+    // The final world rotation is the room's rotation followed by the camera's local rotation.
+    const finalWorldQuaternion = roomObject.quaternion.clone().multiply(localQuaternion);
+
+    // Apply the final calculated position and rotation.
     viewpointCamera.position.copy(worldPos);
-    viewpointCamera.lookAt(target);
+    viewpointCamera.quaternion.copy(finalWorldQuaternion);
     viewpointCamera.fov = fov;
     viewpointCamera.far = dist;
     viewpointCamera.updateProjectionMatrix();
@@ -327,24 +356,27 @@ function _setupControls(domElement) {
     // TransformControls for moving/rotating the viewpoint gizmo
     transformControls = new TransformControls(activeCamera, domElement);
     transformControls.addEventListener('dragging-changed', (event) => {
-    controls.enabled = !event.value; // Disable orbit controls while dragging the gizmo
+        controls.enabled = !event.value; // Disable orbit controls while dragging the gizmo
     });
-    // This listener now clamps the camera's position to stay within the room,
-    // then notifies the UI layer to update the sliders.
-    transformControls.addEventListener('objectChange', () => {
-        if (renderer && viewpointCamera && roomObject) {
-            const roomBox = new THREE.Box3().setFromObject(roomObject);
-            const roomSize = new THREE.Vector3();
-            roomBox.getSize(roomSize);
+    // This listener clamps the camera and notifies the UI to update the sliders,
+    // but uses the isUpdatingCameraFromSliders flag to prevent feedback loops.
+    // Use immediate updates for better responsiveness during dragging.
+        transformControls.addEventListener('objectChange', () => {
+            if (isUpdatingCameraFromSliders) return; // Prevent feedback loop
 
-            // Clamp world position to keep gizmo inside room boundaries
-            viewpointCamera.position.x = THREE.MathUtils.clamp(viewpointCamera.position.x, -roomSize.x / 2, roomSize.x / 2);
-            viewpointCamera.position.y = THREE.MathUtils.clamp(viewpointCamera.position.y, 0, roomSize.y);
-            viewpointCamera.position.z = THREE.MathUtils.clamp(viewpointCamera.position.z, -roomSize.z / 2, roomSize.z / 2);
-            
-            renderer.domElement.dispatchEvent(new CustomEvent('gizmoUpdated'));
-        }
-    });
+            if (renderer && viewpointCamera && roomObject) {
+                const roomBox = new THREE.Box3().setFromObject(roomObject);
+                const roomSize = new THREE.Vector3();
+                roomBox.getSize(roomSize);
+
+                // Clamp world position to keep gizmo inside room boundaries
+                viewpointCamera.position.x = THREE.MathUtils.clamp(viewpointCamera.position.x, -roomSize.x / 2, roomSize.x / 2);
+                viewpointCamera.position.y = THREE.MathUtils.clamp(viewpointCamera.position.y, 0, roomSize.y);
+                viewpointCamera.position.z = THREE.MathUtils.clamp(viewpointCamera.position.z, -roomSize.z / 2, roomSize.z / 2);
+
+                // Removed custom event dispatch; UI now listens directly to transformControls
+            }
+        });
 
     // TransformControls for the daylighting sensor
     sensorTransformControls = new TransformControls(activeCamera, domElement);
