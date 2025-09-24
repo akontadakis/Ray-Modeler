@@ -1,3 +1,4 @@
+
 // scripts/sunTracer.js
 
 import * as THREE from 'three';
@@ -152,15 +153,26 @@ export function traceSunRays(params) {
 
                     if (hitObject.userData.surfaceType === 'GLAZING') {
                         isInside = !isInside; // Toggle state: ray passes through
-                    } else {
-                        if (isInside) {
-                            interiorBounces++;
-                        }
-                        // Reflect the ray off the opaque surface (wall, ceiling, shading device)
-                        const normal = hit.face.normal.clone();
-                        normal.transformDirection(hitObject.matrixWorld);
-                        currentDirection.reflect(normal);
+                        // By continuing, we skip the reflection logic below for this segment.
+                        // The next raycast will start from the glazing surface with an unchanged direction.
+                        continue;
                     }
+
+                    // --- This block now only executes for OPAQUE surfaces ---
+
+                    // If a ray hits the window frame from outside, terminate it to reduce visual clutter.
+                    // This prevents the visualization of direct reflections from the frame itself.
+                    if (hitObject.userData.surfaceType === 'FRAME' && !isInside) {
+                        break; // Stop tracing this ray's path completely.
+                    }
+
+                    if (isInside) {
+                        interiorBounces++;
+                    }
+                    // Reflect the ray off any other opaque surface (wall, ceiling, shading device)
+                    const normal = hit.face.normal.clone();
+                    normal.transformDirection(hitObject.matrixWorld);
+                    currentDirection.reflect(normal);
                 }
             }
         }

@@ -1,3 +1,4 @@
+
 // scripts/ui.js
 
 import { updateScene, axesObject, updateSensorGridColors, roomObject, shadingObject, sensorMeshes, wallSelectionGroup, highlightWall, clearWallHighlights, updateHighlightColor } from './geometry.js';
@@ -3849,10 +3850,8 @@ function onWallClick(event) {
                 // If clicking the SAME locked wall, unlock it.
                 isWallSelectionLocked = false;
                 updateLockIcon();
-            } else {
-                // If clicking a NEW wall while locked, select it but KEEP THE LOCK.
-                handleWallSelection(targetGroup, false); // `false` prevents the lock from resetting.
             }
+            // If a different wall is clicked while locked, do nothing.
         } else {
             // If UNLOCKED, select any new wall and reset the lock state (default behavior).
             if (newWallId !== selectedWallId) {
