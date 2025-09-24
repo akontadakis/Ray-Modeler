@@ -253,7 +253,119 @@ const availableTools = [
                     "property": { "type": "STRING", "description": "The property to change. Must be one of 'reflectance', 'specularity', 'roughness', or 'transmittance' (for glazing only)." },
                     "value": { "type": "NUMBER", "description": "The new value for the property, typically between 0.0 and 1.0." }
                 },
-                "required": ["surface", "property", "value"]
+"required": ["surface", "property", "value"]
+            }
+        },
+        {
+            "name": "searchKnowledgeBase",
+            "description": "Searches the application's built-in help documentation and knowledge base for topics related to a query. Useful for defining terms (e.g., 'What is Daylight Factor?') or explaining concepts.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "query": { "type": "STRING", "description": "The search term or question to look up in the knowledge base." }
+                },
+                "required": ["query"]
+            }
+        },
+        {
+            "name": "traceSunRays",
+            "description": "Configures and runs the Sun Ray Tracing visualization. Sets the date, time, number of rays, and max bounces, then initiates the trace. Requires an EPW file to be loaded.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "date": { "type": "STRING", "description": "The date for the sun position, formatted as 'Month Day', e.g., 'Jun 21' or 'Dec 21'." },
+                    "time": { "type": "STRING", "description": "The 24-hour time for the sun position, formatted as 'HH:MM', e.g., '14:30'." },
+                    "rayCount": { "type": "NUMBER", "description": "The total number of sun rays to trace through all glazing. e.g., 200." },
+                    "maxBounces": { "type": "NUMBER", "description": "The maximum number of times a ray can bounce inside the room after entering. e.g., 3." }
+                },
+                "required": ["date", "time", "rayCount", "maxBounces"]
+            }
+        },
+        {
+            "name": "toggleSunRayVisibility",
+            "description": "Shows or hides the currently displayed sun ray traces in the 3D view.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "visible": { "type": "BOOLEAN", "description": "Set to true to show the rays, false to hide them." }
+                },
+                "required": ["visible"]
+            }
+        },
+        {
+            "name": "generateReport",
+            "description": "Generates and downloads a PDF summary report of the current project state and loaded simulation results.",
+            "parameters": { "type": "OBJECT", "properties": {} }
+        },
+        {
+            "name": "toggleDataTable",
+            "description": "Shows or hides the interactive data table for the currently loaded results.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "show": { "type": "BOOLEAN", "description": "Set to true to show the data table, false to hide it." }
+                },
+                "required": ["show"]
+            }
+        },
+        {
+            "name": "filterDataTable",
+            "description": "Applies a filter to the interactive data table to show only specific rows. The query should be a simple comparison operator followed by a number.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "query": { "type": "STRING", "description": "The filter query, e.g., '> 500', '<= 100', '== 0'." }
+                },
+                "required": ["query"]
+            }
+        },
+        {
+            "name": "toggleHdrViewer",
+            "description": "Opens or closes the High Dynamic Range (HDR) image viewer, if an HDR result file has been loaded.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "show": { "type": "BOOLEAN", "description": "Set to true to show the HDR viewer, false to hide it." }
+                },
+                "required": ["show"]
+            }
+        },
+        {
+            "name": "configureHdrViewer",
+            "description": "Adjusts the settings of the currently open HDR viewer.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "exposure": { "type": "NUMBER", "description": "Sets the exposure level (EV). Can be positive or negative." },
+                    "falseColor": { "type": "BOOLEAN", "description": "Set to true to enable the false color luminance view, false to disable it." }
+                }
+            }
+        },
+        {
+            "name": "setTheme",
+            "description": "Changes the visual theme of the application.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "themeName": { "type": "STRING", "description": "The name of the theme to apply. Must be one of: 'light', 'dark', 'cyber', 'cafe58'." }
+                },
+                "required": ["themeName"]
+            }
+        },
+        {
+            "name": "loadProject",
+            "description": "Initiates the process to load a previously saved project file by opening the system's file dialog for the user.",
+            "parameters": { "type": "OBJECT", "properties": {} }
+        },
+        {
+            "name": "toggleComparisonMode",
+            "description": "Enables or disables the comparative analysis mode in the results panel, which allows loading a second dataset.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "enable": { "type": "BOOLEAN", "description": "Set to true to enable comparison mode, false to disable it." }
+                },
+                "required": ["enable"]
             }
         }
     ]
@@ -869,6 +981,121 @@ async function _executeToolCall(toolCall) {
                 } else {
                     throw new Error(`Could not find the UI control for ${args.surface} ${args.property} (ID: ${elementId}).`);
                 }
+            }
+            case 'searchKnowledgeBase': {
+                const results = searchKnowledgeBase(args.query);
+                if (results.length > 0) {
+                    const formattedResults = results.map(r => `Topic: ${r.topic}\nContent: ${r.content}`).join('\n---\n');
+                    return { success: true, message: `Found ${results.length} relevant documents.`, results: formattedResults };
+                }
+                return { success: true, message: "No relevant documents found in the knowledge base." };
+            }
+            case 'traceSunRays': {
+                const traceSection = dom['sun-ray-trace-section'];
+                if (!traceSection) throw new Error("The Sun Ray Tracing panel doesn't appear to be available.");
+                if (traceSection.classList.contains('hidden')) {
+                     // Find the active toggle and enable the section
+                    const activeToggle = document.querySelector('input[id^="sun-ray-tracing-toggle-"]:checked');
+                    if (!activeToggle) {
+                        // If none are active, default to enabling it for the south wall as a sensible default.
+                        dom['sun-ray-tracing-toggle-s']?.click();
+                    }
+                }
+
+                // Use flatpickr's API to set the date, which also triggers its internal events.
+                if (dom['sun-ray-date']?._flatpickr) {
+                    dom['sun-ray-date']._flatpickr.setDate(args.date, true);
+                } else {
+                    updateUI('sun-ray-date', args.date); // Fallback for plain input
+                }
+                updateUI('sun-ray-time', args.time);
+                updateUI('sun-ray-count', args.rayCount);
+                updateUI('sun-ray-bounces', args.maxBounces);
+
+                dom['trace-sun-rays-btn']?.click();
+                return { success: true, message: `Initiating sun ray trace for ${args.date} at ${args.time}.` };
+            }
+            case 'toggleSunRayVisibility': {
+                if (updateUI('sun-rays-visibility-toggle', args.visible, 'checked')) {
+                    return { success: true, message: `Sun ray visibility set to ${args.visible}.` };
+                }
+                throw new Error("Could not find the sun ray visibility toggle control.");
+            }
+            case 'generateReport': {
+                dom['generate-report-btn']?.click();
+                return { success: true, message: "Report generation initiated." };
+            }
+            case 'toggleDataTable': {
+                const panel = dom['data-table-panel'];
+                if (!panel) throw new Error("Data table panel not found.");
+                const isHidden = panel.classList.contains('hidden');
+                if ((args.show && isHidden) || (!args.show && !isHidden)) {
+                    dom['data-table-btn']?.click();
+                }
+                return { success: true, message: `Data table visibility set to ${args.show}.` };
+            }
+            case 'filterDataTable': {
+                if (updateUI('data-table-filter-input', args.query)) {
+                    return { success: true, message: `Applied filter '${args.query}' to the data table.` };
+                }
+                throw new Error("Could not find the data table filter input.");
+            }
+            case 'toggleHdrViewer': {
+                const panel = dom['hdr-viewer-panel'];
+                if (!panel) throw new Error("HDR viewer panel not found.");
+                const isHidden = panel.classList.contains('hidden');
+                if ((args.show && isHidden) || (!args.show && !isHidden)) {
+                    if (args.show && !resultsManager.hdrResult) {
+                        throw new Error("Cannot open HDR viewer: No HDR file has been loaded.");
+                    }
+                    dom['view-hdr-btn']?.click();
+                }
+                return { success: true, message: `HDR viewer visibility set to ${args.show}.` };
+            }
+            case 'configureHdrViewer': {
+                if (dom['hdr-viewer-panel']?.classList.contains('hidden')) {
+                    throw new Error("HDR viewer must be open before it can be configured.");
+                }
+                let configuredCount = 0;
+                if (args.exposure !== undefined) {
+                    if (updateUI('hdr-exposure', args.exposure)) configuredCount++;
+                }
+                if (args.falseColor !== undefined) {
+                    if (updateUI('hdr-false-color-toggle', args.falseColor, 'checked')) configuredCount++;
+                }
+                return { success: true, message: `Configured ${configuredCount} setting(s) in the HDR viewer.` };
+            }
+            case 'setTheme': {
+                const themeOrder = ['light', 'dark', 'cyber', 'cafe58'];
+                const targetTheme = args.themeName;
+                if (!themeOrder.includes(targetTheme)) {
+                    throw new Error(`Invalid theme name: ${targetTheme}. Must be one of ${themeOrder.join(', ')}.`);
+                }
+                const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+                if (currentTheme === targetTheme) {
+                    return { success: true, message: `Theme is already set to ${targetTheme}.` };
+                }
+                
+                const currentIndex = themeOrder.indexOf(currentTheme);
+                const targetIndex = themeOrder.indexOf(targetTheme);
+                let clicksNeeded = (targetIndex - currentIndex + themeOrder.length) % themeOrder.length;
+
+                // Find the currently visible button to click it
+                for (let i = 0; i < clicksNeeded; i++) {
+                    const visibleButton = document.querySelector('#theme-switcher-container .theme-btn:not([style*="display: none"])');
+                    visibleButton?.click();
+                }
+                return { success: true, message: `Theme changed to ${targetTheme}.` };
+            }
+            case 'loadProject': {
+                dom['load-project-button']?.click();
+                return { success: true, message: "Opening file dialog for user to select a project file." };
+            }
+            case 'toggleComparisonMode': {
+                if (updateUI('compare-mode-toggle', args.enable, 'checked')) {
+                    return { success: true, message: `Comparison mode ${args.enable ? 'enabled' : 'disabled'}.` };
+                }
+                throw new Error("Could not find the comparison mode toggle control.");
             }
             default:
             throw new Error(`Unknown tool: ${name}`);
