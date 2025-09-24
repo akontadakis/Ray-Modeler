@@ -66,6 +66,8 @@ Ray Modeler is packed with features that automate and enhance the Radiance workf
 
 - **Interactive HDR Image Analysis**: View High-Dynamic Range (HDR) renderings with exposure controls, toggle false-color luminance mode, and use a mouse-over probe to get exact cd/m² values. Detected glare sources can be overlaid directly onto the image for verification.
 
+- **Live Sun Ray Tracing**: Visualize direct sun penetration in real-time. Trace a grid of rays from the sun's current position (calculated from the EPW file for any date/time) through glazing surfaces and see how they bounce around the interior, helping to quickly identify potential glare spots or assess daylight distribution.
+
 - **File System Integration**: Using the File System Access API (or Electron's APIs), Ray Modeler can directly read from and save to a local project folder, enabling a seamless desktop-like experience.
   
 - **AI Assistant**: An integrated, context-aware AI chat powered by generative AI (Google Gemini or models via OpenRouter) that can answer questions and directly manipulate the scene, run simulations, and control the UI using natural language commands.
@@ -234,6 +236,8 @@ The panels on the left toolbar are used to define the scene.
   
     - Roller Shades: Defined with detailed physical properties for simulation (transmittance, reflectance, emissivity, etc.) and placement controls.
 
+- *Interactive Sun Ray Tracer*: Integrated directly into the wall selection workflow, this tool allows you to trace a specified number of rays from the sun's position for any date and time. It provides immediate visual feedback on sun penetration and internal reflections, showing the path of each ray as it bounces off surfaces. This is invaluable for quickly diagnosing direct sun issues without running a full simulation.
+
 - **Artificial Lighting**: Add and configure electric light sources.
 
   - *Light Source Types*: Choose from standard Radiance primitives (light, spotlight, glow, illum) or upload an .ies file for a specific luminaire.
@@ -246,12 +250,12 @@ The panels on the left toolbar are used to define the scene.
 
   - *Interactive IES Photometry Viewer*: When an `.ies` file is loaded, the application parses the photometric data and generates an interactive 2D polar plot directly in the lighting panel. This visualization shows the luminaire's light distribution curve and key data like total lumens and maximum candela, providing immediate feedback on the selected file.
 
-  - *Detailed Daylighting Controls*: Beyond simple activation, the daylighting control system can be configured with multiple photosensors. Each sensor has a specific 3D position, direction vector, and can be set to control a specific percentage of the luminaires in the space. Advanced parameters from Radiance's `gendaylit` are exposed in the UI, including:
+  - *Detailed Daylighting Controls*: Beyond simple activation, the daylighting control system can be configured with up to two photosensors, creating distinct control zones. Each sensor has a manipulable 3D position and direction vector. Advanced parameters from Radiance's `gendaylit` are exposed in the UI, including:
     - **Control Strategy**: `Continuous`, `Stepped`, or `Continuous/Off`.
     - **Dimming Curve**: Minimum power fraction and minimum light output fraction for continuous dimming systems.
     - **Stepped Dimming**: The number of steps for stepped control systems.
     - **Availability Schedule**: An optional `.csv` schedule file can be provided to define when the daylighting system is active.
-    - **Control Zone Visualization**: A toggle to color-code the 3D luminaire gizmos based on which photosensor controls them (e.g., Zone 1 in blue, Zone 2 in green). This provides immediate visual feedback to verify that the control strategy is configured as intended.
+    - **Interactive Control Zone Visualization**: A 2D canvas allows you to interactively drag a divider to define what percentage of luminaires (by row or column) is controlled by each photosensor. The 3D luminaire gizmos are also color-coded based on their assigned control zone (e.g., Zone 1 in blue, Zone 2 in green), providing immediate visual feedback to verify the control strategy.
 
 - *EN 12464-1 Luminaire Specification*: To support lighting for workplaces compliance, each light source can be defined with a **Maintenance Factor (MF)**, **Color Rendering Index ($R_a$)**, and **Correlated Color Temperature (TCP)**.
 
@@ -295,7 +299,9 @@ The panels on the left toolbar are used to define the scene.
   
   - *Live Preview*: When a section cut is active, you can render a real-time preview of that view using the loaded weather data (Electron version only).
 
-- **UI Theming**: The application includes multiple UI themes (Light, Dark, Cyber) that can be cycled through. The selected theme affects all UI panels, the 3D viewport background, and the map tiles for a consistent user experience.
+  - *UI Theming*: The application includes multiple UI themes (Light, Dark, Cyber, Cafe 58) that can be cycled through. The selected theme affects all UI panels, the 3D viewport background, and the map tiles for a consistent user experience.
+
+- **Sensor Point Context Menu**: Right-clicking on any sensor point in the 3D view (when results are loaded) opens a context menu. This menu provides an option to instantly move the Radiance **Viewpoint** camera to that exact sensor's location, making it easy to investigate specific areas of interest.
 
 - **3D Glare Source Projection**: When viewing an `evalglare` report in the analysis panel, each detected glare source is listed. Clicking on a source in the list will project a ray from the camera's position into the 3D scene to identify and highlight the object that caused the glare, providing an intuitive way to verify results.
 

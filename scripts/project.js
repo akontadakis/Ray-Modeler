@@ -191,11 +191,10 @@ async gatherAllProjectData() {
                 'view-type': getValue('view-type'), 'gizmo-toggle': getChecked('gizmo-toggle'),
                 'view-pos-x': getValue('view-pos-x', parseFloat), 'view-pos-y': getValue('view-pos-y', parseFloat), 'view-pos-z': getValue('view-pos-z', parseFloat),
                 'view-dir-x': getValue('view-dir-x', parseFloat), 'view-dir-y': getValue('view-dir-y', parseFloat), 'view-dir-z': getValue('view-dir-z', parseFloat),
-                'view-fov': getValue('view-fov', parseFloat), 'view-dist': getValue('view-dist', parseFloat),
-                gizmoMode: dom['mode-translate-btn']?.classList.contains('active') ? 'translate' : 'rotate'
+                'view-fov': getValue('view-fov', parseFloat), 'view-dist': getValue('view-dist', parseFloat)
             },
             viewOptions: {
-                projection: dom['proj-btn-persp'].classList.contains('active') ? 'perspective' : 'orthographic',
+            projection: dom['proj-btn-persp'].classList.contains('active') ? 'perspective' : 'orthographic',
                 transparent: getChecked('transparent-toggle'),
                 ground: getChecked('ground-plane-toggle'),
                 worldAxes: getChecked('world-axes-toggle'),
@@ -848,17 +847,6 @@ async gatherAllProjectData() {
                 }
             });
             setChecked('gizmo-toggle', vp['gizmo-toggle']);
-
-            // Handle gizmo mode button group
-            if (vp.gizmoMode === 'translate') {
-                dom['mode-translate-btn']?.classList.add('active');
-                dom['mode-rotate-btn']?.classList.remove('active');
-                if (typeof transformControls !== 'undefined') transformControls.setMode('translate');
-            } else {
-                dom['mode-translate-btn']?.classList.remove('active');
-                dom['mode-rotate-btn']?.classList.add('active');
-                if (typeof transformControls !== 'undefined') transformControls.setMode('rotate');
-            }
         }
 
         // --- View Options ---

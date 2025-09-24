@@ -39,7 +39,6 @@ export function setUpdatingFromSliders(value) {
 // --- EXPORTED VARIABLES ---
 export let scene, perspectiveCamera, orthoCamera, activeCamera, renderer, labelRenderer, controls;
 export let viewpointCamera, viewCamHelper, transformControls, fpvOrthoCamera, sensorTransformControls;
-export let sunRayObject;
 export let horizontalClipPlane, verticalClipPlane;
 export let daylightingSensorsGroup;
 export let isFirstPersonView = false;
@@ -142,9 +141,7 @@ export function setupScene(container) {
     verticalClipPlane = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0);
 
     // 9. Add Geometry Groups to Scene
-    sunRayObject = new THREE.Group();
-    sunRayObject.name = 'SunRays';
-    scene.add(roomObject, shadingObject, sensorGridObject, axesObject, northArrowObject, groundObject, daylightingSensorsGroup, wallSelectionGroup, sunRayObject);
+    scene.add(roomObject, shadingObject, sensorGridObject, axesObject, northArrowObject, groundObject, daylightingSensorsGroup, wallSelectionGroup);
 
     // 10. Signal that the scene is initialized and ready for interaction.
     container.dispatchEvent(new CustomEvent('sceneReady', { bubbles: true }));
@@ -273,9 +270,8 @@ export function updateViewpointFromUI(params) {
 * @param {boolean} isVisible - True to show the gizmo, false to hide it.
 */
 export function setGizmoVisibility(isVisible) {
-    if (!transformControls || !viewCamHelper) return;
-    transformControls.visible = isVisible;
-    transformControls.enabled = isVisible;
+    if (!viewCamHelper) return;
+    // Only control the camera helper visibility, not the transform gizmo
     viewCamHelper.visible = isVisible;
 }
 
@@ -353,32 +349,10 @@ function _setupControls(domElement) {
     controls = new OrbitControls(activeCamera, domElement);
     controls.enableDamping = true;
 
-    // TransformControls for moving/rotating the viewpoint gizmo
+    // TransformControls for moving/rotating the viewpoint gizmo (now disabled for viewpoint)
     transformControls = new TransformControls(activeCamera, domElement);
-    transformControls.addEventListener('dragging-changed', (event) => {
-        controls.enabled = !event.value; // Disable orbit controls while dragging the gizmo
-    });
-    // This listener clamps the camera and notifies the UI to update the sliders,
-    // but uses the isUpdatingCameraFromSliders flag to prevent feedback loops.
-    // Use immediate updates for better responsiveness during dragging.
-        transformControls.addEventListener('objectChange', () => {
-            if (isUpdatingCameraFromSliders) return; // Prevent feedback loop
-
-            if (renderer && viewpointCamera && roomObject) {
-                const roomBox = new THREE.Box3().setFromObject(roomObject);
-                const roomSize = new THREE.Vector3();
-                roomBox.getSize(roomSize);
-
-                // Clamp world position to keep gizmo inside room boundaries
-                viewpointCamera.position.x = THREE.MathUtils.clamp(viewpointCamera.position.x, -roomSize.x / 2, roomSize.x / 2);
-                viewpointCamera.position.y = THREE.MathUtils.clamp(viewpointCamera.position.y, 0, roomSize.y);
-            viewpointCamera.position.z = THREE.MathUtils.clamp(viewpointCamera.position.z, -roomSize.z / 2, roomSize.z / 2);
-
-            // Dispatch a custom event on the renderer's DOM element that the UI can listen to.
-            // This re-establishes the link for updating sliders from the gizmo.
-            renderer.domElement.dispatchEvent(new CustomEvent('gizmoUpdated', { bubbles: true }));
-        }
-    });
+    transformControls.enabled = false;
+    transformControls.visible = false;
 
     // TransformControls for the daylighting sensor
     sensorTransformControls = new TransformControls(activeCamera, domElement);
@@ -400,8 +374,7 @@ function _setupHelpersAndGizmos() {
     viewCamHelper = new THREE.CameraHelper(viewpointCamera);
     scene.add(viewCamHelper);
 
-    // Attach the transform controls to the viewpoint camera
-    transformControls.attach(viewpointCamera);
+    // The transform controls are no longer attached to the viewpoint camera.
     scene.add(transformControls);
 
     // Add the sensor transform controls to the scene (it's attached to an object later)
@@ -445,17 +418,15 @@ export function toggleFirstPersonView(viewType) {
     isFirstPersonView = !isFirstPersonView;
     const isParallel = viewType === 'l';
 
-    controls.enabled = !isFirstPersonView;
+  controls.enabled = !isFirstPersonView;
 
     if (isFirstPersonView) {
         preFpvCamera = activeCamera; // Store the camera that was active before FPV
-        transformControls.detach();
         if (viewCamHelper) viewCamHelper.visible = false;
         if (axesObject) axesObject.visible = false;
         // Set the FPV camera as the globally active one for all renderers
         setActiveCamera(isParallel ? fpvOrthoCamera : viewpointCamera);
     } else {
-        transformControls.attach(viewpointCamera);
         if (axesObject) axesObject.visible = true;
         // Restore the camera that was active before entering FPV
         setActiveCamera(preFpvCamera || perspectiveCamera);

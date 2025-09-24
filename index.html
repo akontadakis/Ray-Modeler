@@ -300,6 +300,61 @@
                     </button>
                 </div>
             </div>
+        </div>
+
+            <div id="sun-ray-trace-section" class="hidden space-y-3 pt-4 mt-4 border-t-2 border-[--grid-color]">
+                <h3 class="font-semibold text-sm uppercase">Sun Ray Tracing</h3>
+                <p class="info-box !text-xs !py-2 !px-3">Visualize direct sun penetration and bounces. Requires an EPW file to be loaded.</p>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="sun-ray-date" class="label text-xs">Date</label>
+                        <input type="text" id="sun-ray-date" class="w-full mt-1 flatpickr-input" placeholder="Select date...">
+                    </div>
+                        <div>
+                            <label for="sun-ray-time" class="label text-xs">Time</label>
+                            <input type="time" id="sun-ray-time" value="12:00" class="w-full mt-1">
+                        </div>
+                    </div>
+                        <div>
+                            <label class="label text-xs flex justify-between" for="sun-ray-count">
+                                <span>Ray Count</span>
+                                <span id="sun-ray-count-val" class="data-value font-mono">200</span>
+                            </label>
+                            <input type="range" id="sun-ray-count" min="50" max="1000" value="200" step="10">
+                        </div>
+                    <div>
+                        <label class="label text-xs flex justify-between" for="sun-ray-bounces">
+                            <span>Max Bounces</span>
+                            <span id="sun-ray-bounces-val" class="data-value font-mono">1</span>
+                        </label>
+                        <input type="range" id="sun-ray-bounces" min="0" max="10" value="1" step="1">
+                    </div>
+
+                    <div class="pt-2">
+                    <label for="sun-rays-visibility-toggle" class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="sun-rays-visibility-toggle" checked>
+                        <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Show Traced Rays</span>
+                    </label>
+                </div>
+
+                    <div id="sun-ray-info-display" class="hidden mt-4 pt-4 border-t border-dashed border-[--grid-color] space-y-2">
+                        <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Solar Data at Selected Time</h4>
+                        <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                        <span class="text-[--text-secondary]">Sun Altitude:</span>
+                        <span id="sun-altitude-val" class="data-value font-mono text-right">--</span>
+                        <span class="text-[--text-secondary]">Sun Azimuth:</span>
+                        <span id="sun-azimuth-val" class="data-value font-mono text-right">--</span>
+                        <span class="text-[--text-secondary]">Direct Normal Irradiance:</span>
+                        <span id="sun-dni-val" class="data-value font-mono text-right">--</span>
+                        <span class="text-[--text-secondary]">Diffuse Horizontal Irradiance:</span>
+                        <span id="sun-dhi-val" class="data-value font-mono text-right">--</span>
+                    </div>
+                </div>
+
+                <button id="trace-sun-rays-btn" class="btn btn-primary w-full mt-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="mr-2 inline-block"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    <span>Trace Sun Rays</span>
+                </button>
             </div>
 
             <div id="aperture-controls-n" class="aperture-controls hidden space-y-5 pt-4 border-t border-[--grid-color]">
@@ -363,10 +418,16 @@
                             <div><label class="label" for="roller-conductivity-n">Conductivity (W/m-K)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="roller-conductivity-n" min="0.0" max="10.0" value="0.1" step="0.01"><span id="roller-conductivity-n-val" class="data-value font-mono w-12 text-left">0.10</span></div></div>
                         </div>
                     </div>
+                    <div class="pt-4 mt-4 border-t border-dashed border-[--grid-color]">
+                    <label for="sun-ray-tracing-toggle-n" class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="sun-ray-tracing-toggle-n">
+                        <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Sun Ray Tracing</span>
+                    </label>
                 </div>
             </div>
+        </div>
 
-            <div id="aperture-controls-s" class="aperture-controls hidden space-y-5 pt-4 border-t border-[--grid-color]">
+        <div id="aperture-controls-s" class="aperture-controls hidden space-y-5 pt-4 border-t border-[--grid-color]">
             <h3 class="font-semibold text-sm uppercase">South Wall Apertures</h3>
             <div><label class="label" for="win-count-s"># of Windows</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="win-count-s" min="0" max="10" value="0" step="1"><span id="win-count-s-val" class="data-value font-mono w-12 text-left">0</span></div></div>
             <div><label class="label">Mode</label><div class="btn-group mt-1"><button id="mode-wwr-btn-s" class="btn active">WWR</button><button id="mode-manual-btn-s" class="btn">Manual</button></div></div>
@@ -427,9 +488,15 @@
                             <div><label class="label" for="roller-conductivity-s">Conductivity (W/m-K)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="roller-conductivity-s" min="0.0" max="10.0" value="0.1" step="0.01"><span id="roller-conductivity-s-val" class="data-value font-mono w-12 text-left">0.10</span></div></div>
                         </div>
                     </div>
+                    <div class="pt-4 mt-4 border-t border-dashed border-[--grid-color]">
+                    <label for="sun-ray-tracing-toggle-s" class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="sun-ray-tracing-toggle-s">
+                        <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Sun Ray Tracing</span>
+                    </label>
                 </div>
             </div>
-            
+        </div>
+
         <div id="aperture-controls-e" class="aperture-controls hidden space-y-5 pt-4 border-t border-[--grid-color]">
             <h3 class="font-semibold text-sm uppercase">East Wall Apertures</h3>
             <div><label class="label" for="win-count-e"># of Windows</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="win-count-e" min="0" max="10" value="0" step="1"><span id="win-count-e-val" class="data-value font-mono w-12 text-left">0</span></div></div>
@@ -491,9 +558,15 @@
                             <div><label class="label" for="roller-conductivity-e">Conductivity (W/m-K)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="roller-conductivity-e" min="0.0" max="10.0" value="0.1" step="0.01"><span id="roller-conductivity-e-val" class="data-value font-mono w-12 text-left">0.10</span></div></div>
                         </div>
                     </div>
+                    <div class="pt-4 mt-4 border-t border-dashed border-[--grid-color]">
+                    <label for="sun-ray-tracing-toggle-e" class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="sun-ray-tracing-toggle-e">
+                        <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Sun Ray Tracing</span>
+                    </label>
                 </div>
             </div>
-            
+        </div>
+
             <div id="aperture-controls-w" class="aperture-controls hidden space-y-5 pt-4 border-t border-[--grid-color]">
             <h3 class="font-semibold text-sm uppercase">West Wall Apertures</h3>
             <div><label class="label" for="win-count-w"># of Windows</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="win-count-w" min="0" max="10" value="0" step="1"><span id="win-count-w-val" class="data-value font-mono w-12 text-left">0</span></div></div>
@@ -554,6 +627,12 @@
                             <div><label class="label" for="roller-thickness-w">Thickness (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="roller-thickness-w" min="0.0" max="0.05" value="0.001" step="0.001"><span id="roller-thickness-w-val" class="data-value font-mono w-12 text-left">0.001m</span></div></div>
                             <div><label class="label" for="roller-conductivity-w">Conductivity (W/m-K)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="roller-conductivity-w" min="0.0" max="10.0" value="0.1" step="0.01"><span id="roller-conductivity-w-val" class="data-value font-mono w-12 text-left">0.10</span></div></div>
                         </div>
+                    </div>
+                    <div class="pt-4 mt-4 border-t border-dashed border-[--grid-color]">
+                        <label for="sun-ray-tracing-toggle-w" class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="sun-ray-tracing-toggle-w">
+                            <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Sun Ray Tracing</span>
+                        </label>
                     </div>
                 </div>
             </div>
@@ -1122,21 +1201,14 @@
                 </button>
             </div>
             <div class="pt-2">
-                <label for="gizmo-toggle" class="flex items-center cursor-pointer">
-                    <input type="checkbox" id="gizmo-toggle">
-                    <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Show Viewpoint Gizmo</span>
-                </label>
-            </div>
-            <div>
-                <label class="label">Gizmo Control</label>
-                <div class="btn-group mt-1">
-                    <button id="mode-translate-btn" class="btn active">Move</button>
-                    <button id="mode-rotate-btn" class="btn">Rotate</button>
-                </div>
-            </div>
+            <label for="gizmo-toggle" class="flex items-center cursor-pointer">
+                <input type="checkbox" id="gizmo-toggle">
+                <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Show Viewpoint Camera</span>
+            </label>
+        </div>
 
-            <div class="border-t border-[--grid-color] pt-4 space-y-4">
-                <h3 class="font-bold text-xs uppercase text-[--text-secondary]">Position (vp)</h3>
+        <div class="border-t border-[--grid-color] pt-4 space-y-4">
+            <h3 class="font-bold text-xs uppercase text-[--text-secondary]">Position (vp)</h3>
                 <div>
                     <label class="label text-xs">X</label>
                     <div class="flex items-center space-x-4 mt-1">
@@ -1216,7 +1288,6 @@
                 </div>
             </div>
             <div class="window-content space-y-5">
-                <div><label class="label">3D Projection</label><div class="btn-group"><button id="proj-btn-persp" class="btn active">Perspective</button><button id="proj-btn-ortho" class="btn">Orthographic</button></div></div>
                 <div class="space-y-3 pt-4 border-t border-[--grid-color]">
                     <label for="transparent-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="transparent-toggle" checked><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Transparent Surfaces</span></label>
                     <div id="transparency-controls" class="mt-4 pl-4">
@@ -1258,44 +1329,6 @@
         </div>
             <div class="space-y-3 pt-4 border-t border-[--grid-color]"><label for="v-section-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="v-section-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Vertical Section</span></label><div id="v-section-controls" class="hidden"><label class="label text-xs">Section Position (from West)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="v-section-dist" min="0" max="4" value="2.0" step="0.1"><span id="v-section-dist-val" class="data-value font-mono w-12 text-left">2.0m</span></div></div>
                 </div>
-
-                <div id="sun-ray-tracer-section" class="space-y-3 pt-4 border-t border-[--grid-color]">
-                    <label for="sun-ray-tracer-toggle" class="flex items-center cursor-pointer">
-                        <input type="checkbox" id="sun-ray-tracer-toggle">
-                        <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Sun Ray Tracer</span>
-                    </label>
-                    <div id="sun-ray-tracer-controls" class="hidden space-y-3 pl-4">
-                        <p class="info-box !text-xs !py-2 !px-3">Visualize how direct sun rays interact with the model. Requires an EPW file.</p>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label for="sun-ray-date" class="label text-xs">Date</label>
-                                <input type="text" id="sun-ray-date" class="w-full mt-1 flatpickr-input" placeholder="Select date...">
-                            </div>
-                            <div>
-                                <label for="sun-ray-time" class="label text-xs">Time</label>
-                                <input type="time" id="sun-ray-time" value="12:00" class="w-full mt-1">
-                            </div>
-                        </div>
-                        <div>
-                            <label class="label text-xs flex justify-between" for="sun-ray-count">
-                                <span>Ray Count</span>
-                                <span id="sun-ray-count-val" class="data-value font-mono">200</span>
-                            </label>
-                            <input type="range" id="sun-ray-count" min="10" max="1000" value="200" step="10">
-                        </div>
-                        <div>
-                            <label class="label text-xs flex justify-between" for="sun-ray-bounces">
-                                <span>Interior Bounces</span>
-                                <span id="sun-ray-bounces-val" class="data-value font-mono">2</span>
-                            </label>
-                            <input type="range" id="sun-ray-bounces" min="0" max="10" value="2" step="1">
-                        </div>
-                         <button id="trace-sun-rays-btn" class="btn btn-primary w-full mt-2">
-                            <span>Trace Sun Rays</span>
-                        </button>
-                    </div>
-                </div>
-
                 <div id="live-preview-section" class="hidden space-y-3 pt-4 mt-4 border-t-2 border-[--grid-color]">
                     <h3 class="font-semibold text-sm uppercase">Live Section Preview</h3>
                     <p class="info-box !text-xs !py-2 !px-3">Render a preview from the current camera view using the loaded EPW weather data.</p>
@@ -1309,13 +1342,16 @@
                             <input type="time" id="preview-time" value="14:30" class="w-full mt-1">
                         </div>
                     </div>
+
                     <button id="render-section-preview-btn" class="btn btn-primary w-full mt-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="mr-2 inline-block"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                        <span>Render Preview</span>
-              </button>
-          </div>
-        </div> <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-        </div> <div id="project-access-prompt" class="fixed top-20 left-1/2 -translate-x-1/2 z-[100] ui-panel !p-3 flex items-center gap-4 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="mr-2 inline-block"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                    <span>Render Preview</span>
+            </button>
+        </div>
+        
+      </div> <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+      </div> <div id="project-access-prompt" class="fixed top-20 left-1/2 -translate-x-1/2 z-[100] ui-panel !p-3 flex items-center gap-4 hidden">
+
         <p class="text-sm">Please select a project folder to enable direct saving and file access.</p>
                 <button id="select-folder-btn" class="btn btn-primary btn-sm">Select Folder</button>
                 <button id="dismiss-prompt-btn" class="text-gray-400 hover:text-gray-200" aria-label="Dismiss">&times;</button>
@@ -3034,6 +3070,7 @@
     <script type="module" src="scripts/annualDashboard.js"></script>
     <script type="module" src="scripts/hdrViewer.js"></script>
     <script type="module" src="scripts/lighting.js"></script>
+    <script type="module" src="scripts/sunTracer.js"></script>
     <script type="module" src="scripts/main.js"></script>
     <script type="module" src="scripts/ai-assistant.js"></script>
 </body>

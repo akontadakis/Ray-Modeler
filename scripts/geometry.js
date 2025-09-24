@@ -5,7 +5,20 @@ import { renderer, horizontalClipPlane, verticalClipPlane, sensorTransformContro
 import { getDom, getAllWindowParams, getAllShadingParams, validateInputs, getWindowParamsForWall, getSensorGridParams } from './ui.js';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { resultsManager } from './resultsManager.js';
-import { SURFACE_TYPES } from './sunTracer.js';
+/**
+ * Surface type classification system for ray interaction behavior.
+ */
+const SURFACE_TYPES = {
+    EXTERIOR_WALL: 'EXTERIOR_WALL',
+    EXTERIOR_CEILING: 'EXTERIOR_CEILING',
+    EXTERIOR_FLOOR: 'EXTERIOR_FLOOR',
+    INTERIOR_WALL: 'INTERIOR_WALL',
+    INTERIOR_CEILING: 'INTERIOR_CEILING',
+    INTERIOR_FLOOR: 'INTERIOR_FLOOR',
+    GLAZING: 'GLAZING',
+    FRAME: 'FRAME',
+    SHADING_DEVICE: 'SHADING_DEVICE'
+};
 
 // --- GEOMETRY GROUPS ---
 export const roomObject = new THREE.Group();

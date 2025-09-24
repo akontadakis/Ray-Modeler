@@ -1,7 +1,7 @@
 // scripts/ui.js
 
 import { updateScene, axesObject, updateSensorGridColors, roomObject, shadingObject, sensorMeshes, wallSelectionGroup, highlightWall, clearWallHighlights, updateHighlightColor } from './geometry.js';
-import { activeCamera, perspectiveCamera, orthoCamera, setActiveCamera, onWindowResize, controls, transformControls, sensorTransformControls, viewpointCamera, scene, updateLiveViewType, renderer, toggleFirstPersonView as sceneToggleFPV, isFirstPersonView as sceneIsFPV, fpvOrthoCamera, updateViewpointFromUI, setGizmoVisibility, setGizmoMode as sceneSetGizmoMode, setUpdatingFromSliders, isUpdatingCameraFromSliders, sunRayObject } from './scene.js';
+import { activeCamera, perspectiveCamera, orthoCamera, setActiveCamera, onWindowResize, controls, transformControls, sensorTransformControls, viewpointCamera, scene, updateLiveViewType, renderer, toggleFirstPersonView as sceneToggleFPV, isFirstPersonView as sceneIsFPV, fpvOrthoCamera, updateViewpointFromUI, setGizmoVisibility, setUpdatingFromSliders, isUpdatingCameraFromSliders } from './scene.js';
 import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { project } from './project.js';
@@ -327,23 +327,16 @@ const ids = [
     'view-grid-start-vec-x', 'view-grid-start-vec-y', 'view-grid-start-vec-z',
 
     // Viewpoint Panel
-    'panel-viewpoint', 'view-type', 'fpv-toggle-btn', 'gizmo-toggle', 'mode-translate-btn', 'mode-rotate-btn',
+    'panel-viewpoint', 'view-type', 'fpv-toggle-btn', 'gizmo-toggle',
     'view-pos-x', 'view-pos-x-val', 'view-pos-y', 'view-pos-y-val', 'view-pos-z', 'view-pos-z-val',
     'view-dir-x', 'view-dir-x-val', 'view-dir-y', 'view-dir-y-val', 'view-dir-z', 'view-dir-z-val',
     'view-fov', 'view-fov-val', 'view-dist', 'view-dist-val',
 
     // View Options Panel
-    'proj-btn-persp', 'proj-btn-ortho',
     'transparent-toggle', 'transparency-controls', 'surface-opacity', 'surface-opacity-val', 'ground-plane-toggle', 'world-axes-toggle', 'world-axes-size', 'world-axes-size-val',
     'h-section-toggle', 'h-section-controls', 'h-section-dist', 'h-section-dist-val',
     'v-section-toggle', 'v-section-controls', 'v-section-dist', 'v-section-dist-val',
-
-    // Sun Ray Tracer
-    'sun-ray-tracer-toggle', 'sun-ray-tracer-controls', 'sun-ray-date', 'sun-ray-time',
-    'sun-ray-count', 'sun-ray-count-val', 'sun-ray-bounces', 'sun-ray-bounces-val', 'trace-sun-rays-btn',
-
     'live-preview-section', 'preview-date', 'preview-time', 'render-section-preview-btn',
-
     'occupancy-toggle', 'occupancy-controls', 'occupancy-schedule-filename',
     'occupancy-time-range-display', 'occupancy-time-slider-container',
     'occupancy-time-range-start', 'occupancy-time-range-end', 'generate-occupancy-btn',
@@ -468,7 +461,14 @@ const ids = [
     'circadian-metrics-dashboard', 'cs-gauge', 'cs-value', 'eml-value', 'cct-value', 'well-compliance-checklist',
 
     // Metric Selector for 3D View
-    'metric-selector-container', 'metric-selector'
+    'metric-selector-container', 'metric-selector',
+
+    // Sun Ray Tracing
+    'sun-ray-trace-section', 'sun-ray-date', 'sun-ray-time', 'sun-ray-count',
+    'sun-ray-count-val', 'sun-ray-bounces', 'sun-ray-bounces-val',
+    'sun-rays-visibility-toggle', 'trace-sun-rays-btn',
+    'sun-ray-info-display', 'sun-altitude-val', 'sun-azimuth-val', 'sun-dni-val', 'sun-dhi-val',
+    'sun-ray-tracing-toggle-n', 'sun-ray-tracing-toggle-s', 'sun-ray-tracing-toggle-e', 'sun-ray-tracing-toggle-w'
 ];
 
     ids.forEach(id => { const el = document.getElementById(id); if(el) dom[id] = el; });
@@ -893,49 +893,6 @@ function setupTaskAreaVisualizer() {
 
 // --- END: New functions for Task Area Visualizer ---
 
-/**
-* Gathers parameters and initiates the sun ray tracing visualization.
-*/
-async function handleSunRayTrace() {
-    if (!project.epwFileContent) {
-        showAlert('Please load an EPW weather file in the Project Setup panel before tracing sun rays.', 'Weather Data Missing');
-        return;
-    }
-
-    const btn = dom['trace-sun-rays-btn'];
-    const btnSpan = btn.querySelector('span');
-    const originalText = btnSpan.textContent;
-    btn.disabled = true;
-    btnSpan.textContent = 'Tracing...';
-
-    try {
-        // Use a timeout to allow the UI to update to the "Tracing..." state
-        await new Promise(resolve => setTimeout(resolve, 10));
-
-        const { traceSunRays } = await import('./sunTracer.js');
-           const params = {
-            epwContent: project.epwFileContent,
-            date: dom['sun-ray-date']._flatpickr.selectedDates[0],
-            time: dom['sun-ray-time'].value,
-            rayCount: parseInt(dom['sun-ray-count'].value, 10),
-            maxBounces: parseInt(dom['sun-ray-bounces'].value, 10),
-            W: parseFloat(dom.width.value),
-            L: parseFloat(dom.length.value),
-            H: parseFloat(dom.height.value),
-            rotationY: parseFloat(dom['room-orientation'].value)
-        };
-
-        traceSunRays(params);
-
-    } catch (error) {
-        console.error("Error during sun ray tracing:", error);
-        showAlert(`An error occurred: ${error.message}`, 'Error');
-    } finally {
-        btn.disabled = false;
-        btnSpan.textContent = originalText;
-    }
-}
-
 export async function setupEventListeners() {
     // Add the event listener for the lock button
     dom['wall-select-lock-btn']?.addEventListener('click', () => {
@@ -976,8 +933,6 @@ export async function setupEventListeners() {
     dom['epw-modal-close']?.addEventListener('click', () => dom['epw-upload-modal'].classList.replace('flex', 'hidden'));
 
     setupPanelToggleButtons();
-    dom['mode-translate-btn']?.addEventListener('click', () => setGizmoMode('translate'));
-    dom['mode-rotate-btn']?.addEventListener('click', () => setGizmoMode('rotate'));
     dom['view-btn-persp']?.addEventListener('click', () => setCameraView('persp'));
     dom['view-btn-ortho']?.addEventListener('click', () => setCameraView('ortho'));
     dom['view-btn-top']?.addEventListener('click', () => setCameraView('top'));
@@ -1040,61 +995,43 @@ export async function setupEventListeners() {
         dom[id]?.addEventListener('input', () => validateInputs(id));
     });
 
-    dom['proj-btn-persp']?.addEventListener('click', () => setProjectionMode('perspective'));
-    dom['proj-btn-ortho']?.addEventListener('click', () => setProjectionMode('orthographic'));
-
     dom['h-section-toggle']?.addEventListener('change', () => {
         dom['h-section-controls']?.classList.toggle('hidden', !dom['h-section-toggle'].checked);
         _updateLivePreviewVisibility();
         scheduleUpdate();
     });
-    dom['v-section-toggle']?.addEventListener('change', () => {
+        dom['v-section-toggle']?.addEventListener('change', () => {
         dom['v-section-controls']?.classList.toggle('hidden', !dom['v-section-toggle'].checked);
         _updateLivePreviewVisibility();
         scheduleUpdate();
     });
 
-    // Sun Ray Tracer Listeners
-    dom['sun-ray-tracer-toggle']?.addEventListener('change', (e) => {
-        dom['sun-ray-tracer-controls']?.classList.toggle('hidden', !e.target.checked);
-        if (!e.target.checked && sunRayObject) {
-            // When disabling, clear any visible rays
-            while (sunRayObject.children.length > 0) {
-                const child = sunRayObject.children[0];
-                sunRayObject.remove(child);
-                if (child.geometry) child.geometry.dispose();
-                if (child.material) child.material.dispose();
-            }
-        }
-    });
-    flatpickr("#sun-ray-date", {
-        dateFormat: "M j",
-        defaultDate: "Jun 21",
-    });
-    dom['trace-sun-rays-btn']?.addEventListener('click', handleSunRayTrace);
-
     // Date picker for the Live Section Preview
     flatpickr("#preview-date", {
-        dateFormat: "M j",
-        defaultDate: "Jun 21",
-    });
-
-    dom['render-section-preview-btn']?.addEventListener('click', handleRenderPreview);
-
-    dom['transparent-toggle']?.addEventListener('change', () => {
-        dom['transparency-controls']?.classList.toggle('hidden', !dom['transparent-toggle'].checked);
-        scheduleUpdate();
-    });
-
-    // Date picker for the EN 17037 Sunlight Exposure check
-    flatpickr("#en17037-sunlight-date", {
         dateFormat: "M j",
         defaultDate: "Mar 21",
         minDate: "Feb 1",
         maxDate: "Mar 21"
     });
 
+    // Date picker for the Sun Ray Tracer
+    flatpickr("#sun-ray-date", {
+        dateFormat: "M j",
+        defaultDate: "Jun 21"
+    });
+
     dom['render-section-preview-btn']?.addEventListener('click', handleRenderPreview);
+    dom['trace-sun-rays-btn']?.addEventListener('click', handleSunRayTrace);
+
+    // Add listeners for the new sun ray tracing toggles in the aperture panel
+    ['n', 's', 'e', 'w'].forEach(dir => {
+        dom[`sun-ray-tracing-toggle-${dir}`]?.addEventListener('change', handleSunRayToggle);
+    });
+
+    dom['sun-rays-visibility-toggle']?.addEventListener('change', async (e) => {
+        const { toggleSunRaysVisibility } = await import('./sunTracer.js');
+        toggleSunRaysVisibility(e.target.checked);
+    });
 
     dom['ground-plane-toggle']?.addEventListener('change', scheduleUpdate);
     dom['world-axes-toggle']?.addEventListener('change', scheduleUpdate);
@@ -1294,7 +1231,7 @@ export async function setupEventListeners() {
                     resultsPanel.classList.remove('hidden');
                     updateResultsAnalysisPanel();
                     makeDraggable(resultsPanel, resultsPanel.querySelector('.window-header'));
-                    makeResizable(resultsPanel, resultsPanel.querySelector('.resize-handle'));
+                    makeResizable(resultsPanel, resultsPanel.querySelectorAll('.resize-handle-edge, .resize-handle-corner'));
                     ensureWindowInView(resultsPanel);
                 } else {
                     showAlert('Please load a results file first.', 'No Data');
@@ -1553,10 +1490,7 @@ async function render2DHeatmap() {
 
     // Defer initial state settings until the 3D scene is fully initialized.
     dom['render-container'].addEventListener('sceneReady', () => {
-        // Listen for the custom event dispatched by scene.js when the gizmo moves.
-        renderer.domElement.addEventListener('gizmoUpdated', updateViewpointFromGizmo);
-
-        // Set the gizmo's visibility based on the default checkbox state.
+        // Set the camera helper's visibility based on the default checkbox state.
         setGizmoVisibility(dom['gizmo-toggle'].checked);
         }, { once: true }); // The event should only fire once.
 
@@ -1724,6 +1658,29 @@ export function togglePanelVisibility(panelId, btnId) {
     }
 }
 
+// --- Delegated Event Listeners for All Floating Panels ---
+    document.body.addEventListener('click', (e) => {
+        const collapseBtn = e.target.closest('.collapse-icon');
+        if (collapseBtn) {
+            const win = collapseBtn.closest('.floating-window');
+            if (win) {
+                e.stopPropagation();
+                handlePanelCollapse(win);
+                return; // Stop further processing
+            }
+        }
+
+        const maxBtn = e.target.closest('.window-icon-max');
+        if (maxBtn) {
+            const win = maxBtn.closest('.floating-window');
+            if (win) {
+                e.stopPropagation();
+                handlePanelMaximize(win);
+                return; // Stop further processing
+            }
+        }
+    });
+
 /**
 * Sets up the click listeners for the new left toolbar buttons.
 */
@@ -1824,47 +1781,7 @@ export function initializePanelControls(win) {
     // Bring to front on click
     win.addEventListener('mousedown', () => { maxZ++; win.style.zIndex = maxZ; }, true);
 
-    // Collapse/Expand button
-    if (collapseIcon && content) {
-        collapseIcon.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const isCollapsed = win.classList.contains('collapsed');
-
-            if (isCollapsed) {
-                // EXPANDING
-                win.classList.remove('collapsed');
-                content.style.display = '';
-                resizeHandles.forEach(h => h.style.display = '');
-
-                requestAnimationFrame(() => {
-                    // Restore height and min-height from data attributes.
-                    win.style.height = win.dataset.preCollapseHeight || '';
-                    win.style.minHeight = win.dataset.preCollapseMinHeight || ''; // Restore min-height
-                    delete win.dataset.preCollapseHeight;
-                    delete win.dataset.preCollapseMinHeight; // Clean up
-                    ensureWindowInView(win);
-                    if (win.id === 'panel-project' && map) {
-                        setTimeout(() => map.invalidateSize(), 10);
-                    }
-                });
-            } else {
-                // COLLAPSING
-                // Store the current computed height and any inline min-height for reliability.
-                win.dataset.preCollapseHeight = getComputedStyle(win).height;
-                win.dataset.preCollapseMinHeight = win.style.minHeight; // Store existing min-height
-
-                win.classList.add('collapsed');
-                content.style.display = 'none';
-                resizeHandles.forEach(h => h.style.display = 'none');
-
-                // Set height to auto and explicitly override min-height to allow the panel to shrink.
-                win.style.height = 'auto';
-                win.style.minHeight = '0px'; // This is the crucial fix.
-            }
-        });
-    }
-
-    // Close button
+   // Close button
     if (closeIcon) {
         closeIcon.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -1893,30 +1810,98 @@ export function initializePanelControls(win) {
         });
     }
 
-    // Maximize button
-    if (maxIcon) {
-        maxIcon.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const isMaximized = win.classList.contains('maximized');
-            if (isMaximized) {
-                win.classList.remove('maximized');
-                win.style.width = win.dataset.oldWidth || '';
-                win.style.height = win.dataset.oldHeight || '';
-                win.style.transform = win.dataset.oldTransform || '';
-            } else {
-                win.dataset.oldWidth = win.style.width;
-                win.dataset.oldHeight = win.style.height;
-                win.dataset.oldTransform = win.style.transform;
-                win.classList.add('maximized');
-            }
-        });
-    }
-
-    // Make draggable and resizable
     if (header) makeDraggable(win, header);
+
+
+
+
     if (resizeHandles.length > 0) makeResizable(win, resizeHandles);
 
     win.dataset.controlsInitialized = 'true';
+}
+
+/**
+ * Handles the logic for minimizing (collapsing) and expanding a floating panel.
+ * @param {HTMLElement} win The floating window element.
+ */
+function handlePanelCollapse(win) {
+    const header = win.querySelector('.window-header');
+    const content = win.querySelector('.window-content');
+    const resizeHandles = win.querySelectorAll('.resize-handle-edge, .resize-handle-corner');
+    if (!header || !content) return;
+
+    const isCollapsed = win.classList.contains('collapsed');
+
+    if (isCollapsed) {
+        // ACTION: EXPAND (UN-MINIMIZE)
+        win.classList.remove('collapsed');
+        content.style.display = '';
+        resizeHandles.forEach(h => h.style.display = '');
+        win.style.height = win.dataset.preCollapseHeight || '';
+        win.style.minHeight = win.dataset.preCollapseMinHeight || '';
+        if (win.id === 'panel-project' && map) {
+            setTimeout(() => map.invalidateSize(), 10);
+        }
+    } else {
+        // ACTION: COLLAPSE (MINIMIZE)
+        win.dataset.preCollapseHeight = getComputedStyle(win).height;
+        win.dataset.preCollapseMinHeight = win.style.minHeight;
+
+        win.classList.add('collapsed');
+        content.style.display = 'none';
+        resizeHandles.forEach(h => h.style.display = 'none');
+        win.style.height = `${header.offsetHeight}px`;
+        win.style.minHeight = '0px';
+    }
+}
+
+/**
+ * Handles the logic for maximizing and restoring a floating panel.
+ * @param {HTMLElement} win The floating window element.
+ */
+function handlePanelMaximize(win) {
+    const container = document.getElementById('window-container');
+    if (!container) return;
+
+    const isMaximized = win.classList.contains('maximized');
+
+    if (isMaximized) {
+        // --- ACTION: RESTORE ---
+        if (win.classList.contains('collapsed')) {
+            win.classList.remove('collapsed');
+            win.querySelector('.window-content').style.display = '';
+            win.querySelectorAll('.resize-handle-edge, .resize-handle-corner').forEach(h => h.style.display = '');
+        }
+
+        win.classList.remove('maximized');
+        win.style.width = win.dataset.oldWidth || '';
+        win.style.height = win.dataset.oldHeight || '';
+        win.style.transform = win.dataset.oldTransform || '';
+        win.style.minHeight = win.dataset.oldMinHeight || '';
+
+    } else {
+        // --- ACTION: MAXIMIZE ---
+        if (win.classList.contains('collapsed')) {
+            handlePanelCollapse(win); // Un-collapse it first
+        }
+
+        const computedStyle = getComputedStyle(win);
+        win.dataset.oldWidth = computedStyle.width;
+        win.dataset.oldHeight = computedStyle.height;
+        win.dataset.oldTransform = win.style.transform;
+        win.dataset.oldMinHeight = win.style.minHeight;
+
+        win.classList.add('maximized');
+
+        const newWidth = container.clientWidth / 2;
+        const newHeight = container.clientHeight * 0.9;
+        const newX = container.clientWidth - newWidth;
+        const newY = 0;
+
+        win.style.width = `${newWidth}px`;
+        win.style.height = `${newHeight}px`;
+        win.style.transform = `translate3d(${newX}px, ${newY}px, 0)`;
+    }
 }
 
 export function setupFloatingWindows() {
@@ -2710,55 +2695,6 @@ function setProjectionMode(mode, updateViewButtons = true) {
 
 updateViewpointFromSliders
 
-export function updateViewpointFromGizmo() {
-    console.log("DEBUG: Gizmo update received. Updating slider values and scene.");
-
-    const roomW = parseFloat(dom.width.value) || 0;
-    const roomL = parseFloat(dom.length.value) || 0;
-
-    // --- Position Update ---
-    const worldPos = viewpointCamera.position;
-    const sliderPos = new THREE.Vector3(
-        worldPos.x + roomW / 2,
-        worldPos.y,
-        worldPos.z + roomL / 2
-    );
-
-    // --- Direction Update ---
-    const worldDirection = new THREE.Vector3();
-    viewpointCamera.getWorldDirection(worldDirection);
-
-    // Convert world direction to local direction that matches slider expectations
-    const inverseRoomQuaternion = roomObject.quaternion.clone().invert();
-    const localDirection = worldDirection.clone().applyQuaternion(inverseRoomQuaternion);
-
-    // --- Safety Check ---
-    if (isNaN(sliderPos.x) || isNaN(localDirection.x)) {
-        console.error("DEBUG: NaN detected during gizmo update. Aborting UI update.", { sliderPos, localDirection });
-        return;
-    }
-
-    // --- Set flag to prevent feedback loop ---
-    setUpdatingFromSliders(true);
-
-    // --- UI Update ---
-    // Update slider values without triggering events
-    if (dom['view-pos-x']) dom['view-pos-x'].value = sliderPos.x.toFixed(2);
-    if (dom['view-pos-y']) dom['view-pos-y'].value = sliderPos.y.toFixed(2);
-    if (dom['view-pos-z']) dom['view-pos-z'].value = sliderPos.z.toFixed(2);
-    if (dom['view-dir-x']) dom['view-dir-x'].value = localDirection.x.toFixed(2);
-    if (dom['view-dir-y']) dom['view-dir-y'].value = localDirection.y.toFixed(2);
-    if (dom['view-dir-z']) dom['view-dir-z'].value = localDirection.z.toFixed(2);
-
-    // Update the text labels to reflect the new slider values
-    updateAllLabels();
-
-    // Clear the flag after a short delay to allow the gizmo to resume normal operation
-    requestAnimationFrame(() => {
-        setUpdatingFromSliders(false);
-    });
-}
-
 export function setWindowMode(dir, mode, triggerUpdate = true) {
     windowModes[dir] = mode;
     dom[`mode-wwr-btn-${dir}`].classList.toggle('active', mode === 'wwr');
@@ -2766,12 +2702,6 @@ export function setWindowMode(dir, mode, triggerUpdate = true) {
     dom[`wwr-controls-${dir}`].classList.toggle('hidden', mode !== 'wwr');
     dom[`manual-controls-${dir}`].classList.toggle('hidden', mode === 'wwr');
     if (triggerUpdate) scheduleUpdate(`mode-${dir}`);
-}
-
-function setGizmoMode(mode) {
-    sceneSetGizmoMode(mode); // Call the new function imported from scene.js
-    dom['mode-translate-btn'].classList.toggle('active', mode === 'translate');
-    dom['mode-rotate-btn'].classList.toggle('active', mode !== 'translate');
 }
 
 function updateGridControls() {
@@ -4716,14 +4646,46 @@ function renderBsdfPlot(bsdfData, incidentIndex) {
         ctx.arc(x, y, pointRadius, 0, 2 * Math.PI);
         ctx.fill();
     });
+}
+
+/**
+* Handles the toggling of the Sun Ray Tracing feature within the Aperture panel.
+* This function moves the global sun ray tracing controls into the context of the currently selected wall panel and ensures only one toggle can be active at a time.
+* @param {Event} event - The change event from the checkbox.
+*/
+function handleSunRayToggle(event) {
+    const sunRaySection = dom['sun-ray-trace-section'];
+    if (!sunRaySection) return;
+
+    const checkbox = event.target;
+    const dir = checkbox.id.split('-').pop(); // 'n', 's', 'e', or 'w'
+
+    // Uncheck all other sun ray toggles to ensure only one is active
+    ['n', 's', 'e', 'w'].forEach(d => {
+        if (d !== dir && dom[`sun-ray-tracing-toggle-${d}`]) {
+        dom[`sun-ray-tracing-toggle-${d}`].checked = false;
+        }
+    });
+
+    if (checkbox.checked) {
+        // Move the section into the correct parent container and make it visible
+        const parentContainer = checkbox.parentElement.parentElement; // The div containing the label
+        parentContainer.appendChild(sunRaySection);
+        sunRaySection.classList.remove('hidden');
+    } else {
+        // Just hide the section. It will be moved again if another toggle is activated.
+        sunRaySection.classList.add('hidden');
+    }
+}
+
 /**
 * Gathers parameters and initiates the sun ray tracing visualization.
 */
 async function handleSunRayTrace() {
-    if (!project.epwFileContent) {
-        showAlert('Please load an EPW weather file in the Project Setup panel before tracing sun rays.', 'Weather Data Missing');
-        return;
-    }
+if (!project.epwFileContent) {
+    showAlert('Please load an EPW weather file in the Project Setup panel before tracing sun rays.', 'Weather Data Missing');
+    return;
+}
 
     const btn = dom['trace-sun-rays-btn'];
     const btnSpan = btn.querySelector('span');
@@ -4731,30 +4693,29 @@ async function handleSunRayTrace() {
     btn.disabled = true;
     btnSpan.textContent = 'Tracing...';
 
-    try {
-        // Use a timeout to allow the UI to update to the "Tracing..." state
-        await new Promise(resolve => setTimeout(resolve, 10));
+try {
+// Use a timeout to allow the UI to update to the "Tracing..." state
+await new Promise(resolve => setTimeout(resolve, 10));
 
-        const { traceSunRays } = await import('./sunTracer.js');
-           const params = {
-            epwContent: project.epwFileContent,
-            date: dom['sun-ray-date']._flatpickr.selectedDates[0],
-            time: dom['sun-ray-time'].value,
-            rayCount: parseInt(dom['sun-ray-count'].value, 10),
-            maxBounces: parseInt(dom['sun-ray-bounces'].value, 10),
-            W: parseFloat(dom.width.value),
-            L: parseFloat(dom.length.value),
-            H: parseFloat(dom.height.value),
-            rotationY: parseFloat(dom['room-orientation'].value)
-        };
+  const { traceSunRays } = await import('./sunTracer.js');
+  const params = {
+      epwContent: project.epwFileContent,
+      date: dom['sun-ray-date']._flatpickr.selectedDates[0],
+      time: dom['sun-ray-time'].value,
+      rayCount: parseInt(dom['sun-ray-count'].value, 10),
+      maxBounces: parseInt(dom['sun-ray-bounces'].value, 10),
+      W: parseFloat(dom.width.value),
+      L: parseFloat(dom.length.value),
+      H: parseFloat(dom.height.value),
+      rotationY: parseFloat(dom['room-orientation'].value)
+  };
 
-        traceSunRays(params);
-
+  traceSunRays(params);
     } catch (error) {
-        console.error("Error during sun ray tracing:", error);
-        showAlert(`An error occurred: ${error.message}`, 'Error');
+    console.error("Error during sun ray tracing:", error);
+    showAlert(`An error occurred: ${error.message}`, 'Error');
     } finally {
-        btn.disabled = false;
-        btnSpan.textContent = originalText;
+    btn.disabled = false;
+    btnSpan.textContent = originalText;
     }
-}}
+}
