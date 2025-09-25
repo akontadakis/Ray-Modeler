@@ -155,30 +155,33 @@ async gatherAllProjectData() {
                 }
             },
             materials: (() => {
-                const wallMode = dom['wall-mode-srd']?.classList.contains('active') ? 'srd' : 'refl';
-                const wallMaterialData = {
-                    type: getValue('wall-mat-type'),
-                    mode: wallMode,
-                    reflectance: getValue('wall-refl', parseFloat),
-                    specularity: getValue('wall-spec', parseFloat),
-                    roughness: getValue('wall-rough', parseFloat),
-                    srdFile: null
+                const getMaterialData = (type) => {
+                    const mode = dom[`${type}-mode-srd`]?.classList.contains('active') ? 'srd' : 'refl';
+                    const data = {
+                        type: getValue(`${type}-mat-type`),
+                        mode: mode,
+                        reflectance: getValue(`${type}-refl`, parseFloat),
+                        specularity: getValue(`${type}-spec`, parseFloat),
+                        roughness: getValue(`${type}-rough`, parseFloat),
+                        color: getValue(`${type}-color`),
+                        srdFile: null
+                    };
+                    if (mode === 'srd' && this.simulationFiles[`${type}-srd-file`]) {
+                        data.srdFile = {
+                            inputId: `${type}-srd-file`,
+                            name: this.simulationFiles[`${type}-srd-file`].name
+                        };
+                    }
+                    return data;
                 };
 
-                if (wallMode === 'srd' && this.simulationFiles['wall-srd-file']) {
-                    wallMaterialData.srdFile = {
-                        inputId: 'wall-srd-file',
-                        name: this.simulationFiles['wall-srd-file'].name
-                    };
-                }
-                
                 return {
-                    wall: wallMaterialData,
-                    floor: { type: getValue('floor-mat-type'), reflectance: getValue('floor-refl', parseFloat), specularity: getValue('floor-spec', parseFloat), roughness: getValue('floor-rough', parseFloat) },
-                    ceiling: { type: getValue('ceiling-mat-type'), reflectance: getValue('ceiling-refl', parseFloat), specularity: getValue('ceiling-spec', parseFloat), roughness: getValue('ceiling-rough', parseFloat) },
-                    frame: { type: getValue('frame-mat-type'), reflectance: getValue('frame-refl', parseFloat), specularity: getValue('frame-spec', parseFloat), roughness: getValue('frame-rough', parseFloat) },
-                    shading: { type: getValue('shading-mat-type'), reflectance: getValue('shading-refl', parseFloat), specularity: getValue('shading-spec', parseFloat), roughness: getValue('shading-rough', parseFloat) },
-                    glazing: { 
+                    wall: getMaterialData('wall'),
+                    floor: getMaterialData('floor'),
+                    ceiling: getMaterialData('ceiling'),
+                    frame: { type: getValue('frame-mat-type'), reflectance: getValue('frame-refl', parseFloat), specularity: getValue('frame-spec', parseFloat), roughness: getValue('frame-rough', parseFloat), color: getValue('frame-color') },
+                    shading: { type: getValue('shading-mat-type'), reflectance: getValue('shading-refl', parseFloat), specularity: getValue('shading-spec', parseFloat), roughness: getValue('shading-rough', parseFloat), color: getValue('shading-color') },
+                    glazing: {
                         transmittance: getValue('glazing-trans', parseFloat),
                         bsdfEnabled: getChecked('bsdf-toggle'),
                         bsdfFile: getChecked('bsdf-toggle') && this.simulationFiles['bsdf-file'] ? { inputId: 'bsdf-file', name: this.simulationFiles['bsdf-file'].name } : null
@@ -715,6 +718,14 @@ async gatherAllProjectData() {
                         if (content) this.addSimulationFile(key, fileData.name, content);
                     }
                 });
+                // Restore the daylighting schedule file if it was saved with the lighting state
+                const lightingScheduleInfo = settings.lighting?.daylighting?.scheduleFile;
+                if (lightingScheduleInfo?.name) {
+                    const content = await readFileContent(['10_schedules', lightingScheduleInfo.name]);
+                    if (content) {
+                        this.addSimulationFile('daylighting-availability-schedule', lightingScheduleInfo.name, content);
+                    }
+                }
                 await Promise.all(filePromises);
             }
 
@@ -804,10 +815,11 @@ async gatherAllProjectData() {
                 if(mat.type) setValue(`${type}-mat-type`, mat.type);
                 if(mat.reflectance) setValue(`${type}-refl`, mat.reflectance);
                 if(mat.specularity) setValue(`${type}-spec`, mat.specularity);
-                if (type === 'wall' && mat.mode === 'srd') {
-                    dom['wall-mode-srd']?.click();
-                    if (mat.srdFile?.name && dom['wall-srd-file']) {
-                        let display = dom['wall-srd-file'].parentElement.querySelector('span[data-file-display-for]');
+                if(mat.color) setValue(`${type}-color`, mat.color);
+                if ((type === 'wall' || type === 'floor' || type === 'ceiling') && mat.mode === 'srd') {
+                    dom[`${type}-mode-srd`]?.click();
+                    if (mat.srdFile?.name && dom[`${type}-srd-file`]) {
+                        let display = dom[`${type}-srd-file`].parentElement.querySelector('span[data-file-display-for]');
                         if (display) {
                             display.textContent = mat.srdFile.name;
                             display.title = mat.srdFile.name;

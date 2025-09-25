@@ -125,7 +125,11 @@ class ResultsManager {
                         this.datasets[key].data = parsedData.perPointCircadianData.Photopic_lux;
                         this.activeMetricType = 'Photopic_lux';
                     } else if (lowerFileName.includes('_direct.ill')) { // NEW: Detect direct-only .ill files
-                    this.datasets[key].annualDirectData = parsedData.annualData || [];
+                        this.datasets[key].annualDirectData = parsedData.annualData || [];
+                        // Also populate the main data array with the average direct illuminance for visualization
+                        this.datasets[key].data = parsedData.data || [];
+                        this.datasets[key].spectralResults['illuminance'] = parsedData.data || [];
+                        this.activeMetricType = 'illuminance';
                     } else if (parsedData.lightingEnergyMetrics) {
                         this.datasets[key].lightingEnergyMetrics = parsedData.lightingEnergyMetrics;
                     } else {

@@ -106,6 +106,7 @@ function _parseAnnualGlareFile(content, type) {
 function _parseEvalglareContent(content) {
     const ugrLine = content.match(/^UGR\s*=\s*([0-9.]+)/im);
     const dgpLine = content.match(/Daylight Glare Probability\s*:\s*([0-9.]+)/im);
+    const resolutionLine = content.match(/rpict.*-x\s+(\d+)\s+-y\s+(\d+)/);
 
     // If neither UGR nor DGP is found, it's not a report we can parse.
     if (!ugrLine && !dgpLine) {
@@ -115,9 +116,11 @@ function _parseEvalglareContent(content) {
     const glareResult = {
         dgp: dgpLine ? parseFloat(dgpLine[1]) : null,
         ugr: ugrLine ? parseFloat(ugrLine[1]) : null,
+        imageWidth: resolutionLine ? parseInt(resolutionLine[1], 10) : null,
+        imageHeight: resolutionLine ? parseInt(resolutionLine[2], 10) : null,
         sources: []
     };
-    
+
     // Find the start of the source list (this format is common to modern evalglare output for both metrics)
     const lines = content.split('\n');
     let sourceStartIndex = lines.findIndex(line => line.trim().startsWith("Nr.") && line.includes("Ev"));

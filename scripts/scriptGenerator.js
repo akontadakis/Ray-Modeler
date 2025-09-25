@@ -71,7 +71,8 @@ function generateLightSourceDefinitions(lightingData, roomData) {
                 const totalMultiplier = (lightingData.ies_multiplier || 1.0) * mf;
                 // Get the basename of the file (e.g., "my_light" from "my_light.ies")
                 iesBasename = lightingData.ies_file.replace(/\\.ies$/i, '');
-                lightRad += `!ies2rad -m ${totalMultiplier.toPrecision(4)} ../05_bsdf/${lightingData.ies_file}\n`;
+                // Corrected path to point to the general files directory instead of bsdf
+                lightRad += `!ies2rad -m ${totalMultiplier.toPrecision(4)} ../11_files/${lightingData.ies_file_data.name}\n`;
                 break;
         }
 

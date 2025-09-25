@@ -112,25 +112,29 @@ function mapEvToColor(ev) {
 /**
  * Creates and displays semi-transparent overlays for each glare source on the HDR image.
  * @param {Array<object>} sources - An array of glare source objects from an evalglare report.
+ * @param {number} imageWidth - The width of the source HDR image.
+ * @param {number} imageHeight - The height of the source HDR image.
  */
-function drawGlareSourcesOverlay(sources, sourceImageDimension) {
+function drawGlareSourcesOverlay(sources, imageWidth, imageHeight) {
     if (!glareOverlayContainer) return;
     glareOverlayContainer.innerHTML = ''; // Clear previous overlays
 
-    if (!sourceImageDimension) {
-        console.warn("Glare overlay drawn without source image dimension, assuming 1500px.");
-        sourceImageDimension = 1500;
+    // If dimensions are missing, we cannot accurately place overlays.
+    if (!imageWidth || !imageHeight) {
+        console.warn("Glare overlay skipped: Source image dimensions were not found in the report.");
+        return;
     }
 
     sources.forEach(source => {
         const overlay = document.createElement('div');
-        const sizePercent = (source.size / sourceImageDimension) * 100;
+        // Use a fixed size for the marker for better visibility, as source.size is not a pixel dimension.
+        const markerSize = '12px'; 
 
         overlay.style.position = 'absolute';
-        overlay.style.left = `${(source.pos.x / sourceImageDimension) * 100}%`;
-        overlay.style.top = `${(source.pos.y / sourceImageDimension) * 100}%`;
-        overlay.style.width = `${sizePercent}%`;
-        overlay.style.height = `${sizePercent}%`;
+        overlay.style.left = `${(source.pos.x / imageWidth) * 100}%`;
+        overlay.style.top = `${(source.pos.y / imageHeight) * 100}%`;
+        overlay.style.width = markerSize;
+        overlay.style.height = markerSize;
         overlay.style.transform = 'translate(-50%, -50%)';
         overlay.style.borderRadius = '50%';
         overlay.style.backgroundColor = mapEvToColor(source.Ev);
@@ -315,10 +319,10 @@ export function openHdrViewer(texture, glareResult = null) {
     camera.updateProjectionMatrix();
     controls.reset();
 
-    // If glare results are provided, draw the overlays
+   // If glare results are provided, draw the overlays
    if (glareResult && glareResult.sources && glareResult.sources.length > 0) {
-        // Assumes the glareResult object includes the source image dimension. Falls back if not found.
-        drawGlareSourcesOverlay(glareResult.sources, glareResult.sourceImageDimension);
+        // Pass the parsed width and height to the overlay function.
+        drawGlareSourcesOverlay(glareResult.sources, glareResult.imageWidth, glareResult.imageHeight);
     }
 
     // Show the panel

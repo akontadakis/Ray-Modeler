@@ -11,6 +11,8 @@ export { generateAndStoreOccupancyCsv };
 import { resultsManager, palettes } from './resultsManager.js';
 import { updateAnnualMetricsDashboard, clearAnnualDashboard, openTemporalMapForPoint, openGlareRoseDiagram, updateGlareRoseDiagram, openCombinedAnalysisPanel, updateCombinedAnalysisChart } from './annualDashboard.js';
 import { initHdrViewer, openHdrViewer } from './hdrViewer.js';
+import { viewpointCamera } from './scene.js'; // Import the camera object
+import { roomObject } from './geometry.js'; // Import the room object for its rotation
 
 
 // --- MODULE STATE ---
@@ -1150,8 +1152,8 @@ export async function setupEventListeners() {
     });
 
     dom['generate-report-btn']?.addEventListener('click', async () => {
-        const { generateReport } = await import('./reportGenerator.js');
-        generateReport();
+        const { reportGenerator } = await import('./reportGenerator.js');
+        reportGenerator.generate();
     });
 
     const updateColorScaleAndViz = () => {
@@ -4080,46 +4082,38 @@ function _setupAiSettingsModal() {
 
 /**
  * Gathers the current viewpoint parameters and formats them into a Radiance .vf file content string.
+ * This version reads directly from the scene's camera object to ensure FPV changes are captured.
  * @param {boolean} [forceFisheye=false] - If true, overrides the UI settings to generate a 180° fisheye view.
  * @returns {string|null} The content for the .vf file or null if view elements are not found.
  */
 export function getViewpointFileContent(forceFisheye = false) {
     const dom = getDom();
-    // Ensure all necessary DOM elements exist before proceeding.
-    const requiredIds = ['view-pos-x', 'view-pos-y', 'view-pos-z', 'view-dir-x', 'view-dir-y', 'view-dir-z', 'view-fov', 'view-type', 'width', 'length', 'room-orientation'];
-    if (requiredIds.some(id => !dom[id])) return null;
+    if (!viewpointCamera || !roomObject || !dom['view-type'] || !dom['view-fov']) return null;
 
-    // Gather values from DOM
-    const vpx = parseFloat(dom['view-pos-x'].value), vpy = parseFloat(dom['view-pos-y'].value), vpz = parseFloat(dom['view-pos-z'].value);
-    const vdx = parseFloat(dom['view-dir-x'].value), vdy = parseFloat(dom['view-dir-y'].value), vdz = parseFloat(dom['view-dir-z'].value);
-    const fov = parseFloat(dom['view-fov'].value);
+    // --- Get View Type and FOV from UI ---
     const viewType = forceFisheye ? 'h' : dom['view-type'].value;
-    const W = parseFloat(dom.width.value), L = parseFloat(dom.length.value);
-    const alphaRad = THREE.MathUtils.degToRad(parseFloat(dom['room-orientation'].value));
-    const cosA = Math.cos(alphaRad), sinA = Math.sin(alphaRad);
-
-    // Correctly transform local UI coordinates to Radiance world coordinates
-    const transformPointToRadiance = (pos, w, l, c, s) => {
-        const p = { x: pos[0], y: pos[2], z: pos[1] }; // Map to Radiance Z-up coords
-        const cx = p.x - w / 2, cy = p.y - l / 2;    // Center coordinates
-        const rx = cx * c - cy * s, ry = cx * s + cy * c; // Rotate
-        return `${rx.toFixed(4)} ${ry.toFixed(4)} ${p.z.toFixed(4)}`;
-    };
-    const transformDirectionToRadiance = (dir, c, s) => {
-        const v = { x: dir[0], y: dir[2], z: dir[1] }; // Map to Radiance Z-up coords
-        const rx = v.x * c - v.y * s, ry = v.x * s + v.y * c; // Rotate
-        return `${rx.toFixed(4)} ${ry.toFixed(4)} ${v.z.toFixed(4)}`;
-    };
-
-    const rad_vp = transformPointToRadiance([vpx, vpy, vpz], W, L, cosA, sinA);
-    const rad_vd = transformDirectionToRadiance([vdx, vdy, vdz], cosA, sinA);
-
-    // Generate the correct .vf file content string (without the incorrect "rview" command)
+    const fov = parseFloat(dom['view-fov'].value);
+    const vfov = (viewType === 'h' || viewType === 'a') ? 180 : fov;
     const viewTypeMap = { 'v': '-vtv', 'h': '-vth', 'c': '-vtc', 'l': '-vtl', 'a': '-vta' };
     const radViewType = viewTypeMap[viewType] || '-vtv';
-    const vfov = (viewType === 'h' || viewType === 'a') ? 180 : fov;
 
-    return `${radViewType} -vp ${rad_vp} -vd ${rad_vd} -vu 0 0 1 -vh ${vfov} -vv ${vfov}`;
+    // --- Get Position and Direction from the 3D Camera Object ---
+    // This ensures that movements made in FPV mode are correctly captured.
+    
+    // 1. Get the camera's world position. Radiance is Z-up, Three.js is Y-up.
+    const pos = viewpointCamera.position;
+    const rad_vp = `${pos.x.toFixed(4)} ${pos.z.toFixed(4)} ${pos.y.toFixed(4)}`;
+
+    // 2. Get the camera's world direction.
+    // The camera looks down its local -Z axis. We get this vector in world space.
+    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(viewpointCamera.quaternion);
+    const rad_vd = `${dir.x.toFixed(4)} ${dir.z.toFixed(4)} ${dir.y.toFixed(4)}`;
+
+    // 3. Get the camera's "up" vector in world space.
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(viewpointCamera.quaternion);
+    const rad_vu = `${up.x.toFixed(4)} ${up.z.toFixed(4)} ${up.y.toFixed(4)}`;
+
+    return `${radViewType} -vp ${rad_vp} -vd ${rad_vd} -vu ${rad_vu} -vh ${vfov} -vv ${vfov}`;
 }
 
 /**
