@@ -2184,35 +2184,124 @@ function setupEpwUploadModal() {
 }
 
 function setCameraView(view) {
-    if (sceneIsFPV) sceneToggleFPV(dom['view-type'].value); // Exit FPV if active
-    controls.enabled = true;
+    console.log(`setCameraView called with view: ${view}`);
 
-    const W = parseFloat(dom.width.value), L = parseFloat(dom.length.value), H = parseFloat(dom.height.value);
-    const center = new THREE.Vector3(0, H / 2, 0);
-    const rotationY = THREE.MathUtils.degToRad(parseFloat(dom['room-orientation'].value));
-    setProjectionMode(view === 'persp' ? 'perspective' : 'orthographic', false);
-
-    let cameraDistance = Math.max(W, L, H) * 3;
-    let position;
-    switch (view) {
-        case 'top': position = new THREE.Vector3(0, cameraDistance, 0); break;
-        case 'front': position = new THREE.Vector3(0, 0, cameraDistance); break;
-        case 'back': position = new THREE.Vector3(0, 0, -cameraDistance); break;
-        case 'left': position = new THREE.Vector3(-cameraDistance, 0, 0); break;
-        case 'right': position = new THREE.Vector3(cameraDistance, 0, 0); break;
-        default: position = new THREE.Vector3(cameraDistance * 0.7, cameraDistance * 0.7, cameraDistance * 0.7); break;
+    // Validate inputs
+    if (!dom.width || !dom.length || !dom.height || !dom['room-orientation']) {
+        console.error('Missing required DOM elements for camera positioning');
+        showAlert('Room dimensions not properly set. Please check the Dimensions panel.', 'Error');
+        return;
     }
-    const rotatedCenter = center.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), rotationY);
-    activeCamera.position.copy(rotatedCenter).add(position);
-    controls.target.copy(rotatedCenter);
 
-    if (activeCamera.isOrthographicCamera) {
-        activeCamera.zoom = (1 / Math.max(W, L, H)) * 5;
-        activeCamera.updateProjectionMatrix();
+    const W = parseFloat(dom.width.value);
+    const L = parseFloat(dom.length.value);
+    const H = parseFloat(dom.height.value);
+
+    console.log(`Room dimensions: W=${W}, L=${L}, H=${H}`);
+
+    // Validate room dimensions
+    if (isNaN(W) || isNaN(L) || isNaN(H) || W <= 0 || L <= 0 || H <= 0) {
+        console.error(`Invalid room dimensions: W=${W}, L=${L}, H=${H}`);
+        showAlert('Invalid room dimensions. Please check the Dimensions panel.', 'Error');
+        return;
     }
-    controls.update();
-    document.querySelectorAll('#view-controls .btn').forEach(b => b.classList.remove('active'));
-    if(dom[`view-btn-${view}`]) dom[`view-btn-${view}`].classList.add('active');
+
+    // Check if controls are available
+    if (!controls) {
+        console.error('Controls not initialized');
+        showAlert('3D scene not ready. Please wait for the scene to load.', 'Error');
+        return;
+    }
+
+    try {
+        // Exit FPV if active
+        if (sceneIsFPV) {
+            console.log('Exiting FPV mode');
+            sceneToggleFPV(dom['view-type'].value);
+        }
+
+        controls.enabled = true;
+        console.log('Controls enabled');
+
+        const rotationY = THREE.MathUtils.degToRad(parseFloat(dom['room-orientation'].value));
+        console.log(`Room rotation: ${rotationY} radians`);
+
+        setProjectionMode(view === 'persp' ? 'perspective' : 'orthographic', false);
+
+        let cameraDistance = Math.max(W, L, H) * 2.5; // Adjusted distance for a better fit
+        console.log(`Camera distance: ${cameraDistance}`);
+
+        let position;
+
+        // Reset camera's UP vector for standard views before calculating new orientation
+        activeCamera.up.set(0, 1, 0);
+
+        switch (view) {
+            case 'top':
+                position = new THREE.Vector3(0, cameraDistance, 0);
+                // For a top-down view, the "up" direction for the camera must be redefined
+                // to be towards the back of the scene (-Z in local camera space).
+                activeCamera.up.set(0, 0, -1);
+                console.log('Set to top view');
+                break;
+            case 'front':
+                position = new THREE.Vector3(0, 0, cameraDistance);
+                console.log('Set to front view');
+                break;
+            case 'back':
+                position = new THREE.Vector3(0, 0, -cameraDistance);
+                console.log('Set to back view');
+                break;
+            case 'left':
+                position = new THREE.Vector3(-cameraDistance, 0, 0);
+                console.log('Set to left view');
+                break;
+            case 'right':
+                position = new THREE.Vector3(cameraDistance, 0, 0);
+                console.log('Set to right view');
+                break;
+            default: // 'persp' and 'ortho' general views
+                position = new THREE.Vector3(cameraDistance * 0.7, cameraDistance * 0.7, cameraDistance * 0.7);
+                console.log('Set to perspective/ortho view');
+                break;
+        }
+
+        // Rotate both the camera position and its 'up' vector by the room's orientation
+        const rotationQuaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rotationY);
+        position.applyQuaternion(rotationQuaternion);
+        activeCamera.up.applyQuaternion(rotationQuaternion);
+
+        const worldCenter = new THREE.Vector3(0, H / 2, 0);
+        activeCamera.position.copy(worldCenter).add(position);
+        controls.target.copy(worldCenter);
+
+        console.log(`Camera position: ${activeCamera.position.x.toFixed(2)}, ${activeCamera.position.y.toFixed(2)}, ${activeCamera.position.z.toFixed(2)}`);
+        console.log(`Camera target: ${controls.target.x.toFixed(2)}, ${controls.target.y.toFixed(2)}, ${controls.target.z.toFixed(2)}`);
+
+        if (activeCamera.isOrthographicCamera) {
+            activeCamera.zoom = (1 / Math.max(W, L, H)) * 5;
+            activeCamera.updateProjectionMatrix();
+            console.log(`Orthographic camera zoom: ${activeCamera.zoom}`);
+        }
+
+        controls.update();
+        console.log('Controls updated successfully');
+
+        // Update button states
+        document.querySelectorAll('#view-controls .btn').forEach(b => b.classList.remove('active'));
+        const targetButton = dom[`view-btn-${view}`];
+        if (targetButton) {
+            targetButton.classList.add('active');
+            console.log(`Activated button: view-btn-${view}`);
+        } else {
+            console.warn(`Button not found: view-btn-${view}`);
+        }
+
+        console.log(`setCameraView completed successfully for view: ${view}`);
+    } catch (error) {
+        console.error('Error in setCameraView:', error);
+        showAlert(`Error changing view: ${error.message}`, 'Error');
+    }
 }
 
 function handleInputChange(e) {
@@ -2676,8 +2765,6 @@ export function getSensorGridParams() {
 
 function setProjectionMode(mode, updateViewButtons = true) {
     const isPersp = mode === 'perspective';
-    dom['proj-btn-persp'].classList.toggle('active', isPersp);
-    dom['proj-btn-ortho'].classList.toggle('active', !isPersp);
     const oldCam = activeCamera;
     const newCam = isPersp ? perspectiveCamera : orthoCamera;
     if (oldCam !== newCam) {
