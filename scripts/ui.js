@@ -11,8 +11,6 @@ export { generateAndStoreOccupancyCsv };
 import { resultsManager, palettes } from './resultsManager.js';
 import { updateAnnualMetricsDashboard, clearAnnualDashboard, openTemporalMapForPoint, openGlareRoseDiagram, updateGlareRoseDiagram, openCombinedAnalysisPanel, updateCombinedAnalysisChart } from './annualDashboard.js';
 import { initHdrViewer, openHdrViewer } from './hdrViewer.js';
-import { viewpointCamera } from './scene.js'; // Import the camera object
-import { roomObject } from './geometry.js'; // Import the room object for its rotation
 
 
 // --- MODULE STATE ---
