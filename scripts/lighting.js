@@ -1,6 +1,7 @@
 // scripts/lighting.js
 
 import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { sensorTransformControls } from './scene.js';
 import { attachGizmoToSelectedSensor } from './geometry.js';
 import { updateAllLabels } from './ui.js';
@@ -16,9 +17,13 @@ class IESParser {
      * @param {string} iesContent The raw text content of the .ies file.
      * @returns {{
      * lumensPerLamp: number,
+     * numLamps: number,
+     * wattage: number,
      * maxCandela: number,
      * verticalAngles: number[],
-     * candelaValues: number[]
+     * horizontalAngles: number[],
+     * allCandelaValues: number[],
+     * candelaValuesFor2D: number[]
      * }} Parsed photometric data.
      * @throws {Error} If the file format is invalid.
      */
@@ -33,28 +38,44 @@ class IESParser {
         if (lineIndex >= lines.length) throw new Error("IES file format error: TILT line not found.");
         lineIndex++; // Move past the TILT line
 
-        const dataLine = lines[lineIndex++].split(/\s+/).map(Number);
-        if (dataLine.length < 10) throw new Error("IES file format error: Invalid data definition line.");
+        const dataLine1 = lines[lineIndex++].split(/\s+/).map(Number);
+        const dataLine2 = lines[lineIndex++].split(/\s+/).map(Number);
 
-        const [ , lumensPerLamp, , numVAngles, numHAngles] = dataLine;
+        if (dataLine1.length < 10) throw new Error("IES file format error: Invalid data definition line 1.");
+        if (dataLine2.length < 3) throw new Error("IES file format error: Invalid ballast/watts definition line 2.");
+
+        const [numLamps, lumensPerLamp, , numVAngles, numHAngles] = dataLine1;
+        const wattage = dataLine2[2];
+
         if (numVAngles <= 0 || numHAngles <= 0) throw new Error("IES file format error: Invalid number of angles.");
 
         // All subsequent lines contain angle and candela data as a stream of numbers.
         const dataValues = lines.slice(lineIndex).join(' ').trim().split(/\s+/).map(Number);
-        if (dataValues.length < numVAngles + numHAngles + numVAngles) {
-            throw new Error("IES file format error: Not enough data points.");
+        if (dataValues.length < numVAngles + numHAngles + numVAngles * numHAngles) {
+            throw new Error("IES file format error: Not enough data points for angles and candelas.");
         }
 
         const verticalAngles = dataValues.slice(0, numVAngles);
-        // Horizontal angles are read to correctly index into the candela values, but are not used for the 2D plot.
+        const horizontalAngles = dataValues.slice(numVAngles, numVAngles + numHAngles);
         const candelaStartIndex = numVAngles + numHAngles;
-        // For a 2D plot, we only use the candela values for the first horizontal angle.
-        const candelaValues = dataValues.slice(candelaStartIndex, candelaStartIndex + numVAngles);
+        const allCandelaValues = dataValues.slice(candelaStartIndex, candelaStartIndex + (numVAngles * numHAngles));
 
-        const maxCandela = Math.max(...candelaValues);
+        // For 2D plot, use the first set of vertical candela values (C0 plane)
+        const candelaValuesFor2D = allCandelaValues.slice(0, numVAngles);
+
+        const maxCandela = Math.max(...allCandelaValues);
         if (maxCandela <= 0) throw new Error("No valid candela values found for plotting.");
 
-        return { lumensPerLamp, maxCandela, verticalAngles, candelaValues };
+        return {
+            lumensPerLamp,
+            numLamps,
+            wattage,
+            maxCandela,
+            verticalAngles,
+            horizontalAngles,
+            allCandelaValues,
+            candelaValuesFor2D
+        };
     }
 
     /**
@@ -104,9 +125,11 @@ class LightingManager {
         /** @private @type {boolean} */
         this.isInitialized = false;
         /** @private @type {boolean} */
-       this.updateScheduled = false;
+        this.updateScheduled = false;
         /** @private @type {?{name: string, content: string}} */
         this.iesFileData = null;
+        /** @private @type {object} */
+        this.ies3d = { scene: null, camera: null, renderer: null, controls: null, webMesh: null, animationFrameId: null, resizeObserver: null };
         /** @private @type {boolean} */
         this.isUpdatingFractions = false;
 
@@ -741,6 +764,185 @@ class LightingManager {
         }
     }
 
+    /**
+     * Creates and manages the 3D photometric web viewer.
+     * @param {object} parsedData - The parsed data from the IESParser.
+     * @private
+     */
+    _updateIes3dView(parsedData) {
+        this._setupIes3dViewer();
+        const scene = this.ies3d.scene;
+        if (!scene) return;
+
+        // Clear previous mesh
+        if (this.ies3d.webMesh) {
+            this.ies3d.webMesh.traverse(child => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+            });
+            scene.remove(this.ies3d.webMesh);
+        }
+
+        this.ies3d.webMesh = this._createPhotometricWeb(parsedData);
+        if (this.ies3d.webMesh) {
+            scene.add(this.ies3d.webMesh);
+        }
+    }
+
+    /**
+     * Initializes the Three.js scene for the 3D IES viewer.
+     * @private
+     */
+    _setupIes3dViewer() {
+        if (this.ies3d.renderer) return; // Already initialized
+
+        const container = this.dom['ies-3d-viewer-container'];
+        if (!container) return;
+
+        this.ies3d.scene = new THREE.Scene();
+        this.ies3d.scene.background = null; // transparent
+
+        const aspect = container.clientWidth / container.clientHeight;
+        this.ies3d.camera = new THREE.PerspectiveCamera(50, aspect, 0.1, 100);
+        this.ies3d.camera.position.set(1.2, 0.8, 1.8);
+
+        const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+        this.ies3d.scene.add(ambient);
+        const directional = new THREE.DirectionalLight(0xffffff, 1.2);
+        directional.position.set(1, 2, 1.5);
+        this.ies3d.scene.add(directional);
+
+        this.ies3d.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        this.ies3d.renderer.setSize(container.clientWidth, container.clientHeight);
+        this.ies3d.renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(this.ies3d.renderer.domElement);
+
+        this.ies3d.controls = new OrbitControls(this.ies3d.camera, this.ies3d.renderer.domElement);
+        this.ies3d.controls.enableDamping = true;
+        this.ies3d.controls.dampingFactor = 0.1;
+        this.ies3d.controls.minDistance = 1;
+        this.ies3d.controls.maxDistance = 10;
+        this.ies3d.controls.autoRotate = true;
+        this.ies3d.controls.autoRotateSpeed = 0.75;
+
+
+        const animate = () => {
+            this.ies3d.animationFrameId = requestAnimationFrame(animate);
+            this.ies3d.controls.update();
+            this.ies3d.renderer.render(this.ies3d.scene, this.ies3d.camera);
+        };
+        animate();
+
+        this.ies3d.resizeObserver = new ResizeObserver(() => {
+            if (!this.ies3d.renderer) return;
+            const w = container.clientWidth;
+            const h = container.clientHeight;
+            this.ies3d.camera.aspect = w / h;
+            this.ies3d.camera.updateProjectionMatrix();
+            this.ies3d.renderer.setSize(w, h);
+        });
+        this.ies3d.resizeObserver.observe(container);
+    }
+
+    /**
+     * Generates a 3D mesh representing the photometric web.
+     * @param {object} parsedData - The parsed data from IESParser.
+     * @returns {THREE.Mesh|null} The generated mesh or null.
+     * @private
+     */
+    _createPhotometricWeb(parsedData) {
+        const { verticalAngles, horizontalAngles, allCandelaValues, maxCandela } = parsedData;
+        const numV = verticalAngles.length;
+        const numH = horizontalAngles.length;
+
+        if (numV < 2 || numH < 1 || allCandelaValues.length === 0) return null;
+
+        const vertices = [];
+        const indices = [];
+        const scale = 1 / maxCandela;
+
+        for (let j = 0; j < numH; j++) {
+            for (let i = 0; i < numV; i++) {
+                const vAngleRad = THREE.MathUtils.degToRad(verticalAngles[i]);
+                const hAngleRad = THREE.MathUtils.degToRad(horizontalAngles[j]);
+                const candela = allCandelaValues[j * numV + i];
+                const r = candela * scale;
+
+                const x = r * Math.sin(vAngleRad) * Math.cos(hAngleRad);
+                const y = -r * Math.cos(vAngleRad);
+                const z = r * Math.sin(vAngleRad) * Math.sin(hAngleRad);
+                vertices.push(x, y, z);
+            }
+        }
+
+        for (let j = 0; j < numH; j++) {
+            for (let i = 0; i < numV - 1; i++) {
+                const currentH = j;
+                const nextH = (j + 1) % numH;
+                const p1 = currentH * numV + i;
+                const p2 = nextH * numV + i;
+                const p3 = nextH * numV + (i + 1);
+                const p4 = currentH * numV + (i + 1);
+                indices.push(p1, p2, p4);
+                indices.push(p2, p3, p4);
+            }
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setIndex(indices);
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        geometry.computeVertexNormals();
+
+        const style = getComputedStyle(document.documentElement);
+        const material = new THREE.MeshStandardMaterial({
+            color: new THREE.Color(style.getPropertyValue('--highlight-color').trim()),
+            side: THREE.DoubleSide,
+            metalness: 0.2,
+            roughness: 0.6
+        });
+
+        const mesh = new THREE.Mesh(geometry, material);
+
+        const wireframeGeom = new THREE.WireframeGeometry(geometry);
+        const wireframeMat = new THREE.LineBasicMaterial({
+            color: new THREE.Color(style.getPropertyValue('--text-secondary').trim()),
+            transparent: true,
+            opacity: 0.3
+        });
+        mesh.add(new THREE.LineSegments(wireframeGeom, wireframeMat));
+        return mesh;
+    }
+
+    /**
+     * Cleans up all resources used by the 3D IES viewer.
+     * @private
+     */
+    _clearIes3dView() {
+        if (this.ies3d.animationFrameId) {
+            cancelAnimationFrame(this.ies3d.animationFrameId);
+            this.ies3d.animationFrameId = null;
+        }
+        if (this.ies3d.resizeObserver) {
+            this.ies3d.resizeObserver.disconnect();
+            this.ies3d.resizeObserver = null;
+        }
+        if (this.ies3d.scene) {
+            while (this.ies3d.scene.children.length > 0) {
+                const object = this.ies3d.scene.children[0];
+                this.ies3d.scene.remove(object);
+            }
+        }
+        if (this.ies3d.renderer) {
+            this.ies3d.renderer.dispose();
+            this.ies3d.renderer.domElement.remove();
+            this.ies3d.renderer = null;
+        }
+        if (this.ies3d.controls) {
+            this.ies3d.controls.dispose();
+            this.ies3d.controls = null;
+        }
+    }
+
     // --- PRIVATE: STATE GETTERS ---
 
     /** @private @returns {object} */
@@ -1022,18 +1224,38 @@ class LightingManager {
      * @private
      */
     _updateIesViewer(iesContent) {
-        const viewer = this.dom['ies-photometry-viewer'];
+        const viewerContainer = this.dom['ies-photometry-viewer'];
         if (iesContent) {
             try {
-                this._drawIesPolarPlot(IESParser.parse(iesContent));
-                viewer?.classList.remove('hidden');
+                const parsedData = IESParser.parse(iesContent);
+                this._updateIesInfoDisplay(parsedData);
+                this._drawIesPolarPlot(parsedData);
+                this._updateIes3dView(parsedData);
+                viewerContainer?.classList.remove('hidden');
             } catch (error) {
-                console.error("Error parsing IES data:", error);
-                viewer?.classList.add('hidden');
+                console.error("Error parsing or rendering IES data:", error);
+                viewerContainer?.classList.add('hidden');
+                this._clearIes3dView();
             }
         } else {
-            viewer?.classList.add('hidden');
+            viewerContainer?.classList.add('hidden');
+            this._clearIes3dView();
         }
+    }
+
+    /**
+     * Updates the IES metadata display in the UI.
+     * @param {object} parsedData - The parsed data from the IESParser.
+     * @private
+     */
+    _updateIesInfoDisplay(parsedData) {
+        const { numLamps, lumensPerLamp, wattage } = parsedData;
+        const totalLumens = numLamps * lumensPerLamp;
+        const efficacy = (wattage > 0) ? (totalLumens / wattage).toFixed(1) : 'N/A';
+
+        if (this.dom['ies-lumens-val']) this.dom['ies-lumens-val'].textContent = totalLumens.toFixed(0);
+        if (this.dom['ies-wattage-val']) this.dom['ies-wattage-val'].textContent = wattage.toFixed(1);
+        if (this.dom['ies-efficacy-val']) this.dom['ies-efficacy-val'].textContent = efficacy;
     }
 
     /**
@@ -1042,11 +1264,7 @@ class LightingManager {
      * @private
      */
     _drawIesPolarPlot(parsedData) {
-        const { lumensPerLamp, maxCandela, verticalAngles, candelaValues } = parsedData;
-
-        if (this.dom['ies-info-display']) {
-            this.dom['ies-info-display'].innerHTML = `Lumens: ${lumensPerLamp}<br>Max Cd: ${maxCandela.toFixed(0)}`;
-        }
+        const { maxCandela, verticalAngles, candelaValuesFor2D } = parsedData;
 
         const canvas = this.dom['ies-polar-plot-canvas'];
         if (!canvas) return;
@@ -1068,7 +1286,7 @@ class LightingManager {
         ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--highlight-color').trim();
         ctx.lineWidth = 2;
         ctx.beginPath();
-        candelaValues.forEach((cd, i) => {
+        candelaValuesFor2D.forEach((cd, i) => {
             const angleRad = verticalAngles[i] * Math.PI / 180;
             const r = (cd / maxCandela) * radius;
             const x = centerX + r * Math.sin(angleRad);
