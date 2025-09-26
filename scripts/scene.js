@@ -440,9 +440,54 @@ export function toggleFirstPersonView(viewType) {
  * Captures a snapshot of the current 3D view.
  * @returns {string} A base64 encoded data URL of the canvas image.
  */
-export function captureSceneSnapshot() {
+export function captureSceneSnapshot(width = 128) {
     // Force a render of the current frame to ensure it's up-to-date
     composer.render();
+    
+    const mainCanvas = renderer.domElement;
+    const thumbnailCanvas = document.createElement('canvas');
+    const aspect = mainCanvas.height / mainCanvas.width;
+    thumbnailCanvas.width = width;
+    thumbnailCanvas.height = Math.round(width * aspect);
+
+    const ctx = thumbnailCanvas.getContext('2d');
+    ctx.drawImage(mainCanvas, 0, 0, thumbnailCanvas.width, thumbnailCanvas.height);
+
+    // Return a JPEG for smaller file size
+    return thumbnailCanvas.toDataURL('image/jpeg', 0.8);
     // Return the data URL from the main renderer's canvas
     return renderer.domElement.toDataURL('image/png');
+}
+
+/**
+ * Captures the essential state of the active camera and controls.
+ * @returns {object} An object containing the camera's state.
+ */
+export function getCameraState() {
+    return {
+        position: activeCamera.position.clone(),
+        quaternion: activeCamera.quaternion.clone(),
+        zoom: activeCamera.zoom,
+        target: controls.target.clone()
+    };
+}
+
+/**
+ * Applies a saved camera state to the active camera and controls.
+ * @param {object} state - The camera state object to apply.
+ */
+export function applyCameraState(state) {
+    if (!state || !state.position || !state.quaternion || !state.target) {
+        console.error("Invalid camera state provided to applyCameraState.");
+        return;
+    }
+
+    activeCamera.position.copy(state.position);
+    activeCamera.quaternion.copy(state.quaternion);
+    activeCamera.zoom = state.zoom;
+    controls.target.copy(state.target);
+
+    // After setting properties, update matrices and controls
+    activeCamera.updateProjectionMatrix();
+    controls.update();
 }

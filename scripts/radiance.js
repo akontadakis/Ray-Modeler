@@ -768,3 +768,30 @@ export async function generateRayFileContent() {
     
     return "# Radiance Rays (X Y Z Vx Vy Vz)\n" + rays.join('\n');
 }
+
+/**
+ * Gathers the current viewpoint parameters and formats them into a Radiance .vf file content string from a state object.
+ * This is used for generating .vf files from saved camera views.
+ * @param {object} cameraState - A saved camera state object with position, quaternion, viewType, fov.
+ * @returns {string|null} The content for the .vf file or null if data is invalid.
+ */
+export function generateViewpointFileContentFromState(cameraState) {
+    if (!cameraState) return null;
+
+    const { viewType, fov, position, quaternion } = cameraState;
+    const vfov = (viewType === 'h' || viewType === 'a') ? 180 : fov;
+    const viewTypeMap = { 'v': '-vtv', 'h': '-vth', 'c': '-vtc', 'l': '-vtl', 'a': '-vta' };
+    const radViewType = viewTypeMap[viewType] || '-vtv';
+
+    // Camera state is already in world coordinates. Convert from Y-up to Z-up for Radiance.
+    const pos = position;
+    const rad_vp = `${pos.x.toFixed(4)} ${pos.z.toFixed(4)} ${pos.y.toFixed(4)}`;
+
+    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(quaternion);
+    const rad_vd = `${dir.x.toFixed(4)} ${dir.z.toFixed(4)} ${dir.y.toFixed(4)}`;
+
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(quaternion);
+    const rad_vu = `${up.x.toFixed(4)} ${up.z.toFixed(4)} ${up.y.toFixed(4)}`;
+
+    return `${radViewType} -vp ${rad_vp} -vd ${rad_vd} -vu ${rad_vu} -vh ${vfov} -vv ${vfov}`;
+}

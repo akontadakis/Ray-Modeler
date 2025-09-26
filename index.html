@@ -274,6 +274,39 @@
                 </div>
             </div>
         </div>
+        
+        <div class="pt-4 mt-4 border-t border-[--grid-color] space-y-4">
+            <h3 class="font-semibold text-sm uppercase">Scene Display</h3>
+            <div class="space-y-3">
+                <label for="transparent-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="transparent-toggle" checked><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Transparent Surfaces</span></label>
+                <div id="transparency-controls" class="mt-4 pl-4">
+                    <label class="label text-xs" for="surface-opacity">Surface Opacity</label>
+                    <div class="flex items-center space-x-3 mt-1">
+                        <input type="range" id="surface-opacity" min="0.05" max="1.0" value="0.15" step="0.01">
+                        <span id="surface-opacity-val" class="data-value font-mono w-12 text-left">0.5</span>
+                    </div>
+                </div>
+            </div>
+            <div class="space-y-3 pt-4 border-t border-[--grid-color]">
+                <label for="ground-plane-toggle" class="flex items-center cursor-pointer">
+                    <input type="checkbox" id="ground-plane-toggle" checked>
+                    <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Show Ground Plane</span>
+                </label>
+            </div>
+            <div class="space-y-3 pt-4 border-t border-[--grid-color]">
+                <label for="world-axes-toggle" class="flex items-center cursor-pointer">
+                    <input type="checkbox" id="world-axes-toggle" checked>
+                    <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Show World Axes</span>
+                </label>
+                <div id="world-axes-controls" class="mt-2">
+                    <label class="label text-xs" for="world-axes-size">Axes Size</label>
+                    <div class="flex items-center space-x-3 mt-1">
+                        <input type="range" id="world-axes-size" min="0.5" max="10" value="1.5" step="0.1">
+                        <span id="world-axes-size-val" class="data-value font-mono w-12 text-left">1.5x</span>
+                    </div>
+                </div>
+            </div>
+        </div>
         </div>
         <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
         </div>
@@ -1220,7 +1253,15 @@
                 <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Show Viewpoint Camera</span>
             </label>
         </div>
-
+        <div class="space-y-3 pt-4 border-t border-[--grid-color]">
+        <h3 class="font-semibold text-sm uppercase">Saved Views</h3>
+            <button id="save-view-btn" class="btn btn-secondary w-full">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="mr-2 inline-block"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                <span>Save Current View</span>
+            </button>
+                <div id="saved-views-list" class="mt-4 space-y-2 max-h-48 overflow-y-auto">
+                </div>
+            </div>
         <div class="border-t border-[--grid-color] pt-4 space-y-4">
             <h3 class="font-bold text-xs uppercase text-[--text-secondary]">Position (vp)</h3>
                 <div>
@@ -1288,9 +1329,38 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="border-t border-[--grid-color] pt-4 space-y-4">
+                    <h3 class="font-bold text-xs uppercase text-[--text-secondary]">Section Views</h3>
+                    <div>
+                        <label for="h-section-toggle" class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="h-section-toggle">
+                            <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Horizontal Section</span>
+                        </label>
+                        <div id="h-section-controls" class="hidden">
+                            <label class="label text-xs">Section Height</label>
+                            <div class="flex items-center space-x-3 mt-1">
+                                <input type="range" id="h-section-dist" min="0" max="3" value="1.5" step="0.1">
+                                <span id="h-section-dist-val" class="data-value font-mono w-12 text-left">1.5m</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="pt-4 border-t border-dashed border-[--grid-color]">
+                        <label for="v-section-toggle" class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="v-section-toggle">
+                            <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Vertical Section</span>
+                        </label>
+                        <div id="v-section-controls" class="hidden">
+                            <label class="label text-xs">Section Position (from West)</label>
+                            <div class="flex items-center space-x-3 mt-1">
+                                <input type="range" id="v-section-dist" min="0" max="4" value="2.0" step="0.1">
+                                <span id="v-section-dist-val" class="data-value font-mono w-12 text-left">2.0m</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-        </div>
 
         <div id="panel-view-options" class="floating-window ui-panel hidden">
             <div class="window-header">
@@ -1302,47 +1372,6 @@
                 </div>
             </div>
             <div class="window-content space-y-5">
-                <div class="space-y-3 pt-4 border-t border-[--grid-color]">
-                    <label for="transparent-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="transparent-toggle" checked><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Transparent Surfaces</span></label>
-                    <div id="transparency-controls" class="mt-4 pl-4">
-                        <label class="label text-xs" for="surface-opacity">Surface Opacity</label>
-                        <div class="flex items-center space-x-3 mt-1">
-                            <input type="range" id="surface-opacity" min="0.05" max="1.0" value="0.15" step="0.01">
-                            <span id="surface-opacity-val" class="data-value font-mono w-12 text-left">0.5</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="space-y-3 pt-4 border-t border-[--grid-color]">
-                    <label for="ground-plane-toggle" class="flex items-center cursor-pointer">
-                        <input type="checkbox" id="ground-plane-toggle" checked>
-                        <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Show Ground Plane</span>
-                </label>
-            </div>
-            <div class="space-y-3 pt-4 border-t border-[--grid-color]">
-                <label for="world-axes-toggle" class="flex items-center cursor-pointer">
-                    <input type="checkbox" id="world-axes-toggle" checked>
-                    <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Show World Axes</span>
-                </label>
-                <div id="world-axes-controls" class="mt-2">
-                    <label class="label text-xs" for="world-axes-size">Axes Size</label>
-                    <div class="flex items-center space-x-3 mt-1">
-                        <input type="range" id="world-axes-size" min="0.5" max="10" value="1.5" step="0.1">
-                        <span id="world-axes-size-val" class="data-value font-mono w-12 text-left">1.5x</span>
-                    </div>
-                </div>
-            </div>
-            <div class="space-y-3 pt-4 border-t border-[--grid-color]">
-                <label for="h-section-toggle" class="flex items-center cursor-pointer">
-                    <input type="checkbox" id="h-section-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Horizontal Section</span></label><div id="h-section-controls" class="hidden">
-                <label class="label text-xs">Section Height</label>
-                <div class="flex items-center space-x-3 mt-1">
-                    <input type="range" id="h-section-dist" min="0" max="3" value="1.5" step="0.1">
-                    <span id="h-section-dist-val" class="data-value font-mono w-12 text-left">1.5m</span>
-                </div>
-            </div>
-        </div>
-            <div class="space-y-3 pt-4 border-t border-[--grid-color]"><label for="v-section-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="v-section-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Vertical Section</span></label><div id="v-section-controls" class="hidden"><label class="label text-xs">Section Position (from West)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="v-section-dist" min="0" max="4" value="2.0" step="0.1"><span id="v-section-dist-val" class="data-value font-mono w-12 text-left">2.0m</span></div></div>
-                </div>
                 <div id="live-preview-section" class="hidden space-y-3 pt-4 mt-4 border-t-2 border-[--grid-color]">
                     <h3 class="font-semibold text-sm uppercase">Live Section Preview</h3>
                     <p class="info-box !text-xs !py-2 !px-3">Render a preview from the current camera view using the loaded EPW weather data.</p>

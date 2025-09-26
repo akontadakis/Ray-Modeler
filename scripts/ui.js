@@ -22,6 +22,7 @@ export let selectedWallId = null;
 let isWallSelectionLocked = false;
 const suggestionMemory = new Set(); // Prevents spamming suggestions during a session
 let tableData = []; // Holds data for the interactive table
+let savedViews = []; // Holds the saved camera view "snapshots"
 let currentSort = { column: 'id', direction: 'asc' }; // Default sort state
 let parsedBsdfData = null; // Holds parsed BSDF data to avoid re-parsing
 
@@ -469,7 +470,10 @@ const ids = [
     'sun-ray-count-val', 'sun-ray-bounces', 'sun-ray-bounces-val',
     'sun-rays-visibility-toggle', 'trace-sun-rays-btn',
     'sun-ray-info-display', 'sun-altitude-val', 'sun-azimuth-val', 'sun-dni-val', 'sun-dhi-val',
-    'sun-ray-tracing-toggle-n', 'sun-ray-tracing-toggle-s', 'sun-ray-tracing-toggle-e', 'sun-ray-tracing-toggle-w'
+    'sun-ray-tracing-toggle-n', 'sun-ray-tracing-toggle-s', 'sun-ray-tracing-toggle-e', 'sun-ray-tracing-toggle-w',
+
+    // Saved Views
+    'save-view-btn', 'saved-views-list'
 ];
 
     ids.forEach(id => { const el = document.getElementById(id); if(el) dom[id] = el; });
@@ -1558,12 +1562,27 @@ async function render2DHeatmap() {
         });
     }
 
-    const hourlyData = resultsManager.getIlluminanceForHour(hour);
+   const hourlyData = resultsManager.getIlluminanceForHour(hour);
     if (hourlyData) {
         updateSensorGridColors(hourlyData);
         }
     });
     dom['view-bsdf-btn']?.addEventListener('click', openBsdfViewer);
+
+    // --- Saved Views Listeners ---
+    dom['save-view-btn']?.addEventListener('click', saveCurrentView);
+    dom['saved-views-list']?.addEventListener('click', (e) => {
+        const target = e.target;
+        const viewItem = target.closest('.saved-view-item');
+        const deleteBtn = target.closest('.delete-view-btn');
+
+        if (deleteBtn && viewItem && viewItem.dataset.index) {
+            e.stopPropagation(); // Prevent applying view when deleting
+            deleteSavedView(parseInt(viewItem.dataset.index, 10));
+        } else if (viewItem && viewItem.dataset.index) {
+            applySavedView(parseInt(viewItem.dataset.index, 10));
+        }
+    });
 }
 
 // --- UI LOGIC & EVENT HANDLERS ---
@@ -4656,6 +4675,113 @@ async function openBsdfViewer() {
     
     // Ensure canvas is ready before drawing
     requestAnimationFrame(() => renderBsdfPlot(parsedBsdfData, 0));
+}
+
+/**
+ * Renders the list of saved camera views in the UI.
+ */
+function renderSavedViews() {
+    const listContainer = dom['saved-views-list'];
+    if (!listContainer) return;
+
+    listContainer.innerHTML = ''; // Clear existing list
+
+    if (savedViews.length === 0) {
+        listContainer.innerHTML = `<p class="text-xs text-center text-[--text-secondary] py-2">No views saved yet.</p>`;
+        return;
+    }
+
+    savedViews.forEach((view, index) => {
+        const viewElement = document.createElement('div');
+        viewElement.className = 'saved-view-item';
+        viewElement.dataset.index = index;
+        viewElement.innerHTML = `
+            <img src="${view.thumbnail}" alt="${view.name}" class="saved-view-thumbnail">
+            <span class="saved-view-name">${view.name}</span>
+            <button class="delete-view-btn" aria-label="Delete ${view.name}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        `;
+        listContainer.appendChild(viewElement);
+    });
+}
+
+/**
+ * Captures the current camera view and adds it to the saved views list.
+ */
+async function saveCurrentView() {
+    const { getCameraState, captureSceneSnapshot } = await import('./scene.js');
+    const cameraState = getCameraState();
+    const thumbnail = captureSceneSnapshot(128); // 128px wide thumbnail
+
+    // Also capture the Radiance-specific view settings from the UI
+    cameraState.viewType = dom['view-type'].value;
+    cameraState.fov = parseFloat(dom['view-fov'].value);
+
+    savedViews.push({
+        name: `View ${savedViews.length + 1}`,
+        thumbnail: thumbnail,
+        cameraState: cameraState
+    });
+
+    renderSavedViews();
+}
+
+/**
+ * Applies a saved camera view from the list to the main 3D scene.
+ * @param {number} index - The index of the view to apply in the savedViews array.
+ */
+async function applySavedView(index) {
+    if (index < 0 || index >= savedViews.length) return;
+    const { applyCameraState } = await import('./scene.js');
+    const view = savedViews[index];
+
+    // Update the UI controls first to match the saved view
+    if (dom['view-type'] && view.cameraState.viewType) {
+        dom['view-type'].value = view.cameraState.viewType;
+        // This will trigger other UI updates like enabling/disabling the fov slider
+        dom['view-type'].dispatchEvent(new Event('change', { bubbles: true })); 
+    }
+    if (dom['view-fov'] && view.cameraState.fov) {
+        dom['view-fov'].value = view.cameraState.fov;
+        dom['view-fov'].dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    // Then apply the camera's physical position and orientation
+    applyCameraState(view.cameraState);
+}
+
+/**
+ * Deletes a saved camera view from the list.
+ * @param {number} index - The index of the view to delete from the savedViews array.
+ */
+function deleteSavedView(index) {
+    if (index < 0 || index >= savedViews.length) return;
+    savedViews.splice(index, 1);
+    // Re-name subsequent views to keep numbering consistent
+    savedViews.forEach((view, i) => {
+        if (view.name.startsWith('View ')) {
+            view.name = `View ${i + 1}`;
+        }
+    });
+    renderSavedViews();
+}
+
+/**
+ * Loads an array of saved views into the UI state and renders them.
+ * @param {Array} views - The array of view objects to load.
+ */
+export function loadSavedViews(views) {
+    savedViews = views || [];
+    renderSavedViews();
+}
+
+/**
+ * Returns the current array of saved views.
+ * @returns {Array} The saved views.
+ */
+export function getSavedViews() {
+    return savedViews;
 }
 
 /**

@@ -127,7 +127,7 @@ async gatherAllProjectData() {
         const getChecked = (id) => (dom[id] ? dom[id].checked : null);
 
         // Import helper functions from UI module
-        const { getAllWindowParams, getAllShadingParams } = ui;
+        const { getAllWindowParams, getAllShadingParams, getSavedViews } = ui;
 
         const projectData = {
             projectInfo: {
@@ -205,6 +205,18 @@ async gatherAllProjectData() {
                 hSection: { enabled: getChecked('h-section-toggle'), dist: getValue('h-section-dist', parseFloat) },
                 vSection: { enabled: getChecked('v-section-toggle'), dist: getValue('v-section-dist', parseFloat) }
             },
+            savedViews: getSavedViews().map(view => ({
+                name: view.name,
+                thumbnail: view.thumbnail, 
+                cameraState: {
+                    position: view.cameraState.position.toArray(),
+                    quaternion: view.cameraState.quaternion.toArray(),
+                    zoom: view.cameraState.zoom,
+                    target: view.cameraState.target.toArray(),
+                    viewType: view.cameraState.viewType,
+                    fov: view.cameraState.fov
+                }
+            })),
             visualization: {
             },
             occupancy: {
@@ -351,6 +363,32 @@ async gatherAllProjectData() {
 
     async downloadProjectFile() {
         const { showAlert } = await import('./ui.js');
+        const allPtsContent = await this._generateSensorPointsContent('all');
+            const taskPtsContent = await this._generateSensorPointsContent('task');
+            const surroundingPtsContent = await this._generateSensorPointsContent('surrounding');
+            const daylightingPtsContent = await this._generateDaylightingPointsContent();
+            const rayContent = await generateRayFileContent();
+
+            // Generate .vf files for each saved camera view
+            const { generateViewpointFileContentFromState } = await import('./radiance.js');
+            const savedViewsData = projectData.savedViews || [];
+            savedViewsData.forEach((view, index) => {
+                // De-serialize the state for the generation function
+                const cameraStateForVf = {
+                    position: new THREE.Vector3().fromArray(view.cameraState.position),
+                    quaternion: new THREE.Quaternion().fromArray(view.cameraState.quaternion),
+                    viewType: view.cameraState.viewType,
+                    fov: view.cameraState.fov,
+                };
+                const viewFileContent = generateViewpointFileContentFromState(cameraStateForVf);
+                if (viewFileContent) {
+                    filesToWrite.push({ path: ['03_views', `saved_view_${index + 1}.vf`], content: viewFileContent });
+                }
+            });
+
+            // Sanitize the project data for JSON serialization by removing large file contents.
+            const dataForJson = JSON.parse(JSON.stringify(projectData));
+            dataForJson.epwFileContent = null;
     
         // 1. Check for a valid save location (either an Electron path or a Browser handle).
         // If none exists, prompt the user to select one.
@@ -690,6 +728,9 @@ async gatherAllProjectData() {
 
             this.simulationFiles = {}; 
             this.epwFileContent = null;
+            // Clear any existing saved views before loading new ones
+            const { loadSavedViews } = await import('./ui.js');
+            loadSavedViews([]);
 
             const readFileContent = async (pathSegments) => {
                 try {
@@ -930,6 +971,24 @@ async gatherAllProjectData() {
     if (settings.simulationParameters) {
         const { recreateSimulationPanels } = await import('./simulation.js');
         recreateSimulationPanels(settings.simulationParameters, this.simulationFiles, ui);
+    }
+
+    // --- Saved Views ---
+    if (settings.savedViews) {
+        const viewsToLoad = settings.savedViews.map(view => ({
+            ...view,
+            cameraState: {
+                position: new THREE.Vector3().fromArray(view.cameraState.position),
+                quaternion: new THREE.Quaternion().fromArray(view.cameraState.quaternion),
+                zoom: view.cameraState.zoom,
+                target: new THREE.Vector3().fromArray(view.cameraState.target),
+                viewType: view.cameraState.viewType,
+                fov: view.cameraState.fov
+            }
+        }));
+        ui.loadSavedViews(viewsToLoad);
+    } else {
+        ui.loadSavedViews([]); // Clear views if none are in the project file
     }
 
     // --- Final UI & Scene Updates ---
