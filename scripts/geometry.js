@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { renderer, horizontalClipPlane, verticalClipPlane, sensorTransformControls, daylightingSensorsGroup } from './scene.js';
 import { getDom, getAllWindowParams, getAllShadingParams, validateInputs, getWindowParamsForWall, getSensorGridParams } from './ui.js';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { resultsManager } from './resultsManager.js';
 /**
  * Surface type classification system for ray interaction behavior.
@@ -25,15 +26,18 @@ const SURFACE_TYPES = {
 export const roomObject = new THREE.Group();
 export const shadingObject = new THREE.Group();
 export const sensorGridObject = new THREE.Group();
+export const resizeHandlesObject = new THREE.Group();
 export const wallSelectionGroup = new THREE.Group(); // Group for selectable walls
 export const axesObject = new THREE.Group();
 export const groundObject = new THREE.Group();
 export const northArrowObject = new THREE.Group();
+export const furnitureObject = new THREE.Group();
 const taskAreaHelpersGroup = new THREE.Group();
 
 // --- MODULE STATE & SHARED RESOURCES ---
 export let sensorMeshes = []; // Store references to instanced meshes for results
 export let daylightingSensorMeshes = []; // Store references to individual sensor meshes for gizmo control
+export let importedShadingObjects = []; // Store references to imported OBJ meshes for selection
 
 const highlightMaterial = new THREE.MeshBasicMaterial({
     color: new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--highlight-color').trim() || '#3b82f6'),
@@ -50,9 +54,11 @@ const shared = {
     sensorGeom: new THREE.SphereGeometry(0.033, 8, 8),
     sensorMat: new THREE.MeshBasicMaterial({ color: '#343434' }), // Fallback color
     wireMat: new THREE.LineBasicMaterial({ color: '#343434' }),
+    furnitureMat: new THREE.MeshBasicMaterial({
+        color: new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--furniture-color').trim() || '#8D6E63'),
+    }),
     shadeMat: new THREE.MeshBasicMaterial({ color: '#1a1a1a', side: THREE.DoubleSide }), // Fallback color
     taskAreaMat: new THREE.MeshBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.2, side: THREE.DoubleSide }),
-    surroundingAreaMat: new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.2, side: THREE.DoubleSide }),
 };
 
 // --- HELPER FUNCTIONS ---
@@ -62,9 +68,20 @@ const shared = {
  */
 export function updateHighlightColor() {
     if (highlightMaterial) {
-        const newColor = getComputedStyle(document.documentElement).getPropertyValue('--highlight-color').trim();
+        const newColor = getComputedStyle(document.documentElement).getPropertyValue('--highlight-color').trim() || '#3b82f6';
         highlightMaterial.color.set(newColor);
     }
+}
+
+/**
+ * Updates the color of all furniture objects to match the current theme.
+ */
+export function updateFurnitureColor() {
+    // Read the color directly from the CSS variables for the active theme.
+    const newColor = getComputedStyle(document.documentElement).getPropertyValue('--furniture-color').trim() || '#8D6E63';
+
+    // Since all furniture shares one material instance, we only need to update that single instance.
+    shared.furnitureMat.color.set(newColor);
 }
 
 function applyClippingToMaterial(mat, clippingPlanes) {
@@ -85,11 +102,20 @@ function clearGroup(group) {
     if (group === sensorGridObject) {
         sensorMeshes.length = 0; // Clear the references when clearing the group
     }
+    if (group === resizeHandlesObject) {
+        // No specific cleanup needed yet, but good to have the case
+    }
     if (group === wallSelectionGroup) {
         highlightedWall = { object: null, originalMaterial: null };
     }
+    if (group === furnitureObject) {
+        // Any specific cleanup for furniture can go here
+    }
     if (group === daylightingSensorsGroup) {
         daylightingSensorMeshes.length = 0;
+    }
+    if (group === shadingObject) {
+        importedShadingObjects.length = 0;
     }
     group.traverse(child => {
         if (child.element && child.removeFromParent) {
@@ -145,7 +171,9 @@ export async function updateScene(changedId = null) {
     shadingObject.rotation.y = rotationY;
     sensorGridObject.rotation.y = rotationY;
     wallSelectionGroup.rotation.y = rotationY;
+    furnitureObject.rotation.y = rotationY;
     daylightingSensorsGroup.rotation.y = rotationY;
+    resizeHandlesObject.rotation.y = rotationY;
 
     // If the room orientation changed, re-sync the viewpoint camera from the UI sliders.
     if (changedId === 'room-orientation') {
@@ -158,6 +186,7 @@ export async function updateScene(changedId = null) {
     createSensorGrid();
     createGroundPlane();
     createNorthArrow();
+    createResizeHandles();
     updateDaylightingSensorVisuals();
 
     // Create or update the world axes helper
@@ -674,9 +703,11 @@ export function createShadingDevices() {
             let deviceGroup;
 
             if (shadeParams.type === 'overhang' && shadeParams.overhang) {
-                deviceGroup = createOverhang(ww, wh, shadeParams.overhang, shadeColor);
+                deviceGroup = createOverhang(ww, wh, shadeParams.overhang, shadeColor, orientation);
+            } else if (shadeParams.type === 'imported_obj' && shadeParams.imported_obj) {
+                deviceGroup = createImportedShading(shadeParams.imported_obj, shadeColor, orientation, i);
             } else if (shadeParams.type === 'lightshelf' && shadeParams.lightshelf) {
-                deviceGroup = createLightShelf(ww, wh, sh, shadeParams.lightshelf, shadeColor);
+                deviceGroup = createLightShelf(ww, wh, sh, shadeParams.lightshelf, shadeColor, orientation);
             } else if (shadeParams.type === 'louver' && shadeParams.louver) {
                 deviceGroup = createLouvers(ww, wh, shadeParams.louver, shadeColor);
             } else if (shadeParams.type === 'roller' && shadeParams.roller) {
@@ -686,9 +717,9 @@ export function createShadingDevices() {
         if (deviceGroup) {
             // The original creation logic is correct for E/W walls but inverted for N/S.
             // This block corrects the N/S placement by flipping the device's local z-axis.
-            if (orientation === 'N' || orientation === 'S') {
+            if ((orientation === 'N' || orientation === 'S') && deviceGroup.userData.shadingType !== 'overhang' && deviceGroup.userData.shadingType !== 'lightshelf') {
                 deviceGroup.children.forEach(child => {
-                    child.position.z *= 1;
+                    child.position.z *= -1;
                 });
             }
 
@@ -696,21 +727,21 @@ export function createShadingDevices() {
             if (orientation === 'N') {
                 deviceGroup.position.set(winStartPos + ww / 2, sh, 0);
                 deviceGroup.rotation.y = Math.PI; // Match North wall's rotation
-                deviceGroup.translateZ(effectiveWinDepthPos);
+                deviceGroup.translateZ(-effectiveWinDepthPos);
             } else if (orientation === 'S') {
                 deviceGroup.position.set(winStartPos + ww / 2, sh, L);
-                deviceGroup.rotation.y = Math.PI; // Match South wall's rotation
+                deviceGroup.rotation.y = 0; // Match South wall's rotation (which is 0)
+                deviceGroup.translateZ(-effectiveWinDepthPos);
+            } else if (orientation === 'W') {
+                deviceGroup.position.set(0, sh, winStartPos + ww / 2);
+                deviceGroup.rotation.y = Math.PI / 2; // Match West wall's rotation
                 deviceGroup.translateZ(effectiveWinDepthPos);
-                } else if (orientation === 'W') {
-                    deviceGroup.position.set(0, sh, winStartPos + ww / 2);
-                    deviceGroup.rotation.y = Math.PI / 2; // Match West wall's rotation
-                    deviceGroup.translateZ(effectiveWinDepthPos);
-                } else if (orientation === 'E') {
-                    deviceGroup.position.set(W, sh, winStartPos + ww / 2);
-                    deviceGroup.rotation.y = -Math.PI / 2; // Match East wall's rotation
-                    deviceGroup.translateZ(effectiveWinDepthPos);
+            } else if (orientation === 'E') {
+                deviceGroup.position.set(W, sh, winStartPos + ww / 2);
+                deviceGroup.rotation.y = -Math.PI / 2; // Match East wall's rotation
+                deviceGroup.translateZ(effectiveWinDepthPos);
                 }
-                shadingContainer.add(deviceGroup);
+            shadingContainer.add(deviceGroup);
             }
         }
     }
@@ -720,7 +751,7 @@ export function createShadingDevices() {
 /**
  * Creates a single overhang device.
  */
-function createOverhang(winWidth, winHeight, params, color) {
+function createOverhang(winWidth, winHeight, params, color, orientation) {
     const { distAbove, tilt, depth, extension, thick } = params;
     if (depth <= 0) return null;
 
@@ -738,7 +769,12 @@ function createOverhang(winWidth, winHeight, params, color) {
     applyClippingToMaterial(overhangMesh.material, renderer.clippingPlanes);
 
     overhangMesh.position.y = thick / 2;
-    overhangMesh.position.z = -depth / 2;
+    // For North/South walls, the default placement is internal. This reverses it to be external.
+    if (orientation === 'N' || orientation === 'S') {
+        overhangMesh.position.z = depth / 2;
+    } else {
+        overhangMesh.position.z = -depth / 2;
+    }
     pivot.add(overhangMesh);
     return assembly;
 }
@@ -746,18 +782,21 @@ function createOverhang(winWidth, winHeight, params, color) {
 /**
  * Creates a light shelf assembly.
  */
-function createLightShelf(winWidth, winHeight, sillHeight, params, color) {
+function createLightShelf(winWidth, winHeight, sillHeight, params, color, orientation) {
     const assembly = new THREE.Group();
     const { placeExt, placeInt, placeBoth, depthExt, depthInt, tiltExt, tiltInt, distBelowExt, distBelowInt, thickExt, thickInt } = params;
     const material = shared.shadeMat.clone();
     material.color.set(color);
     applyClippingToMaterial(material, renderer.clippingPlanes);
 
+    const isNS = orientation === 'N' || orientation === 'S';
+
  if ((placeExt || placeBoth) && depthExt > 0) {
         const pivot = new THREE.Group();
         const shelfMesh = new THREE.Mesh(new THREE.BoxGeometry(winWidth, thickExt, depthExt), material);
         shelfMesh.userData.surfaceType = SURFACE_TYPES.SHADING_DEVICE;
-        shelfMesh.position.z = -depthExt / 2;
+        // Reverse the Z position for N/S walls to ensure correct external placement
+        shelfMesh.position.z = isNS ? depthExt / 2 : -depthExt / 2;
         pivot.position.y = winHeight - distBelowExt;
         pivot.rotation.x = THREE.MathUtils.degToRad(tiltExt);
         pivot.add(shelfMesh);
@@ -767,7 +806,8 @@ function createLightShelf(winWidth, winHeight, sillHeight, params, color) {
         const pivot = new THREE.Group();
         const shelfMesh = new THREE.Mesh(new THREE.BoxGeometry(winWidth, thickInt, depthInt), material);
         shelfMesh.userData.surfaceType = SURFACE_TYPES.SHADING_DEVICE;
-        shelfMesh.position.z = depthInt / 2;
+        // Reverse the Z position for N/S walls to ensure correct internal placement
+        shelfMesh.position.z = isNS ? -depthInt / 2 : depthInt / 2;
         pivot.position.y = winHeight - distBelowInt;
         pivot.rotation.x = THREE.MathUtils.degToRad(tiltInt);
         pivot.add(shelfMesh);
@@ -853,6 +893,48 @@ function createRoller(winWidth, winHeight, params, color) {
 
     assembly.add(rollerMesh);
     return assembly;
+}
+
+/**
+ * Creates a shading device from an imported OBJ file.
+ */
+async function createImportedShading(params, color, orientation, index) {
+    const { project } = await import('./project.js');
+    const fileKey = `shading-obj-file-${orientation.toLowerCase()}`;
+    const objFile = project.simulationFiles[fileKey];
+
+    if (!objFile || !objFile.content) return null;
+
+    const loader = new OBJLoader();
+    const objectGroup = loader.parse(objFile.content);
+
+    const material = shared.shadeMat.clone();
+    material.color.set(color);
+    applyClippingToMaterial(material, renderer.clippingPlanes);
+
+    objectGroup.traverse(child => {
+        if (child.isMesh) {
+            child.material = material;
+            child.userData.surfaceType = SURFACE_TYPES.SHADING_DEVICE;
+            child.userData.isSelectable = true; // For raycasting
+            child.userData.parentWall = orientation;
+            child.userData.parentIndex = index;
+        }
+    });
+
+    // Apply transformations from UI
+    objectGroup.position.set(params.position.x, params.position.y, params.position.z);
+    objectGroup.rotation.set(
+        THREE.MathUtils.degToRad(params.rotation.x),
+        THREE.MathUtils.degToRad(params.rotation.y),
+        THREE.MathUtils.degToRad(params.rotation.z)
+    );
+    objectGroup.scale.set(params.scale.x, params.scale.y, params.scale.z);
+
+    // Add to our list for selection and gizmo control
+    importedShadingObjects.push(objectGroup);
+
+    return objectGroup;
 }
 
 /**
@@ -1074,4 +1156,123 @@ export function attachGizmoToSelectedSensor() {
     } else if (!objectToAttach) {
         sensorTransformControls.detach();
     }
+}
+
+/**
+ * Creates and adds a furniture asset to the scene.
+ * @param {string} assetType - The type of asset to create (e.g., 'desk', 'chair').
+ * @param {THREE.Vector3} position - The initial world position for the asset.
+ * @returns {THREE.Mesh|null} The created mesh, or null if asset type is unknown.
+ */
+export function addFurniture(assetType, position) {
+    const dom = getDom();
+    // Use the single, shared material for all furniture
+        const material = shared.furnitureMat;
+        applyClippingToMaterial(material, renderer.clippingPlanes);
+
+        let geometry;
+        let mesh;
+
+    switch (assetType) {
+        case 'desk':
+            geometry = new THREE.BoxGeometry(1.2, 0.75, 0.05); // L, D, H for tabletop
+            mesh = new THREE.Mesh(geometry, material);
+            mesh.position.y = 0.725; // Top of desk at 0.75m
+            // Simple legs
+            const legGeom = new THREE.BoxGeometry(0.05, 0.05, 0.7);
+            const leg1 = new THREE.Mesh(legGeom, material); leg1.position.set(-0.55, -0.35, -0.35);
+            const leg2 = new THREE.Mesh(legGeom, material); leg2.position.set(0.55, -0.35, -0.35);
+            const leg3 = new THREE.Mesh(legGeom, material); leg3.position.set(-0.55, 0.35, -0.35);
+            const leg4 = new THREE.Mesh(legGeom, material); leg4.position.set(0.55, 0.35, -0.35);
+            mesh.add(leg1, leg2, leg3, leg4);
+            break;
+        case 'chair':
+            geometry = new THREE.BoxGeometry(0.4, 0.4, 0.04);
+            mesh = new THREE.Mesh(geometry, material);
+            mesh.position.y = 0.42; // Seat height
+            const backGeom = new THREE.BoxGeometry(0.4, 0.04, 0.5);
+            const back = new THREE.Mesh(backGeom, material);
+            back.position.set(0, 0.2, 0.27);
+            back.rotation.x = -0.1;
+            mesh.add(back);
+            break;
+        case 'partition':
+            geometry = new THREE.BoxGeometry(1.2, 0.05, 1.5);
+            mesh = new THREE.Mesh(geometry, material);
+            mesh.position.y = 0.75;
+            break;
+        case 'shelf':
+            geometry = new THREE.BoxGeometry(0.9, 0.3, 1.8);
+            mesh = new THREE.Mesh(geometry, material);
+            mesh.position.y = 0.9;
+            break;
+        default:
+            return null;
+    }
+
+    mesh.userData = {
+        isFurniture: true,
+        assetType: assetType,
+    };
+
+    const { W, L } = readParams();
+    // Position is in world space, needs to be converted to local space of the furniture container
+    mesh.position.add(position);
+    mesh.position.x -= W / 2;
+    mesh.position.z -= L / 2;
+
+    const furnitureContainer = furnitureObject.children[0] || new THREE.Group();
+    if (furnitureObject.children.length === 0) {
+        furnitureContainer.position.set(-W / 2, 0, -L / 2);
+        furnitureObject.add(furnitureContainer);
+    }
+    furnitureContainer.add(mesh);
+
+    return mesh;
+}
+
+/**
+ * Creates transparent planes on the exterior of the room to act as resize handles.
+ */
+export function createResizeHandles() {
+    clearGroup(resizeHandlesObject);
+    const dom = getDom();
+    if (!dom['resize-mode-toggle'] || !dom['resize-mode-toggle'].checked) {
+        return; // Don't create handles if mode is off
+    }
+
+    const { W, L, H } = readParams();
+
+    const handleMaterial = new THREE.MeshBasicMaterial({
+        color: 0x3b82f6,
+        transparent: true,
+        opacity: 0.2, // Slightly increased opacity
+        side: THREE.DoubleSide,
+        depthTest: false,
+    });
+
+    const { wallThickness } = readParams();
+    const handles = [
+        // Positions are now calculated to be outside the wall thickness
+        { name: 'wall-handle-east',  w: L, h: H, pos: [W/2 + wallThickness + 0.01, H/2, 0],    axis: 'x', dir: 1  },
+        { name: 'wall-handle-west',  w: L, h: H, pos: [-W/2 - wallThickness - 0.01, H/2, 0],   axis: 'x', dir: -1 },
+        { name: 'wall-handle-south', w: W, h: H, pos: [0, H/2, L/2 + wallThickness + 0.01],    axis: 'z', dir: 1  },
+        { name: 'wall-handle-north', w: W, h: H, pos: [0, H/2, -L/2 - wallThickness - 0.01],   axis: 'z', dir: -1 },
+        { name: 'wall-handle-top',   w: W, h: L, pos: [0, H + 0.01, 0],                        axis: 'y', dir: 1  },
+    ];
+
+    handles.forEach(h => {
+        const geometry = new THREE.PlaneGeometry(h.w, h.h);
+        const plane = new THREE.Mesh(geometry, handleMaterial.clone());
+        plane.position.set(...h.pos);
+        if (h.axis === 'x') plane.rotation.y = Math.PI / 2;
+        if (h.axis === 'y') plane.rotation.x = -Math.PI / 2;
+        
+        plane.userData = {
+            isResizeHandle: true,
+            axis: h.axis, // 'x', 'y', or 'z'
+            direction: h.dir // 1 or -1
+        };
+        resizeHandlesObject.add(plane);
+    });
 }

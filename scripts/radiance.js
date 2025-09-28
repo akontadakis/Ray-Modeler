@@ -312,7 +312,7 @@ export function generateViewpointFileContent(viewpointData, roomData) {
     return `${radViewType} -vp ${rad_vp} -vd ${rad_vd} -vu 0 0 1 -vh ${hfov} -vv ${vfov}`;
 }
 
-export function generateRadFileContent(options = {}) {
+export async function generateRadFileContent(options = {}) {
   const { channelSet, clippingPlanes } = options; // e.g., 'c1-3', 'c4-6', 'c7-9' for spectral runs
   const dom = getDom();
 
@@ -374,6 +374,7 @@ export function generateRadFileContent(options = {}) {
   radMaterials += getMaterialDef('ceiling');
   radMaterials += getMaterialDef('frame');
   radMaterials += getMaterialDef('shading');
+  radMaterials += getMaterialDef('furniture');
 
   const Tn = parseFloat(dom['glazing-trans'].value);
   const tn = transmittanceToTransmissivity(Tn);
@@ -530,6 +531,28 @@ for (const [orientation, winParams] of Object.entries(allWindows)) {
         }
     }
 }
+
+// --- Generate Imported OBJ Shading ---
+// Find the Three.js objects for imported shading from the scene
+const { importedShadingObjects, furnitureObject } = await import('./geometry.js');
+importedShadingObjects.forEach((objGroup, index) => {
+    // Traverse the group to find the actual mesh
+    objGroup.traverse(child => {
+        if (child.isMesh) {
+            shadingGeometry += _generateRadFromMesh(child, 'shading_mat', `imported_obj_${index}`, transformAndFormat);
+        }
+    });
+});
+
+// --- Generate Furniture Geometry ---
+let furnitureGeometry = '\n# --- FURNITURE & PARTITIONS ---\n';
+if (furnitureObject.children.length > 0) {
+    const furnitureContainer = furnitureObject.children[0];
+    furnitureContainer.children.forEach((mesh, index) => {
+        furnitureGeometry += _generateRadFromMesh(mesh, 'furniture_mat', `${mesh.userData.assetType}_${index}`, transformAndFormat);
+    });
+}
+
 
   for (const [orientation, winParams] of Object.entries(allWindows)) {
     const { ww, wh, sh, wallWidth, winCount, mode } = winParams || {};
@@ -703,7 +726,7 @@ for (const [orientation, winParams] of Object.entries(allWindows)) {
 
   return {
       materials: matHeader + radMaterials + dynamicMaterialDefs,
-      geometry: geoHeader + radGeometry + shadingGeometry + clippingGeometry
+      geometry: geoHeader + radGeometry + shadingGeometry + furnitureGeometry + clippingGeometry
   };
 }
 
@@ -794,4 +817,56 @@ export function generateViewpointFileContentFromState(cameraState) {
     const rad_vu = `${up.x.toFixed(4)} ${up.z.toFixed(4)} ${up.y.toFixed(4)}`;
 
     return `${radViewType} -vp ${rad_vp} -vd ${rad_vd} -vu ${rad_vu} -vh ${vfov} -vv ${vfov}`;
+}
+
+/**
+ * Converts a Three.js mesh into a string of Radiance polygons.
+ * @param {THREE.Mesh} mesh - The mesh to convert.
+ * @param {string} material - The name of the Radiance material.
+ * @param {string} name - The base name for the polygons.
+ * @param {function} transformFunc - The function to transform vertices to the final Radiance coordinate system.
+ * @returns {string} A string containing Radiance polygon definitions.
+ * @private
+ */
+function _generateRadFromMesh(mesh, material, name, transformFunc) {
+    let radString = `\n# Imported Mesh: ${name}\n`;
+    const position = mesh.geometry.attributes.position;
+    const index = mesh.geometry.index;
+
+    // Ensure the mesh's world matrix is up-to-date
+    mesh.updateWorldMatrix(true, false);
+    const matrix = mesh.matrixWorld;
+
+    const vertices = [];
+    for (let i = 0; i < position.count; i++) {
+        const v = new THREE.Vector3().fromBufferAttribute(position, i);
+        v.applyMatrix4(matrix); // Apply object's world transform
+        vertices.push([v.x, v.y, v.z]); // Store as array [x, y, z]
+    }
+
+    if (index) { // Indexed geometry
+        for (let i = 0; i < index.count; i += 3) {
+            const vA = vertices[index.getX(i)];
+            const vB = vertices[index.getX(i + 1)];
+            const vC = vertices[index.getX(i + 2)];
+
+            radString += `${material} polygon ${name}_face_${i / 3}\n0\n0\n9\n`;
+            radString += transformFunc(vA) + '\n';
+            radString += transformFunc(vB) + '\n';
+            radString += transformFunc(vC) + '\n\n';
+        }
+    } else { // Non-indexed geometry (triangles)
+        for (let i = 0; i < vertices.length; i += 3) {
+            const vA = vertices[i];
+            const vB = vertices[i + 1];
+            const vC = vertices[i + 2];
+
+            radString += `${material} polygon ${name}_face_${i / 3}\n0\n0\n9\n`;
+            radString += transformFunc(vA) + '\n';
+            radString += transformFunc(vB) + '\n';
+            radString += transformFunc(vC) + '\n\n';
+        }
+    }
+
+    return radString;
 }

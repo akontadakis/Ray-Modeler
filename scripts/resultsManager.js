@@ -28,6 +28,7 @@ class ResultsManager {
         };
         this.activeView = 'a'; // 'a', 'b', or 'diff'
         this.activeMetricType = 'photopic'; // Default metric to display
+        this.climateData = null; // To store parsed EPW data
         this.colorScale = {
             min: 0,
             max: 1000,
@@ -78,10 +79,26 @@ class ResultsManager {
             }
 
             const reader = new FileReader();
-            const isIllFile = file.name.toLowerCase().endsWith('.ill');
+            const lowerFileName = file.name.toLowerCase();
+            const isIllFile = lowerFileName.endsWith('.ill');
+            const isEpwFile = lowerFileName.endsWith('.epw');
 
             reader.onload = (e) => {
                 const content = e.target.result;
+
+                // --- NEW: Handle EPW file parsing directly ---
+                if (isEpwFile) {
+                    try {
+                        this.climateData = this._parseEpwContent(content);
+                        showAlert(`Climate file "${file.name}" parsed successfully.`, 'Climate Data Loaded');
+                        // Resolve with a special type to let the UI know
+                        resolve({ key: key, type: 'climate' });
+                    } catch (error) {
+                        showAlert(`Error parsing EPW file: ${error.message}`, 'EPW Error');
+                        reject(error);
+                    }
+                    return; // Stop further processing for EPW files
+                }
                 const worker = new Worker('./scripts/parsingWorker.js');
 
                 worker.onmessage = (event) => {
@@ -208,6 +225,171 @@ class ResultsManager {
             count: data.length,
         };
     }
+
+    /**
+     * Parses the string content of an EPW file to extract hourly climate data.
+     * @param {string} epwContent - The full string content of the EPW file.
+     * @returns {object} An object containing arrays of hourly data.
+     * @private
+     */
+    _parseEpwContent(epwContent) {
+        const lines = epwContent.split(/\r?\n/);
+        const dataLines = lines.slice(8); // Data starts from the 9th line
+
+        const hourlyData = {
+            temp: [],    // Dry Bulb Temperature (°C) - Column 6
+            rh: [],      // Relative Humidity (%) - Column 8
+            dni: [],     // Direct Normal Radiation (Wh/m^2) - Column 14
+            dhi: [],     // Diffuse Horizontal Radiation (Wh/m^2) - Column 15
+            windDir: [], // Wind Direction (°) - Column 20
+        };
+
+        for (const line of dataLines) {
+            const values = line.split(',');
+            if (values.length < 22) continue; // Skip incomplete lines
+
+            hourlyData.temp.push(parseFloat(values[6]));
+            hourlyData.rh.push(parseFloat(values[8]));
+            hourlyData.dni.push(parseFloat(values[14]));
+            hourlyData.dhi.push(parseFloat(values[15]));
+            hourlyData.windDir.push(parseFloat(values[20]));
+        }
+
+        if (hourlyData.temp.length !== 8760) {
+            console.warn(`EPW file parsing resulted in ${hourlyData.temp.length} data points instead of 8760.`);
+        }
+        
+        return hourlyData;
+    }
+
+    /**
+     * Processes raw climate data to generate binned data for a wind rose chart.
+     * @returns {object|null} Data formatted for Chart.js or null if no data.
+     */
+    getWindRoseData() {
+        if (!this.climateData) return null;
+
+        const directions = 16;
+        const speedBins = [1, 3, 6, 9, 12]; // Wind speed categories in m/s
+        const labels = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+        
+        // Initialize a 2D array for bins [direction][speed]
+        const bins = Array(directions).fill(0).map(() => Array(speedBins.length + 1).fill(0));
+
+        for (let i = 0; i < this.climateData.windDir.length; i++) {
+            const dir = this.climateData.windDir[i];
+            const spd = this.climateData.windSpd[i];
+
+            if (spd <= 0.5) continue; // Ignore calm winds
+
+            const dirIndex = Math.floor(((dir + 11.25) % 360) / 22.5);
+            
+            let spdIndex = speedBins.findIndex(s => spd < s);
+            if (spdIndex === -1) spdIndex = speedBins.length; // Faster than the fastest bin
+
+            bins[dirIndex][spdIndex]++;
+        }
+
+        return { labels, bins, speedBins };
+    }
+
+    /**
+     * Processes raw climate data to get monthly average solar radiation.
+     * @returns {object|null} Data formatted for Chart.js or null if no data.
+     */
+    getMonthlySolarData() {
+        if (!this.climateData) return null;
+
+        const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        const monthlyTotals = { dni: Array(12).fill(0), dhi: Array(12).fill(0) };
+        let hourIndex = 0;
+
+        for (let m = 0; m < 12; m++) {
+            for (let d = 0; d < daysInMonth[m] * 24; d++) {
+                monthlyTotals.dni[m] += this.climateData.dni[hourIndex];
+                monthlyTotals.dhi[m] += this.climateData.dhi[hourIndex];
+                hourIndex++;
+            }
+        }
+
+        const avgDailyDni = monthlyTotals.dni.map((total, i) => (total / daysInMonth[i]) / 1000); // kWh/m²/day
+        const avgDailyDhi = monthlyTotals.dhi.map((total, i) => (total / daysInMonth[i]) / 1000);
+
+        return {
+            labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+            dni: avgDailyDni,
+            dhi: avgDailyDhi
+        };
+    }
+
+    /**
+     * Processes raw climate data to get monthly temperature ranges.
+     * @returns {object|null} Data formatted for Chart.js or null if no data.
+     */
+    getMonthlyTemperatureData() {
+        if (!this.climateData) return null;
+
+        const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        const monthly = Array(12).fill(0).map(() => ({ min: Infinity, max: -Infinity, sum: 0, count: 0 }));
+        let hourIndex = 0;
+
+        for (let m = 0; m < 12; m++) {
+            for (let d = 0; d < daysInMonth[m] * 24; d++) {
+                const temp = this.climateData.temp[hourIndex];
+                if (temp > -99) { // EPW uses -99 for missing data
+                    monthly[m].min = Math.min(monthly[m].min, temp);
+                    monthly[m].max = Math.max(monthly[m].max, temp);
+                    monthly[m].sum += temp;
+                    monthly[m].count++;
+                }
+                hourIndex++;
+            }
+        }
+        
+        return {
+            labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+            min: monthly.map(m => m.min),
+            max: monthly.map(m => m.max),
+            avg: monthly.map(m => m.sum / m.count)
+        };
+    }
+
+    /**
+     * Calculates the sun path for key days of the year for a sun path diagram.
+     * @returns {object|null} Data formatted for Chart.js or null if no project data.
+     */
+    getSunPathData() {
+        if (!project || !project.projectData) return null;
+
+        const keyDays = {
+            summerSolstice: 172, // June 21
+            equinox: 80,         // March 21
+            winterSolstice: 355  // Dec 21
+        };
+
+        const datasets = {};
+
+        for (const [name, dayOfYear] of Object.entries(keyDays)) {
+            datasets[name] = [];
+            for (let hour = 0; hour < 24; hour += 0.5) {
+                const { altitude, azimuth } = this._calculateSunPosition(dayOfYear, hour);
+                const altDegrees = altitude * (180 / Math.PI);
+                
+                if (altDegrees > 0) {
+                    let azimuthDeg = azimuth * (180 / Math.PI);
+                    // Convert math azimuth (0=E) to compass azimuth (0=N)
+                    azimuthDeg = (450 - azimuthDeg) % 360; 
+
+                    datasets[name].push({
+                        r: 90 - altDegrees, // Radial axis is zenith angle (90 - altitude)
+                        t: azimuthDeg       // Angular axis is azimuth
+                    });
+                }
+            }
+        }
+        return datasets;
+    }
+
 
     /**
      * Calculates the difference between dataset A and B and stores the result.

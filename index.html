@@ -130,7 +130,7 @@
                 </div>
                 <div class="action-button-container">
                     <button id="toggle-panel-materials-btn" class="btn" aria-label="Material Properties">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="12,2 2,7 12,12 22,7 12,2"/><polyline points="2,17 12,22 22,17"/><polyline points="2,12 12,17 22,12"/></svg>                  
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M17 4a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-10a1 1 0 0 1 -1 -1v-2a1 1 0 0 1 1 -1h10z"></path><path d="M6 8v-1a1 1 0 0 1 1 -1h2"></path><path d="M15 8v-1a1 1 0 0 1 1 -1h2"></path><path d="M12 12l0 9"></path><path d="M9 21h6"></path></svg>
                     </button>
                     <span class="tooltip" role="tooltip">Material Properties</span>
                 </div>
@@ -146,11 +146,11 @@
                     </button>
                     <span class="tooltip" role="tooltip">Viewpoint</span>
                 </div>
-                 <div class="action-button-container">
-                    <button id="toggle-panel-view-options-btn" class="btn" aria-label="View Options">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>                    
-                </button>
-                    <span class="tooltip" role="tooltip">View Options</span>
+                <div class="action-button-container">
+                    <button id="toggle-panel-scene-btn" class="btn" aria-label="Scene Elements">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                    </button>
+                    <span class="tooltip" role="tooltip">Scene Elements</span>
                 </div>
             </div>
         </div>
@@ -266,6 +266,17 @@
                 <div><label class="label" for="height">Height (Y)</label><div class="flex items-center space-x-4 mt-1"><input type="range" id="height" min="1" max="10" value="2.8" step="0.1"><span id="height-val" class="data-value font-mono w-12 text-left">2.8m</span></div></div>
                 <div><label class="label" for="room-orientation">Orientation</label><div class="flex items-center space-x-4 mt-1"><input type="range" id="room-orientation" min="0" max="359" value="0" step="1"><span id="room-orientation-val" class="data-value font-mono w-12 text-left">0°</span></div></div>
                 <div class="pt-4 mt-4 border-t border-[--grid-color]">
+                    <label for="resize-mode-toggle" class="flex items-center cursor-pointer w-full">
+                        <input type="checkbox" id="resize-mode-toggle">
+                        <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">
+                            Enable 3D Resize Handles
+                        </span>
+                    </label>
+                    <p class="info-box !text-xs !py-2 !px-3 mt-2 hidden" id="resize-mode-info">
+                        Click and drag the transparent handles on the exterior of the room to adjust its dimensions.
+                    </p>
+                </div>
+                <div class="pt-4 mt-4 border-t border-[--grid-color]">
                 <div>
                     <label class="label" for="surface-thickness">Surface Thickness</label>
                 <div class="flex items-center space-x-4 mt-1">
@@ -274,7 +285,6 @@
                 </div>
             </div>
         </div>
-        
         <div class="pt-4 mt-4 border-t border-[--grid-color] space-y-4">
             <h3 class="font-semibold text-sm uppercase">Scene Display</h3>
             <div class="space-y-3">
@@ -406,13 +416,18 @@
                     <div><label class="label" for="sill-height-n">Sill Height (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="sill-height-n" min="0" max="10" value="1.0" step="0.05"><span id="sill-height-n-val" class="data-value font-mono w-12 text-left">1.0m</span></div></div>
                     <div><label class="label" for="win-depth-pos-n-manual">Window Depth Position (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="win-depth-pos-n-manual" min="0" max="0.2" value="0.1" step="0.01"><span id="win-depth-pos-n-val-manual" class="data-value font-mono w-12 text-left">0.10m</span></div></div>
                 </div>
+
+
+
                 <div class="shading-section-container space-y-4 pt-4 mt-4 border-t border-dashed border-[--grid-color]">
                     <h4 class="font-semibold text-sm uppercase text-gray-700">North Wall Shading</h4>
                     <label class="flex items-center cursor-pointer" for="shading-n-toggle"><input type="checkbox" id="shading-n-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Shading on this Wall</span></label>
                     <div id="shading-controls-n" class="hidden space-y-5">
-                        <div><label class="label" for="shading-type-n">Device Type</label><select id="shading-type-n" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option></select></div>
+                        <div><label class="label" for="shading-type-n">Device Type</label><select id="shading-type-n" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option><option value="imported_obj">Imported OBJ</option></select></div>
                         <div id="shading-controls-overhang-n" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
                             <div><label class="label" for="overhang-dist-above-n">Distance Above Top (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-dist-above-n" min="0" max="1.0" value="0" step="0.05"><span id="overhang-dist-above-n-val" class="data-value font-mono w-12 text-left">0.00m</span></div></div>
+
+
                             <div><label class="label" for="overhang-tilt-n">Tilt Angle (°)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-tilt-n" min="-90" max="90" value="0" step="1"><span id="overhang-tilt-n-val" class="data-value font-mono w-12 text-left">0°</span></div></div>
                             <div><label class="label" for="overhang-depth-n">Depth (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-depth-n" min="0" max="2.0" value="0.5" step="0.1"><span id="overhang-depth-n-val" class="data-value font-mono w-12 text-left">0.5m</span></div></div>
                             <div><label class="label" for="overhang-thick-n">Thickness (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-thick-n" min="0.005" max="0.5" value="0.05" step="0.005"><span id="overhang-thick-n-val" class="data-value font-mono w-12 text-left">0.050m</span></div></div>
@@ -451,6 +466,39 @@
                             <div><label class="label" for="roller-thickness-n">Thickness (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="roller-thickness-n" min="0.0" max="0.05" value="0.001" step="0.001"><span id="roller-thickness-n-val" class="data-value font-mono w-12 text-left">0.001m</span></div></div>
                             <div><label class="label" for="roller-conductivity-n">Conductivity (W/m-K)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="roller-conductivity-n" min="0.0" max="10.0" value="0.1" step="0.01"><span id="roller-conductivity-n-val" class="data-value font-mono w-12 text-left">0.10</span></div></div>
                         </div>
+                        <div id="shading-controls-imported_obj-n" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
+                            <div>
+                                <label class="label" for="shading-obj-file-n">OBJ File (.obj)</label>
+                                <input type="file" id="shading-obj-file-n" accept=".obj" class="w-full text-sm">
+                                <span data-file-display-for-id="shading-obj-file-n" class="text-xs text-[--text-secondary] truncate block mt-1">No file selected.</span>
+                            </div>
+                            <h4 class="font-semibold text-xs uppercase text-[--text-secondary] pt-2">Transform</h4>
+                             <div>
+                                <label class="label text-xs">Position (X, Y, Z)</label>
+                                <div class="grid grid-cols-3 gap-2 mt-1">
+                                    <input type="number" id="shading-obj-pos-x-n" value="0" step="0.1" class="param-input-num">
+                                    <input type="number" id="shading-obj-pos-y-n" value="0" step="0.1" class="param-input-num">
+                                    <input type="number" id="shading-obj-pos-z-n" value="0" step="0.1" class="param-input-num">
+                                </div>
+                            </div>
+                             <div>
+                                <label class="label text-xs">Rotation (°)</label>
+                                <div class="grid grid-cols-3 gap-2 mt-1">
+                                    <input type="number" id="shading-obj-rot-x-n" value="0" step="1" class="param-input-num">
+                                    <input type="number" id="shading-obj-rot-y-n" value="0" step="1" class="param-input-num">
+                                    <input type="number" id="shading-obj-rot-z-n" value="0" step="1" class="param-input-num">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="label text-xs">Scale</label>
+                                <div class="grid grid-cols-3 gap-2 mt-1">
+                                    <input type="number" id="shading-obj-scale-x-n" value="1" step="0.05" class="param-input-num">
+                                    <input type="number" id="shading-obj-scale-y-n" value="1" step="0.05" class="param-input-num">
+                                    <input type="number" id="shading-obj-scale-z-n" value="1" step="0.05" class="param-input-num">
+                                </div>
+                            </div>
+                            <p class="info-box !text-xs !py-2 !px-3">Click the imported object in the 3D view to use the transform gizmo for interactive placement.</p>
+                        </div>
                     </div>
                     <div class="pt-4 mt-4 border-t border-dashed border-[--grid-color]">
                     <label for="sun-ray-tracing-toggle-n" class="flex items-center cursor-pointer">
@@ -480,7 +528,7 @@
                     <h4 class="font-semibold text-sm uppercase text-gray-700">South Wall Shading</h4>
                     <label class="flex items-center cursor-pointer" for="shading-s-toggle"><input type="checkbox" id="shading-s-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Shading on this Wall</span></label>
                     <div id="shading-controls-s" class="hidden space-y-5">
-                        <div><label class="label" for="shading-type-s">Device Type</label><select id="shading-type-s" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option></select></div>
+                        <div><label class="label" for="shading-type-s">Device Type</label><select id="shading-type-s" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option><option value="imported_obj">Imported OBJ</option></select></div>
                         <div id="shading-controls-overhang-s" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
                             <div><label class="label" for="overhang-dist-above-s">Distance Above Top (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-dist-above-s" min="0" max="1.0" value="0" step="0.05"><span id="overhang-dist-above-s-val" class="data-value font-mono w-12 text-left">0.00m</span></div></div>
                             <div><label class="label" for="overhang-tilt-s">Tilt Angle (°)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-tilt-s" min="-90" max="90" value="0" step="1"><span id="overhang-tilt-s-val" class="data-value font-mono w-12 text-left">0°</span></div></div>
@@ -521,6 +569,39 @@
                             <div><label class="label" for="roller-thickness-s">Thickness (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="roller-thickness-s" min="0.0" max="0.05" value="0.001" step="0.001"><span id="roller-thickness-s-val" class="data-value font-mono w-12 text-left">0.001m</span></div></div>
                             <div><label class="label" for="roller-conductivity-s">Conductivity (W/m-K)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="roller-conductivity-s" min="0.0" max="10.0" value="0.1" step="0.01"><span id="roller-conductivity-s-val" class="data-value font-mono w-12 text-left">0.10</span></div></div>
                         </div>
+                        <div id="shading-controls-imported_obj-s" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
+                            <div>
+                                <label class="label" for="shading-obj-file-s">OBJ File (.obj)</label>
+                                <input type="file" id="shading-obj-file-s" accept=".obj" class="w-full text-sm">
+                                <span data-file-display-for-id="shading-obj-file-s" class="text-xs text-[--text-secondary] truncate block mt-1">No file selected.</span>
+                            </div>
+                            <h4 class="font-semibold text-xs uppercase text-[--text-secondary] pt-2">Transform</h4>
+                             <div>
+                                <label class="label text-xs">Position (X, Y, Z)</label>
+                                <div class="grid grid-cols-3 gap-2 mt-1">
+                                    <input type="number" id="shading-obj-pos-x-s" value="0" step="0.1" class="param-input-num">
+                                    <input type="number" id="shading-obj-pos-y-s" value="0" step="0.1" class="param-input-num">
+                                    <input type="number" id="shading-obj-pos-z-s" value="0" step="0.1" class="param-input-num">
+                                </div>
+                            </div>
+                             <div>
+                                <label class="label text-xs">Rotation (°)</label>
+                                <div class="grid grid-cols-3 gap-2 mt-1">
+                                    <input type="number" id="shading-obj-rot-x-s" value="0" step="1" class="param-input-num">
+                                    <input type="number" id="shading-obj-rot-y-s" value="0" step="1" class="param-input-num">
+                                    <input type="number" id="shading-obj-rot-z-s" value="0" step="1" class="param-input-num">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="label text-xs">Scale</label>
+                                <div class="grid grid-cols-3 gap-2 mt-1">
+                                    <input type="number" id="shading-obj-scale-x-s" value="1" step="0.05" class="param-input-num">
+                                    <input type="number" id="shading-obj-scale-y-s" value="1" step="0.05" class="param-input-num">
+                                    <input type="number" id="shading-obj-scale-z-s" value="1" step="0.05" class="param-input-num">
+                                </div>
+                            </div>
+                            <p class="info-box !text-xs !py-2 !px-3">Click the imported object in the 3D view to use the transform gizmo for interactive placement.</p>
+                        </div>
                     </div>
                     <div class="pt-4 mt-4 border-t border-dashed border-[--grid-color]">
                     <label for="sun-ray-tracing-toggle-s" class="flex items-center cursor-pointer">
@@ -550,7 +631,7 @@
                 <h4 class="font-semibold text-sm uppercase text-gray-700">East Wall Shading</h4>
                     <label class="flex items-center cursor-pointer" for="shading-e-toggle"><input type="checkbox" id="shading-e-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Shading on this Wall</span></label>
                     <div id="shading-controls-e" class="hidden space-y-5">
-                        <div><label class="label" for="shading-type-e">Device Type</label><select id="shading-type-e" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option></select></div>
+                        <div><label class="label" for="shading-type-e">Device Type</label><select id="shading-type-e" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option><option value="imported_obj">Imported OBJ</option></select></div>
                         <div id="shading-controls-overhang-e" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
                             <div><label class="label" for="overhang-dist-above-e">Distance Above Top (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-dist-above-e" min="0" max="1.0" value="0" step="0.05"><span id="overhang-dist-above-e-val" class="data-value font-mono w-12 text-left">0.00m</span></div></div>
                             <div><label class="label" for="overhang-tilt-e">Tilt Angle (°)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-tilt-e" min="-90" max="90" value="0" step="1"><span id="overhang-tilt-e-val" class="data-value font-mono w-12 text-left">0°</span></div></div>
@@ -591,6 +672,39 @@
                             <div><label class="label" for="roller-thickness-e">Thickness (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="roller-thickness-e" min="0.0" max="0.05" value="0.001" step="0.001"><span id="roller-thickness-e-val" class="data-value font-mono w-12 text-left">0.001m</span></div></div>
                             <div><label class="label" for="roller-conductivity-e">Conductivity (W/m-K)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="roller-conductivity-e" min="0.0" max="10.0" value="0.1" step="0.01"><span id="roller-conductivity-e-val" class="data-value font-mono w-12 text-left">0.10</span></div></div>
                         </div>
+                        <div id="shading-controls-imported_obj-e" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
+                            <div>
+                                <label class="label" for="shading-obj-file-e">OBJ File (.obj)</label>
+                                <input type="file" id="shading-obj-file-e" accept=".obj" class="w-full text-sm">
+                                <span data-file-display-for-id="shading-obj-file-e" class="text-xs text-[--text-secondary] truncate block mt-1">No file selected.</span>
+                            </div>
+                            <h4 class="font-semibold text-xs uppercase text-[--text-secondary] pt-2">Transform</h4>
+                             <div>
+                                <label class="label text-xs">Position (X, Y, Z)</label>
+                                <div class="grid grid-cols-3 gap-2 mt-1">
+                                    <input type="number" id="shading-obj-pos-x-e" value="0" step="0.1" class="param-input-num">
+                                    <input type="number" id="shading-obj-pos-y-e" value="0" step="0.1" class="param-input-num">
+                                    <input type="number" id="shading-obj-pos-z-e" value="0" step="0.1" class="param-input-num">
+                                </div>
+                            </div>
+                             <div>
+                                <label class="label text-xs">Rotation (°)</label>
+                                <div class="grid grid-cols-3 gap-2 mt-1">
+                                    <input type="number" id="shading-obj-rot-x-e" value="0" step="1" class="param-input-num">
+                                    <input type="number" id="shading-obj-rot-y-e" value="0" step="1" class="param-input-num">
+                                    <input type="number" id="shading-obj-rot-z-e" value="0" step="1" class="param-input-num">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="label text-xs">Scale</label>
+                                <div class="grid grid-cols-3 gap-2 mt-1">
+                                    <input type="number" id="shading-obj-scale-x-e" value="1" step="0.05" class="param-input-num">
+                                    <input type="number" id="shading-obj-scale-y-e" value="1" step="0.05" class="param-input-num">
+                                    <input type="number" id="shading-obj-scale-z-e" value="1" step="0.05" class="param-input-num">
+                                </div>
+                            </div>
+                            <p class="info-box !text-xs !py-2 !px-3">Click the imported object in the 3D view to use the transform gizmo for interactive placement.</p>
+                        </div>
                     </div>
                     <div class="pt-4 mt-4 border-t border-dashed border-[--grid-color]">
                     <label for="sun-ray-tracing-toggle-e" class="flex items-center cursor-pointer">
@@ -620,7 +734,7 @@
                 <h4 class="font-semibold text-sm uppercase text-gray-700">West Wall Shading</h4>
                     <label class="flex items-center cursor-pointer" for="shading-w-toggle"><input type="checkbox" id="shading-w-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Shading on this Wall</span></label>
                     <div id="shading-controls-w" class="hidden space-y-5">
-                        <div><label class="label" for="shading-type-w">Device Type</label><select id="shading-type-w" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option></select></div>
+                        <div><label class="label" for="shading-type-w">Device Type</label><select id="shading-type-w" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option><option value="imported_obj">Imported OBJ</option></select></div>
                         <div id="shading-controls-overhang-w" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
                             <div><label class="label" for="overhang-dist-above-w">Distance Above Top (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-dist-above-w" min="0" max="1.0" value="0" step="0.05"><span id="overhang-dist-above-w-val" class="data-value font-mono w-12 text-left">0.00m</span></div></div>
                             <div><label class="label" for="overhang-tilt-w">Tilt Angle (°)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-tilt-w" min="-90" max="90" value="0" step="1"><span id="overhang-tilt-w-val" class="data-value font-mono w-12 text-left">0°</span></div></div>
@@ -660,6 +774,39 @@
                             <div><label class="label" for="roller-ir-trans-w">IR Transmittance</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="roller-ir-trans-w" min="0.0" max="1.0" value="0.0" step="0.01"><span id="roller-ir-trans-w-val" class="data-value font-mono w-12 text-left">0.00</span></div></div>
                             <div><label class="label" for="roller-thickness-w">Thickness (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="roller-thickness-w" min="0.0" max="0.05" value="0.001" step="0.001"><span id="roller-thickness-w-val" class="data-value font-mono w-12 text-left">0.001m</span></div></div>
                             <div><label class="label" for="roller-conductivity-w">Conductivity (W/m-K)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="roller-conductivity-w" min="0.0" max="10.0" value="0.1" step="0.01"><span id="roller-conductivity-w-val" class="data-value font-mono w-12 text-left">0.10</span></div></div>
+                        </div>
+                        <div id="shading-controls-imported_obj-w" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
+                            <div>
+                                <label class="label" for="shading-obj-file-w">OBJ File (.obj)</label>
+                                <input type="file" id="shading-obj-file-w" accept=".obj" class="w-full text-sm">
+                                <span data-file-display-for-id="shading-obj-file-w" class="text-xs text-[--text-secondary] truncate block mt-1">No file selected.</span>
+                            </div>
+                            <h4 class="font-semibold text-xs uppercase text-[--text-secondary] pt-2">Transform</h4>
+                             <div>
+                                <label class="label text-xs">Position (X, Y, Z)</label>
+                                <div class="grid grid-cols-3 gap-2 mt-1">
+                                    <input type="number" id="shading-obj-pos-x-w" value="0" step="0.1" class="param-input-num">
+                                    <input type="number" id="shading-obj-pos-y-w" value="0" step="0.1" class="param-input-num">
+                                    <input type="number" id="shading-obj-pos-z-w" value="0" step="0.1" class="param-input-num">
+                                </div>
+                            </div>
+                             <div>
+                                <label class="label text-xs">Rotation (°)</label>
+                                <div class="grid grid-cols-3 gap-2 mt-1">
+                                    <input type="number" id="shading-obj-rot-x-w" value="0" step="1" class="param-input-num">
+                                    <input type="number" id="shading-obj-rot-y-w" value="0" step="1" class="param-input-num">
+                                    <input type="number" id="shading-obj-rot-z-w" value="0" step="1" class="param-input-num">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="label text-xs">Scale</label>
+                                <div class="grid grid-cols-3 gap-2 mt-1">
+                                    <input type="number" id="shading-obj-scale-x-w" value="1" step="0.05" class="param-input-num">
+                                    <input type="number" id="shading-obj-scale-y-w" value="1" step="0.05" class="param-input-num">
+                                    <input type="number" id="shading-obj-scale-z-w" value="1" step="0.05" class="param-input-num">
+                                </div>
+                            </div>
+                            <p class="info-box !text-xs !py-2 !px-3">Click the imported object in the 3D view to use the transform gizmo for interactive placement.</p>
                         </div>
                     </div>
                     <div class="pt-4 mt-4 border-t border-dashed border-[--grid-color]">
@@ -1081,6 +1228,13 @@
                     <button id="view-bsdf-btn" class="btn btn-secondary w-full mt-2 hidden">View BSDF</button>
                 </div>
             </div>
+            <div class="space-y-3 pt-4 border-t border-[--grid-color]">
+                <h3 class="font-semibold text-sm uppercase">Furniture</h3>
+                <div><label class="label text-xs">Material Type</label><select id="furniture-mat-type" class="w-full mt-1"><option selected>Plastic</option><option>Metal</option></select></div>
+                <label class="label text-xs !mb-0">Reflectance</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="furniture-refl" min="0" max="1" value="0.3" step="0.01"><span id="furniture-refl-val" class="data-value font-mono w-12 text-left">0.30</span></div>
+                <div><label class="label text-xs">Specularity</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="furniture-spec" min="0" max="1" value="0.05" step="0.01"><span id="furniture-spec-val" class="data-value font-mono w-12 text-left">0.05</span></div></div>
+                <div><label class="label text-xs">Roughness</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="furniture-rough" min="0" max="1" value="0.1" step="0.01"><span id="furniture-rough-val" class="data-value font-mono w-12 text-left">0.10</span></div></div>
+            </div>
         </div> <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
 </div>
 
@@ -1330,6 +1484,7 @@
                     </div>
                 </div>
 
+
                 <div class="border-t border-[--grid-color] pt-4 space-y-4">
                     <h3 class="font-bold text-xs uppercase text-[--text-secondary]">Section Views</h3>
                     <div>
@@ -1361,10 +1516,11 @@
                 </div>
             </div>
             <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+        </div>
 
-        <div id="panel-view-options" class="floating-window ui-panel hidden">
+        <div id="panel-scene-elements" class="floating-window ui-panel hidden">
             <div class="window-header">
-                        <span>View Options</span>
+                <span>Scene Elements</span>
                 <div class="window-controls">
                     <div class="window-icon-max"></div>
                     <div class="collapse-icon"></div>
@@ -1372,28 +1528,77 @@
                 </div>
             </div>
             <div class="window-content space-y-5">
-                <div id="live-preview-section" class="hidden space-y-3 pt-4 mt-4 border-t-2 border-[--grid-color]">
-                    <h3 class="font-semibold text-sm uppercase">Live Section Preview</h3>
-                    <p class="info-box !text-xs !py-2 !px-3">Render a preview from the current camera view using the loaded EPW weather data.</p>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label for="preview-date" class="label text-xs">Date</label>
-                            <input type="text" id="preview-date" class="w-full mt-1 flatpickr-input" placeholder="Select date...">
+                <div class="param-section">
+                    <h3 class="font-semibold text-sm uppercase">Interior Furniture & Partitions</h3>
+                    <p class="info-box !text-xs !py-2 !px-3">Drag assets into the 3D scene. Select an object to transform it.</p>
+                    <div id="asset-library" class="grid grid-cols-4 gap-2 mt-4">
+                        <div class="asset-item" draggable="true" data-asset-type="desk" title="Desk">
+                            <div class="asset-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 2v7h16v-7z"/><path d="M6 10V4"/><path d="M18 10V4"/><path d="M4 17h16"/></svg></div>
+                            <span class="asset-name">Desk</span>
                         </div>
-                        <div>
-                            <label for="preview-time" class="label text-xs">Time</label>
-                            <input type="time" id="preview-time" value="14:30" class="w-full mt-1">
+                        <div class="asset-item" draggable="true" data-asset-type="chair" title="Chair">
+                            <div class="asset-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2.5a.5.5 0 0 1-.5-.5V4a2 2 0 0 0-2-2h-3a2 2 0 0 0-2 2v2.5a.5.5 0 0 1-.5.5H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12zm-6-5h.01"/><path d="M6 11.5V14h12v-2.5"/><path d="M6.5 18.5l1.5-3.5"/><path d="M17.5 18.5l-1.5-3.5"/></svg></div>
+                            <span class="asset-name">Chair</span>
+                        </div>
+                        <div class="asset-item" draggable="true" data-asset-type="partition" title="Partition">
+                            <div class="asset-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg></div>
+                            <span class="asset-name">Partition</span>
+                        </div>
+                        <div class="asset-item" draggable="true" data-asset-type="shelf" title="Shelf">
+                            <div class="asset-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.54 5.23a.9.9 0 0 0-.81-.43H4.27a.9.9 0 0 0-.81.43l-1.5 6a.9.9 0 0 0 .81 1.37h18.46a.9.9 0 0 0 .81-1.37l-1.5-6zM4 12v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/></svg></div>
+                            <span class="asset-name">Shelf</span>
                         </div>
                     </div>
-
-                    <button id="render-section-preview-btn" class="btn btn-primary w-full mt-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="mr-2 inline-block"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                    <span>Render Preview</span>
-            </button>
+                </div>
+                <div id="transform-controls-section" class="hidden param-section pt-4 border-t border-dashed border-[--grid-color]">
+                    <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Selected Object Transform</h4>
+                    <div class="btn-group mt-2">
+                        <button id="gizmo-mode-translate" class="btn active" data-mode="translate">Move</button>
+                        <button id="gizmo-mode-rotate" class="btn" data-mode="rotate">Rotate</button>
+                        <button id="gizmo-mode-scale" class="btn" data-mode="scale">Scale</button>
+                    </div>
+                    <div class="space-y-4 pt-4 border-t border-[--grid-color] mt-4">
+                        <div>
+                            <label class="label text-xs" for="obj-pos-x">Position (X)</label>
+                            <div class="flex items-center space-x-4 mt-1">
+                                <input type="range" id="obj-pos-x" min="-25" max="25" value="0" step="0.1">
+                                <span id="obj-pos-x-val" class="data-value font-mono w-16 text-left">0.0m</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="label text-xs" for="obj-pos-y">Position (Y)</label>
+                            <div class="flex items-center space-x-4 mt-1">
+                                <input type="range" id="obj-pos-y" min="0" max="10" value="0" step="0.1">
+                                <span id="obj-pos-y-val" class="data-value font-mono w-16 text-left">0.0m</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="label text-xs" for="obj-pos-z">Position (Z)</label>
+                            <div class="flex items-center space-x-4 mt-1">
+                                <input type="range" id="obj-pos-z" min="-25" max="25" value="0" step="0.1">
+                                <span id="obj-pos-z-val" class="data-value font-mono w-16 text-left">0.0m</span>
+                            </div>
+                        </div>
+                        <div class="pt-2 border-t border-dashed border-[--grid-color]">
+                             <label class="label text-xs" for="obj-rot-y">Rotation (°)</label>
+                            <div class="flex items-center space-x-4 mt-1">
+                                <input type="range" id="obj-rot-y" min="-180" max="180" value="0" step="1">
+                                <span id="obj-rot-y-val" class="data-value font-mono w-16 text-left">0°</span>
+                            </div>
+                        </div>
+                        <div class="pt-2 border-t border-dashed border-[--grid-color]">
+                            <label class="label text-xs" for="obj-scale-x">Scale (Uniform)</label>
+                            <div class="flex items-center space-x-4 mt-1">
+                                <input type="range" id="obj-scale-uniform" min="0.1" max="5" value="1" step="0.05">
+                                <span id="obj-scale-uniform-val" class="data-value font-mono w-16 text-left">1.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
         </div>
-        
-      </div> <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-      </div> <div id="project-access-prompt" class="fixed top-20 left-1/2 -translate-x-1/2 z-[100] ui-panel !p-3 flex items-center gap-4 hidden">
+      <div id="project-access-prompt" class="fixed top-20 left-1/2 -translate-x-1/2 z-[100] ui-panel !p-3 flex items-center gap-4 hidden">
 
         <p class="text-sm">Please select a project folder to enable direct saving and file access.</p>
                 <button id="select-folder-btn" class="btn btn-primary btn-sm">Select Folder</button>
@@ -1634,18 +1839,73 @@
                     <div class="window-icon-close"></div>
                 </div>
             </div>
-            <div class="window-content !p-0 flex flex-col">
-                <div id="ai-chat-messages" class="flex-grow p-4 space-y-4 overflow-y-auto">
-                    </div>
-                <div class="p-4 border-t border-[--grid-color]">
-                <form id="ai-chat-form" class="flex gap-2">
+          <div class="window-content !p-0 flex flex-col">
+              <div class="p-2 border-b border-[--grid-color] flex items-center justify-between">
+                  <div class="btn-group">
+                      <button id="ai-mode-chat" class="btn btn-sm active">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 5v8a2 2 0 01-2 2h-5l-5 4v-4H4a2 2 0 01-2-2V5a2 2 0 012-2h12a2 2 0 012 2zM7 8H5v2h2V8zm2 0h2v2H9V8zm6 0h-2v2h2V8z" clip-rule="evenodd" /></svg>
+                          Chat
+                      </button>
+                      <button id="ai-mode-inspector" class="btn btn-sm">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" viewBox="0 0 20 20" fill="currentColor"><path d="M9 9a2 2 0 114 0 2 2 0 01-4 0z" /><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a4 4 0 100 8 4 4 0 000-8z" clip-rule="evenodd" /></svg>
+                          Inspector
+                      </button>
+                  </div>
+                  <button id="run-inspector-btn" class="btn btn-secondary btn-sm hidden">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg>
+                      Run Inspector
+                  </button>
+              </div>
+              <div id="ai-chat-messages" class="flex-grow p-4 space-y-4 overflow-y-auto">
+              </div>
+              <div id="ai-inspector-results" class="flex-grow p-4 space-y-3 overflow-y-auto hidden">
+                  <div class="text-center text-sm text-[--text-secondary] p-4">
+                      <p>Click "Run Inspector" to analyze your current project setup for potential issues and design suggestions.</p>
+                  </div>
+              </div>
+              <div class="p-4 border-t border-[--grid-color]">
+                    <form id="ai-chat-form" class="flex gap-2">
                     <input type="text" id="ai-chat-input" placeholder="Ask about Radiance or this app..." class="flex-grow" autocomplete="off">
                     <button type="submit" id="ai-chat-send" class="btn btn-primary">Send</button>
               </form>
           </div>
         </div> <div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
     </div> <div id="proactive-suggestion-container" class="fixed bottom-24 right-8 z-[10001] flex flex-col items-end gap-2 w-full max-w-sm pointer-events-none"></div>
-            </main>
+
+<div id="climate-analysis-panel" class="floating-window ui-panel hidden" style="width: 950px; height: 820px;">
+        <div class="window-header">
+            <span>Climate Analysis</span>
+            <div class="window-controls">
+                <div class="window-icon-max"></div>
+                <div class="collapse-icon"></div>
+                <div class="window-icon-close"></div>
+            </div>
+        </div>
+        <div class="window-content !p-4 grid grid-cols-6 grid-rows-2 gap-6 h-full">
+            <div class="flex flex-col items-center h-full col-span-2">
+                <h4 class="font-semibold text-xs uppercase text-[--text-secondary] mb-2">Wind Rose</h4>
+                <div class="w-full relative flex-grow"><canvas id="wind-rose-canvas"></canvas></div>
+            </div>
+            <div class="flex flex-col items-center h-full col-span-2">
+                <h4 class="font-semibold text-xs uppercase text-[--text-secondary] mb-2">Monthly Solar Radiation (kWh/m²)</h4>
+                <div class="w-full relative flex-grow"><canvas id="solar-radiation-canvas"></canvas></div>
+            </div>
+            <div class="flex flex-col items-center h-full col-span-2">
+                <h4 class="font-semibold text-xs uppercase text-[--text-secondary] mb-2">Annual Temperature Range (°C)</h4>
+                <div class="w-full relative flex-grow"><canvas id="temperature-chart-canvas"></canvas></div>
+            </div>
+            <div class="flex flex-col items-center h-full col-span-3">
+                <h4 class="font-semibold text-xs uppercase text-[--text-secondary] mb-2">Humidity & Comfort Profile</h4>
+                <div class="w-full relative flex-grow"><canvas id="humidity-chart-canvas"></canvas></div>
+            </div>
+            <div class="flex flex-col items-center h-full col-span-3">
+                <h4 class="font-semibold text-xs uppercase text-[--text-secondary] mb-2">Sun Path Diagram</h4>
+                <div class="w-full relative flex-grow"><canvas id="sun-path-canvas"></canvas></div>
+            </div>
+        </div>
+        <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+    </div>
+        </main>
 
         <div id="sidebar-wrapper">
             <aside id="right-sidebar" class="ui-panel closed">
@@ -1672,8 +1932,15 @@
                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="mr-2 inline-block"><path stroke-linecap="round" stroke-linejoin="round" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                                     <span>Load Results File (A)</span>
                                 </label>
-                                <input type="file" id="results-file-input-a" class="hidden" accept=".txt,.res,.ill,.hdr,.dgp,.ga">
+                                <input type="file" id="results-file-input-a" class="hidden" accept=".txt,.res,.ill,.hdr,.dgp,.ga,.epw">
                                 <p id="results-file-name-a" class="text-sm text-gray-500 mt-2 text-center truncate"></p>
+                            </div>
+
+                            <div id="climate-analysis-controls" class="param-section hidden pt-4 border-t border-dashed border-[--grid-color]">
+                                <button id="climate-dashboard-btn" class="btn btn-secondary w-full">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="mr-2 inline-block"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"></path></svg>
+                                    <span>Climate Analysis</span>
+                                </button>
                             </div>
 
                             <div class="param-section pt-4 border-t border-dashed border-[--grid-color]">
@@ -2075,9 +2342,9 @@
                     
                     
                 <div data-template-id="shading-controls" class="hidden space-y-5">
-                    <div><label class="label" data-template-for="shading-type">Device Type</label><select data-template-id="shading-type" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option></select></div>
-                    <div data-template-id="shading-controls-overhang" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
-                    <div><label class="label" data-template-for="overhang-dist-above">Distance Above Top (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" data-template-id="overhang-dist-above" min="0" max="1.0" value="0" step="0.05"><span data-template-id="overhang-dist-above-val" class="data-value font-mono w-12 text-left">0.00m</span></div></div>
+                        <div><label class="label" data-template-for="shading-type">Device Type</label><select data-template-id="shading-type" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option><option value="imported_obj">Imported OBJ</option></select></div>
+                        <div data-template-id="shading-controls-overhang" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
+                        <div><label class="label" data-template-for="overhang-dist-above">Distance Above Top (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" data-template-id="overhang-dist-above" min="0" max="1.0" value="0" step="0.05"><span data-template-id="overhang-dist-above-val" class="data-value font-mono w-12 text-left">0.00m</span></div></div>
 
 
 
@@ -2108,7 +2375,40 @@
                             <div><label class="label" data-template-for="louver-slat-sep">Slat Separation (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" data-template-id="louver-slat-sep" min="0.0" max="0.5" value="0.05" step="0.01"><span data-template-id="louver-slat-sep-val" class="data-value font-mono w-12 text-left">0.05m</span></div></div>
                             <div><label class="label" data-template-for="louver-slat-thick">Slat Thickness (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" data-template-id="louver-slat-thick" min="0.0" max="0.5" value="0.01" step="0.005"><span data-template-id="louver-slat-thick-val" class="data-value font-mono w-12 text-left">0.01m</span></div></div>
                             <div><label class="label" data-template-for="louver-slat-angle">Slat Angle (°)</label><div class="flex items-center space-x-3 mt-1"><input type="range" data-template-id="louver-slat-angle" min="-90" max="90" value="0" step="1"><span data-template-id="louver-slat-angle-val" class="data-value font-mono w-12 text-left">0°</span></div></div>
-                            <div><label class="label" data-template-for="louver-dist-to-glass">Blind to Glass Distance (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" data-template-id="louver-dist-to-glass" min="0.0" max="1.0" value="0.1" step="0.01"><span data-template-id="louver-dist-to-glass-val" class="data-value font-mono w-12 text-left">0.10m</span></div></div>
+                            <<div><label class="label" data-template-for="louver-dist-to-glass">Blind to Glass Distance (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" data-template-id="louver-dist-to-glass" min="0.0" max="1.0" value="0.1" step="0.01"><span data-template-id="louver-dist-to-glass-val" class="data-value font-mono w-12 text-left">0.10m</span></div></div>
+                        </div>
+                        <div data-template-id="shading-controls-imported_obj" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
+                            <div>
+                                <label class="label" data-template-for="shading-obj-file">OBJ File (.obj)</label>
+                                <input type="file" data-template-id="shading-obj-file" accept=".obj" class="w-full text-sm">
+                                <span data-file-display-for-id="shading-obj-file" class="text-xs text-[--text-secondary] truncate block mt-1">No file selected.</span>
+                            </div>
+                            <h4 class="font-semibold text-xs uppercase text-[--text-secondary] pt-2">Transform</h4>
+                             <div>
+                                <label class="label text-xs">Position (X, Y, Z)</label>
+                                <div class="grid grid-cols-3 gap-2 mt-1">
+                                    <input type="number" data-template-id="shading-obj-pos-x" value="0" step="0.1" class="param-input-num">
+                                    <input type="number" data-template-id="shading-obj-pos-y" value="0" step="0.1" class="param-input-num">
+                                    <input type="number" data-template-id="shading-obj-pos-z" value="0" step="0.1" class="param-input-num">
+                                </div>
+                            </div>
+                             <div>
+                                <label class="label text-xs">Rotation (°)</label>
+                                <div class="grid grid-cols-3 gap-2 mt-1">
+                                    <input type="number" data-template-id="shading-obj-rot-x" value="0" step="1" class="param-input-num">
+                                    <input type="number" data-template-id="shading-obj-rot-y" value="0" step="1" class="param-input-num">
+                                    <input type="number" data-template-id="shading-obj-rot-z" value="0" step="1" class="param-input-num">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="label text-xs">Scale</label>
+                                <div class="grid grid-cols-3 gap-2 mt-1">
+                                    <input type="number" data-template-id="shading-obj-scale-x" value="1" step="0.05" class="param-input-num">
+                                    <input type="number" data-template-id="shading-obj-scale-y" value="1" step="0.05" class="param-input-num">
+                                    <input type="number" data-template-id="shading-obj-scale-z" value="1" step="0.05" class="param-input-num">
+                                </div>
+                            </div>
+                            <p class="info-box !text-xs !py-2 !px-3">Click the imported object in the 3D view to use the transform gizmo for interactive placement.</p>
                         </div>
                     </div>
                 </div>

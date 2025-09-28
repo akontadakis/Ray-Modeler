@@ -1,15 +1,14 @@
 
 // scripts/ui.js
 
-import { updateScene, axesObject, updateSensorGridColors, roomObject, shadingObject, sensorMeshes, wallSelectionGroup, highlightWall, clearWallHighlights, updateHighlightColor } from './geometry.js';
-import { activeCamera, perspectiveCamera, orthoCamera, setActiveCamera, onWindowResize, controls, transformControls, sensorTransformControls, viewpointCamera, scene, updateLiveViewType, renderer, toggleFirstPersonView as sceneToggleFPV, isFirstPersonView as sceneIsFPV, fpvOrthoCamera, updateViewpointFromUI, setGizmoVisibility, setUpdatingFromSliders, isUpdatingCameraFromSliders } from './scene.js';
+import { updateScene, axesObject, updateSensorGridColors, roomObject, shadingObject, sensorMeshes, wallSelectionGroup, highlightWall, clearWallHighlights, updateHighlightColor, furnitureObject, addFurniture, updateFurnitureColor, resizeHandlesObject } from './geometry.js';
+import { activeCamera, perspectiveCamera, orthoCamera, setActiveCamera, onWindowResize, controls, transformControls, sensorTransformControls, viewpointCamera, scene, updateLiveViewType, renderer, toggleFirstPersonView as sceneToggleFPV, isFirstPersonView as sceneIsFPV, fpvOrthoCamera, updateViewpointFromUI, setGizmoVisibility, setUpdatingFromSliders, isUpdatingCameraFromSliders, setGizmoMode } from './scene.js';
 import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { project } from './project.js';
 // The generateAndStoreOccupancyCsv function needs to be available to other modules like project.js
 export { generateAndStoreOccupancyCsv };
 import { resultsManager, palettes } from './resultsManager.js';
-import { updateAnnualMetricsDashboard, clearAnnualDashboard, openTemporalMapForPoint, openGlareRoseDiagram, updateGlareRoseDiagram, openCombinedAnalysisPanel, updateCombinedAnalysisChart } from './annualDashboard.js';
 import { initHdrViewer, openHdrViewer } from './hdrViewer.js';
 
 
@@ -18,6 +17,12 @@ const dom = {}; // No longer exported directly
 export function getDom() { return dom; } // Export a getter function instead
 
 let updateScheduled = false;
+let isResizeMode = false;
+let draggedHandle = null;
+let pointerDownPosition = new THREE.Vector2();
+let initialDimension = { width: 0, length: 0, height: 0 };
+let intersectionPoint = new THREE.Vector3();
+let dragPlane = new THREE.Plane();
 export let selectedWallId = null;
 let isWallSelectionLocked = false;
 const suggestionMemory = new Set(); // Prevents spamming suggestions during a session
@@ -275,17 +280,26 @@ const ids = [
 
     // Toolbars
     'left-toolbar', 'toggle-panel-project-btn', 'toggle-panel-dimensions-btn', 
-    'toggle-panel-aperture-btn', 'toggle-panel-lighting-btn', 'toggle-panel-materials-btn', 
-    'toggle-panel-sensor-btn', 'toggle-panel-viewpoint-btn', 'toggle-panel-view-options-btn',
+    'toggle-panel-aperture-btn', 'toggle-panel-lighting-btn', 'toggle-panel-materials-btn',
+    'toggle-panel-sensor-btn', 'toggle-panel-viewpoint-btn', 'toggle-panel-scene-btn',
     'view-controls', 'view-btn-persp', 'view-btn-ortho', 'view-btn-top', 'view-btn-front', 'view-btn-back', 'view-btn-left', 'view-btn-right',
 
+    // Scene Elements Panel
+    'panel-scene-elements', 'asset-library', 'transform-controls-section',
+    'gizmo-mode-translate', 'gizmo-mode-rotate', 'gizmo-mode-scale',
+    'obj-pos-x', 'obj-pos-y', 'obj-pos-z', 'obj-pos-x-val', 'obj-pos-y-val', 'obj-pos-z-val',
+    'obj-rot-y', 'obj-rot-y-val', // We now only have a single rotation slider for simplicity
+    'obj-scale-uniform', 'obj-scale-uniform-val',
+
     // Project Panel
+    'project-name', 'project-desc', 'building-type',
     'project-name', 'project-desc', 'building-type',
     'upload-epw-btn', 'epw-file-name', 'epw-upload-modal', 'epw-modal-close', 'modal-file-drop-area', 'epw-file-input',
     'latitude', 'longitude', 'map', 'location-inputs-container', 'radiance-path',
 
     // Dimensions Panel
     'width', 'width-val', 'length', 'length-val', 'height', 'height-val', 'room-orientation', 'room-orientation-val',
+    'resize-mode-toggle', 'resize-mode-info',
     'surface-thickness', 'surface-thickness-val',
 
     // Apertures Panel (Frames)
@@ -294,11 +308,11 @@ const ids = [
     
 
     // Materials Panel
-    'wall-mat-type', 'floor-mat-type', 'ceiling-mat-type', 'frame-mat-type', 'shading-mat-type',
-    'wall-refl', 'wall-refl-val', 'floor-refl', 'floor-refl-val', 'ceiling-refl', 'ceiling-refl-val', 
+    'wall-mat-type', 'floor-mat-type', 'ceiling-mat-type', 'frame-mat-type', 'shading-mat-type', 'furniture-mat-type',
+    'wall-refl', 'wall-refl-val', 'floor-refl', 'floor-refl-val', 'ceiling-refl', 'ceiling-refl-val', 'furniture-refl', 'furniture-refl-val',
     'glazing-trans', 'glazing-trans-val',
-    'wall-spec', 'wall-spec-val', 'floor-spec', 'floor-spec-val', 'ceiling-spec', 'ceiling-spec-val',
-    'wall-rough', 'wall-rough-val', 'floor-rough', 'floor-rough-val', 'ceiling-rough', 'ceiling-rough-val',
+    'wall-spec', 'wall-spec-val', 'floor-spec', 'floor-spec-val', 'ceiling-spec', 'ceiling-spec-val', 'furniture-spec', 'furniture-spec-val',
+    'wall-rough', 'wall-rough-val', 'floor-rough', 'floor-rough-val', 'ceiling-rough', 'ceiling-rough-val', 'furniture-rough', 'furniture-rough-val',
     'frame-refl', 'frame-refl-val', 'frame-spec', 'frame-spec-val', 'frame-rough', 'frame-rough-val',
     'shading-rough-val', 'wall-color', 'floor-color', 'ceiling-color', 'frame-color', 'shading-color',
     'wall-mode-refl', 'wall-mode-srd', 'wall-refl-controls', 'wall-srd-controls', 'wall-srd-file',
@@ -413,6 +427,7 @@ const ids = [
     // Info Panel & AI Assistant
     'info-button', 'panel-info',
     'ai-assistant-button', 'panel-ai-assistant', 'ai-chat-messages', 'ai-chat-form', 'ai-chat-input', 'ai-chat-send',
+    'ai-mode-chat', 'ai-mode-inspector', 'run-inspector-btn', 'ai-inspector-results',
     'ai-settings-btn', 'ai-settings-modal', 'ai-settings-close-btn', 'ai-settings-form', 'ai-provider-select', 'ai-model-select', 'ai-api-key-input', 'openrouter-info-box',
 
     // Project Access Prompt
@@ -455,6 +470,10 @@ const ids = [
     'proactive-suggestion-container',
 
     'generate-report-btn',
+
+    // Climate Analysis Dashboard
+    'climate-analysis-controls', 'climate-dashboard-btn', 'climate-analysis-panel',
+    'wind-rose-canvas', 'solar-radiation-canvas', 'temperature-chart-canvas',
 
     // Lighting Energy Dashboard
     'lighting-energy-dashboard', 'lpd-val', 'energy-val', 'energy-savings-val',
@@ -906,7 +925,6 @@ export async function setupEventListeners() {
     });
 
     // The import from annualDashboard is updated to include the new functions
-    const { openGlareRoseDiagram, updateGlareRoseDiagram } = await import('./annualDashboard.js');
     initHdrViewer(); // Initialize the HDR viewer
     observeAndInitDynamicPanels();
 
@@ -1072,30 +1090,40 @@ export async function setupEventListeners() {
     dom['set-viewpoint-here-btn']?.addEventListener('click', onSetViewpointHere);
 
     // --- Annual Glare Listeners ---
-    dom['glare-rose-btn']?.addEventListener('click', () => {
+    dom['glare-rose-btn']?.addEventListener('click', async () => {
+        const { openGlareRoseDiagram } = await import('./annualDashboard.js');
         openGlareRoseDiagram();
     });
-    dom['glare-rose-threshold']?.addEventListener('input', (e) => {
+    dom['glare-rose-threshold']?.addEventListener('input', async (e) => {
         if (dom['glare-rose-threshold-val']) {
             dom['glare-rose-threshold-val'].textContent = parseFloat(e.target.value).toFixed(2);
         }
         // Live update the chart if the panel is visible
         if (dom['glare-rose-panel'] && !dom['glare-rose-panel'].classList.contains('hidden')) {
+            const { updateGlareRoseDiagram } = await import('./annualDashboard.js');
             updateGlareRoseDiagram();
         }
     });
 
     // --- Combined Analysis Listeners ---
-    dom['combined-analysis-btn']?.addEventListener('click', () => {
+    dom['combined-analysis-btn']?.addEventListener('click', async () => {
+        const { openCombinedAnalysisPanel } = await import('./annualDashboard.js');
         openCombinedAnalysisPanel();
     });
-    dom['combined-glare-threshold']?.addEventListener('input', (e) => {
+    dom['combined-glare-threshold']?.addEventListener('input', async (e) => {
         if (dom['combined-glare-threshold-val']) {
             dom['combined-glare-threshold-val'].textContent = parseFloat(e.target.value).toFixed(2);
         }
         if (dom['combined-analysis-panel'] && !dom['combined-analysis-panel'].classList.contains('hidden')) {
+            const { updateCombinedAnalysisChart } = await import('./annualDashboard.js');
             updateCombinedAnalysisChart();
         }
+    });
+    
+    // --- Climate Analysis Listener ---
+    dom['climate-dashboard-btn']?.addEventListener('click', async () => {
+        const { openClimateAnalysisDashboard } = await import('./annualDashboard.js');
+        openClimateAnalysisDashboard();
     });
 
     // --- Results Panel Listeners ---
@@ -1202,10 +1230,48 @@ export async function setupEventListeners() {
 
     setupAperturePanel();
     setupProjectPanel();
+    _setupAssetLibraryDragDrop();
     window.addEventListener('resize', onWindowResize);
-    renderer.domElement.addEventListener('click', onWallClick, false);
+    dom['resize-mode-toggle']?.addEventListener('change', (e) => {
+        isResizeMode = e.target.checked;
+        dom['resize-mode-info'].classList.toggle('hidden', !isResizeMode);
+        scheduleUpdate(); // Rebuild scene to show/hide handles
+    });
+    renderer.domElement.addEventListener('pointerdown', onPointerDown, false);
+    renderer.domElement.addEventListener('pointermove', onPointerMove, false);
+    renderer.domElement.addEventListener('pointerup', onPointerUp, false);
 
     if(dom['view-type']) updateLiveViewType(dom['view-type'].value);
+
+   // --- Gizmo Mode Listeners ---
+    dom['gizmo-mode-translate']?.addEventListener('click', () => setGizmoMode('translate'));
+    dom['gizmo-mode-rotate']?.addEventListener('click', () => setGizmoMode('rotate'));
+    dom['gizmo-mode-scale']?.addEventListener('click', () => setGizmoMode('scale'));
+
+    // Listeners for the new transform sliders with real-time feedback
+    const transformSliders = ['obj-pos-x', 'obj-pos-y', 'obj-pos-z', 'obj-rot-y', 'obj-scale-uniform'];
+    transformSliders.forEach(id => {
+        const slider = dom[id];
+        const label = dom[`${id}-val`];
+        if (slider && label) {
+            slider.addEventListener('input', () => {
+                let unit = '';
+                if (id.startsWith('obj-pos')) unit = 'm';
+                else if (id.startsWith('obj-rot')) unit = '°';
+                
+                updateValueLabel(label, slider.value, unit, id);
+                _updateObjectFromTransformSliders();
+            });
+        }
+    });
+    
+    // Listener for updates from the transform gizmo in the 3D scene
+    renderer.domElement.addEventListener('transformGizmoChange', (e) => {
+        if (e.detail.object) {
+            _updateTransformSlidersFromObject(e.detail.object);
+        }
+    });
+
 
     // --- Occupancy Schedule Listeners ---
     dom['occupancy-toggle']?.addEventListener('change', (e) => {
@@ -1714,9 +1780,9 @@ function setupPanelToggleButtons() {
         'toggle-panel-sensor-btn': 'panel-sensor',
         'toggle-panel-sensor-btn': 'panel-sensor',
         'toggle-panel-viewpoint-btn': 'panel-viewpoint',
-        'toggle-panel-view-options-btn': 'panel-view-options',
+        'toggle-panel-scene-btn': 'panel-scene-elements',
         'info-button': 'panel-info',
-        'ai-assistant-button': 'panel-ai-assistant' // Add the new mapping
+        'ai-assistant-button': 'panel-ai-assistant'
         };
 
         for (const [btnId, panelId] of Object.entries(panelMap)) {
@@ -2134,10 +2200,14 @@ function setupEpwUploadModal() {
             fileNameDisplay.title = file.name;
 
             const reader = new FileReader();
-            reader.onload = async function(e) {
+           reader.onload = async function(e) {
             try {
                 const epwContent = e.target.result;
                 await project.setEpwData(epwContent);
+                
+                // Also parse the file for climate analysis
+                await resultsManager.loadAndProcessFile(file, 'a');
+                dom['climate-analysis-controls']?.classList.remove('hidden');
 
                 const lines = epwContent.split('\n');
                 const locationLine = lines.find(line => line.startsWith('LOCATION'));
@@ -2323,7 +2393,7 @@ function setCameraView(view) {
     }
 }
 
-function handleInputChange(e) {
+async function handleInputChange(e) {
     const id = e.target.id;
     const val = e.target.value;
     const valEl = dom[`${id}-val`];
@@ -2344,9 +2414,8 @@ function handleInputChange(e) {
     if (id.includes('-refl') && !suggestionMemory.has('unrealistic_reflectance')) {
         const numVal = parseFloat(val);
         if (numVal < 0.1 || numVal > 0.85) {
-            import('./ai-assistant.js').then(({ triggerProactiveSuggestion }) => {
-                triggerProactiveSuggestion('unrealistic_reflectance');
-            });
+            const { triggerProactiveSuggestion } = await import('./ai-assistant.js');
+            triggerProactiveSuggestion('unrealistic_reflectance');
             suggestionMemory.add('unrealistic_reflectance'); // Remember we've shown this
         }
     }
@@ -2355,16 +2424,14 @@ function handleInputChange(e) {
     const qualityPresetPanel = e.target.closest('.floating-window');
     if (qualityPresetPanel && id.startsWith('ab') && !suggestionMemory.has('low_ambient_bounces')) {
         if (parseInt(val, 10) < 2) {
-            import('./ai-assistant.js').then(({ triggerProactiveSuggestion }) => {
-                triggerProactiveSuggestion('low_ambient_bounces');
-            });
+            const { triggerProactiveSuggestion } = await import('./ai-assistant.js');
+            triggerProactiveSuggestion('low_ambient_bounces');
             suggestionMemory.add('low_ambient_bounces');
         }
     }
 
     debouncedScheduleUpdate(id);
 }
-
 
 /**
  * Configuration for formatting numeric values based on input ID patterns.
@@ -3034,6 +3101,9 @@ export function setupThemeSwitcher() {
         // Update the 3D highlight color to match the new theme
         updateHighlightColor();
 
+        // Update furniture colors to match the new theme
+        updateFurnitureColor();
+
         // Re-render Mermaid diagrams with the new theme
         if (typeof mermaid !== 'undefined' && mermaid.run) {
             const style = getComputedStyle(document.documentElement);
@@ -3119,10 +3189,10 @@ export async function clearAllResultsDisplay() {
     if (dom['results-file-input-b']) dom['results-file-input-b'].value = '';
     if (dom['generate-report-btn']) dom['generate-report-btn'].classList.add('hidden');
 
-    clearAnnualDashboard();
-    clearTimeSeriesExplorer();
-    // NEW: Also clear the lighting energy dashboard
-        const { clearLightingEnergyDashboard } = await import('./annualDashboard.js');
+    const { clearAnnualDashboard, clearLightingEnergyDashboard } = await import('./annualDashboard.js');
+        clearAnnualDashboard();
+        clearTimeSeriesExplorer();
+        // NEW: Also clear the lighting energy dashboard
         clearLightingEnergyDashboard();
         updateSpectralMetricsDashboard(null); // Clear the spectral dashboard
 
@@ -3140,9 +3210,14 @@ async function handleResultsFile(file, key) {
 
     const fileNameDisplay = dom[`results-file-name-${key}`];
     if (fileNameDisplay) fileNameDisplay.textContent = `Loading ${file.name}...`;
-    const isHdrFile = file.name.toLowerCase().endsWith('.hdr');
+    const lowerFileName = file.name.toLowerCase();
+    const isHdrFile = lowerFileName.endsWith('.hdr');
+    const isEpwFile = lowerFileName.endsWith('.epw');
 
-    clearAllResultsDisplay();
+    // For EPW files, we only want to load climate data, not clear other results
+    if (!isEpwFile) {
+        clearAllResultsDisplay();
+    }
 
     if (isHdrFile) {
         const loader = new RGBELoader();
@@ -3161,9 +3236,17 @@ async function handleResultsFile(file, key) {
     });
 
     } else {
-    // Handle .ill and other text-based results files
+    // Handle .ill, .epw, and other text-based results files
     try {
-        const { key: loadedKey } = await resultsManager.loadAndProcessFile(file, key);
+        const result = await resultsManager.loadAndProcessFile(file, key);
+        const loadedKey = result.key;
+
+        // If an EPW was loaded, just show the climate button and stop
+        if (result.type === 'climate') {
+            if (fileNameDisplay) fileNameDisplay.textContent = file.name;
+            dom['climate-analysis-controls']?.classList.remove('hidden');
+            return;
+        }
 
         if (resultsManager.hasAnnualData(loadedKey)) {
             const { project } = await import('./project.js');
@@ -3177,12 +3260,12 @@ async function handleResultsFile(file, key) {
 
     // After loading, check for annual data to update relevant dashboards
     if (resultsManager.hasAnnualData(loadedKey)) {
+        const { updateAnnualMetricsDashboard, updateLightingEnergyDashboard } = await import('./annualDashboard.js');
         const metrics = resultsManager.calculateAnnualMetrics(loadedKey, {});
         const lightingMetrics = resultsManager.datasets[loadedKey].lightingMetrics;
         const energyMetrics = resultsManager.datasets[loadedKey].lightingEnergyMetrics;
         updateAnnualMetricsDashboard(metrics, lightingMetrics);
-            if (energyMetrics) {
-            const { updateLightingEnergyDashboard } = await import('./annualDashboard.js');
+        if (energyMetrics) {
             updateLightingEnergyDashboard(energyMetrics);
         }
         updateTimeSeriesExplorer();
@@ -3433,7 +3516,7 @@ export function updateViewpointFromSliders() {
 * Handles clicks on the 3D scene to detect clicks on sensor points.
 * @param {MouseEvent} event The click event.
 */
-function onSensorClick(event) {
+async function onSensorClick(event) {
     // Only proceed if annual data is loaded and a panel isn't being dragged
     if (!resultsManager.hasAnnualData('a') || event.target.closest('.floating-window .window-header')) {
         return;
@@ -3464,9 +3547,10 @@ function onSensorClick(event) {
         }
 
         const finalIndex = baseIndex + instanceId;
-        openTemporalMapForPoint(finalIndex);
+            const { openTemporalMapForPoint } = await import('./annualDashboard.js');
+            openTemporalMapForPoint(finalIndex);
+        }
     }
-}
 
 /**
  * Projects a 2D pixel coordinate from a fisheye image into the 3D scene to find a glare source.
@@ -3922,10 +4006,10 @@ export function setupWelcomeScreen() {
 }
 
 /**
-* Handles a click on the main renderer canvas to select/deselect walls.
+* Handles a click on the main renderer canvas to select/deselect walls or furniture.
 * @param {MouseEvent} event The click event.
 */
-function onWallClick(event) {
+function onSceneClick(event) {
     // Prevent selection when interacting with gizmos
     if (transformControls.dragging || sensorTransformControls.dragging) {
         return;
@@ -3938,35 +4022,26 @@ function onWallClick(event) {
 
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(pointer, activeCamera);
-    const intersects = raycaster.intersectObjects(wallSelectionGroup.children, true);
+
+    const objectsToIntersect = [wallSelectionGroup];
+    if (furnitureObject.children.length > 0) {
+        objectsToIntersect.push(furnitureObject);
+    }
+    const intersects = raycaster.intersectObjects(objectsToIntersect, true);
+
     const wallIntersect = intersects.find(i => i.object.userData.isSelectableWall === true);
+    const furnitureIntersect = intersects.find(i => i.object.userData.isFurniture === true);
 
-    if (wallIntersect) {
-        let targetGroup = wallIntersect.object.parent;
-        while (targetGroup && !targetGroup.userData.canonicalId) {
-            targetGroup = targetGroup.parent;
-        }
-
-        if (!targetGroup) return;
-
-        const newWallId = targetGroup.userData.canonicalId;
-
-        if (isWallSelectionLocked) {
-            if (newWallId === selectedWallId) {
-                // If clicking the SAME locked wall, unlock it.
-                isWallSelectionLocked = false;
-                updateLockIcon();
-            }
-            // If a different wall is clicked while locked, do nothing.
-        } else {
-            // If UNLOCKED, select any new wall and reset the lock state (default behavior).
-            if (newWallId !== selectedWallId) {
-                handleWallSelection(targetGroup, true);
-            }
-        }
+    if (furnitureIntersect) {
+        // Clicked on a piece of furniture, select it
+        handleFurnitureSelection(furnitureIntersect.object);
+    } else if (wallIntersect) {
+        // Clicked on a wall, handle wall selection logic
+        transformControls.detach(); // Detach from any furniture
+        handleWallInteraction(wallIntersect);
     } else {
-        // Clicked on empty space, which respects the lock state.
-        handleWallDeselection();
+        // Clicked on empty space
+        handleDeselection();
     }
 }
 
@@ -4030,6 +4105,51 @@ function showApertureControlsFor(id) {
         isWallSelectionLocked = false;
         updateLockIcon();
     }
+}
+
+/**
+ * Handles the logic for selecting a furniture object and attaching the transform gizmo.
+ * @param {THREE.Mesh} furnitureMesh The mesh object of the furniture that was clicked.
+ */
+function handleFurnitureSelection(furnitureMesh) {
+    handleWallDeselection(); // Deselect any walls first
+    transformControls.attach(furnitureMesh);
+    dom['transform-controls-section']?.classList.remove('hidden');
+    _updateTransformSlidersFromObject(furnitureMesh);
+}
+
+/**
+ * Handles clicks specifically on walls.
+ * @param {object} wallIntersect The intersection object from the raycaster.
+ */
+function handleWallInteraction(wallIntersect) {
+    let targetGroup = wallIntersect.object.parent;
+    while (targetGroup && !targetGroup.userData.canonicalId) {
+        targetGroup = targetGroup.parent;
+    }
+    if (!targetGroup) return;
+
+    const newWallId = targetGroup.userData.canonicalId;
+
+    if (isWallSelectionLocked) {
+        if (newWallId === selectedWallId) {
+            isWallSelectionLocked = false;
+            updateLockIcon();
+        }
+    } else {
+        if (newWallId !== selectedWallId) {
+            handleWallSelection(targetGroup, true);
+        }
+    }
+}
+
+/**
+ * Manages deselection of any selected object (walls or furniture).
+ */
+function handleDeselection() {
+    handleWallDeselection();
+    transformControls.detach();
+    dom['transform-controls-section']?.classList.add('hidden');
 }
 
 /**
@@ -4264,10 +4384,12 @@ export function displayProactiveSuggestion(htmlContent) {
                         break;
                     case 'show_temporal_map_info':
                         showAlert('To view a temporal map, right-click on any sensor point in the 3D view after loading annual results.', 'Temporal Map');
-                        break;
-                    case 'open_glare_rose':
+                    break;
+                    case 'open_glare_rose': {
+                        const { openGlareRoseDiagram } = await import('./annualDashboard.js');
                         openGlareRoseDiagram();
                         break;
+                    }
                     case 'set_view_fisheye':
                         if (dom['view-type']) {
                             dom['view-type'].value = 'h'; // 'h' is standard fisheye
@@ -4921,5 +5043,255 @@ await new Promise(resolve => setTimeout(resolve, 10));
     } finally {
     btn.disabled = false;
     btnSpan.textContent = originalText;
+    }
+}
+
+/**
+ * Sets up the drag and drop functionality for the asset library.
+ * @private
+ */
+function _setupAssetLibraryDragDrop() {
+    const assetLibrary = dom['asset-library'];
+    const renderContainer = dom['render-container'];
+    if (!assetLibrary || !renderContainer) return;
+
+    let draggedAssetType = null;
+
+    assetLibrary.addEventListener('dragstart', (e) => {
+        const item = e.target.closest('.asset-item');
+        if (item && item.dataset.assetType) {
+            draggedAssetType = item.dataset.assetType;
+            e.dataTransfer.effectAllowed = 'copy';
+        }
+    });
+
+    renderContainer.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+    });
+
+    renderContainer.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (!draggedAssetType) return;
+
+        const rect = renderContainer.getBoundingClientRect();
+        const pointer = new THREE.Vector2();
+        pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(pointer, activeCamera);
+
+        // Intersect with the ground plane to find the drop position
+        const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+        const intersectPoint = new THREE.Vector3();
+        raycaster.ray.intersectPlane(groundPlane, intersectPoint);
+
+        if (intersectPoint) {
+            addFurniture(draggedAssetType, intersectPoint);
+        }
+        draggedAssetType = null;
+    });
+}
+
+/**
+* Reads a 3D object's transform properties and populates the UI input fields.
+* @param {THREE.Object3D} object The object to read from.
+* @private
+*/
+function _updateTransformSlidersFromObject(object) {
+    if (!object) return;
+
+    // Position
+    dom['obj-pos-x'].value = object.position.x;
+    updateValueLabel(dom['obj-pos-x-val'], object.position.x, 'm', 'obj-pos-x');
+    dom['obj-pos-y'].value = object.position.y;
+    updateValueLabel(dom['obj-pos-y-val'], object.position.y, 'm', 'obj-pos-y');
+    dom['obj-pos-z'].value = object.position.z;
+    updateValueLabel(dom['obj-pos-z-val'], object.position.z, 'm', 'obj-pos-z');
+
+    // Rotation (Y-axis only)
+    const rotY = THREE.MathUtils.radToDeg(object.rotation.y);
+    dom['obj-rot-y'].value = rotY;
+    updateValueLabel(dom['obj-rot-y-val'], rotY, '°', 'obj-rot-y');
+
+    // Scale (Uniform, using X-axis as the master)
+    const scale = object.scale.x;
+    dom['obj-scale-uniform'].value = scale;
+    updateValueLabel(dom['obj-scale-uniform-val'], scale, '', 'obj-scale-uniform');
+}
+
+/**
+* Reads the transform input fields and applies the values to the selected 3D object.
+* @private
+*/
+function _updateObjectFromTransformSliders() {
+    const object = transformControls.object;
+    if (!object) return;
+
+    // Position
+    object.position.set(
+        parseFloat(dom['obj-pos-x'].value),
+        parseFloat(dom['obj-pos-y'].value),
+        parseFloat(dom['obj-pos-z'].value)
+    );
+
+    // Rotation (Y-axis only) - Preserve existing X and Z rotation
+    object.rotation.y = THREE.MathUtils.degToRad(parseFloat(dom['obj-rot-y'].value));
+
+    // Scale (Uniform)
+    const scale = parseFloat(dom['obj-scale-uniform'].value);
+    object.scale.set(scale, scale, scale);
+}
+
+/**
+ * Handles the pointer down event to initiate a resize drag or prepare for a click.
+ */
+function onPointerDown(event) {
+    if (event.button !== 0) return;
+    pointerDownPosition.set(event.clientX, event.clientY);
+
+    if (isResizeMode) {
+        const pointer = new THREE.Vector2();
+        const rect = renderer.domElement.getBoundingClientRect();
+        pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(pointer, activeCamera);
+        
+        const intersects = raycaster.intersectObjects(resizeHandlesObject.children);
+
+        if (intersects.length > 0) {
+            draggedHandle = intersects[0].object;
+            intersectionPoint.copy(intersects[0].point);
+
+            initialDimension.width = parseFloat(dom.width.value);
+            initialDimension.length = parseFloat(dom.length.value);
+            initialDimension.height = parseFloat(dom.height.value);
+
+            const normal = (draggedHandle.userData.axis === 'y') 
+                ? activeCamera.getWorldDirection(new THREE.Vector3()).negate() 
+                : new THREE.Vector3(0, 1, 0).applyQuaternion(roomObject.quaternion);
+            dragPlane.setFromNormalAndCoplanarPoint(normal, intersectionPoint);
+            
+            controls.enabled = false;
+            renderer.domElement.style.cursor = 'move';
+        }
+    }
+}
+
+/**
+ * Handles the pointer move event to perform the resize and update the UI.
+ */
+function onPointerMove(event) {
+    if (isResizeMode) {
+        updateResizeCursor(event); // Update cursor style on hover
+    }
+    if (!isResizeMode || !draggedHandle) return;
+
+    const pointer = new THREE.Vector2();
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(pointer, activeCamera);
+
+    const newPoint = new THREE.Vector3();
+    if (raycaster.ray.intersectPlane(dragPlane, newPoint)) {
+        const delta = newPoint.clone().sub(intersectionPoint);
+        const roomInverseQuaternion = roomObject.quaternion.clone().invert();
+        delta.applyQuaternion(roomInverseQuaternion);
+
+        const handleData = draggedHandle.userData;
+        if (handleData.axis === 'x') {
+            dom.width.value = Math.max(1, initialDimension.width + delta.x * handleData.direction * 2).toFixed(1);
+            dom.width.dispatchEvent(new Event('input', { bubbles: true }));
+        } else if (handleData.axis === 'z') {
+            dom.length.value = Math.max(1, initialDimension.length + delta.z * handleData.direction * 2).toFixed(1);
+            dom.length.dispatchEvent(new Event('input', { bubbles: true }));
+        } else if (handleData.axis === 'y') {
+            dom.height.value = Math.max(1, initialDimension.height + delta.y * handleData.direction).toFixed(1);
+            dom.height.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    }
+}
+
+/**
+ * Handles the pointer up event to end a resize drag or trigger a scene click action.
+ */
+function onPointerUp(event) {
+    if (draggedHandle) {
+        // This was the end of a resize drag
+        draggedHandle = null;
+        controls.enabled = true;
+        renderer.domElement.style.cursor = 'auto';
+        return; 
+    }
+
+    // Check if the mouse moved significantly. If not, treat it as a click.
+    const pointerUpPosition = new THREE.Vector2(event.clientX, event.clientY);
+    if (pointerUpPosition.distanceTo(pointerDownPosition) < 5) { // 5-pixel tolerance for a "click"
+        handleSceneClick(event);
+    }
+}
+
+/**
+ * Contains the logic for selecting objects in the scene, formerly in onSceneClick.
+ */
+function handleSceneClick(event) {
+    if (transformControls.dragging || sensorTransformControls.dragging || isResizeMode) return;
+
+    const pointer = new THREE.Vector2();
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(pointer, activeCamera);
+
+    const objectsToIntersect = [wallSelectionGroup, furnitureObject];
+    const intersects = raycaster.intersectObjects(objectsToIntersect, true);
+
+    const wallIntersect = intersects.find(i => i.object.userData.isSelectableWall === true);
+    const furnitureIntersect = intersects.find(i => i.object.userData.isFurniture === true);
+
+    if (furnitureIntersect) {
+        handleFurnitureSelection(furnitureIntersect.object);
+    } else if (wallIntersect) {
+        transformControls.detach();
+        handleWallInteraction(wallIntersect);
+    } else {
+        handleDeselection();
+    }
+}
+
+/**
+ * Changes the cursor style when hovering over a resize handle.
+ */
+function updateResizeCursor(event) {
+    // Don't do anything if a drag is already in progress
+    if (draggedHandle) {
+        renderer.domElement.style.cursor = 'move';
+        return;
+    }
+
+    const pointer = new THREE.Vector2();
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(pointer, activeCamera);
+
+    const intersects = raycaster.intersectObjects(resizeHandlesObject.children, false);
+
+    if (intersects.length > 0) {
+        const axis = intersects[0].object.userData.axis;
+        // Show ns-resize for up/down, and ew-resize for left/right
+        renderer.domElement.style.cursor = (axis === 'y' || axis === 'z') ? 'ns-resize' : 'ew-resize';
+    } else {
+        renderer.domElement.style.cursor = 'auto';
     }
 }

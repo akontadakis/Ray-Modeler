@@ -1,13 +1,18 @@
 // scripts/annualDashboard.js
 
 import { resultsManager, palettes } from './resultsManager.js';
-import { getNewZIndex, ensureWindowInView, initializePanelControls, showAlert } from './ui.js';
 
 // Store chart instances to destroy/update them later
 let sdaGauge = null;
 let aseGauge = null;
 let udiChart = null;
 let savingsGauge = null;
+let climateAnalysisPanel = null;
+let windRoseChart = null;
+let solarRadiationChart = null;
+let temperatureChart = null;
+let humidityChart = null;
+let sunPathChart = null;
 let powerGauge = null;
 let glareRoseChart = null;
 let combinedAnalysisChart = null;
@@ -18,18 +23,251 @@ let energySavingsGauge = null;
 let temporalMapPanel = null, temporalMapCanvas = null, temporalMapTooltip = null;
 
 /**
- * Opens the glare rose panel and triggers chart generation.
+ * Opens the climate analysis dashboard and generates the charts.
+ */
+export async function openClimateAnalysisDashboard() {
+    // Dynamic import to break circular dependency
+    const { getNewZIndex, ensureWindowInView, initializePanelControls, showAlert } = await import('./ui.js');
+
+    if (!climateAnalysisPanel) {
+        climateAnalysisPanel = document.getElementById('climate-analysis-panel');
+        if (!climateAnalysisPanel) return;
+        initializePanelControls(climateAnalysisPanel);
+    }
+    
+    if (!resultsManager.climateData) {
+        showAlert('No climate data has been loaded. Please load an EPW file via the Project Setup or Analysis panel.', 'No Data');
+        return;
+    }
+
+    climateAnalysisPanel.classList.remove('hidden');
+    climateAnalysisPanel.style.zIndex = getNewZIndex();
+    ensureWindowInView(climateAnalysisPanel);
+
+    // Use requestAnimationFrame to ensure the panel is visible and has dimensions before drawing charts
+    requestAnimationFrame(() => {
+        createWindRoseChart();
+        createSolarRadiationChart();
+        createTemperatureChart();
+        createHumidityChart();
+        createSunPathChart();
+    });
+}
+
+/**
+ * Creates and renders the wind rose chart.
+ */
+function createWindRoseChart() {
+    const chartData = resultsManager.getWindRoseData();
+    if (!chartData) return;
+    
+    const canvas = document.getElementById('wind-rose-canvas');
+    if (!canvas) return;
+    if (windRoseChart) windRoseChart.destroy();
+
+    const speedColors = ['#a6d9f6', '#73b3df', '#4488c5', '#1a5ea4', '#08306b', '#001a3f'];
+    const speedLabels = [`< ${chartData.speedBins[0]} m/s`];
+    for(let i = 0; i < chartData.speedBins.length - 1; i++) {
+        speedLabels.push(`${chartData.speedBins[i]}-${chartData.speedBins[i+1]} m/s`);
+    }
+    speedLabels.push(`> ${chartData.speedBins[chartData.speedBins.length - 1]} m/s`);
+    
+    const datasets = chartData.bins[0].map((_, speedIndex) => ({
+        label: speedLabels[speedIndex],
+        data: chartData.bins.map(dirBin => dirBin[speedIndex]),
+        backgroundColor: speedColors[speedIndex],
+    }));
+
+    windRoseChart = new Chart(canvas, {
+        type: 'radar',
+        data: { labels: chartData.labels, datasets },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } },
+            scales: { r: { beginAtZero: true, ticks: { backdropColor: 'transparent' } } }
+        }
+    });
+}
+
+/**
+ * Creates and renders the monthly solar radiation chart.
+ */
+function createSolarRadiationChart() {
+    const chartData = resultsManager.getMonthlySolarData();
+    if (!chartData) return;
+
+    const canvas = document.getElementById('solar-radiation-canvas');
+    if (!canvas) return;
+    if (solarRadiationChart) solarRadiationChart.destroy();
+
+    solarRadiationChart = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels: chartData.labels,
+            datasets: [
+                { label: 'Avg Daily Direct', data: chartData.dni, backgroundColor: '#f97316' },
+                { label: 'Avg Daily Diffuse', data: chartData.dhi, backgroundColor: '#3b82f6' }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } },
+            scales: { y: { beginAtZero: true, stacked: true }, x: { stacked: true } }
+        }
+    });
+}
+
+/**
+ * Creates and renders the annual temperature range chart.
+ */
+function createTemperatureChart() {
+    const chartData = resultsManager.getMonthlyTemperatureData();
+    if (!chartData) return;
+
+    const canvas = document.getElementById('temperature-chart-canvas');
+    if (!canvas) return;
+    if (temperatureChart) temperatureChart.destroy();
+    
+    temperatureChart = new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels: chartData.labels,
+            datasets: [
+                {
+                    label: 'Max Temp', data: chartData.max,
+                    borderColor: 'rgba(239, 68, 68, 0.8)', tension: 0.1, pointRadius: 0
+                },
+                {
+                    label: 'Min Temp', data: chartData.min,
+                    borderColor: 'rgba(59, 130, 246, 0.8)', tension: 0.1, pointRadius: 0,
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: '-1' // Fill to the dataset above (max temp)
+                },
+                 {
+                    label: 'Avg Temp', data: chartData.avg,
+                    borderColor: 'rgba(255, 255, 255, 0.6)', borderWidth: 2, tension: 0.1, pointRadius: 0
+                },
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: false, ticks: { callback: value => `${value}°C` } } }
+        }
+    });
+}
+
+/**
+ * Creates and renders the hourly temperature vs. humidity scatter plot.
+ */
+function createHumidityChart() {
+    const climateData = resultsManager.climateData;
+    if (!climateData || !climateData.temp || !climateData.rh) return;
+
+    const canvas = document.getElementById('humidity-chart-canvas');
+    if (!canvas) return;
+    if (humidityChart) humidityChart.destroy();
+
+    // Color points by season
+    const points = climateData.temp.map((temp, i) => {
+        const day = Math.floor(i / 24);
+        let season = 'winter'; // Dec, Jan, Feb
+        if (day >= 79 && day < 172) season = 'spring'; // Mar, Apr, May
+        else if (day >= 172 && day < 265) season = 'summer'; // Jun, Jul, Aug
+        else if (day >= 265 && day < 355) season = 'autumn'; // Sep, Oct, Nov
+        
+        return { x: temp, y: climateData.rh[i], season: season };
+    });
+
+    const seasonColors = {
+        winter: 'rgba(59, 130, 246, 0.5)',
+        spring: 'rgba(34, 197, 94, 0.5)',
+        summer: 'rgba(239, 68, 68, 0.5)',
+        autumn: 'rgba(249, 115, 22, 0.5)'
+    };
+
+    humidityChart = new Chart(canvas, {
+        type: 'scatter',
+        data: {
+            datasets: Object.keys(seasonColors).map(season => ({
+                label: season.charAt(0).toUpperCase() + season.slice(1),
+                data: points.filter(p => p.season === season),
+                backgroundColor: seasonColors[season],
+                pointRadius: 2,
+                pointHoverRadius: 4
+            }))
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { 
+                legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } },
+                tooltip: { callbacks: { label: ctx => `(${ctx.raw.x.toFixed(1)}°C, ${ctx.raw.y.toFixed(0)}% RH)` } }
+            },
+            scales: {
+                x: { type: 'linear', position: 'bottom', title: { display: true, text: 'Dry Bulb Temperature (°C)' } },
+                y: { beginAtZero: true, max: 100, title: { display: true, text: 'Relative Humidity (%)' } }
+            }
+        }
+    });
+}
+
+/**
+ * Creates and renders the sun path diagram.
+ */
+function createSunPathChart() {
+    const chartData = resultsManager.getSunPathData();
+    if (!chartData) return;
+    
+    const canvas = document.getElementById('sun-path-canvas');
+    if (!canvas) return;
+    if (sunPathChart) sunPathChart.destroy();
+
+    sunPathChart = new Chart(canvas, {
+        type: 'polarArea',
+        data: {
+            labels: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'],
+            datasets: [
+                { label: 'Summer Solstice', data: chartData.summerSolstice, backgroundColor: 'rgba(239, 68, 68, 0.7)', pointStyle: 'circle', radius: 3 },
+                { label: 'Equinox', data: chartData.equinox, backgroundColor: 'rgba(34, 197, 94, 0.7)', pointStyle: 'rect', radius: 3 },
+                { label: 'Winter Solstice', data: chartData.winterSolstice, backgroundColor: 'rgba(59, 130, 246, 0.7)', pointStyle: 'triangle', radius: 3 },
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 }, usePointStyle: true } },
+                tooltip: { callbacks: { label: ctx => ` Azimuth: ${ctx.raw.t.toFixed(1)}°, Altitude: ${(90 - ctx.raw.r).toFixed(1)}°` } }
+            },
+            scales: {
+                r: {
+                    type: 'linear', max: 90, min: 0, startAngle: -90,
+                    ticks: {
+                        stepSize: 30, backdropColor: 'transparent',
+                        callback: value => `${90 - value}°` // Display as altitude
+                    }
+                }
+            },
+            elements: { line: { show: true, tension: 0.1, borderWidth: 2 } },
+            // Re-map the data to use line elements instead of area fills
+            datasets: { polarArea: { showLine: true } }
+        }
+    });
+}
+
+/**
+* Opens the glare rose panel and triggers chart generation.
  */
 export async function openGlareRoseDiagram() {
     const panel = document.getElementById('glare-rose-panel');
     if (!panel) return;
 
+    // Dynamic import to break circular dependency
+    const { showAlert, getNewZIndex, ensureWindowInView, initializePanelControls } = await import('./ui.js');
+
     if (!resultsManager.hasAnnualGlareData('a')) {
-        const { showAlert } = await import('./ui.js');
         showAlert('Please load an annual glare results file (.dgp) first.', 'No Data');
         return;
     }
-    
+
     initializePanelControls(panel);
     panel.classList.remove('hidden');
     panel.style.zIndex = getNewZIndex();
@@ -130,9 +368,12 @@ function createGlareRoseChart(chartData) {
 /**
  * Opens the combined daylight/glare analysis panel and triggers chart generation.
  */
-export function openCombinedAnalysisPanel() {
+export async function openCombinedAnalysisPanel() {
     const panel = document.getElementById('combined-analysis-panel');
     if (!panel) return;
+
+    // Dynamic import to break circular dependency
+    const { showAlert, getNewZIndex, ensureWindowInView, initializePanelControls } = await import('./ui.js');
 
     const hasIll = resultsManager.hasAnnualData('a') || resultsManager.hasAnnualData('b');
     const hasDgp = resultsManager.hasAnnualGlareData('a') || resultsManager.hasAnnualGlareData('b');
@@ -505,7 +746,8 @@ export function updateAnnualMetricsDashboard(metrics, lightingMetrics) {
 * Opens and renders the temporal map for a specific sensor point.
 * @param {number} pointIndex The global index of the sensor point.
 */
-export function openTemporalMapForPoint(pointIndex) {
+export async function openTemporalMapForPoint(pointIndex) {
+    const { getNewZIndex, ensureWindowInView, initializePanelControls } = await import('./ui.js');
     const data = resultsManager.getAnnualDataForPoint('a', pointIndex);
     if (!data) {
         console.error(`No annual data found for point index ${pointIndex}`);

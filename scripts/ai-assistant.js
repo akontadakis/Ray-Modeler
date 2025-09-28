@@ -39,6 +39,11 @@ const availableTools = [
                 }
             },
             {
+                "name": "runDesignInspector",
+                "description": "Performs a comprehensive analysis of the entire project configuration, checking for common errors, potential issues, and adherence to best practices. Returns a structured list of findings.",
+                "parameters": { "type": "OBJECT", "properties": {} }
+            },
+            {
                 "name": "setDimension",
                 "description": "Sets a primary room dimension (width, length, or height) to a new value.",
                 "parameters": {
@@ -420,6 +425,7 @@ const modelsByProvider = {
     ]
 };
 
+
 /**
  * Initializes the AI Assistant, setting up all necessary event listeners.
  */
@@ -431,9 +437,6 @@ function initAiAssistant() {
         console.warn('AI Assistant button not found, feature disabled.');
         return;
     }
-    
-    // NOTE: The main button to open the panel is already handled by the generic
-    // panel toggling logic in ui.js, so we don't need to add a listener for it here.
 
     dom['ai-chat-form']?.addEventListener('submit', handleSendMessage);
     dom['ai-settings-btn']?.addEventListener('click', openSettingsModal);
@@ -444,9 +447,163 @@ function initAiAssistant() {
         toggleProviderInfo(e.target.value);
     });
 
+    // Listeners for Inspector Mode
+    dom['ai-mode-chat']?.addEventListener('click', switchToChatMode);
+    dom['ai-mode-inspector']?.addEventListener('click', switchToInspectorMode);
+    dom['run-inspector-btn']?.addEventListener('click', handleRunInspector);
+    dom['ai-inspector-results']?.addEventListener('click', handleInspectorActionClick);
+
     loadSettings();
     loadKnowledgeBase(); // Load custom knowledge documents
     addMessage('ai', 'Hello! How can I help you with your simulation?');
+}
+
+/**
+ * Switches the AI panel to Chat mode.
+ */
+function switchToChatMode() {
+    dom['ai-mode-chat'].classList.add('active');
+    dom['ai-mode-inspector'].classList.remove('active');
+
+    dom['ai-chat-messages'].classList.remove('hidden');
+    dom['ai-chat-form'].classList.remove('hidden');
+
+    dom['ai-inspector-results'].classList.add('hidden');
+    dom['run-inspector-btn'].classList.add('hidden');
+}
+
+/**
+ * Switches the AI panel to Inspector mode.
+ */
+function switchToInspectorMode() {
+    dom['ai-mode-inspector'].classList.add('active');
+    dom['ai-mode-chat'].classList.remove('active');
+
+    dom['ai-inspector-results'].classList.remove('hidden');
+    dom['run-inspector-btn'].classList.remove('hidden');
+
+    dom['ai-chat-messages'].classList.add('hidden');
+    dom['ai-chat-form'].classList.add('hidden');
+}
+
+/**
+ * Event handler for the 'Run Inspector' button.
+ */
+async function handleRunInspector() {
+    const resultsContainer = dom['ai-inspector-results'];
+    if (!resultsContainer) return;
+
+    resultsContainer.innerHTML = '<div class="text-center p-4">🔍 Analyzing project...</div>';
+    setLoadingState(true);
+
+    try {
+        const findings = await _runInspectorChecks();
+        displayInspectorResults(findings);
+    } catch (error) {
+        console.error("Design Inspector failed:", error);
+        resultsContainer.innerHTML = `<div class="p-4 text-red-500">An error occurred during inspection: ${error.message}</div>`;
+        showAlert(`Inspector failed: ${error.message}`, 'Error');
+    } finally {
+        setLoadingState(false);
+    }
+}
+
+/**
+ * Renders the findings from the inspector into the UI.
+ * @param {object} findings - An object with arrays for errors, warnings, and suggestions.
+ */
+function displayInspectorResults(findings) {
+    const container = dom['ai-inspector-results'];
+    container.innerHTML = ''; // Clear previous results
+
+    if (findings.errors.length === 0 && findings.warnings.length === 0 && findings.suggestions.length === 0) {
+        container.innerHTML = `
+            <div class="inspector-finding type-success">
+                <div class="finding-icon">✅</div>
+                <div class="finding-content">
+                    <p class="finding-message"><strong>All Clear!</strong> No immediate issues found in your project setup.</p>
+                </div>
+            </div>`;
+        return;
+    }
+
+    const createFindingElement = (finding, type) => {
+        const el = document.createElement('div');
+        el.className = `inspector-finding type-${type}`;
+
+        const icons = {
+            error: '❌',
+            warning: '⚠️',
+            suggestion: '💡'
+        };
+
+        let actionButton = '';
+        if (finding.action) {
+            // Encode params as a JSON string and escape it for the HTML attribute
+            const paramsJson = CSS.escape(JSON.stringify(finding.params || {}));
+            actionButton = `<button class="btn btn-xs btn-secondary finding-action-btn" data-action="${finding.action}" data-params="${paramsJson}">${finding.actionLabel || 'Fix It'}</button>`;
+        }
+
+        el.innerHTML = `
+            <div class="finding-icon">${icons[type]}</div>
+            <div class="finding-content">
+                <p class="finding-message">${finding.message}</p>
+                ${actionButton}
+            </div>
+        `;
+        return el;
+    };
+
+    findings.errors.forEach(f => container.appendChild(createFindingElement(f, 'error')));
+    findings.warnings.forEach(f => container.appendChild(createFindingElement(f, 'warning')));
+    findings.suggestions.forEach(f => container.appendChild(createFindingElement(f, 'suggestion')));
+}
+
+/**
+ * Handles clicks on action buttons within the inspector results.
+ * @param {MouseEvent} event 
+ */
+async function handleInspectorActionClick(event) {
+    const button = event.target.closest('.finding-action-btn');
+    if (!button) return;
+
+    const action = button.dataset.action;
+    const params = JSON.parse(button.dataset.params);
+
+    console.log(`Inspector action clicked: ${action}`, params);
+
+    try {
+        switch (action) {
+            case 'addOverhang':
+                const wallDir = params.wall.charAt(0).toLowerCase();
+                dom[`shading-${wallDir}-toggle`].checked = true;
+                dom[`shading-${wallDir}-toggle`].dispatchEvent(new Event('change', { bubbles: true }));
+                dom[`shading-type-${wallDir}`].value = 'overhang';
+                dom[`shading-type-${wallDir}`].dispatchEvent(new Event('change', { bubbles: true }));
+                dom[`overhang-depth-${wallDir}`].value = params.depth || 0.8;
+                dom[`overhang-depth-${wallDir}`].dispatchEvent(new Event('input', { bubbles: true }));
+                showAlert(`Added a ${params.depth || 0.8}m overhang to the ${params.wall} wall.`, 'Action Complete');
+                break;
+            case 'openPanel':
+                const panelMap = {
+                    dimensions: { panelId: 'panel-dimensions', btnId: 'toggle-panel-dimensions-btn' },
+                    materials: { panelId: 'panel-materials', btnId: 'toggle-panel-materials-btn' },
+                    sensors: { panelId: 'panel-sensor', btnId: 'toggle-panel-sensor-btn' },
+                    project: { panelId: 'panel-project', btnId: 'toggle-panel-project-btn' },
+                    viewpoint: { panelId: 'panel-viewpoint', btnId: 'toggle-panel-viewpoint-btn' },
+                };
+                const mapping = panelMap[params.panel];
+                if (mapping) {
+                    togglePanelVisibility(mapping.panelId, mapping.btnId);
+                }
+                break;
+        }
+        await handleRunInspector(); // Re-run to confirm the fix
+
+    } catch (error) {
+        console.error(`Failed to execute inspector action '${action}':`, error);
+        showAlert(`Action failed: ${error.message}`, 'Error');
+    }
 }
 
 /**
@@ -457,7 +614,6 @@ function updateModelOptions(provider) {
     const modelSelect = dom['ai-model-select'];
     if (!modelSelect) return;
 
-    // Clear existing options
     modelSelect.innerHTML = '';
 
     const models = modelsByProvider[provider] || [];
@@ -477,11 +633,7 @@ function toggleProviderInfo(provider) {
     const infoBox = dom['openrouter-info-box'];
     if (!infoBox) return;
 
-    if (provider === 'openrouter') {
-        infoBox.classList.remove('hidden');
-    } else {
-        infoBox.classList.add('hidden');
-    }
+    infoBox.classList.toggle('hidden', provider !== 'openrouter');
 }
 
 /**
@@ -498,16 +650,13 @@ function addMessage(sender, text) {
 
     const messageBubble = document.createElement('div');
     messageBubble.className = 'message-bubble';
-    
-    // Basic markdown for code blocks
+
     text = text.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
     messageBubble.innerHTML = text;
 
-    // Add to conversation history for context in future API calls
     const role = sender === 'ai' ? 'model' : 'user';
     chatHistory.push({ role: role, parts: [{ text: text }] });
-    
-    // Cap the history to avoid overly large payloads (last 20 messages)
+
     if(chatHistory.length > 20) {
         chatHistory.splice(0, chatHistory.length - 20);
     }
@@ -525,24 +674,20 @@ function addMessage(sender, text) {
  * @private
  */
 async function _createContextualSystemPrompt(userQuery) {
-    // Base Persona for the AI
     let systemPrompt = "You are Helios, an expert AI assistant with deep knowledge of the Radiance Lighting Simulation Engine embedded within the Ray Modeler web application. Your purpose is to guide users through daylighting analysis, lighting simulation, and building performance modeling. You can explain Radiance concepts, troubleshoot errors, and interpret results. Your tone is that of a seasoned mentor: clear, precise, and encouraging.";
 
-    // Part 1: Add context from the local knowledge base
     const contextChunks = searchKnowledgeBase(userQuery);
     if (contextChunks.length > 0) {
         const contextText = contextChunks.map(chunk => `Source: ${chunk.source}\nTopic: ${chunk.topic}\nContent: ${chunk.content}`).join('\n\n---\n\n');
         systemPrompt += `\n\nUse the following information from the application's knowledge base to help answer the user's question. Prioritize this information.\n\n--- KNOWLEDGE BASE CONTEXT ---\n${contextText}\n--- END OF CONTEXT ---`;
     }
 
-    // Part 2: Gather and add the full current application state
     const projectData = await project.gatherAllProjectData();
     const resultsData = {
         datasetA: resultsManager.datasets.a ? { fileName: resultsManager.datasets.a.fileName, stats: resultsManager.datasets.a.stats, glareResult: !!resultsManager.datasets.a.glareResult, isAnnual: resultsManager.hasAnnualData('a') } : null,
         datasetB: resultsManager.datasets.b ? { fileName: resultsManager.datasets.b.fileName, stats: resultsManager.datasets.b.stats, glareResult: !!resultsManager.datasets.b.glareResult, isAnnual: resultsManager.hasAnnualData('b') } : null
     };
 
-    // Sanitize project data for the prompt to avoid sending huge file contents
     const dataForPrompt = JSON.parse(JSON.stringify(projectData));
     dataForPrompt.epwFileContent = dataForPrompt.epwFileContent ? `[Loaded: ${dataForPrompt.projectInfo.epwFileName}]` : null;
     if (dataForPrompt.simulationFiles) {
@@ -590,8 +735,6 @@ async function handleSendMessage(event) {
             return;
         }
 
-        // Create the full contextual prompt by combining the base persona,
-        // knowledge base search results, and the live application state.
         const systemPrompt = await _createContextualSystemPrompt(message);
 
         const responseText = await callGenerativeAI(apiKey, provider, model, systemPrompt);
@@ -675,7 +818,6 @@ async function _executeToolCall(toolCall) {
             case 'setGlobalRadianceParameter': {
                 const globalPanel = document.querySelector('[data-template-id="template-global-sim-params"]');
                 if (!globalPanel) throw new Error("Global Simulation Parameters panel is not open.");
-                // The global panel has static IDs, so we don't need a suffix.
                 const paramId = args.parameter; 
                 if (updateUI(paramId, args.value, 'value', globalPanel)) {
                     return { success: true, message: `Set global parameter -${args.parameter} to ${args.value}.` };
@@ -692,7 +834,6 @@ async function _executeToolCall(toolCall) {
                 return { success: true, message: `Daylighting system ${args.enable ? 'enabled and configured' : 'disabled'}.` };
             }
             case 'configureSimulationRecipe': {
-                const recipeMap = { 'illuminance': 'template-recipe-illuminance', 'rendering': 'template-recipe-rendering', 'dgp': 'template-recipe-dgp' };
                 const templateId = recipeMap[args.recipeType];
                 if (!templateId) throw new Error(`Unknown recipe type: ${args.recipeType}`);
 
@@ -704,7 +845,6 @@ async function _executeToolCall(toolCall) {
                 let paramsSet = 0;
                 for (const key in args.parameters) {
                     const elId = `${key}-${panelSuffix}`;
-                    // Pass the specific panel element as the context for the query
                     if (updateUI(elId, args.parameters[key], 'value', panel)) {
                         paramsSet++;
                     }
@@ -712,10 +852,13 @@ async function _executeToolCall(toolCall) {
                 return { success: true, message: `Successfully set ${paramsSet} parameters in the ${args.recipeType} recipe.` };
             }
             case 'openSimulationRecipe': {
-                const { openRecipePanelByType } = await import('./simulation.js');
                 const templateId = recipeMap[args.recipeType];
                 if (!templateId) throw new Error(`Unknown recipe type: ${args.recipeType}`);
-                
+
+                if (args.recipeType === 'dgp' && dom['view-type']?.value !== 'h' && dom['view-type']?.value !== 'a') {
+                    triggerProactiveSuggestion('dgp_recipe_bad_viewpoint');
+                }
+
                 const panel = openRecipePanelByType(templateId);
                 if (panel) {
                     return { success: true, message: `Opened the ${args.recipeType} recipe panel.` };
@@ -723,52 +866,9 @@ async function _executeToolCall(toolCall) {
                     throw new Error(`Could not open the ${args.recipeType} recipe panel.`);
                 }
             }
-            case 'generateSimulationPackage': {
-                const { programmaticallyGeneratePackage } = await import('./simulation.js');
-                const templateId = recipeMap[args.recipeType];
-                if (!templateId) throw new Error(`Unknown recipe type: ${args.recipeType}`);
-
-                const panel = document.querySelector(`.floating-window[data-template-id="${templateId}"]`);
-                if (!panel || panel.classList.contains('hidden')) {
-                    throw new Error(`The '${args.recipeType}' recipe panel is not open. Please open it first.`);
-                }
-                
-                const result = await programmaticallyGeneratePackage(panel);
-                if (result) {
-                    return { success: true, message: `Successfully generated simulation package for the ${args.recipeType} recipe.` };
-                } else {
-                    throw new Error(`Failed to generate simulation package for ${args.recipeType}.`);
-                }
-            }
-           case 'validateProjectState': {
-            const validationResult = await _performValidationChecks(args.analysisType);
-            let message;
-            if (validationResult.errors.length === 0 && validationResult.warnings.length === 0) {
-                message = `Validation successful! The project appears to be correctly configured for a(n) ${args.analysisType} analysis.`;
-            } else {
-                message = `Validation complete. Found ${validationResult.errors.length} error(s) and ${validationResult.warnings.length} warning(s).`;
-            }
-            // Return the structured data so the AI can list the issues.
-            return { success: true, message: message, validationResult: validationResult };
-        }
-        case 'openSimulationRecipe': {
-            const templateId = recipeMap[args.recipeType];
-            if (!templateId) throw new Error(`Unknown recipe type: ${args.recipeType}`);
-
-            // Proactive check: If opening DGP recipe, ensure viewpoint is correct.
-            if (args.recipeType === 'dgp' && dom['view-type']?.value !== 'h' && dom['view-type']?.value !== 'a') {
-                triggerProactiveSuggestion('dgp_recipe_bad_viewpoint');
-            }
-
-            const panel = openRecipePanelByType(templateId);
-            if (panel) {
-                return { success: true, message: `Opened the ${args.recipeType} recipe panel.` };
-            } else {
-                throw new Error(`Could not open the ${args.recipeType} recipe panel.`);
-            }
-        }
-        case 'showAnalysisDashboard': {
-            if (args.dashboardType === 'glareRose') {
+            case 'showAnalysisDashboard': {
+                if (args.dashboardType === 'glareRose') {
+                      openGlareRoseDiagram();
                     return { success: true, message: `Opening the Glare Rose diagram.` };
                 } else if (args.dashboardType === 'combinedAnalysis') {
                     await openCombinedAnalysisPanel();
@@ -823,58 +923,6 @@ async function _executeToolCall(toolCall) {
 
                runButton.click();
                 return { success: true, message: `Initiating the ${args.recipeType} simulation.` };
-            }
-            case 'highlightResultPoint': {
-                if (!resultsManager.getActiveData() || resultsManager.getActiveData().length === 0) {
-                    throw new Error("No results data is loaded to highlight.");
-                }
-                const { analysisType } = args;
-
-                // --- General Sanity Checks ---
-                if (projectData.mergedSimParams.ab < 1) {
-                    warnings.push("Global parameter 'Ambient Bounces (-ab)' is set to 0. No indirect light will be calculated, which can lead to inaccurate results for most daylighting simulations.");
-                }
-
-                // --- Analysis-Specific Checks ---
-                switch (analysisType) {
-                    case 'dgp':
-                        if (projectData.viewpoint['view-type'] !== 'h') {
-                            errors.push("For a Daylight Glare Probability (DGP) analysis, the Viewpoint Type must be set to 'Fisheye'.");
-                        }
-                        if (!projectData.projectInfo.epwFileName) {
-                            warnings.push("You are running a point-in-time glare analysis without a weather file. The sky will be generated using default values, not location-specific data.");
-                        }
-                        break;
-                    
-                    case 'annual-3ph':
-                    case 'annual-5ph':
-                    case 'sda-ase':
-                        if (!projectData.simulationFiles['weather-file']) {
-                            errors.push("An EPW weather file must be loaded in the Project Setup panel for any annual simulation.");
-                        }
-                        if (!projectData.simulationFiles['bsdf-file'] && analysisType !== 'sda-ase') { // sda-ase recipe has its own bsdf inputs
-                            warnings.push("A BSDF file is typically required for multi-phase annual simulations. Please ensure one is loaded in the Materials panel if your glazing is complex.");
-                        }
-                        break;
-                        
-                    case 'illuminance':
-                    case 'df':
-                        if (!projectData.sensorGrid.illuminance.enabled) {
-                            errors.push("An 'Illuminance Grid' must be enabled in the Sensor Grid panel for this analysis.");
-                        }
-                        break;
-                        
-                    case 'imageless-glare':
-                        if (!projectData.sensorGrid.view.enabled) {
-                            errors.push("A 'View Grid (for Glare)' must be enabled in the Sensor Grid panel for this analysis.");
-                        }
-                        if (!projectData.simulationFiles['weather-file']) {
-                            errors.push("An EPW weather file must be loaded for an imageless annual glare simulation.");
-                        }
-                        break;
-                }
-                
-                return { success: true, validationResult: { errors, warnings } };
             }
             case 'highlightResultPoint': {
                 if (!resultsManager.getActiveData() || resultsManager.getActiveData().length === 0) {
@@ -972,8 +1020,7 @@ async function _executeToolCall(toolCall) {
 
                 const propSuffix = propMap[args.property];
                 const elementId = `${args.surface}-${propSuffix}`;
-                
-                // Clamp the value to the typical 0-1 range for these properties
+
                 const clampedValue = Math.max(0, Math.min(1, args.value));
 
                 if (updateUI(elementId, clampedValue)) {
@@ -994,19 +1041,16 @@ async function _executeToolCall(toolCall) {
                 const traceSection = dom['sun-ray-trace-section'];
                 if (!traceSection) throw new Error("The Sun Ray Tracing panel doesn't appear to be available.");
                 if (traceSection.classList.contains('hidden')) {
-                     // Find the active toggle and enable the section
                     const activeToggle = document.querySelector('input[id^="sun-ray-tracing-toggle-"]:checked');
                     if (!activeToggle) {
-                        // If none are active, default to enabling it for the south wall as a sensible default.
                         dom['sun-ray-tracing-toggle-s']?.click();
                     }
                 }
 
-                // Use flatpickr's API to set the date, which also triggers its internal events.
                 if (dom['sun-ray-date']?._flatpickr) {
                     dom['sun-ray-date']._flatpickr.setDate(args.date, true);
                 } else {
-                    updateUI('sun-ray-date', args.date); // Fallback for plain input
+                    updateUI('sun-ray-date', args.date);
                 }
                 updateUI('sun-ray-time', args.time);
                 updateUI('sun-ray-count', args.rayCount);
@@ -1075,12 +1119,9 @@ async function _executeToolCall(toolCall) {
                 if (currentTheme === targetTheme) {
                     return { success: true, message: `Theme is already set to ${targetTheme}.` };
                 }
-                
-                const currentIndex = themeOrder.indexOf(currentTheme);
-                const targetIndex = themeOrder.indexOf(targetTheme);
-                let clicksNeeded = (targetIndex - currentIndex + themeOrder.length) % themeOrder.length;
 
-                // Find the currently visible button to click it
+                let clicksNeeded = (themeOrder.indexOf(targetTheme) - themeOrder.indexOf(currentTheme) + themeOrder.length) % themeOrder.length;
+
                 for (let i = 0; i < clicksNeeded; i++) {
                     const visibleButton = document.querySelector('#theme-switcher-container .theme-btn:not([style*="display: none"])');
                     visibleButton?.click();
@@ -1097,6 +1138,19 @@ async function _executeToolCall(toolCall) {
                 }
                 throw new Error("Could not find the comparison mode toggle control.");
             }
+            case 'validateProjectState': {
+                const validationResult = await _runInspectorChecks();
+                const { errors, warnings, suggestions } = validationResult;
+                const message = `Validation complete. Found ${errors.length} error(s), ${warnings.length} warning(s), and ${suggestions.length} suggestion(s).`;
+                return { success: true, message: message, validationResult: { errors, warnings, suggestions } };
+            }
+            case 'runDesignInspector': {
+                const findings = await _runInspectorChecks();
+                const message = "The design inspector has been run. The results are now displayed in the Inspector panel.";
+                displayInspectorResults(findings);
+                switchToInspectorMode();
+                return { success: true, message: message, findings: findings };
+            }
             default:
             throw new Error(`Unknown tool: ${name}`);
             }
@@ -1108,79 +1162,80 @@ async function _executeToolCall(toolCall) {
 
 /**
  * Performs validation checks on the current project state.
- * @param {string} analysisType - The type of simulation to validate for.
- * @returns {Promise<object>} An object containing lists of errors and warnings.
+ * @returns {Promise<object>} An object containing lists of errors, warnings, and suggestions.
  * @private
  */
-async function _performValidationChecks(analysisType) {
+async function _runInspectorChecks() {
     const errors = [];
     const warnings = [];
+    const suggestions = [];
 
-    // --- General Checks (apply to all simulations) ---
-    if (!project.dirHandle) {
-        errors.push("No project directory has been selected. A directory is required to save simulation files.");
-    }
-    if (!dom['radiance-path']?.value) {
-        warnings.push("The Radiance Installation Path is not set. The simulation may fail if Radiance is not in the system's PATH.");
-    }
-    const globalPanel = document.querySelector('[data-template-id="template-global-sim-params"]');
-    if (globalPanel) {
-        const abInput = globalPanel.querySelector('[id^="ab-"]');
-        if (abInput && parseInt(abInput.value, 10) < 1) {
-            warnings.push("Global parameter 'Ambient Bounces (-ab)' is set to 0. No indirect light will be calculated, which can lead to inaccurate results for most daylighting simulations.");
+    const projectData = await project.gatherAllProjectData();
+    const { W, L, H } = projectData.geometry.room;
+
+    // GEOMETRY CHECKS
+    if (H < 2.2) warnings.push({ message: `Room height is ${H}m, which is quite low for a typical space. This might affect light distribution.` });
+    if (W < 2 || L < 2) warnings.push({ message: `Room dimensions (${W}m x ${L}m) are very small.` });
+
+    // SHADING CHECKS (Context-aware for location)
+    if (projectData.projectInfo.latitude > 23.5) { // Northern Hemisphere
+        const southWallShading = projectData.geometry.shading['S'];
+        const southWallWindows = projectData.geometry.apertures['S'];
+        if (southWallWindows && southWallWindows.winCount > 0 && (!southWallShading || southWallShading.type === 'none')) {
+            warnings.push({ 
+                message: "The south-facing wall has windows but no shading. This creates a high risk of summer overheating and glare.",
+                action: 'addOverhang',
+                actionLabel: 'Add 0.8m Overhang',
+                params: { wall: 'south', depth: 0.8 }
+            });
         }
     }
 
-    // --- Analysis-Specific Checks ---
-    switch (analysisType) {
-        case 'dgp':
-            const viewType = dom['view-type']?.value;
-            if (viewType !== 'h' && viewType !== 'a') {
-                errors.push("For a DGP (glare) analysis, the Viewpoint 'View Type' must be set to 'Fisheye' or 'Angular Fisheye'.");
-            }
-            break;
+    // MATERIALS CHECKS
+    ['wall', 'floor', 'ceiling'].forEach(surface => {
+        const refl = projectData.materials[surface].reflectance;
+        if (refl > 0.9) warnings.push({ message: `The ${surface} reflectance (${refl}) is very high, which can be unrealistic and may increase simulation time.` });
+        if (refl < 0.1 && surface !== 'floor') warnings.push({ message: `The ${surface} reflectance (${refl}) is very low, which will result in a dark space.` });
+    });
 
-        case 'annual':
-            if (!project.epwFileContent) {
-                errors.push("An annual analysis requires a weather file. Please upload an .epw file in the Project Setup panel.");
-            }
-            // Check for BSDF file in any open annual recipe panel
-            const annualRecipePanel = document.querySelector('.floating-window[data-template-id*="annual"]');
-            if (annualRecipePanel) {
-                const bsdfInput = annualRecipePanel.querySelector('input[type="file"][id*="bsdf-file"]');
-                const bsdfFileInProject = project.simulationFiles['bsdf-file'];
-                if (bsdfInput && !bsdfFileInProject) {
-                    warnings.push("The annual simulation recipe panel is open, but no BSDF file has been loaded into the project.");
-                }
-            }
-            break;
+    // SIMULATION SETUP CHECKS
+    if (!projectData.projectInfo.epwFileName) {
+        warnings.push({ 
+            message: "No EPW weather file is loaded. Annual and location-specific simulations will not be accurate.",
+            action: 'openPanel',
+            actionLabel: 'Go to Project Panel',
+            params: { panel: 'project' }
+        });
+    }
 
-            case 'illuminance':
-            case 'df':
-            case 'en-illuminance':
-                const sensorParams = getSensorGridParams();
-                if (!sensorParams?.illuminance?.enabled) {
-                    errors.push("An illuminance map requires an active sensor grid. Please enable the 'Illuminance Grid' and select at least one surface in the Sensor Grid panel.");
-                }
-                if (analysisType === 'en-illuminance' && !sensorParams?.illuminance.floor.isTaskArea) {
-                    errors.push("The 'EN 12464-1 Illuminance' recipe requires a 'Specific Task Area' to be defined in the Sensor Grid panel.");
-                }
-                break;
+    const globalParams = projectData.simulationParameters?.global;
+    if (globalParams && globalParams.ab < 2) {
+        suggestions.push({ message: `Ambient Bounces (-ab) is set to ${globalParams.ab}. For more realistic indirect lighting, a value of 3-5 is recommended.` });
+    }
 
-            case 'imageless-glare':
-                const viewGridParams = getSensorGridParams();
-                if (!viewGridParams?.view?.enabled) {
-                    errors.push("An imageless annual glare analysis requires a 'View Grid' to be enabled in the Sensor Grid panel.");
-                }
-                break;
-            case 'en-ugr':
-                if (!project.lighting || !project.lighting.enabled) {
-                    warnings.push("The 'EN 12464-1 UGR' recipe is typically used for electric lighting. Artificial lighting is currently disabled.");
-                }
-                break;
+    // RECIPE-SPECIFIC CHECKS
+    const openRecipePanels = document.querySelectorAll('.floating-window[data-template-id^="template-recipe-"]:not(.hidden)');
+    openRecipePanels.forEach(panel => {
+        const recipeType = panel.dataset.templateId;
+        if (recipeType === 'template-recipe-dgp' && projectData.viewpoint['view-type'] !== 'h') {
+            errors.push({ 
+                message: "The DGP recipe is open, but the Viewpoint Type is not set to 'Fisheye'. This will cause the simulation to fail.",
+                action: 'openPanel',
+                actionLabel: 'Go to Viewpoint',
+                params: { panel: 'viewpoint' }
+            });
         }
+        if ((recipeType === 'template-recipe-illuminance' || recipeType === 'template-recipe-df') && !getSensorGridParams().illuminance.enabled) {
+            errors.push({ 
+                message: `The ${recipeType.split('-')[2]} recipe requires an illuminance grid, but none is enabled.`,
+                action: 'openPanel',
+                actionLabel: 'Go to Sensors',
+                params: { panel: 'sensors' }
+            });
+        }
+    });
 
-        return { success: true, errors, warnings };
+    return { errors, warnings, suggestions };
 }
 
 /**
@@ -1191,8 +1246,6 @@ async function _performValidationChecks(analysisType) {
  */
 async function callGenerativeAI(apiKey, provider, model, systemPrompt) {
     if (provider !== 'gemini') {
-        // For simplicity, this enhanced functionality is demonstrated for the Gemini API.
-        // OpenRouter also supports function calling but has a slightly different API structure.
         addMessage('ai', "Sorry, AI-powered actions are only implemented for the Google Gemini provider in this example.");
         throw new Error("Tool use is only implemented for Gemini in this example.");
     }
@@ -1200,7 +1253,6 @@ async function callGenerativeAI(apiKey, provider, model, systemPrompt) {
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     const headers = { 'Content-Type': 'application/json' };
 
-    // Initial request payload
     let payload = {
         contents: chatHistory,
         systemInstruction: { parts: [{ text: systemPrompt }] },
@@ -1221,7 +1273,6 @@ async function callGenerativeAI(apiKey, provider, model, systemPrompt) {
     const data = await response.json();
     const candidate = data.candidates?.[0];
 
-    // Check for safety blocks or invalid responses first
     if (!candidate) {
         const promptFeedback = data.promptFeedback;
         console.warn('Gemini response blocked.', { promptFeedback });
@@ -1233,16 +1284,12 @@ async function callGenerativeAI(apiKey, provider, model, systemPrompt) {
 
     const toolCalls = candidate.content?.parts?.filter(part => part.functionCall);
 
-    // If the AI wants to use one or more tools, execute them in parallel
     if (toolCalls && toolCalls.length > 0) {
-        // Add the model's tool call request to history
         chatHistory.push(candidate.content);
 
-        // Execute all tool calls concurrently
         const toolPromises = toolCalls.map(part => _executeToolCall(part));
         const toolResults = await Promise.all(toolPromises);
 
-        // Add the results of all tool executions to history
         chatHistory.push({
             role: 'tool',
             parts: toolResults.map((result, i) => ({
@@ -1256,21 +1303,19 @@ async function callGenerativeAI(apiKey, provider, model, systemPrompt) {
             })),
         });
 
-        // Make a second API call with the tool results to get the final text response
         const secondResponse = await fetch(apiUrl, {
             method: 'POST',
             headers: headers,
-            body: JSON.stringify({ ...payload, contents: chatHistory }) // Send the updated history
+            body: JSON.stringify({ ...payload, contents: chatHistory })
         });
-        
+
         if (!secondResponse.ok) throw new Error(`API Error after tool call: ${secondResponse.status}`);
-        
+
         const secondData = await secondResponse.json();
         const text = secondData.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!text) throw new Error('Received an invalid final response from Gemini API after tool call.');
         return text;
     } else {
-        // If no tool is called, just return the text response
         const text = candidate.content?.parts?.[0]?.text;
         if (!text) throw new Error('Received an invalid response from Gemini API.');
         return text;
@@ -1284,21 +1329,19 @@ async function callGenerativeAI(apiKey, provider, model, systemPrompt) {
 function setLoadingState(isLoading) {
     const sendButton = dom['ai-chat-send'];
     const input = dom['ai-chat-input'];
-    if (!sendButton || !input) return;
+    const inspectorButton = dom['run-inspector-btn'];
+
+    const elements = [sendButton, input, inspectorButton].filter(Boolean);
 
     if (isLoading) {
-        sendButton.disabled = true;
-        sendButton.innerHTML = '...'; // Simple loading indicator
-        input.disabled = true;
+        elements.forEach(el => el.disabled = true);
+        if (sendButton) sendButton.innerHTML = '...';
     } else {
-        sendButton.disabled = false;
-        sendButton.innerHTML = 'Send';
-        input.disabled = false;
-        input.focus();
+        elements.forEach(el => el.disabled = false);
+        if (sendButton) sendButton.innerHTML = 'Send';
+        if (input) input.focus();
     }
 }
-
-// --- Settings Modal Logic ---
 
 /** Opens the AI settings modal window. */
 function openSettingsModal() {
@@ -1347,13 +1390,9 @@ function loadSettings() {
         const savedProvider = localStorage.getItem('ai_provider') || 'gemini';
         providerSelect.value = savedProvider;
 
-        // Populate the model dropdown for the saved provider
         updateModelOptions(savedProvider);
-
-        // Show/hide the provider-specific info box
         toggleProviderInfo(savedProvider);
 
-        // Select the saved model, or the first model as a default
         const savedModel = localStorage.getItem('ai_model');
         if (savedModel) {
             modelSelect.value = savedModel;
@@ -1365,8 +1404,7 @@ function loadSettings() {
 
 /**
  * Triggers a proactive suggestion based on a user action.
- * Bypasses the AI for speed and reliability, using predefined templates.
- * @param {'annual_illuminance_loaded' | 'annual_glare_loaded' | 'view_grid_enabled'} context
+ * @param {string} context - The context of the user's action.
  */
 export function triggerProactiveSuggestion(context) {
     let suggestionHTML = '';
@@ -1387,36 +1425,34 @@ export function triggerProactiveSuggestion(context) {
         case 'daylighting_controls_enabled':
             suggestionHTML = `Daylighting controls enabled. An annual simulation is needed to evaluate performance. Would you like to open the <strong data-action="open_recipe:annual-3ph">Annual Daylight (3-Phase)</strong> recipe?`;
             break;
-            case 'bsdf_enabled':
-                suggestionHTML = `BSDF file enabled. This is used for advanced multi-phase simulations. Would you like to open the <strong data-action="open_recipe:annual-5ph">Annual Daylight (5-Phase)</strong> recipe?`;
-        break;
+        case 'bsdf_enabled':
+            suggestionHTML = `BSDF file enabled. This is used for advanced multi-phase simulations. Would you like to open the <strong data-action="open_recipe:annual-5ph">Annual Daylight (5-Phase)</strong> recipe?`;
+            break;
         case 'task_area_enabled':
-                suggestionHTML = `Task Area grid defined. This is required for the <strong data-action="open_recipe:en-illuminance">EN 12464-1 Illuminance</strong> recipe. Would you like to open it?`;
-                break;
-            case 'ies_file_loaded':
-                suggestionHTML = `IES file loaded. You can view the photometric plot in the lighting panel and adjust the light's position and rotation.`;
-                break;
-            case 'unrealistic_reflectance':
-                suggestionHTML = `A material reflectance is outside the typical range (0.1 to 0.85). Unusually high or low values can be physically unrealistic and may increase simulation time.`;
-                break;
-            case 'louver_shading_enabled':
-                suggestionHTML = `Louvers configured. For the most accurate annual analysis of complex shading, consider using the <strong data-action="open_recipe:annual-5ph">5-Phase method</strong>.`;
-                break;
-            case 'low_ambient_bounces':
-                suggestionHTML = `Ambient Bounces (-ab) is set to a low value. This will limit or prevent indirect light calculation, which can lead to unrealistic, dark, or splotchy results.`;
-                break;
-            case 'dgp_recipe_bad_viewpoint':
-                suggestionHTML = `The DGP recipe requires a fisheye view. Would you like to <strong data-action="set_view_fisheye">change the viewpoint to Fisheye</strong> to ensure correct results?`;
-                break;
-            default:
-                return; // No suggestion for this context
-}
+            suggestionHTML = `Task Area grid defined. This is required for the <strong data-action="open_recipe:en-illuminance">EN 12464-1 Illuminance</strong> recipe. Would you like to open it?`;
+            break;
+        case 'ies_file_loaded':
+            suggestionHTML = `IES file loaded. You can view the photometric plot in the lighting panel and adjust the light's position and rotation.`;
+            break;
+        case 'unrealistic_reflectance':
+            suggestionHTML = `A material reflectance is outside the typical range (0.1 to 0.85). Unusually high or low values can be physically unrealistic and may increase simulation time.`;
+            break;
+        case 'louver_shading_enabled':
+            suggestionHTML = `Louvers configured. For the most accurate annual analysis of complex shading, consider using the <strong data-action="open_recipe:annual-5ph">5-Phase method</strong>.`;
+            break;
+        case 'low_ambient_bounces':
+            suggestionHTML = `Ambient Bounces (-ab) is set to a low value. This will limit or prevent indirect light calculation, which can lead to unrealistic, dark, or splotchy results.`;
+            break;
+        case 'dgp_recipe_bad_viewpoint':
+            suggestionHTML = `The DGP recipe requires a fisheye view. Would you like to <strong data-action="set_view_fisheye">change the viewpoint to Fisheye</strong> to ensure correct results?`;
+            break;
+        default:
+            return;
+    }
 
-    // Dynamically import and call the UI function to display the suggestion
     import('./ui.js').then(({ displayProactiveSuggestion }) => {
         displayProactiveSuggestion(suggestionHTML);
     }).catch(err => console.error("Failed to display proactive suggestion:", err));
 }
 
-// Export the initializer function to be called from main.js
 export { initAiAssistant };

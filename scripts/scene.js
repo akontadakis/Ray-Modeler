@@ -8,6 +8,7 @@ import { roomObject, shadingObject, sensorGridObject, axesObject, northArrowObje
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 
 /**
  * Debounce utility to limit the rate at which a function gets called.
@@ -101,7 +102,7 @@ const FisheyeShader = {
 /**
 * Sets up the entire Three.js scene, including cameras, renderers, and controls.
 */
-export function setupScene(container) {
+export async function setupScene(container) {
     if (!container) {
         console.error("Render container not found!");
         return;
@@ -140,8 +141,9 @@ export function setupScene(container) {
     horizontalClipPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
     verticalClipPlane = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0);
 
-    // 9. Add Geometry Groups to Scene
-    scene.add(roomObject, shadingObject, sensorGridObject, axesObject, northArrowObject, groundObject, daylightingSensorsGroup, wallSelectionGroup);
+   // 9. Add Geometry Groups to Scene
+    const { furnitureObject, resizeHandlesObject } = await import('./geometry.js');
+    scene.add(roomObject, shadingObject, sensorGridObject, axesObject, northArrowObject, groundObject, daylightingSensorsGroup, wallSelectionGroup, furnitureObject, resizeHandlesObject);
 
     // 10. Signal that the scene is initialized and ready for interaction.
     container.dispatchEvent(new CustomEvent('sceneReady', { bubbles: true }));
@@ -349,10 +351,21 @@ function _setupControls(domElement) {
     controls = new OrbitControls(activeCamera, domElement);
     controls.enableDamping = true;
 
-    // TransformControls for moving/rotating the viewpoint gizmo (now disabled for viewpoint)
+    // TransformControls for moving/rotating scene objects
     transformControls = new TransformControls(activeCamera, domElement);
-    transformControls.enabled = false;
-    transformControls.visible = false;
+    transformControls.addEventListener('dragging-changed', (event) => {
+        controls.enabled = !event.value;
+    });
+    transformControls.addEventListener('objectChange', () => {
+        // When the gizmo moves the object, dispatch a custom event
+        // that the UI module can listen for to update the sliders.
+        if (transformControls.object) {
+            renderer.domElement.dispatchEvent(new CustomEvent('transformGizmoChange', {
+                detail: { object: transformControls.object }
+            }));
+        }
+    });
+    scene.add(transformControls);
 
     // TransformControls for the daylighting sensor
     sensorTransformControls = new TransformControls(activeCamera, domElement);
@@ -373,9 +386,6 @@ function _setupHelpersAndGizmos() {
     // Create a helper to visualize the viewpoint camera's frustum
     viewCamHelper = new THREE.CameraHelper(viewpointCamera);
     scene.add(viewCamHelper);
-
-    // The transform controls are no longer attached to the viewpoint camera.
-    scene.add(transformControls);
 
     // Add the sensor transform controls to the scene (it's attached to an object later)
     scene.add(sensorTransformControls);

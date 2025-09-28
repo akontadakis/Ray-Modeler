@@ -1,14 +1,12 @@
 // scripts/project.js
 
 import * as THREE from 'three';
-import { generateRadFileContent, generateViewpointFileContent, transformThreePointToRadianceArray, transformThreeVectorToRadianceArray } from './radiance.js';
+import { generateRadFileContent, generateViewpointFileContent, transformThreePointToRadianceArray, transformThreeVectorToRadianceArray, generateViewpointFileContentFromState, generateRayFileContent } from './radiance.js';
 import { updateScene } from './geometry.js';
 import { recreateSimulationPanels } from './simulation.js';
-// Import the manager instance (reverted to the simpler direct import)
 import { lightingManager } from './lighting.js';
 import { generateScripts } from './scriptGenerator.js';
 
-// The local helper functions are removed from here as they will be moved.
 class Project {
     constructor() {
         this.projectName = 'default-project';
@@ -79,45 +77,10 @@ class Project {
             simParams.recipes.push(recipeData);
         });
 
-    return simParams;
-}
-
-async requestProjectDirectory() {
-    const { showAlert, getDom } = await import('./ui.js');
-    const dom = getDom();
-
-    // --- Electron Environment ---
-    if (window.electronAPI) {
-        const path = await window.electronAPI.openDirectory();
-        if (path) {
-            this.dirPath = path;
-            this.dirHandle = null; // Clear the handle if we're using a path in Electron
-            dom['project-access-prompt']?.classList.add('hidden');
-            showAlert(`Project folder set to: ${path}`, 'Directory Set');
-            return true;
-        }
-        return false;
+        return simParams;
     }
 
-    // --- Browser Environment Fallback (for testing in browser without Electron) ---
-    if (!window.showDirectoryPicker) {
-        showAlert("Your browser does not support the File System Access API. Please use a modern browser like Chrome or Edge.", "Feature Not Supported");
-        return false;
-    }
-    try {
-        const dirHandle = await window.showDirectoryPicker();
-        this.dirHandle = dirHandle;
-        this.dirPath = null; // Clear the path if we're using a handle
-        dom['project-access-prompt']?.classList.add('hidden');
-        showAlert('Project folder selected. Future saves will go here directly.', 'Directory Set');
-        return true;
-    } catch (error) {
-        if (error.name !== 'AbortError') console.error("Error selecting directory:", error);
-        return false;
-    }
-}
-
-async gatherAllProjectData() {
+    async gatherAllProjectData() {
     // Import UI module to get access to dom
         const ui = await import('./ui.js');
         const dom = ui.getDom();
@@ -152,7 +115,23 @@ async gatherAllProjectData() {
                     enabled: getChecked('frame-toggle'),
                     thickness: getValue('frame-thick', parseFloat),
                     depth: getValue('frame-depth', parseFloat)
-                }
+                },
+                furniture: (async () => {
+                    const { furnitureObject } = await import('./geometry.js');
+                    const furnitureData = [];
+                    if (furnitureObject.children.length > 0) {
+                        const furnitureContainer = furnitureObject.children[0];
+                        furnitureContainer.children.forEach(obj => {
+                            furnitureData.push({
+                                assetType: obj.userData.assetType,
+                                position: obj.position.toArray(),
+                                quaternion: obj.quaternion.toArray(),
+                                scale: obj.scale.toArray(),
+                            });
+                        });
+                    }
+                    return furnitureData;
+                })(),
             },
             materials: (() => {
                 const getMaterialData = (type) => {
@@ -181,6 +160,7 @@ async gatherAllProjectData() {
                     ceiling: getMaterialData('ceiling'),
                     frame: { type: getValue('frame-mat-type'), reflectance: getValue('frame-refl', parseFloat), specularity: getValue('frame-spec', parseFloat), roughness: getValue('frame-rough', parseFloat), color: getValue('frame-color') },
                     shading: { type: getValue('shading-mat-type'), reflectance: getValue('shading-refl', parseFloat), specularity: getValue('shading-spec', parseFloat), roughness: getValue('shading-rough', parseFloat), color: getValue('shading-color') },
+                    furniture: { type: getValue('furniture-mat-type'), reflectance: getValue('furniture-refl', parseFloat), specularity: getValue('furniture-spec', parseFloat), roughness: getValue('furniture-rough', parseFloat) },
                     glazing: {
                         transmittance: getValue('glazing-trans', parseFloat),
                         bsdfEnabled: getChecked('bsdf-toggle'),
@@ -197,7 +177,7 @@ async gatherAllProjectData() {
                 'view-fov': getValue('view-fov', parseFloat), 'view-dist': getValue('view-dist', parseFloat)
             },
             viewOptions: {
-            projection: dom['proj-btn-persp'].classList.contains('active') ? 'perspective' : 'orthographic',
+            projection: dom['proj-btn-persp']?.classList.contains('active') ? 'perspective' : 'orthographic',
                 transparent: getChecked('transparent-toggle'),
                 ground: getChecked('ground-plane-toggle'),
                 worldAxes: getChecked('world-axes-toggle'),
@@ -238,8 +218,44 @@ async gatherAllProjectData() {
             simulationParameters: this.gatherSimulationParameters()
         };
         
+        projectData.geometry.furniture = await projectData.geometry.furniture;
         return projectData;
     }
+
+    async requestProjectDirectory() {
+        const { showAlert, getDom } = await import('./ui.js');
+        const dom = getDom();
+
+        // --- Electron Environment ---
+		if (window.electronAPI) {
+			const path = await window.electronAPI.openDirectory();
+			if (path) {
+				this.dirPath = path;
+				this.dirHandle = null; // Clear the handle if we're using a path in Electron
+				dom['project-access-prompt']?.classList.add('hidden');
+				showAlert(`Project folder set to: ${path}`, 'Directory Set');
+				return true;
+			}
+			return false;
+		}
+
+		// --- Browser Environment Fallback (for testing in browser without Electron) ---
+		if (!window.showDirectoryPicker) {
+			showAlert("Your browser does not support the File System Access API. Please use a modern browser like Chrome or Edge.", "Feature Not Supported");
+			return false;
+		}
+		try {
+			const dirHandle = await window.showDirectoryPicker();
+			this.dirHandle = dirHandle;
+			this.dirPath = null; // Clear the path if we're using a handle
+			dom['project-access-prompt']?.classList.add('hidden');
+			showAlert('Project folder selected. Future saves will go here directly.', 'Directory Set');
+			return true;
+		} catch (error) {
+			if (error.name !== 'AbortError') console.error("Error selecting directory:", error);
+			return false;
+		}
+	}
 
     async generateSimulationPackage(panelElement) {
         const { showAlert } = await import('./ui.js');
@@ -277,7 +293,7 @@ async gatherAllProjectData() {
         projectData.mergedSimParams = { ...globalParams, ...recipeOverrides };
 
         // Generate all necessary input files in memory first.
-        const { materials, geometry } = generateRadFileContent();
+        const { materials, geometry } = await generateRadFileContent();
         const viewpointContent = generateViewpointFileContent(projectData.viewpoint, projectData.geometry.room);
         const fisheyeVpData = { ...projectData.viewpoint, 'view-type': 'h' };
         const fisheyeContent = generateViewpointFileContent(fisheyeVpData, projectData.geometry.room);
@@ -363,32 +379,6 @@ async gatherAllProjectData() {
 
     async downloadProjectFile() {
         const { showAlert } = await import('./ui.js');
-        const allPtsContent = await this._generateSensorPointsContent('all');
-            const taskPtsContent = await this._generateSensorPointsContent('task');
-            const surroundingPtsContent = await this._generateSensorPointsContent('surrounding');
-            const daylightingPtsContent = await this._generateDaylightingPointsContent();
-            const rayContent = await generateRayFileContent();
-
-            // Generate .vf files for each saved camera view
-            const { generateViewpointFileContentFromState } = await import('./radiance.js');
-            const savedViewsData = projectData.savedViews || [];
-            savedViewsData.forEach((view, index) => {
-                // De-serialize the state for the generation function
-                const cameraStateForVf = {
-                    position: new THREE.Vector3().fromArray(view.cameraState.position),
-                    quaternion: new THREE.Quaternion().fromArray(view.cameraState.quaternion),
-                    viewType: view.cameraState.viewType,
-                    fov: view.cameraState.fov,
-                };
-                const viewFileContent = generateViewpointFileContentFromState(cameraStateForVf);
-                if (viewFileContent) {
-                    filesToWrite.push({ path: ['03_views', `saved_view_${index + 1}.vf`], content: viewFileContent });
-                }
-            });
-
-            // Sanitize the project data for JSON serialization by removing large file contents.
-            const dataForJson = JSON.parse(JSON.stringify(projectData));
-            dataForJson.epwFileContent = null;
     
         // 1. Check for a valid save location (either an Electron path or a Browser handle).
         // If none exists, prompt the user to select one.
@@ -399,12 +389,11 @@ async gatherAllProjectData() {
         }
     
         try {
-            const { generateRadFileContent, generateRayFileContent } = await import('./radiance.js');
             const projectData = await this.gatherAllProjectData();
             const projectName = this.projectName || 'project';
-
+    
             // 2. Generate all file contents in memory first.
-            const { materials, geometry } = generateRadFileContent();
+            const { materials, geometry } = await generateRadFileContent();
             const viewpointContent = generateViewpointFileContent(projectData.viewpoint, projectData.geometry.room);
             const fisheyeVpData = { ...projectData.viewpoint, 'view-type': 'h' };
             const fisheyeContent = generateViewpointFileContent(fisheyeVpData, projectData.geometry.room);
@@ -413,7 +402,10 @@ async gatherAllProjectData() {
             const surroundingPtsContent = await this._generateSensorPointsContent('surrounding');
             const daylightingPtsContent = await this._generateDaylightingPointsContent();
             const rayContent = await generateRayFileContent();
-
+    
+            // Generate .vf files for each saved camera view
+            const savedViewsData = projectData.savedViews || [];
+    
             // Sanitize the project data for JSON serialization by removing large file contents.
             const dataForJson = JSON.parse(JSON.stringify(projectData));
             dataForJson.epwFileContent = null; 
@@ -434,6 +426,21 @@ async gatherAllProjectData() {
                 { path: ['08_results', 'view_grid.ray'], content: rayContent },
                 { path: [`${projectName}.json`], content: projectJsonContent }
             ];
+    
+            savedViewsData.forEach((view, index) => {
+                // De-serialize the state for the generation function
+                const cameraStateForVf = {
+                    position: new THREE.Vector3().fromArray(view.cameraState.position),
+                    quaternion: new THREE.Quaternion().fromArray(view.cameraState.quaternion),
+                    viewType: view.cameraState.viewType,
+                    fov: view.cameraState.fov,
+                };
+                const viewFileContent = generateViewpointFileContentFromState(cameraStateForVf);
+                if (viewFileContent) {
+                    filesToWrite.push({ path: ['03_views', `saved_view_${index + 1}.vf`], content: viewFileContent });
+                }
+            });
+    
             if (daylightingPtsContent) {
                 filesToWrite.push({ path: ['08_results', 'daylighting_sensors.pts'], content: daylightingPtsContent });
             }
@@ -491,13 +498,12 @@ async gatherAllProjectData() {
         }
     }
 
-        async runLivePreviewRender() {
+    async runLivePreviewRender() {
         if (!window.electronAPI || !window.electronAPI.runLiveRender) {
             throw new Error("Live rendering is not supported in this environment.");
         }
 
         const { getDom } = await import('./ui.js');
-        const { generateRadFileContent, generateViewpointFileContent } = await import('./radiance.js');
         const dom = getDom();
 
         const projectData = await this.gatherAllProjectData();
@@ -513,7 +519,7 @@ async gatherAllProjectData() {
         const [hour, minute] = time.split(':');
         const decimalTime = parseInt(hour, 10) + parseInt(minute, 10) / 60;
 
-        const { materials, geometry } = generateRadFileContent();
+        const { materials, geometry } = await generateRadFileContent();
         const viewpointContent = generateViewpointFileContent(projectData.viewpoint, projectData.geometry.room);
 
         const payload = {
@@ -532,143 +538,144 @@ async gatherAllProjectData() {
     }
     
     async _generateSensorPointsContent(gridType = 'all') {
-    const { dom, showAlert, getSensorGridParams } = await import('./ui.js');
-    const points = [];
-    const W = parseFloat(dom.width.value);
-    const L = parseFloat(dom.length.value);
-    const H = parseFloat(dom.height.value);
-    const alphaRad = THREE.MathUtils.degToRad(parseFloat(dom['room-orientation'].value));
-    const cosA = Math.cos(alphaRad);
-    const sinA = Math.sin(alphaRad);
+        const { getDom, showAlert, getSensorGridParams } = await import('./ui.js');
+        const dom = getDom();
+        const points = [];
+        const W = parseFloat(dom.width.value);
+        const L = parseFloat(dom.length.value);
+        const H = parseFloat(dom.height.value);
+        const alphaRad = THREE.MathUtils.degToRad(parseFloat(dom['room-orientation'].value));
+        const cosA = Math.cos(alphaRad);
+        const sinA = Math.sin(alphaRad);
 
-    // Use the new, centralized utility functions from radiance.js
-    const transformPoint = (localPoint) => transformThreePointToRadianceArray(localPoint, W, L, cosA, sinA);
-    const transformVector = (localVector) => transformThreeVectorToRadianceArray(localVector, cosA, sinA);
+        // Use the new, centralized utility functions from radiance.js
+        const transformPoint = (localPoint) => transformThreePointToRadianceArray(localPoint, W, L, cosA, sinA);
+        const transformVector = (localVector) => transformThreeVectorToRadianceArray(localVector, cosA, sinA);
 
-    const generatePointsInRect = (x, z, width, depth, spacing) => {
-        if (spacing <= 0 || width <= 0 || depth <= 0) return [];
-        const rectPositions = [];
-        const numX = Math.floor(width / spacing);
-        const numZ = Math.floor(depth / spacing);
-        if (numX === 0 || numZ === 0) return [];
+        const generatePointsInRect = (x, z, width, depth, spacing) => {
+            if (spacing <= 0 || width <= 0 || depth <= 0) return [];
+            const rectPositions = [];
+            const numX = Math.floor(width / spacing);
+            const numZ = Math.floor(depth / spacing);
+            if (numX === 0 || numZ === 0) return [];
 
-        const startX = x + (width - (numX > 1 ? (numX - 1) * spacing : 0)) / 2;
-        const startZ = z + (depth - (numZ > 1 ? (numZ - 1) * spacing : 0)) / 2;
+            const startX = x + (width - (numX > 1 ? (numX - 1) * spacing : 0)) / 2;
+            const startZ = z + (depth - (numZ > 1 ? (numZ - 1) * spacing : 0)) / 2;
 
-        for (let i = 0; i < numX; i++) {
-             for (let j = 0; j < numZ; j++) {
-                rectPositions.push({ x: startX + i * spacing, z: startZ + j * spacing });
+            for (let i = 0; i < numX; i++) {
+                 for (let j = 0; j < numZ; j++) {
+                    rectPositions.push({ x: startX + i * spacing, z: startZ + j * spacing });
+                }
             }
-        }
-        return rectPositions;
-    };
+            return rectPositions;
+        };
 
-    const enGridParams = getSensorGridParams()?.illuminance?.floor;
+        const enGridParams = getSensorGridParams()?.illuminance?.floor;
 
-    if (gridType === 'task') {
-        if (!enGridParams?.isTaskArea) return null;
-        const spacing = parseFloat(dom['floor-grid-spacing'].value);
-        const offset = parseFloat(dom['floor-grid-offset'].value);
-        const { x, z, width, depth } = enGridParams.task;
+        if (gridType === 'task') {
+            if (!enGridParams?.isTaskArea) return null;
+            const spacing = parseFloat(dom['floor-grid-spacing'].value);
+            const offset = parseFloat(dom['floor-grid-offset'].value);
+            const { x, z, width, depth } = enGridParams.task;
 
-        const taskPoints = generatePointsInRect(x, z, width, depth, spacing);
-        const normalVector = [0, 0, 1]; // Normal for a horizontal plane
+            const taskPoints = generatePointsInRect(x, z, width, depth, spacing);
+            const normalVector = [0, 0, 1]; // Normal for a horizontal plane
 
-        for (const p of taskPoints) {
-            const localPos = [p.x, p.z, offset];
-            const worldPos = transformPoint(localPos);
-            const worldNorm = transformVector(normalVector);
-            points.push(`${worldPos.map(c => c.toFixed(4)).join(' ')} ${worldNorm.map(c => c.toFixed(4)).join(' ')}`);
-        }
-    } else if (gridType === 'surrounding') {
-        if (!enGridParams?.isTaskArea || !enGridParams?.hasSurrounding) return null;
-
-        const spacing = parseFloat(dom['floor-grid-spacing'].value);
-        const offset = parseFloat(dom['floor-grid-offset'].value);
-        const task = enGridParams.task;
-        const bandWidth = enGridParams.surroundingWidth;
-
-        // Define outer rectangle (task area + surrounding band), clamped to room dimensions
-        const outerX = Math.max(0, task.x - bandWidth);
-        const outerZ = Math.max(0, task.z - bandWidth);
-        const outerW = Math.min(W - outerX, task.width + 2 * bandWidth);
-        const outerD = Math.min(L - outerZ, task.depth + 2 * bandWidth);
-
-        const outerPoints = generatePointsInRect(outerX, outerZ, outerW, outerD, spacing);
-        const normalVector = [0, 0, 1];
-
-        for (const p of outerPoints) {
-            // Check if the point is OUTSIDE the inner task area
-            const isOutsideTask = (p.x < task.x || p.x > task.x + task.width || p.z < task.z || p.z > task.z + task.depth);
-            if (isOutsideTask) {
+            for (const p of taskPoints) {
                 const localPos = [p.x, p.z, offset];
                 const worldPos = transformPoint(localPos);
                 const worldNorm = transformVector(normalVector);
                 points.push(`${worldPos.map(c => c.toFixed(4)).join(' ')} ${worldNorm.map(c => c.toFixed(4)).join(' ')}`);
             }
-        }
-    } else { // gridType === 'all'
-        // This is the original logic of the function
-        const generateCenteredPoints = (totalLength, spacing) => {
-            if (spacing <= 0 || totalLength <= 0) return [];
-            const numPoints = Math.floor(totalLength / spacing);
-            if (numPoints === 0) return [totalLength / 2];
-            const totalGridLength = (numPoints - 1) * spacing;
-            const start = (totalLength - totalGridLength) / 2;
-            return Array.from({ length: numPoints }, (_, i) => start + i * spacing);
-        };
+        } else if (gridType === 'surrounding') {
+            if (!enGridParams?.isTaskArea || !enGridParams?.hasSurrounding) return null;
 
-        const surfaces = [
-            { name: 'floor', enabled: dom['grid-floor-toggle']?.checked }, { name: 'ceiling', enabled: dom['grid-ceiling-toggle']?.checked },
-            { name: 'north', enabled: dom['grid-north-toggle']?.checked }, { name: 'south', enabled: dom['grid-south-toggle']?.checked },
-            { name: 'east', enabled: dom['grid-east-toggle']?.checked }, { name: 'west', enabled: dom['grid-west-toggle']?.checked },
-        ];
+            const spacing = parseFloat(dom['floor-grid-spacing'].value);
+            const offset = parseFloat(dom['floor-grid-offset'].value);
+            const task = enGridParams.task;
+            const bandWidth = enGridParams.surroundingWidth;
 
-        surfaces.forEach(({ name, enabled }) => {
-            if (!enabled) return;
-            let spacing, offset, points1, points2, positionFunc, normalVector;
-            if (name === 'floor' || name === 'ceiling') {
-                spacing = parseFloat(dom[`${name}-grid-spacing`].value);
-                offset = parseFloat(dom[`${name}-grid-offset`].value);
-                points1 = generateCenteredPoints(W, spacing);
-                points2 = generateCenteredPoints(L, spacing);
-                // CORRECTED: Define normals in Three.js coordinate system (Y-up)
-                normalVector = (name === 'floor') ? [0, 1, 0] : [0, -1, 0];
-                positionFunc = (p1, p2) => [p1, name === 'floor' ? offset : H + offset, p2]; // Y is height
-            } else {
-                spacing = parseFloat(dom['wall-grid-spacing'].value);
-                offset = parseFloat(dom['wall-grid-offset'].value);
-                points2 = generateCenteredPoints(H, spacing); // Height is vertical span
-                const wallLength = (name === 'north' || name === 'south') ? W : L;
-                points1 = generateCenteredPoints(wallLength, spacing); // Width/Length is horizontal span
+            // Define outer rectangle (task area + surrounding band), clamped to room dimensions
+            const outerX = Math.max(0, task.x - bandWidth);
+            const outerZ = Math.max(0, task.z - bandWidth);
+            const outerW = Math.min(W - outerX, task.width + 2 * bandWidth);
+            const outerD = Math.min(L - outerZ, task.depth + 2 * bandWidth);
 
-                // CORRECTED: Define normals in Three.js coordinate system (Y-up) and adjust positionFunc
-                switch (name) {
-                    case 'north': normalVector = [0, 0, 1]; positionFunc = (p1, p2) => [p1, p2, offset]; break;
-                    case 'south': normalVector = [0, 0, -1]; positionFunc = (p1, p2) => [p1, p2, L - offset]; break;
-                    case 'west':  normalVector = [1, 0, 0]; positionFunc = (p1, p2) => [offset, p2, p1]; break;
-                    case 'east':  normalVector = [-1, 0, 0]; positionFunc = (p1, p2) => [W - offset, p2, p1]; break;
-                }
-            }
-            for (const p1 of points1) {
-                for (const p2 of points2) {
-                    const localPos = positionFunc(p1, p2);
+            const outerPoints = generatePointsInRect(outerX, outerZ, outerW, outerD, spacing);
+            const normalVector = [0, 0, 1];
+
+            for (const p of outerPoints) {
+                // Check if the point is OUTSIDE the inner task area
+                const isOutsideTask = (p.x < task.x || p.x > task.x + task.width || p.z < task.z || p.z > task.z + task.depth);
+                if (isOutsideTask) {
+                    const localPos = [p.x, p.z, offset];
                     const worldPos = transformPoint(localPos);
                     const worldNorm = transformVector(normalVector);
                     points.push(`${worldPos.map(c => c.toFixed(4)).join(' ')} ${worldNorm.map(c => c.toFixed(4)).join(' ')}`);
                 }
             }
-        });
-    }
+        } else { // gridType === 'all'
+            // This is the original logic of the function
+            const generateCenteredPoints = (totalLength, spacing) => {
+                if (spacing <= 0 || totalLength <= 0) return [];
+                const numPoints = Math.floor(totalLength / spacing);
+                if (numPoints === 0) return [totalLength / 2];
+                const totalGridLength = (numPoints - 1) * spacing;
+                const start = (totalLength - totalGridLength) / 2;
+                return Array.from({ length: numPoints }, (_, i) => start + i * spacing);
+            };
 
-    if (points.length === 0) {
-        if (gridType === 'all') { // Only show alert for the main grid generation
-             showAlert("No sensor grids enabled; sensor points file will be empty.", "Info");
+            const surfaces = [
+                { name: 'floor', enabled: dom['grid-floor-toggle']?.checked }, { name: 'ceiling', enabled: dom['grid-ceiling-toggle']?.checked },
+                { name: 'north', enabled: dom['grid-north-toggle']?.checked }, { name: 'south', enabled: dom['grid-south-toggle']?.checked },
+                { name: 'east', enabled: dom['grid-east-toggle']?.checked }, { name: 'west', enabled: dom['grid-west-toggle']?.checked },
+            ];
+
+            surfaces.forEach(({ name, enabled }) => {
+                if (!enabled) return;
+                let spacing, offset, points1, points2, positionFunc, normalVector;
+                if (name === 'floor' || name === 'ceiling') {
+                    spacing = parseFloat(dom[`${name}-grid-spacing`].value);
+                    offset = parseFloat(dom[`${name}-grid-offset`].value);
+                    points1 = generateCenteredPoints(W, spacing);
+                    points2 = generateCenteredPoints(L, spacing);
+                    // CORRECTED: Define normals in Three.js coordinate system (Y-up)
+                    normalVector = (name === 'floor') ? [0, 1, 0] : [0, -1, 0];
+                    positionFunc = (p1, p2) => [p1, name === 'floor' ? offset : H + offset, p2]; // Y is height
+                } else {
+                    spacing = parseFloat(dom['wall-grid-spacing'].value);
+                    offset = parseFloat(dom['wall-grid-offset'].value);
+                    points2 = generateCenteredPoints(H, spacing); // Height is vertical span
+                    const wallLength = (name === 'north' || name === 'south') ? W : L;
+                    points1 = generateCenteredPoints(wallLength, spacing); // Width/Length is horizontal span
+
+                    // CORRECTED: Define normals in Three.js coordinate system (Y-up) and adjust positionFunc
+                    switch (name) {
+                        case 'north': normalVector = [0, 0, 1]; positionFunc = (p1, p2) => [p1, p2, offset]; break;
+                        case 'south': normalVector = [0, 0, -1]; positionFunc = (p1, p2) => [p1, p2, L - offset]; break;
+                        case 'west':  normalVector = [1, 0, 0]; positionFunc = (p1, p2) => [offset, p2, p1]; break;
+                        case 'east':  normalVector = [-1, 0, 0]; positionFunc = (p1, p2) => [W - offset, p2, p1]; break;
+                    }
+                }
+                for (const p1 of points1) {
+                    for (const p2 of points2) {
+                        const localPos = positionFunc(p1, p2);
+                        const worldPos = transformPoint(localPos);
+                        const worldNorm = transformVector(normalVector);
+                        points.push(`${worldPos.map(c => c.toFixed(4)).join(' ')} ${worldNorm.map(c => c.toFixed(4)).join(' ')}`);
+                    }
+                }
+            });
         }
-        return null;
+
+        if (points.length === 0) {
+            if (gridType === 'all') { // Only show alert for the main grid generation
+                 showAlert("No sensor grids enabled; sensor points file will be empty.", "Info");
+            }
+            return null;
+        }
+        return "# Radiance Sensor Points (X Y Z Vx Vy Vz)\n" + points.join('\n');
     }
-    return "# Radiance Sensor Points (X Y Z Vx Vy Vz)\n" + points.join('\n');
-}
 
     async _generateDaylightingPointsContent() {
         const lightingState = lightingManager.getCurrentState();
@@ -850,9 +857,9 @@ async gatherAllProjectData() {
         setChecked('frame-toggle', settings.geometry.frames.enabled);
         setValue('frame-thick', settings.geometry.frames.thickness);
         setValue('frame-depth', settings.geometry.frames.depth);
-        ['wall', 'floor', 'ceiling', 'frame', 'shading', 'glazing'].forEach(type => {
+        ['wall', 'floor', 'ceiling', 'frame', 'shading', 'glazing', 'furniture'].forEach(type => {
             if(settings.materials[type]) {
-                const mat = settings.materials[type];
+            const mat = settings.materials[type];
                 if(mat.type) setValue(`${type}-mat-type`, mat.type);
                 if(mat.reflectance) setValue(`${type}-refl`, mat.reflectance);
                 if(mat.specularity) setValue(`${type}-spec`, mat.specularity);
@@ -872,6 +879,23 @@ async gatherAllProjectData() {
             }
         });
         setChecked('bsdf-toggle', settings.materials.glazing.bsdfEnabled);
+
+        // --- Furniture ---
+        if (settings.geometry.furniture && Array.isArray(settings.geometry.furniture)) {
+            const { addFurniture, furnitureObject } = await import('./geometry.js');
+            // Clear any existing furniture before loading
+            while(furnitureObject.children.length > 0) furnitureObject.remove(furnitureObject.children[0]);
+
+            settings.geometry.furniture.forEach(item => {
+                const newObj = addFurniture(item.assetType, new THREE.Vector3(0,0,0)); // Add at origin first
+                if (newObj) {
+                    newObj.position.fromArray(item.position);
+                    newObj.quaternion.fromArray(item.quaternion);
+                    newObj.scale.fromArray(item.scale);
+                }
+            });
+        }
+
 
         // --- Artificial Lighting ---
         // Manually update the file input display for daylighting schedule if it exists
@@ -920,21 +944,46 @@ async gatherAllProjectData() {
 
         // --- Sensor Grids ---
         if (settings.sensorGrids) {
-        const sg = settings.sensorGrids;
-            if (sg.floor) { setChecked('grid-floor-toggle', sg.floor.enabled); setValue('floor-grid-spacing', sg.floor.spacing); setValue('floor-grid-offset', sg.floor.offset); setChecked('show-floor-grid-3d-toggle', sg.floor.showIn3D); }
-            if (sg.ceiling) { setChecked('grid-ceiling-toggle', sg.ceiling.enabled); setValue('ceiling-grid-spacing', sg.ceiling.spacing); setValue('ceiling-grid-offset', sg.ceiling.offset); }
-            if (sg.walls) {
-                setValue('wall-grid-spacing', sg.walls.spacing); setValue('wall-grid-offset', sg.walls.offset);
-                setChecked('grid-north-toggle', sg.walls.surfaces.n); setChecked('grid-south-toggle', sg.walls.surfaces.s);
-                setChecked('grid-east-toggle', sg.walls.surfaces.e); setChecked('grid-west-toggle', sg.walls.surfaces.w);
+            const sg = settings.sensorGrids;
+            if (sg.illuminance.floor) {
+                const floor = sg.illuminance.floor;
+                setChecked('grid-floor-toggle', floor.enabled);
+                setValue('floor-grid-spacing', floor.spacing);
+                setValue('floor-grid-offset', floor.offset);
+                setChecked('show-floor-grid-3d-toggle', floor.showIn3D);
+                setChecked('task-area-toggle', floor.isTaskArea);
+                if (floor.task) {
+                    setValue('task-area-start-x', floor.task.x);
+                    setValue('task-area-start-z', floor.task.z);
+                    setValue('task-area-width', floor.task.width);
+                    setValue('task-area-depth', floor.task.depth);
+                }
+                setChecked('surrounding-area-toggle', floor.hasSurrounding);
+                setValue('surrounding-area-width', floor.surroundingWidth);
+            }
+            if (sg.illuminance.ceiling) {
+                setChecked('grid-ceiling-toggle', sg.illuminance.ceiling.enabled);
+                setValue('ceiling-grid-spacing', sg.illuminance.ceiling.spacing);
+                setValue('ceiling-grid-offset', sg.illuminance.ceiling.offset);
+            }
+            if (sg.illuminance.walls) {
+                const walls = sg.illuminance.walls;
+                setValue('wall-grid-spacing', walls.spacing);
+                setValue('wall-grid-offset', walls.offset);
+                if (walls.surfaces) {
+                    setChecked('grid-north-toggle', walls.surfaces.n);
+                    setChecked('grid-south-toggle', walls.surfaces.s);
+                    setChecked('grid-east-toggle', walls.surfaces.e);
+                    setChecked('grid-west-toggle', walls.surfaces.w);
+                }
             }
             if (sg.view) {
                 setChecked('view-grid-toggle', sg.view.enabled); setChecked('show-view-grid-3d-toggle', sg.view.showIn3D); setValue('view-grid-spacing', sg.view.spacing);
                 setValue('view-grid-offset', sg.view.offset); setValue('view-grid-directions', sg.view.numDirs);
-                if(sg.view.startVec) {
-                    setValue('view-grid-start-vec-x', sg.view.startVec.x);
-                    setValue('view-grid-start-vec-y', sg.view.startVec.y);
-                    setValue('view-grid-start-vec-z', sg.view.startVec.z);
+                if(sg.view.startVec && Array.isArray(sg.view.startVec)) {
+                    setValue('view-grid-start-vec-x', sg.view.startVec[0]);
+                    setValue('view-grid-start-vec-y', sg.view.startVec[1]);
+                    setValue('view-grid-start-vec-z', sg.view.startVec[2]);
                 }
             }
         }
@@ -969,7 +1018,6 @@ async gatherAllProjectData() {
 
     // --- Simulation Panels ---
     if (settings.simulationParameters) {
-        const { recreateSimulationPanels } = await import('./simulation.js');
         recreateSimulationPanels(settings.simulationParameters, this.simulationFiles, ui);
     }
 

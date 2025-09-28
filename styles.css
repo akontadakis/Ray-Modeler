@@ -19,6 +19,7 @@
   --floor-color: #333333;
   --ceiling-color: #cccccc;
   --frame-color: #1f1f1f;
+   --furniture-color: #464646; /* Brown Grey */
   --shading-color: #1f1f1f;
   --light-source-color: #ffbf00; /* Amber */
   --illuminance-grid-color: #343434;
@@ -49,6 +50,7 @@ html[data-theme="dark"] {
   --floor-color: #424242;
   --ceiling-color: #bdbdbd;
   --frame-color: #fafafa;
+  --furniture-color: #9E9E9E; /* Grey */
   --shading-color: #fafafa;
   --light-source-color: #ffff00; /* Yellow */
   --illuminance-grid-color: #e0e0e0;
@@ -83,6 +85,7 @@ html[data-theme="cyber"] {
   --floor-color: #11215e;
   --ceiling-color: #e1efff;
   --frame-color: #ff2e97;
+  --furniture-color: #4d8bee; /* Secondary Blue */
   --shading-color: #ff2e97;
   --light-source-color: #ffd400; /* Yellow */
   --illuminance-grid-color: #e1efff;
@@ -117,6 +120,7 @@ html[data-theme="cafe58"] {
   --floor-color: #26303D;
   --ceiling-color: #E1DEDE;
   --frame-color: #26303D;
+  --furniture-color: #5a687a; /* Slate Gray */
   --shading-color: #26303D;
   --light-source-color: #FFA518;
   --illuminance-grid-color: #26303D;
