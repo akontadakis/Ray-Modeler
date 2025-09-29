@@ -286,7 +286,7 @@ const ids = [
 
     // Scene Elements Panel
     'panel-scene-elements', 'asset-library', 'transform-controls-section',
-    'gizmo-mode-translate', 'gizmo-mode-rotate', 'gizmo-mode-scale',
+    'gizmo-mode-translate', 'gizmo-mode-rotate', 'gizmo-mode-scale', 'remove-selected-object-btn',
     'obj-pos-x', 'obj-pos-y', 'obj-pos-z', 'obj-pos-x-val', 'obj-pos-y-val', 'obj-pos-z-val',
     'obj-rot-y', 'obj-rot-y-val', // We now only have a single rotation slider for simplicity
     'obj-scale-uniform', 'obj-scale-uniform-val',
@@ -1320,11 +1320,13 @@ export async function setupEventListeners() {
     
     // Listener for updates from the transform gizmo in the 3D scene
     renderer.domElement.addEventListener('transformGizmoChange', (e) => {
-        if (e.detail.object) {
-            _updateTransformSlidersFromObject(e.detail.object);
-        }
+      if (e.detail.object) {
+          _updateTransformSlidersFromObject(e.detail.object);
+      }
     });
 
+    // Listener for the remove object button
+    dom['remove-selected-object-btn']?.addEventListener('click', _removeSelectedObject);
 
     // --- Occupancy Schedule Listeners ---
     dom['occupancy-toggle']?.addEventListener('change', (e) => {
@@ -5325,6 +5327,43 @@ function _updateObjectFromTransformSliders() {
     // Scale (Uniform)
     const scale = parseFloat(dom['obj-scale-uniform'].value);
     object.scale.set(scale, scale, scale);
+}
+
+/**
+* Removes the currently selected object (furniture or massing block) from the scene.
+* @private
+*/
+async function _removeSelectedObject() {
+    const object = transformControls.object;
+    if (!object) {
+    return; // Nothing selected, do nothing.
+    }
+
+    const objectName = object.userData.assetType || object.userData.name || 'object';
+
+    if (object.userData.isFurniture) {
+    // Detach gizmo and hide controls
+    transformControls.detach();
+    dom['transform-controls-section']?.classList.add('hidden');
+
+    // Remove from parent (which should be a group inside furnitureObject)
+    if (object.parent) {
+        object.parent.remove(object);
+    }
+
+    showAlert(`Removed ${objectName}.`, 'Object Removed');
+    } else if (object.userData.isMassingBlock) {
+    // Detach gizmo and hide controls
+    transformControls.detach();
+    dom['transform-controls-section']?.classList.add('hidden');
+
+    // Use the manager function to handle removal and UI update
+    const { deleteContextObject } = await import('./geometry.js');
+        deleteContextObject(object.userData.id);
+        showAlert(`Removed ${objectName}.`, 'Object Removed');
+    } else {
+        showAlert('This object type cannot be removed.', 'Action Not Allowed');
+    }
 }
 
 /**

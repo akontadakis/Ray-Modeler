@@ -1580,10 +1580,57 @@
                             <span class="asset-name">Shelf</span>
                     </div>
                 </div>
-                <div class="param-section pt-4 border-t border-dashed border-[--grid-color]">
-                    <h3 class="font-semibold text-sm uppercase">Context & Site Modeling</h3>
-                    <p class="info-box !text-xs !py-2 !px-3">Model surrounding buildings and topography to improve simulation accuracy.</p>
-                    <div id="context-controls" class="space-y-4 mt-4">
+                 <div id="transform-controls-section" class="hidden param-section pt-4 border-t border-dashed border-[--grid-color]">
+                <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Selected Object Transform</h4>
+                <div class="flex items-center justify-between mt-2">
+                    <div class="btn-group">
+                        <button id="gizmo-mode-translate" class="btn active" data-mode="translate">Move</button>
+                        <button id="gizmo-mode-rotate" class="btn" data-mode="rotate">Rotate</button>
+                        <button id="gizmo-mode-scale" class="btn" data-mode="scale">Scale</button>
+                    </div>
+                    <button id="remove-selected-object-btn" class="btn btn-danger btn-sm">Remove</button>
+                </div>
+                <div class="space-y-4 pt-4 border-t border-[--grid-color] mt-4">
+                    <div>
+                        <label class="label text-xs" for="obj-pos-x">Position (X)</label>
+                        <div class="flex items-center space-x-4 mt-1">
+                            <input type="range" id="obj-pos-x" min="-25" max="25" value="0" step="0.1">
+                            <span id="obj-pos-x-val" class="data-value font-mono w-16 text-left">0.0m</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="label text-xs" for="obj-pos-y">Position (Y)</label>
+                        <div class="flex items-center space-x-4 mt-1">
+                            <input type="range" id="obj-pos-y" min="0" max="10" value="0" step="0.1">
+                            <span id="obj-pos-y-val" class="data-value font-mono w-16 text-left">0.0m</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="label text-xs" for="obj-pos-z">Position (Z)</label>
+                        <div class="flex items-center space-x-4 mt-1">
+                            <input type="range" id="obj-pos-z" min="-25" max="25" value="0" step="0.1">
+                            <span id="obj-pos-z-val" class="data-value font-mono w-16 text-left">0.0m</span>
+                        </div>
+                    </div>
+                    <div class="pt-2 border-t border-dashed border-[--grid-color]">
+                        <label class="label text-xs" for="obj-rot-y">Rotation (°)</label>
+                        <div class="flex items-center space-x-4 mt-1">
+                            <input type="range" id="obj-rot-y" min="-180" max="180" value="0" step="1">
+                            <span id="obj-rot-y-val" class="data-value font-mono w-16 text-left">0°</span>
+                        </div>
+                    </div>
+                    <div class="pt-2 border-t border-dashed border-[--grid-color]">
+                        <label class="label text-xs" for="obj-scale-uniform">Scale (Uniform)</label>
+                        <div class="flex items-center space-x-4 mt-1">
+                            <input type="range" id="obj-scale-uniform" min="0.1" max="5" value="1" step="0.05">
+                            <span id="obj-scale-uniform-val" class="data-value font-mono w-16 text-left">1.00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="param-section pt-4 border-t border-dashed border-[--grid-color]">
+                <h3 class="font-semibold text-sm uppercase">Context & Site Modeling</h3>
+                <p class="info-box !text-xs !py-2 !px-3">Model surrounding buildings and topography to improve simulation accuracy.</p>
                         <div>
                             <label class="label">Context Source</label>
                             <div class="btn-group mt-1">
@@ -1599,8 +1646,8 @@
                             <div>
                                 <label for="osm-radius" class="label text-xs">Fetch Radius (meters)</label>
                                 <div class="flex items-center space-x-3 mt-1">
-                                    <input type="range" id="osm-radius" min="50" max="1000" value="200" step="10">
-                                    <span id="osm-radius-val" class="data-value font-mono w-16 text-left">200m</span>
+                                    <input type="range" id="osm-radius" min="10" max="1000" value="100" step="10">
+                                    <span id="osm-radius-val" class="data-value font-mono w-16 text-left">100m</span>
                                 </div>
                             </div>
                             <button id="fetch-osm-data-btn" class="btn btn-secondary w-full">Fetch Building Data</button>
@@ -1642,9 +1689,9 @@
                                 <div id="massing-dimensions" class="space-y-3">
                                     <h5 class="font-semibold text-xs text-[--text-secondary]">Dimensions</h5>
                                     <div id="box-dimensions">
-                                        <div><label class="label text-xs" for="massing-width">Width (X)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="massing-width" min="1" max="100" value="10" step="1"><span id="massing-width-val" class="data-value font-mono w-12 text-left">10m</span></div></div>
-                                        <div><label class="label text-xs" for="massing-depth">Depth (Z)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="massing-depth" min="1" max="100" value="10" step="1"><span id="massing-depth-val" class="data-value font-mono w-12 text-left">10m</span></div></div>
-                                        <div><label class="label text-xs" for="massing-height">Height (Y)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="massing-height" min="1" max="100" value="15" step="1"><span id="massing-height-val" class="data-value font-mono w-12 text-left">15m</span></div></div>
+                                        <div><label class="label text-xs" for="massing-width">Width (X)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="massing-width" min="1" max="100" value="10" step="0.1"><span id="massing-width-val" class="data-value font-mono w-12 text-left">10m</span></div></div>
+                                        <div><label class="label text-xs" for="massing-depth">Depth (Z)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="massing-depth" min="1" max="100" value="10" step="0.1"><span id="massing-depth-val" class="data-value font-mono w-12 text-left">10m</span></div></div>
+                                        <div><label class="label text-xs" for="massing-height">Height (Y)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="massing-height" min="1" max="100" value="15" step="0.1"><span id="massing-height-val" class="data-value font-mono w-12 text-left">15m</span></div></div>
                                     </div>
                                     <div id="radius-dimension" class="hidden">
                                         <div><label class="label text-xs" for="massing-radius">Radius</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="massing-radius" min="1" max="50" value="5" step="1"><span id="massing-radius-val" class="data-value font-mono w-12 text-left">5m</span></div></div>
@@ -1660,8 +1707,8 @@
 
                                 <div class="space-y-3">
                                     <h5 class="font-semibold text-xs text-[--text-secondary]">Block Creation</h5>
-                                    <div><label class="label text-xs" for="massing-count">Number of Blocks</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="massing-count" min="1" max="10" value="1" step="1"><span id="massing-count-val" class="data-value font-mono w-12 text-left">1</span></div></div>
-                                    <div><label class="label text-xs" for="massing-spacing">Spacing Between</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="massing-spacing" min="0" max="20" value="5" step="1"><span id="massing-spacing-val" class="data-value font-mono w-12 text-left">5m</span></div></div>
+                                    <div><label class="label text-xs" for="massing-count">Number of Blocks</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="massing-count" min="1" max="10" value="1" step="0.1"><span id="massing-count-val" class="data-value font-mono w-12 text-left">1</span></div></div>
+                                    <div><label class="label text-xs" for="massing-spacing">Spacing Between</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="massing-spacing" min="0" max="20" value="5" step="0.1"><span id="massing-spacing-val" class="data-value font-mono w-12 text-left">5m</span></div></div>
                                     <div>
                                         <label class="label text-xs">Arrangement Pattern</label>
                                         <div class="grid grid-cols-3 gap-2 mt-1">
@@ -1802,60 +1849,13 @@
                         </div>
                     </div>
                 </div>
-                <div id="transform-controls-section" class="hidden param-section pt-4 border-t border-dashed border-[--grid-color]">
-                    <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Selected Object Transform</h4>
-                    <div class="btn-group mt-2">
-                        <button id="gizmo-mode-translate" class="btn active" data-mode="translate">Move</button>
-                        <button id="gizmo-mode-rotate" class="btn" data-mode="rotate">Rotate</button>
-                        <button id="gizmo-mode-scale" class="btn" data-mode="scale">Scale</button>
-                    </div>
-                    <div class="space-y-4 pt-4 border-t border-[--grid-color] mt-4">
-                        <div>
-                            <label class="label text-xs" for="obj-pos-x">Position (X)</label>
-                            <div class="flex items-center space-x-4 mt-1">
-                                <input type="range" id="obj-pos-x" min="-25" max="25" value="0" step="0.1">
-                                <span id="obj-pos-x-val" class="data-value font-mono w-16 text-left">0.0m</span>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="label text-xs" for="obj-pos-y">Position (Y)</label>
-                            <div class="flex items-center space-x-4 mt-1">
-                                <input type="range" id="obj-pos-y" min="0" max="10" value="0" step="0.1">
-                                <span id="obj-pos-y-val" class="data-value font-mono w-16 text-left">0.0m</span>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="label text-xs" for="obj-pos-z">Position (Z)</label>
-                            <div class="flex items-center space-x-4 mt-1">
-                                <input type="range" id="obj-pos-z" min="-25" max="25" value="0" step="0.1">
-                                <span id="obj-pos-z-val" class="data-value font-mono w-16 text-left">0.0m</span>
-                            </div>
-                        </div>
-                        <div class="pt-2 border-t border-dashed border-[--grid-color]">
-                            <label class="label text-xs" for="obj-rot-y">Rotation (°)</label>
-                            <div class="flex items-center space-x-4 mt-1">
-                                <input type="range" id="obj-rot-y" min="-180" max="180" value="0" step="1">
-                                <span id="obj-rot-y-val" class="data-value font-mono w-16 text-left">0°</span>
-                            </div>
-                        </div>
-                        <div class="pt-2 border-t border-dashed border-[--grid-color]">
-                            <label class="label text-xs" for="obj-scale-uniform">Scale (Uniform)</label>
-                            <div class="flex items-center space-x-4 mt-1">
-                                <input type="range" id="obj-scale-uniform" min="0.1" max="5" value="1" step="0.05">
-                                <span id="obj-scale-uniform-val" class="data-value font-mono w-16 text-left">1.00</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
             </div>
-            <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+    <div id="project-access-prompt" class="fixed top-20 left-1/2 -translate-x-1/2 z-[100] ui-panel !p-3 flex items-center gap-4 hidden">
+    <p class="text-sm">Please select a project folder to enable direct saving and file access.</p>
+            <button id="select-folder-btn" class="btn btn-primary btn-sm">Select Folder</button>
+            <button id="dismiss-prompt-btn" class="text-gray-400 hover:text-gray-200" aria-label="Dismiss">&times;</button>
         </div>
-      <div id="project-access-prompt" class="fixed top-20 left-1/2 -translate-x-1/2 z-[100] ui-panel !p-3 flex items-center gap-4 hidden">
-
-        <p class="text-sm">Please select a project folder to enable direct saving and file access.</p>
-                <button id="select-folder-btn" class="btn btn-primary btn-sm">Select Folder</button>
-                <button id="dismiss-prompt-btn" class="text-gray-400 hover:text-gray-200" aria-label="Dismiss">&times;</button>
-            </div>
 
             <div id="hdr-viewer-panel" class="floating-window ui-panel hidden" style="width: 550px; height: 640px;">
                 <div class="window-header">
