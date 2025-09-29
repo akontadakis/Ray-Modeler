@@ -9,8 +9,113 @@ import { project } from './project.js';
 // The generateAndStoreOccupancyCsv function needs to be available to other modules like project.js
 export { generateAndStoreOccupancyCsv };
 import { resultsManager, palettes } from './resultsManager.js';
+import * as MESH from '../scripts/scene.js';
 import { initHdrViewer, openHdrViewer } from './hdrViewer.js';
 
+
+// --- SHORTCUTS ---
+// Centralized object to define all keyboard shortcut actions
+const shortcutActions = {
+    // File actions
+    'saveProject': () => dom['save-project-button']?.click(),
+    'loadProject': () => dom['load-project-button']?.click(),
+
+    // View controls
+    'viewPersp': () => setCameraView('persp'),
+    'viewOrtho': () => setCameraView('ortho'),
+    'viewTop': () => setCameraView('top'),
+    'viewFront': () => setCameraView('front'),
+    'viewBack': () => setCameraView('back'),
+    'viewLeft': () => setCameraView('left'),
+    'viewRight': () => setCameraView('right'),
+
+    // Panel toggles
+    'toggleProjectPanel': () => togglePanelVisibility('panel-project', 'toggle-panel-project-btn'),
+    'toggleDimensionsPanel': () => togglePanelVisibility('panel-dimensions', 'toggle-panel-dimensions-btn'),
+    'toggleAperturePanel': () => togglePanelVisibility('panel-aperture', 'toggle-panel-aperture-btn'),
+    'toggleLightingPanel': () => togglePanelVisibility('panel-lighting', 'toggle-panel-lighting-btn'),
+    'toggleMaterialsPanel': () => togglePanelVisibility('panel-materials', 'toggle-panel-materials-btn'),
+    'toggleSensorPanel': () => togglePanelVisibility('panel-sensor', 'toggle-panel-sensor-btn'),
+    'toggleViewpointPanel': () => togglePanelVisibility('panel-viewpoint', 'toggle-panel-viewpoint-btn'),
+    'toggleScenePanel': () => togglePanelVisibility('panel-scene-elements', 'toggle-panel-scene-btn'),
+
+    // Other UI toggles
+    'toggleInfoPanel': () => togglePanelVisibility('panel-info', 'info-button'),
+    'toggleAIAssistant': () => togglePanelVisibility('panel-ai-assistant', 'ai-assistant-button'),
+    'openShortcuts': () => openShortcutHelp(),
+
+    // Gizmo modes
+    'gizmoTranslate': () => setAndDisplayGizmoMode('translate'),
+    'gizmoRotate': () => setAndDisplayGizmoMode('rotate'),
+    'gizmoScale': () => setAndDisplayGizmoMode('scale'),
+};
+
+// Default key mappings. This structure makes it easier to add a customization UI later.
+const keyMap = {
+    'KeyS+Ctrl': 'saveProject',
+    'KeyO+Ctrl': 'loadProject',
+    'KeyP': 'viewPersp',
+    'KeyO': 'viewOrtho',
+    'KeyT': 'viewTop',
+    'KeyF': 'viewFront',
+    'KeyB': 'viewBack',
+    'KeyL': 'viewLeft',
+    'KeyR': 'viewRight',
+    'Digit1': 'toggleProjectPanel',
+    'Digit2': 'toggleDimensionsPanel',
+    'Digit3': 'toggleAperturePanel',
+    'Digit4': 'toggleLightingPanel',
+    'Digit5': 'toggleMaterialsPanel',
+    'Digit6': 'toggleSensorPanel',
+    'Digit7': 'toggleViewpointPanel',
+    'Digit8': 'toggleScenePanel',
+    'KeyI': 'toggleInfoPanel',
+    'KeyA': 'toggleAIAssistant',
+    'KeyW': 'gizmoTranslate',
+    'KeyE': 'gizmoRotate',
+    'KeyR': 'gizmoScale',
+};
+
+/**
+ * Handles global keydown events for shortcuts.
+ * @param {KeyboardEvent} event
+ */
+function handleKeyDown(event) {
+    // Ignore shortcuts if the user is typing in an input field.
+    const target = event.target;
+    const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+    if (isTyping) return;
+
+    // Special case for '?' key which is more reliable than using event.code
+    if (event.key === '?') {
+        event.preventDefault();
+        shortcutActions['openShortcuts']();
+        return;
+    }
+
+    // Construct a unique key identifier string (e.g., 'KeyS+Ctrl')
+    let keyIdentifier = event.code;
+    if (event.ctrlKey) keyIdentifier += '+Ctrl';
+    if (event.altKey) keyIdentifier += '+Alt';
+    if (event.shiftKey) keyIdentifier += '+Shift';
+
+    const action = keyMap[keyIdentifier];
+    if (action && shortcutActions[action]) {
+        event.preventDefault(); // Prevent browser default actions (e.g., Ctrl+S saving the page)
+        shortcutActions[action]();
+    }
+}
+
+/**
+ * Opens the keyboard shortcut help modal.
+ */
+function openShortcutHelp() {
+    const modal = dom['shortcut-help-modal'];
+    if (modal) {
+        modal.classList.replace('hidden', 'flex');
+        modal.style.zIndex = getNewZIndex();
+    }
+}
 
 // --- MODULE STATE ---
 const dom = {}; // No longer exported directly
@@ -282,7 +387,8 @@ const ids = [
     'left-toolbar', 'toggle-panel-project-btn', 'toggle-panel-dimensions-btn', 
     'toggle-panel-aperture-btn', 'toggle-panel-lighting-btn', 'toggle-panel-materials-btn',
     'toggle-panel-sensor-btn', 'toggle-panel-viewpoint-btn', 'toggle-panel-scene-btn',
-    'view-controls', 'view-btn-persp', 'view-btn-ortho', 'view-btn-top', 'view-btn-front', 'view-btn-back', 'view-btn-left', 'view-btn-right',
+    'view-controls', 'view-btn-persp', 'view-btn-ortho', 'view-btn-top', 'view-btn-front', 'view-btn-back', 'view-btn-left', 'view-btn-right', 'view-btn-quad',
+    'viewport-main', 'viewport-top', 'viewport-front', 'viewport-side',
 
     // Scene Elements Panel
     'panel-scene-elements', 'asset-library', 'transform-controls-section',
@@ -539,7 +645,10 @@ const ids = [
     'select-all-objects', 'clear-selection', 'invert-selection',
     'context-object-list', 'bulk-delete', 'bulk-copy', 'bulk-change-material', 'bulk-select-by-type',
     'context-object-properties', 'object-info-display', 'obj-name', 'obj-type', 'obj-position',
-    'obj-dimensions', 'obj-volume', 'delete-single-object', 'copy-single-object', 'focus-object'
+    'obj-dimensions', 'obj-volume', 'delete-single-object', 'copy-single-object', 'focus-object',
+    
+    // Shortcut Modal
+    'shortcut-help-btn', 'shortcut-help-modal', 'shortcut-modal-close-btn',
 ];
 
     ids.forEach(id => { const el = document.getElementById(id); if(el) dom[id] = el; });
@@ -965,6 +1074,9 @@ function setupTaskAreaVisualizer() {
 // --- END: New functions for Task Area Visualizer ---
 
 export async function setupEventListeners() {
+    // Global listener for all keyboard shortcuts
+    window.addEventListener('keydown', handleKeyDown);
+
     // Add the event listener for the lock button
     dom['wall-select-lock-btn']?.addEventListener('click', () => {
         isWallSelectionLocked = !isWallSelectionLocked;
@@ -1016,6 +1128,22 @@ export async function setupEventListeners() {
     dom['view-btn-back']?.addEventListener('click', () => setCameraView('back'));
     dom['view-btn-left']?.addEventListener('click', () => setCameraView('left'));
     dom['view-btn-right']?.addEventListener('click', () => setCameraView('right'));
+
+    dom['view-btn-quad']?.addEventListener('click', () => {
+        const container = dom['render-container'];
+        const isActive = container.classList.toggle('quad-view-active');
+        dom['view-btn-quad'].classList.toggle('active', isActive);
+
+        // Disable other view buttons in quad mode
+        ['persp', 'ortho', 'top', 'front', 'back', 'left', 'right'].forEach(v => {
+            dom[`view-btn-${v}`].disabled = isActive;
+        });
+
+        import('../scripts/scene.js').then(scene => {
+            scene.toggleQuadView(isActive);
+        });
+    });
+
     dom['frame-toggle']?.addEventListener('change', () => { dom['frame-controls']?.classList.toggle('hidden', !dom['frame-toggle'].checked); scheduleUpdate(); });
     dom['bsdf-toggle']?.addEventListener('change', async (e) => {
         const isEnabled = e.target.checked;
@@ -1290,16 +1418,22 @@ export async function setupEventListeners() {
         dom['resize-mode-info'].classList.toggle('hidden', !isResizeMode);
         scheduleUpdate(); // Rebuild scene to show/hide handles
     });
-    renderer.domElement.addEventListener('pointerdown', onPointerDown, false);
-    renderer.domElement.addEventListener('pointermove', onPointerMove, false);
-    renderer.domElement.addEventListener('pointerup', onPointerUp, false);
+    dom['render-container'].addEventListener('pointerdown', onPointerDown, false);
+    dom['render-container'].addEventListener('pointermove', onPointerMove, false);
+    dom['render-container'].addEventListener('pointerup', onPointerUp, false);
 
     if(dom['view-type']) updateLiveViewType(dom['view-type'].value);
 
    // --- Gizmo Mode Listeners ---
-    dom['gizmo-mode-translate']?.addEventListener('click', () => setGizmoMode('translate'));
-    dom['gizmo-mode-rotate']?.addEventListener('click', () => setGizmoMode('rotate'));
-    dom['gizmo-mode-scale']?.addEventListener('click', () => setGizmoMode('scale'));
+    dom['gizmo-mode-translate']?.addEventListener('click', () => setAndDisplayGizmoMode('translate'));
+    dom['gizmo-mode-rotate']?.addEventListener('click', () => setAndDisplayGizmoMode('rotate'));
+    dom['gizmo-mode-scale']?.addEventListener('click', () => setAndDisplayGizmoMode('scale'));
+
+    // --- Shortcut Help Modal Listeners ---
+    dom['shortcut-help-btn']?.addEventListener('click', openShortcutHelp);
+    dom['shortcut-modal-close-btn']?.addEventListener('click', () => {
+        dom['shortcut-help-modal']?.classList.replace('flex', 'hidden');
+    });
 
     // Listeners for the new transform sliders with real-time feedback
     const transformSliders = ['obj-pos-x', 'obj-pos-y', 'obj-pos-z', 'obj-rot-y', 'obj-scale-uniform'];
@@ -3829,6 +3963,19 @@ function _updateViewpointSliderAndDispatch(id, value) {
 }
 
 /**
+ * Sets the gizmo mode and updates the UI button states.
+ * @param {string} mode - The desired gizmo mode ('translate', 'rotate', 'scale').
+ */
+function setAndDisplayGizmoMode(mode) {
+    setGizmoMode(mode); 
+
+    // Update UI button states
+    dom['gizmo-mode-translate']?.classList.toggle('active', mode === 'translate');
+    dom['gizmo-mode-rotate']?.classList.toggle('active', mode === 'rotate');
+    dom['gizmo-mode-scale']?.classList.toggle('active', mode === 'scale');
+}
+
+/**
 * Handles the click event for the "Set Viewpoint Here" button in the context menu.
 */
 function onSetViewpointHere() {
@@ -5375,7 +5522,10 @@ function onPointerDown(event) {
 
     if (isResizeMode) {
         const pointer = new THREE.Vector2();
-        const rect = renderer.domElement.getBoundingClientRect();
+        const targetElement = event.target.closest('.viewport');
+        if (!targetElement) return; // Must be in a viewport
+
+        const rect = targetElement.getBoundingClientRect();
         pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
         pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
@@ -5413,7 +5563,10 @@ function onPointerMove(event) {
     if (!isResizeMode || !draggedHandle) return;
 
     const pointer = new THREE.Vector2();
-    const rect = renderer.domElement.getBoundingClientRect();
+    const targetElement = event.target.closest('.viewport');
+    if (!targetElement) return; // Must be in a viewport
+
+    const rect = targetElement.getBoundingClientRect();
     pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
@@ -5473,15 +5626,40 @@ function onPointerUp(event) {
 function handleSceneClick(event) {
     if (transformControls.dragging || sensorTransformControls.dragging || isResizeMode) return;
 
+    const { isQuadView, topCamera, frontCamera, sideCamera } = MESH.scene;
     const pointer = new THREE.Vector2();
-    const rect = renderer.domElement.getBoundingClientRect();
+    let cameraForRaycast = activeCamera;
+
+    // Always get the target viewport from the event, as the listener is on the container
+    const targetElement = event.target.closest('.viewport');
+    if (!targetElement) return; // Exit if click was not inside a viewport
+
+    if (isQuadView) {
+        switch (targetElement.id) {
+            case 'viewport-main':
+                cameraForRaycast = activeCamera;
+                break;
+            case 'viewport-top':
+                cameraForRaycast = topCamera;
+                break;
+            case 'viewport-front':
+                cameraForRaycast = frontCamera;
+                break;
+            case 'viewport-side':
+                cameraForRaycast = sideCamera;
+                break;
+            default:
+                return; 
+        }
+    }
+
+    const rect = targetElement.getBoundingClientRect();
     pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
     const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(pointer, activeCamera);
+    raycaster.setFromCamera(pointer, cameraForRaycast);
 
-    // Add contextObject to allow selecting massing blocks
     const objectsToIntersect = [wallSelectionGroup, furnitureObject, contextObject];
     const intersects = raycaster.intersectObjects(objectsToIntersect, true);
 
@@ -5490,13 +5668,11 @@ function handleSceneClick(event) {
     const massingIntersect = intersects.find(i => i.object.userData.isMassingBlock === true);
 
     if (furnitureIntersect) {
-        // Use the generic function to select and attach gizmo
         selectTransformableObject(furnitureIntersect.object);
     } else if (massingIntersect) {
-        // New case to handle selecting a massing block
         selectTransformableObject(massingIntersect.object);
     } else if (wallIntersect) {
-        transformControls.detach(); // Detach from any other object
+        transformControls.detach();
         handleWallInteraction(wallIntersect);
     } else {
         handleDeselection();

@@ -45,6 +45,13 @@ export let daylightingSensorsGroup;
 export let isFirstPersonView = false;
 export let currentViewType = 'v'; // Default to perspective
 export let importedModelObject;
+
+// --- QUAD VIEW VARIABLES ---
+export let isQuadView = false;
+export let topCamera, frontCamera, sideCamera;
+let topControls, frontControls, sideControls;
+let viewports = {};
+
 let preFpvCamera; // To store the camera state before entering FPV
 
 // --- CORE FUNCTIONS ---
@@ -129,8 +136,15 @@ export async function setupScene(container) {
     composer.addPass(fisheyePass);
 
     // 5. Controls Setup
-    _setupControls(renderer.domElement);
-    
+    viewports = {
+        main: { element: document.getElementById('viewport-main') },
+        top: { element: document.getElementById('viewport-top') },
+        front: { element: document.getElementById('viewport-front') },
+        side: { element: document.getElementById('viewport-side') },
+    };
+    _setupControls(viewports.main.element);
+    _setupQuadViewports();
+
     // 6. Helpers & Gizmos Setup
     _setupHelpersAndGizmos();
 
@@ -158,16 +172,48 @@ export async function setupScene(container) {
 export function animate() {
     requestAnimationFrame(animate);
 
-    // The composer's active camera is now managed by other functions,
-    // so we can just render it. This ensures effects like fisheye always work.
-    composer.render();
+    if (isQuadView) {
+        // --- Quad View Rendering ---
+        renderer.setScissorTest(true);
 
-    // The label renderer now simply uses the globally active camera,
-    // which is correctly managed by toggleFirstPersonView and setActiveCamera.
-    labelRenderer.render(scene, activeCamera);
+        // Render main viewport (Perspective)
+        const main = viewports.main;
+        renderer.setScissor(main.left, main.bottom, main.width, main.height);
+        renderer.setViewport(main.left, main.bottom, main.width, main.height);
+        composer.render(); // Use composer for main view to keep effects
+        labelRenderer.render(scene, activeCamera);
+        if(controls.enabled) controls.update();
 
-    if (controls.enabled) {
-        controls.update();
+        // Render top viewport
+        const top = viewports.top;
+        renderer.setScissor(top.left, top.bottom, top.width, top.height);
+        renderer.setViewport(top.left, top.bottom, top.width, top.height);
+        renderer.render(scene, topCamera);
+        topControls.update();
+
+        // Render front viewport
+        const front = viewports.front;
+        renderer.setScissor(front.left, front.bottom, front.width, front.height);
+        renderer.setViewport(front.left, front.bottom, front.width, front.height);
+        renderer.render(scene, frontCamera);
+        frontControls.update();
+
+        // Render side viewport
+        const side = viewports.side;
+        renderer.setScissor(side.left, side.bottom, side.width, side.height);
+        renderer.setViewport(side.left, side.bottom, side.width, side.height);
+        renderer.render(scene, sideCamera);
+        sideControls.update();
+
+        renderer.setScissorTest(false);
+
+    } else {
+        // --- Single View Rendering ---
+        composer.render();
+        labelRenderer.render(scene, activeCamera);
+        if (controls.enabled) {
+            controls.update();
+        }
     }
 }
 
@@ -176,41 +222,76 @@ export function animate() {
  */
 export function onWindowResize() {
     if (!renderer) return;
-    const container = renderer.domElement.parentElement;
-    if (!container || container.clientWidth === 0 || container.clientHeight === 0) return;
+    const container = document.getElementById('render-container');
+    if (!container) return;
 
-    const aspect = container.clientWidth / container.clientHeight;
+    const updateCameraAspect = (cam, element) => {
+        const rect = element.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return;
+        const aspect = rect.width / rect.height;
+        if (cam.isPerspectiveCamera) {
+            cam.aspect = aspect;
+        } else if (cam.isOrthographicCamera) {
+            const frustumSize = 15;
+            cam.left = frustumSize * aspect / -2;
+            cam.right = frustumSize * aspect / 2;
+            cam.top = frustumSize / 2;
+            cam.bottom = frustumSize / -2;
+        }
+        cam.updateProjectionMatrix();
+    };
 
-    // Update perspective camera
-    perspectiveCamera.aspect = aspect;
-    perspectiveCamera.updateProjectionMatrix();
+    if (isQuadView) {
+        // Update all four cameras
+        updateCameraAspect(perspectiveCamera, viewports.main.element);
+        updateCameraAspect(orthoCamera, viewports.main.element);
+        updateCameraAspect(topCamera, viewports.top.element);
+        updateCameraAspect(frontCamera, viewports.front.element);
+        updateCameraAspect(sideCamera, viewports.side.element);
 
-    // Update orthographic camera
-    const frustumSize = 15;
-    orthoCamera.left = frustumSize * aspect / -2;
-    orthoCamera.right = frustumSize * aspect / 2;
-    orthoCamera.top = frustumSize / 2;
-    orthoCamera.bottom = frustumSize / -2;
-    orthoCamera.updateProjectionMatrix();
+        // Update viewport dimensions for the animation loop
+        for (const [key, viewport] of Object.entries(viewports)) {
+            const rect = viewport.element.getBoundingClientRect();
+            const rendererRect = container.getBoundingClientRect();
+            viewport.left = rect.left - rendererRect.left;
+            viewport.bottom = rendererRect.bottom - rect.bottom;
+            viewport.width = rect.width;
+            viewport.height = rect.height;
+        }
+    } else {
+        // Update only the main cameras
+        const aspect = container.clientWidth / container.clientHeight;
+        perspectiveCamera.aspect = aspect;
+        perspectiveCamera.updateProjectionMatrix();
 
-    // Update FPV orthographic camera
-    fpvOrthoCamera.left = frustumSize * aspect / -2;
-    fpvOrthoCamera.right = frustumSize * aspect / 2;
-    fpvOrthoCamera.top = frustumSize / 2;
-    fpvOrthoCamera.bottom = frustumSize / -2;
-    fpvOrthoCamera.updateProjectionMatrix();
-    
+        const frustumSize = 15;
+        orthoCamera.left = frustumSize * aspect / -2;
+        orthoCamera.right = frustumSize * aspect / 2;
+        orthoCamera.top = frustumSize / 2;
+        orthoCamera.bottom = frustumSize / -2;
+        orthoCamera.updateProjectionMatrix();
+    }
+
+    // Update FPV and viewpoint cameras as they are tied to the main view
+    const mainElement = viewports.main ? viewports.main.element : container;
+    const mainAspect = mainElement.clientWidth / mainElement.clientHeight;
     if (viewpointCamera) {
-        viewpointCamera.aspect = aspect;
+        viewpointCamera.aspect = mainAspect;
         viewpointCamera.updateProjectionMatrix();
+    }
+    if (fpvOrthoCamera) {
+        const frustumSize = 15;
+        fpvOrthoCamera.left = frustumSize * mainAspect / -2;
+        fpvOrthoCamera.right = frustumSize * mainAspect / 2;
+        fpvOrthoCamera.top = frustumSize / 2;
+        fpvOrthoCamera.bottom = frustumSize / -2;
+        fpvOrthoCamera.updateProjectionMatrix();
     }
 
     renderer.setSize(container.clientWidth, container.clientHeight);
     labelRenderer.setSize(container.clientWidth, container.clientHeight);
-
-    // Update composer and shader uniforms
     composer.setSize(container.clientWidth, container.clientHeight);
-    fisheyePass.uniforms['aspect'].value = aspect;
+    fisheyePass.uniforms['aspect'].value = mainAspect;
 }
 
 /**
@@ -332,6 +413,14 @@ function _setupRenderers(container) {
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.localClippingEnabled = true;
+
+    // Style the canvas to fill the container but sit behind the viewport divs
+    renderer.domElement.style.position = 'absolute';
+    renderer.domElement.style.top = '0';
+    renderer.domElement.style.left = '0';
+    renderer.domElement.style.width = '100%';
+    renderer.domElement.style.height = '100%';
+    renderer.domElement.style.pointerEvents = 'none'; // Make canvas invisible to mouse events
     container.appendChild(renderer.domElement);
 
     // CSS2D renderer for HTML-based labels
@@ -397,6 +486,39 @@ function _setupHelpersAndGizmos() {
 }
 
 /**
+ * Initializes cameras and controls for the quad-view layout.
+ * @private
+ */
+function _setupQuadViewports() {
+    const frustumSize = 15;
+    const initialCameraPosition = new THREE.Vector3(5, 5, 10);
+
+    // Top Camera (Y-up)
+    topCamera = new THREE.OrthographicCamera(-frustumSize / 2, frustumSize / 2, frustumSize / 2, -frustumSize / 2, 0.1, 1000);
+    topCamera.position.set(0, 10, 0);
+    topCamera.lookAt(0, 0, 0);
+    topControls = new OrbitControls(topCamera, viewports.top.element);
+    topControls.enableRotate = false;
+    topControls.enableDamping = true;
+
+    // Front Camera (Z-out)
+    frontCamera = new THREE.OrthographicCamera(-frustumSize / 2, frustumSize / 2, frustumSize / 2, -frustumSize / 2, 0.1, 1000);
+    frontCamera.position.set(0, 0, 10);
+    frontCamera.lookAt(0, 0, 0);
+    frontControls = new OrbitControls(frontCamera, viewports.front.element);
+    frontControls.enableRotate = false;
+    frontControls.enableDamping = true;
+
+    // Side Camera (X-out, Right view)
+    sideCamera = new THREE.OrthographicCamera(-frustumSize / 2, frustumSize / 2, frustumSize / 2, -frustumSize / 2, 0.1, 1000);
+    sideCamera.position.set(10, 0, 0);
+    sideCamera.lookAt(0, 0, 0);
+    sideControls = new OrbitControls(sideCamera, viewports.side.element);
+    sideControls.enableRotate = false;
+    sideControls.enableDamping = true;
+}
+
+/**
  * Updates the live view to apply a specific view type effect.
  * @param {string} viewType - The view type from the dropdown (e.g., 'h', 'v').
  */
@@ -419,6 +541,16 @@ export function updateLiveViewType(viewType) {
         // camera as a base. The fisheye effect is a post-processing shader.
         setActiveCamera(perspectiveCamera);
     }
+}
+
+/**
+ * Toggles the quad-view layout.
+ * @param {boolean} enabled - True to enable quad-view, false for single view.
+ */
+export function toggleQuadView(enabled) {
+    isQuadView = enabled;
+    // The UI layer will toggle the CSS class on the container
+    onWindowResize(); // Recalculate camera aspects for the new layout
 }
 
 /**

@@ -146,11 +146,28 @@ class Project {
                             });
                         }
                     });
-                    return massingData;
-                })(),
-            },
-            materials: (() => {
-                const getMaterialData = (type) => {
+                   return massingData;
+            })(),
+            contextMassing: (async () => {
+                const { contextObject } = await import('./geometry.js');
+                const massingData = [];
+                contextObject.children.forEach(obj => {
+                    if (obj.userData.isMassingBlock) {
+                        // Combine userData (for geometry) with live transform data
+                        const dataToSave = {
+                            ...obj.userData,
+                            position: obj.position.toArray(), // Overwrite userData.position with the live one
+                            quaternion: obj.quaternion.toArray(),
+                            scale: obj.scale.toArray()
+                        };
+                        massingData.push(dataToSave);
+                    }
+                });
+                return massingData;
+            })(),
+        },
+        materials: (() => {
+            const getMaterialData = (type) => {
                     const mode = dom[`${type}-mode-srd`]?.classList.contains('active') ? 'srd' : 'refl';
                     const data = {
                         type: getValue(`${type}-mat-type`),
@@ -962,11 +979,20 @@ class Project {
             // Clear any default or existing massing blocks before loading
             const existingBlocks = contextObject.children.filter(c => c.userData.isMassingBlock);
             existingBlocks.forEach(b => contextObject.remove(b));
-            
+
             settings.geometry.contextMassing.forEach(item => {
-                const newBlock = addMassingBlock(); // Creates a block with default geometry
+                // Prepare params for addMassingBlock, mapping position array to individual coords
+                const params = {
+                    ...item, // Pass shape, dimensions, name etc.
+                    positionX: item.position[0],
+                    positionY: item.position[1],
+                    positionZ: item.position[2]
+                };
+
+                const newBlock = addMassingBlock(params);
                 if (newBlock) {
-                    newBlock.position.fromArray(item.position);
+                    // The position is already set by addMassingBlock from params.
+                    // Just need to apply quaternion and scale.
                     newBlock.quaternion.fromArray(item.quaternion);
                     newBlock.scale.fromArray(item.scale);
                 }

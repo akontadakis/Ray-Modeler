@@ -20,6 +20,64 @@
     
     <link rel="stylesheet" href="styles.css">
 
+    <style>
+        #render-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            display: grid;
+            grid-template-columns: 1fr;
+            grid-template-rows: 1fr;
+            background-color: var(--bg-main);
+        }
+        #render-container.quad-view-active {
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 2px;
+            background-color: var(--text-secondary);
+        }
+        .viewport {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            border: 1px solid var(--grid-color);
+            box-sizing: border-box; /* Important for grid layout with borders */
+            pointer-events: auto; /* Make sure the viewport divs can receive mouse events */
+        }
+        .viewport canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100% !important;
+            height: 100% !important;
+        }
+        /* Hide the extra viewports by default */
+        #viewport-top, #viewport-front, #viewport-side {
+            display: none;
+        }
+        /* Show them when quad view is active */
+        #render-container.quad-view-active > .viewport {
+            display: block;
+        }
+        .viewport-label {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            color: var(--text-primary);
+            background-color: rgba(0,0,0,0.4);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 1;
+        }
+    </style>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
@@ -99,7 +157,20 @@
         </button>
     </div>
 
-    <div id="render-container"></div>
+    <div id="render-container">
+        <div id="viewport-main" class="viewport">
+            <div class="viewport-label">Perspective</div>
+        </div>
+        <div id="viewport-top" class="viewport">
+            <div class="viewport-label">Top</div>
+        </div>
+        <div id="viewport-front" class="viewport">
+            <div class="viewport-label">Front</div>
+        </div>
+        <div id="viewport-side" class="viewport">
+            <div class="viewport-label">Right</div>
+        </div>
+    </div>
     
     <div id="left-controls-container" class="fixed top-1/2 -translate-y-1/2 left-4 z-50 pointer-events-auto flex flex-col gap-4">
         <div id="left-toolbar" class="ui-panel p-1">
@@ -166,6 +237,8 @@
                 <div class="action-button-container"><button id="view-btn-back" class="btn" aria-label="Back View (North)"><svg viewBox="0 0 24 24"><polygon class="face-fill" points="12,4 20,8 20,16 12,12" /><path d="M4 8l8 4 8-4" /><path d="M12 12v8M20 8l-8 4" /><path d="M4 8v8l8 4" /></svg></button><span class="tooltip" role="tooltip">Back View (North)</span></div>
                 <div class="action-button-container"><button id="view-btn-left" class="btn" aria-label="Left View (West)"><svg viewBox="0 0 24 24"><polygon class="face-fill" points="4,8 12,4 12,12 4,16" /><path d="M4 8l8 4 8-4" /><path d="M12 12v8M20 8l-8 4" /><path d="M4 8v8l8 4" /></svg></button><span class="tooltip" role="tooltip">Left View (West)</span></div>
                 <div class="action-button-container"><button id="view-btn-right" class="btn" aria-label="Right View (East)"><svg viewBox="0 0 24 24"><polygon class="face-fill" points="12,4 20,8 20,16 12,20" /><path d="M4 8l8 4 8-4" /><path d="M12 12v8M20 8l-8 4" /><path d="M4 8v8l8 4" /></svg></button><span class="tooltip" role="tooltip">Right View (East)</span></div>
+                <div class="action-button-container"><button id="view-btn-right" class="btn" aria-label="Right View (East)"><svg viewBox="0 0 24 24"><polygon class="face-fill" points="12,4 20,8 20,16 12,20" /><path d="M4 8l8 4 8-4" /><path d="M12 12v8M20 8l-8 4" /><path d="M4 8v8l8 4" /></svg></button><span class="tooltip" role="tooltip">Right View (East)</span></div>
+                <div class="action-button-container"><button id="view-btn-quad" class="btn" aria-label="Quad View"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="12" x2="21" y2="12"></line><line x1="12" y1="3" x2="12" y2="21"></line></svg></button><span class="tooltip" role="tooltip">Quad View</span></div>
             </div>
         </div>
     </div>
@@ -2536,6 +2609,60 @@
             </form>
         </div>
     </div>
+
+    <div id="shortcut-help-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[10002] hidden items-center justify-center">
+        <div class="ui-panel p-6 w-full max-w-2xl mx-auto bg-[--bg-main] relative">
+            <button id="shortcut-modal-close-btn" class="absolute top-3 right-3 text-[--text-secondary] hover:text-[--text-primary]" aria-label="Close Shortcuts">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+            <h3 class="text-lg font-bold mb-4">Keyboard Shortcuts</h3>
+            <div class="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
+                <div>
+                    <h4 class="font-semibold uppercase text-xs text-[--text-secondary] mb-2">File</h4>
+                    <div class="space-y-1">
+                        <div class="flex justify-between"><span>Save Project</span><div class="flex gap-1"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">S</kbd></div></div>
+                        <div class="flex justify-between"><span>Load Project</span><div class="flex gap-1"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">O</kbd></div></div>
+                    </div>
+                </div>
+                <div>
+                    <h4 class="font-semibold uppercase text-xs text-[--text-secondary] mb-2">Views</h4>
+                    <div class="space-y-1">
+                        <div class="flex justify-between"><span>Perspective</span><kbd class="kbd">P</kbd></div>
+                        <div class="flex justify-between"><span>Orthographic</span><kbd class="kbd">O</kbd></div>
+                        <div class="flex justify-between"><span>Top</span><kbd class="kbd">T</kbd></div>
+                        <div class="flex justify-between"><span>Front</span><kbd class="kbd">F</kbd></div>
+                        <div class="flex justify-between"><span>Back</span><kbd class="kbd">B</kbd></div>
+                        <div class="flex justify-between"><span>Left</span><kbd class="kbd">L</kbd></div>
+                        <div class="flex justify-between"><span>Right</span><kbd class="kbd">R</kbd></div>
+                    </div>
+                </div>
+                <div>
+                    <h4 class="font-semibold uppercase text-xs text-[--text-secondary] mb-2">Panels</h4>
+                    <div class="space-y-1">
+                        <div class="flex justify-between"><span>Project Setup</span><kbd class="kbd">1</kbd></div>
+                        <div class="flex justify-between"><span>Dimensions</span><kbd class="kbd">2</kbd></div>
+                        <div class="flex justify-between"><span>Apertures</span><kbd class="kbd">3</kbd></div>
+                        <div class="flex justify-between"><span>Lighting</span><kbd class="kbd">4</kbd></div>
+                        <div class="flex justify-between"><span>Materials</span><kbd class="kbd">5</kbd></div>
+                        <div class="flex justify-between"><span>Sensor Grid</span><kbd class="kbd">6</kbd></div>
+                        <div class="flex justify-between"><span>Viewpoint</span><kbd class="kbd">7</kbd></div>
+                        <div class="flex justify-between"><span>Scene Elements</span><kbd class="kbd">8</kbd></div>
+                    </div>
+                </div>
+                <div>
+                    <h4 class="font-semibold uppercase text-xs text-[--text-secondary] mb-2">Tools</h4>
+                    <div class="space-y-1">
+                        <div class="flex justify-between"><span>Info Panel</span><kbd class="kbd">I</kbd></div>
+                        <div class="flex justify-between"><span>AI Assistant</span><kbd class="kbd">A</kbd></div>
+                        <div class="flex justify-between"><span>Move Gizmo</span><kbd class="kbd">W</kbd></div>
+                        <div class="flex justify-between"><span>Rotate Gizmo</span><kbd class="kbd">E</kbd></div>
+                        <div class="flex justify-between"><span>Scale Gizmo</span><kbd class="kbd">R</kbd></div>
+                    </div>
+                </div>
+            </div>
+            <p class="text-xs text-[--text-secondary] mt-4 text-center">Shortcuts are disabled when typing in input fields.</p>
+        </div>
+    </div>
     <div id="bottom-left-controls" class="fixed bottom-6 left-6 z-50 flex gap-4 items-center">
         <div class="action-button-container">
             <button id="save-project-button" class="bottom-action-button" aria-label="Save Project File">
@@ -2563,7 +2690,13 @@
                 </button>
                 <span class="tooltip" role="tooltip">AI Assistant</span>
             </div>
+            <div class="action-button-container">
+                <button id="shortcut-help-btn" class="bottom-action-button" aria-label="Show Keyboard Shortcuts">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 0 24 24" width="28px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm-1-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg>
+                </button>
+                <span class="tooltip" role="tooltip">Shortcuts (?)</span>
             </div>
+        </div>
 
         <div id="templates" style="display: none;">
             <template id="template-material-tagger">
