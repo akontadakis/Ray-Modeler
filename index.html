@@ -253,19 +253,49 @@
 </div>
 <div id="panel-dimensions" class="floating-window ui-panel hidden">
   <div class="window-header">
-    <span>Dimensions</span>
+    <span>Dimensions & Geometry</span>
         <div class="window-controls">
             <div class="window-icon-max"></div>
                 <div class="collapse-icon"></div>
                 <div class="window-icon-close"></div>
             </div>
             </div>
-            <div class="window-content space-y-4">
-                <div><label class="label" for="width">Width (X)</label><div class="flex items-center space-x-4 mt-1"><input type="range" id="width" min="1" max="50" value="3.4" step="0.1"><span id="width-val" class="data-value font-mono w-12 text-left">3.4m</span></div></div>
-                <div><label class="label" for="length">Length (Z)</label><div class="flex items-center space-x-4 mt-1"><input type="range" id="length" min="1" max="50" value="5.4" step="0.1"><span id="length-val" class="data-value font-mono w-12 text-left">5.4m</span></div></div>
-                <div><label class="label" for="height">Height (Y)</label><div class="flex items-center space-x-4 mt-1"><input type="range" id="height" min="1" max="10" value="2.8" step="0.1"><span id="height-val" class="data-value font-mono w-12 text-left">2.8m</span></div></div>
-                <div><label class="label" for="room-orientation">Orientation</label><div class="flex items-center space-x-4 mt-1"><input type="range" id="room-orientation" min="0" max="359" value="0" step="1"><span id="room-orientation-val" class="data-value font-mono w-12 text-left">0°</span></div></div>
-                <div class="pt-4 mt-4 border-t border-[--grid-color]">
+    <div class="window-content space-y-4">
+        <div id="geometry-mode-selector" class="pb-4 border-b border-[--grid-color]">
+            <label class="label">Geometry Mode</label>
+            <div class="btn-group mt-1">
+                <button id="mode-parametric-btn" class="btn active">Parametric</button>
+                <button id="mode-import-btn" class="btn">Imported</button>
+            </div>
+        </div>
+
+        <div id="import-controls" class="hidden space-y-4">
+            <p class="info-box !text-xs !py-2 !px-3">Import a .obj model. Parametric controls will be disabled. Ensure your model is in meters.</p>
+            <div>
+                <label class="label" for="import-obj-file">OBJ Model File</label>
+                <input type="file" id="import-obj-file" accept=".obj,.mtl" class="w-full text-sm" multiple>
+                <span data-file-display-for="import-obj-file" class="text-xs text-[--text-secondary] truncate block mt-1">Select .obj and .mtl files.</span>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="label text-xs" for="import-scale">Scale Factor</label>
+                    <input type="number" id="import-scale" value="1.0" step="0.01" class="w-full mt-1">
+                </div>
+                <label for="import-center-toggle" class="flex items-center cursor-pointer mt-4">
+                    <input type="checkbox" id="import-center-toggle" checked>
+                    <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Center Model</span>
+                </label>
+            </div>
+            <button id="load-model-btn" class="btn btn-secondary w-full">Load & Tag Surfaces</button>
+        </div>
+
+       <div id="parametric-controls">
+            <div><label class="label" for="width">Width (X)</label><div class="flex items-center space-x-4 mt-1"><input type="range" id="width" min="1" max="50" value="3.4" step="0.1"><span id="width-val" class="data-value font-mono w-12 text-left">3.4m</span></div></div>
+            <div><label class="label" for="length">Length (Z)</label><div class="flex items-center space-x-4 mt-1"><input type="range" id="length" min="1" max="50" value="5.4" step="0.1"><span id="length-val" class="data-value font-mono w-12 text-left">5.4m</span></div></div>
+            <div><label class="label" for="height">Height (Y)</label><div class="flex items-center space-x-4 mt-1"><input type="range" id="height" min="1" max="10" value="2.8" step="0.1"><span id="height-val" class="data-value font-mono w-12 text-left">2.8m</span></div></div>
+            <div><label class="label" for="elevation">Elevation</label><div class="flex items-center space-x-4 mt-1"><input type="range" id="elevation" min="0" max="20" value="0.0" step="0.1"><span id="elevation-val" class="data-value font-mono w-12 text-left">0.0m</span></div></div>
+            <div><label class="label" for="room-orientation">Orientation</label><div class="flex items-center space-x-4 mt-1"><input type="range" id="room-orientation" min="0" max="359" value="0" step="1"><span id="room-orientation-val" class="data-value font-mono w-12 text-left">0°</span></div></div>
+            <div class="pt-4 mt-4 border-t border-[--grid-color]">
                     <label for="resize-mode-toggle" class="flex items-center cursor-pointer w-full">
                         <input type="checkbox" id="resize-mode-toggle">
                         <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">
@@ -314,12 +344,13 @@
                         <input type="range" id="world-axes-size" min="0.5" max="10" value="1.5" step="0.1">
                         <span id="world-axes-size-val" class="data-value font-mono w-12 text-left">1.5x</span>
                     </div>
+                    </div>
                 </div>
             </div>
         </div>
-        </div>
+    </div>
         <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-        </div>
+    </div>
 
     <div id="panel-aperture" class="floating-window ui-panel hidden">
         <div class="window-header">
@@ -1547,6 +1578,227 @@
                         <div class="asset-item" draggable="true" data-asset-type="shelf" title="Shelf">
                             <div class="asset-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.54 5.23a.9.9 0 0 0-.81-.43H4.27a.9.9 0 0 0-.81.43l-1.5 6a.9.9 0 0 0 .81 1.37h18.46a.9.9 0 0 0 .81-1.37l-1.5-6zM4 12v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/></svg></div>
                             <span class="asset-name">Shelf</span>
+                    </div>
+                </div>
+                <div class="param-section pt-4 border-t border-dashed border-[--grid-color]">
+                    <h3 class="font-semibold text-sm uppercase">Context & Site Modeling</h3>
+                    <p class="info-box !text-xs !py-2 !px-3">Model surrounding buildings and topography to improve simulation accuracy.</p>
+                    <div id="context-controls" class="space-y-4 mt-4">
+                        <div>
+                            <label class="label">Context Source</label>
+                            <div class="btn-group mt-1">
+                                <button id="context-mode-none" class="btn active">None</button>
+                                <button id="context-mode-osm" class="btn">OSM</button>
+                                <button id="context-mode-massing" class="btn">Massing</button>
+                                <button id="context-mode-topo" class="btn">Topography</button>
+                            </div>
+                        </div>
+
+                        <div id="osm-controls" class="hidden space-y-3 pt-4 border-t border-dashed border-[--grid-color]">
+                            <p class="text-xs text-[--text-secondary]">Automatically fetch building data around the project's latitude and longitude.</p>
+                            <div>
+                                <label for="osm-radius" class="label text-xs">Fetch Radius (meters)</label>
+                                <div class="flex items-center space-x-3 mt-1">
+                                    <input type="range" id="osm-radius" min="50" max="1000" value="200" step="10">
+                                    <span id="osm-radius-val" class="data-value font-mono w-16 text-left">200m</span>
+                                </div>
+                            </div>
+                            <button id="fetch-osm-data-btn" class="btn btn-secondary w-full">Fetch Building Data</button>
+                            <div class="pt-2">
+                                <label for="context-visibility-toggle" class="flex items-center cursor-pointer">
+                                    <input type="checkbox" id="context-visibility-toggle" checked>
+                                    <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Show Context in 3D View</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div id="massing-controls" class="hidden space-y-3 pt-4 border-t border-dashed border-[--grid-color]">
+                            <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Simple Massing Tools</h4>
+                            <p class="info-box !text-xs !py-2 !px-3">Create and place simple 3D shapes to represent surrounding buildings or site obstructions. Material for all context objects can be set at the bottom of this panel.</p>
+
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="label text-xs">Shape Type</label>
+                                    <div class="grid grid-cols-4 gap-2 mt-1">
+                                        <label class="flex items-center cursor-pointer">
+                                            <input type="radio" name="massing-shape" value="box" checked class="mr-1">
+                                            <span class="text-xs">Box</span>
+                                        </label>
+                                        <label class="flex items-center cursor-pointer">
+                                            <input type="radio" name="massing-shape" value="cylinder" class="mr-1">
+                                            <span class="text-xs">Cylinder</span>
+                                        </label>
+                                        <label class="flex items-center cursor-pointer">
+                                            <input type="radio" name="massing-shape" value="pyramid" class="mr-1">
+                                            <span class="text-xs">Pyramid</span>
+                                        </label>
+                                        <label class="flex items-center cursor-pointer">
+                                            <input type="radio" name="massing-shape" value="sphere" class="mr-1">
+                                            <span class="text-xs">Sphere</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div id="massing-dimensions" class="space-y-3">
+                                    <h5 class="font-semibold text-xs text-[--text-secondary]">Dimensions</h5>
+                                    <div id="box-dimensions">
+                                        <div><label class="label text-xs" for="massing-width">Width (X)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="massing-width" min="1" max="100" value="10" step="1"><span id="massing-width-val" class="data-value font-mono w-12 text-left">10m</span></div></div>
+                                        <div><label class="label text-xs" for="massing-depth">Depth (Z)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="massing-depth" min="1" max="100" value="10" step="1"><span id="massing-depth-val" class="data-value font-mono w-12 text-left">10m</span></div></div>
+                                        <div><label class="label text-xs" for="massing-height">Height (Y)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="massing-height" min="1" max="100" value="15" step="1"><span id="massing-height-val" class="data-value font-mono w-12 text-left">15m</span></div></div>
+                                    </div>
+                                    <div id="radius-dimension" class="hidden">
+                                        <div><label class="label text-xs" for="massing-radius">Radius</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="massing-radius" min="1" max="50" value="5" step="1"><span id="massing-radius-val" class="data-value font-mono w-12 text-left">5m</span></div></div>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-3">
+                                    <h5 class="font-semibold text-xs text-[--text-secondary]">Positioning</h5>
+                                    <div><label class="label text-xs" for="massing-pos-x">Position X</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="massing-pos-x" min="-100" max="100" value="20" step="1"><span id="massing-pos-x-val" class="data-value font-mono w-12 text-left">20m</span></div></div>
+                                    <div><label class="label text-xs" for="massing-pos-y">Position Y (Height)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="massing-pos-y" min="0" max="50" value="7.5" step="1"><span id="massing-pos-y-val" class="data-value font-mono w-12 text-left">7.5m</span></div></div>
+                                    <div><label class="label text-xs" for="massing-pos-z">Position Z</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="massing-pos-z" min="-100" max="100" value="0" step="1"><span id="massing-pos-z-val" class="data-value font-mono w-12 text-left">0m</span></div></div>
+                                </div>
+
+                                <div class="space-y-3">
+                                    <h5 class="font-semibold text-xs text-[--text-secondary]">Block Creation</h5>
+                                    <div><label class="label text-xs" for="massing-count">Number of Blocks</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="massing-count" min="1" max="10" value="1" step="1"><span id="massing-count-val" class="data-value font-mono w-12 text-left">1</span></div></div>
+                                    <div><label class="label text-xs" for="massing-spacing">Spacing Between</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="massing-spacing" min="0" max="20" value="5" step="1"><span id="massing-spacing-val" class="data-value font-mono w-12 text-left">5m</span></div></div>
+                                    <div>
+                                        <label class="label text-xs">Arrangement Pattern</label>
+                                        <div class="grid grid-cols-3 gap-2 mt-1">
+                                            <label class="flex items-center cursor-pointer">
+                                                <input type="radio" name="massing-pattern" value="linear" checked class="mr-1">
+                                                <span class="text-xs">Linear</span>
+                                            </label>
+                                            <label class="flex items-center cursor-pointer">
+                                                <input type="radio" name="massing-pattern" value="grid" class="mr-1">
+                                                <span class="text-xs">Grid</span>
+                                            </label>
+                                            <label class="flex items-center cursor-pointer">
+                                                <input type="radio" name="massing-pattern" value="random" class="mr-1">
+                                                <span class="text-xs">Random</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="pt-3 border-t border-dashed border-[--grid-color]">
+                                    <button id="create-massing-blocks-btn" class="btn btn-primary w-full">Create Massing Blocks</button>
+                                    <button id="clear-massing-blocks-btn" class="btn btn-secondary w-full mt-2">Clear All Blocks</button>
+                                </div>
+
+                                <div id="massing-info" class="text-xs text-[--text-secondary] pt-2 border-t border-dashed border-[--grid-color]">
+                                    <p>Current blocks: <span id="massing-count-display">0</span></p>
+                                    <p>Total volume: <span id="massing-volume-display">0m³</span></p>
+                                </div>
+                            </div>
+        
+                            <!-- Context Object Management Panel -->
+                            <div id="context-object-management" class="hidden space-y-3 pt-4 border-t border-dashed border-[--grid-color]">
+                                <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Context Object Manager</h4>
+                                <p class="info-box !text-xs !py-2 !px-3">Manage all context objects in your scene. Select objects to view properties and perform bulk operations.</p>
+        
+                                <!-- Search and Filter -->
+                                <div class="space-y-2">
+                                    <div class="flex gap-2">
+                                        <input type="text" id="context-object-search" placeholder="Search objects..." class="flex-grow text-sm">
+                                        <select id="context-object-filter" class="text-sm">
+                                            <option value="all">All Objects</option>
+                                            <option value="mass">Massing Blocks</option>
+                                            <option value="building">Buildings</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <button id="select-all-objects" class="btn btn-xs btn-secondary">Select All</button>
+                                        <button id="clear-selection" class="btn btn-xs btn-secondary">Clear</button>
+                                        <button id="invert-selection" class="btn btn-xs btn-secondary">Invert</button>
+                                    </div>
+                                </div>
+        
+                                <!-- Object List -->
+                                <div id="context-object-list" class="max-h-48 overflow-y-auto space-y-2 border border-[--grid-color] rounded p-2">
+                                    <p class="text-xs text-[--text-secondary] text-center py-4">No context objects found.</p>
+                                </div>
+        
+                                <!-- Bulk Operations -->
+                                <div class="space-y-2 pt-2 border-t border-dashed border-[--grid-color]">
+                                    <h5 class="font-semibold text-xs text-[--text-secondary]">Bulk Operations</h5>
+                                    <div class="flex flex-wrap gap-2">
+                                        <button id="bulk-delete" class="btn btn-xs btn-danger">Delete Selected</button>
+                                        <button id="bulk-copy" class="btn btn-xs btn-secondary">Copy Selected</button>
+                                        <button id="bulk-change-material" class="btn btn-xs btn-secondary">Change Material</button>
+                                        <button id="bulk-select-by-type" class="btn btn-xs btn-secondary">Select by Type</button>
+                                    </div>
+                                </div>
+        
+                                <!-- Object Properties Panel -->
+                                <div id="context-object-properties" class="hidden space-y-2 pt-2 border-t border-dashed border-[--grid-color]">
+                                    <h5 class="font-semibold text-xs text-[--text-secondary]">Selected Object Properties</h5>
+                                    <div id="object-info-display" class="text-xs space-y-1">
+                                        <div class="flex justify-between">
+                                            <span class="text-[--text-secondary]">Name:</span>
+                                            <span id="obj-name" class="font-mono">--</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-[--text-secondary]">Type:</span>
+                                            <span id="obj-type" class="font-mono">--</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-[--text-secondary]">Position:</span>
+                                            <span id="obj-position" class="font-mono">--</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-[--text-secondary]">Dimensions:</span>
+                                            <span id="obj-dimensions" class="font-mono">--</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-[--text-secondary]">Volume:</span>
+                                            <span id="obj-volume" class="font-mono">--</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex gap-2 pt-2">
+                                        <button id="delete-single-object" class="btn btn-xs btn-danger">Delete</button>
+                                        <button id="copy-single-object" class="btn btn-xs btn-secondary">Copy</button>
+                                        <button id="focus-object" class="btn btn-xs btn-secondary">Focus Camera</button>
+                                    </div>
+                                </div>
+                            </div>
+                            </div>
+                        </div>
+
+                        <div id="topo-controls" class="hidden space-y-3 pt-4 border-t border-dashed border-[--grid-color]">
+                            <p class="text-xs text-[--text-secondary]">Use a grayscale image as a heightmap to generate topography. White is high, black is low.</p>
+                            <div>
+                                <label class="label" for="topo-heightmap-file">Heightmap Image (.png, .jpg)</label>
+                                <input type="file" id="topo-heightmap-file" accept="image/png, image/jpeg" class="w-full text-sm">
+                                <span data-file-display-for="topo-heightmap-file" class="text-xs text-[--text-secondary] truncate block mt-1">No file selected.</span>
+                            </div>
+                            <div>
+                                <label class="label" for="topo-plane-size">Plane Size (m)</label>
+                                <div class="flex items-center space-x-3 mt-1"><input type="range" id="topo-plane-size" min="50" max="1000" value="200" step="10"><span id="topo-plane-size-val" class="data-value font-mono w-16 text-left">200m</span></div>
+                            </div>
+                            <div>
+                                <label class="label" for="topo-vertical-scale">Vertical Scale (m)</label>
+                                <div class="flex items-center space-x-3 mt-1"><input type="range" id="topo-vertical-scale" min="0" max="100" value="10" step="1"><span id="topo-vertical-scale-val" class="data-value font-mono w-16 text-left">10m</span></div>
+                            </div>
+                        </div>
+
+                        <div id="context-material-controls" class="hidden space-y-3 pt-4 border-t border-dashed border-[--grid-color]">
+                            <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Context Material</h4>
+                            <div>
+                                <label class="label text-xs" for="context-mat-type">Material Type</label>
+                                <select id="context-mat-type" class="w-full mt-1">
+                                    <option selected>Plastic</option>
+                                    <option>Metal</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="label text-xs !mb-0" for="context-refl">Reflectance</label>
+                                <div class="flex items-center space-x-3 mt-1">
+                                    <input type="range" id="context-refl" min="0" max="1" value="0.2" step="0.01">
+                                    <span id="context-refl-val" class="data-value font-mono w-12 text-left">0.20</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1580,14 +1832,14 @@
                             </div>
                         </div>
                         <div class="pt-2 border-t border-dashed border-[--grid-color]">
-                             <label class="label text-xs" for="obj-rot-y">Rotation (°)</label>
+                            <label class="label text-xs" for="obj-rot-y">Rotation (°)</label>
                             <div class="flex items-center space-x-4 mt-1">
                                 <input type="range" id="obj-rot-y" min="-180" max="180" value="0" step="1">
                                 <span id="obj-rot-y-val" class="data-value font-mono w-16 text-left">0°</span>
                             </div>
                         </div>
                         <div class="pt-2 border-t border-dashed border-[--grid-color]">
-                            <label class="label text-xs" for="obj-scale-x">Scale (Uniform)</label>
+                            <label class="label text-xs" for="obj-scale-uniform">Scale (Uniform)</label>
                             <div class="flex items-center space-x-4 mt-1">
                                 <input type="range" id="obj-scale-uniform" min="0.1" max="5" value="1" step="0.05">
                                 <span id="obj-scale-uniform-val" class="data-value font-mono w-16 text-left">1.00</span>
@@ -1674,12 +1926,11 @@
                     </div>
                     <canvas id="glare-rose-canvas"></canvas>
                   </div>
-              </div>
-          <div class="resize-handle-edge right"></div>
-<div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-          </div>
+                </div>
+                    <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+                </div>
 
-          <div id="combined-analysis-panel" class="floating-window ui-panel hidden" style="width: 600px; height: 650px;">
+                <div id="combined-analysis-panel" class="floating-window ui-panel hidden" style="width: 600px; height: 650px;">
                 <div class="window-header">
                     <span>Combined Daylight & Glare Analysis</span>
                     <div class="window-controls">
@@ -1811,9 +2062,9 @@
                         <li><strong>Combined Daylight vs. Glare Plot:</strong> When both annual illuminance and glare files are loaded, this scatter plot is available. Each point represents a sensor, plotting its percentage of useful daylight hours against its percentage of glare hours.</li>
                         <li><strong>HDR Viewer:</strong> Loads and displays rendered <code>.hdr</code> images. Features include exposure controls, a false-color mode based on luminance, and a mouse-over probe to get exact cd/m² values. It can also overlay detected glare sources from a report.</li>
                 </ul>
-            </div> <div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-        </div> <div id="simulation-console-panel" class="floating-window ui-panel hidden" style="width: 700px; height: 450px;">
-          <div class="window-header">
+                </div> <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+            </div> <div id="simulation-console-panel" class="floating-window ui-panel hidden" style="width: 700px; height: 450px;">
+              <div class="window-header">
               <span>Simulation Console</span>
               <div class="window-controls">
                   <div class="window-icon-max"></div>
@@ -1868,11 +2119,11 @@
                     <input type="text" id="ai-chat-input" placeholder="Ask about Radiance or this app..." class="flex-grow" autocomplete="off">
                     <button type="submit" id="ai-chat-send" class="btn btn-primary">Send</button>
               </form>
-          </div>
-        </div> <div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-    </div> <div id="proactive-suggestion-container" class="fixed bottom-24 right-8 z-[10001] flex flex-col items-end gap-2 w-full max-w-sm pointer-events-none"></div>
+            </div>
+            </div> <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+        </div> <div id="proactive-suggestion-container" class="fixed bottom-24 right-8 z-[10001] flex flex-col items-end gap-2 w-full max-w-sm pointer-events-none"></div>
 
-<div id="climate-analysis-panel" class="floating-window ui-panel hidden" style="width: 950px; height: 820px;">
+    <div id="climate-analysis-panel" class="floating-window ui-panel hidden" style="width: 950px; height: 820px;">
         <div class="window-header">
             <span>Climate Analysis</span>
             <div class="window-controls">
@@ -2315,10 +2566,45 @@
             </div>
 
         <div id="templates" style="display: none;">
-
-        <template id="aperture-wall-template">
-            <div class="aperture-controls space-y-5 pt-4 border-t border-[--grid-color]">
-            <h3 class="font-semibold text-sm uppercase" data-template-text="heading">WALL_DIRECTION Wall Apertures</h3>
+            <template id="template-material-tagger">
+                <div class="floating-window ui-panel">
+                    <div class="window-header">
+                        <span>Surface Tagger</span>
+                        <div class="window-controls">
+                            <div class="window-icon-max"></div>
+                            <div class="collapse-icon"></div>
+                            <div class="window-icon-close"></div>
+                        </div>
+                    </div>
+                    <div class="window-content space-y-4">
+                        <p class="info-box">Assign a surface type to each material from your imported model. This is critical for Radiance simulations.</p>
+                        <div id="material-tag-list" class="space-y-3 max-h-60 overflow-y-auto">
+                            </div>
+                        <button id="finalize-import-btn" class="btn btn-primary w-full">Finalize Import</button>
+                    </div>
+                    <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+                </div>
+            </template>
+            <template id="template-material-tag-item">
+                <div class="material-tag-item grid grid-cols-2 gap-4 items-center">
+                    <div class="flex items-center gap-2">
+                        <div class="material-swatch w-4 h-4 rounded border border-gray-400"></div>
+                        <span class="material-name font-mono text-sm">material_name</span>
+                    </div>
+                    <select class="surface-type-selector w-full">
+                        <option value="INTERIOR_WALL" selected>Wall (Interior)</option>
+                        <option value="INTERIOR_FLOOR">Floor (Interior)</option>
+                        <option value="INTERIOR_CEILING">Ceiling (Interior)</option>
+                        <option value="GLAZING">Glazing</option>
+                        <option value="FRAME">Frame</option>
+                        <option value="SHADING_DEVICE">Shading Device</option>
+                        <option value="IGNORE">Ignore</option>
+                    </select>
+                </div>
+            </template>
+            <template id="aperture-wall-template">
+                <div class="aperture-controls space-y-5 pt-4 border-t border-[--grid-color]">
+                <h3 class="font-semibold text-sm uppercase" data-template-text="heading">WALL_DIRECTION Wall Apertures</h3>
             <div>
                 <label class="label" data-template-for="win-count"># of Windows</label>
                 <div class="flex items-center space-x-3 mt-1"><input type="range" data-template-id="win-count" min="0" max="10" value="0" step="1"><span data-template-id="win-count-val" class="data-value font-mono w-12 text-left">0</span></div>

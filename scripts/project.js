@@ -107,8 +107,10 @@ class Project {
                     width: getValue('width', parseFloat),
                     length: getValue('length', parseFloat),
                     height: getValue('height', parseFloat),
+                    elevation: getValue('elevation', parseFloat),
                     'room-orientation': getValue('room-orientation', parseFloat),
                 },
+                mode: dom['mode-import-btn']?.classList.contains('active') ? 'imported' : 'parametric',
                 apertures: getAllWindowParams(),
                 shading: getAllShadingParams(),
                 frames: {
@@ -131,6 +133,20 @@ class Project {
                         });
                     }
                     return furnitureData;
+                })(),
+                contextMassing: (async () => {
+                    const { contextObject } = await import('./geometry.js');
+                    const massingData = [];
+                    contextObject.children.forEach(obj => {
+                        if (obj.userData.isMassingBlock) {
+                            massingData.push({
+                                position: obj.position.toArray(),
+                                quaternion: obj.quaternion.toArray(),
+                                scale: obj.scale.toArray(),
+                            });
+                        }
+                    });
+                    return massingData;
                 })(),
             },
             materials: (() => {
@@ -197,6 +213,15 @@ class Project {
                     fov: view.cameraState.fov
                 }
             })),
+            topography: {
+                enabled: getChecked('context-mode-topo'),
+                heightmapFile: this.simulationFiles['topo-heightmap-file'] ? {
+                    inputId: 'topo-heightmap-file',
+                    name: this.simulationFiles['topo-heightmap-file'].name
+                } : null,
+                planeSize: getValue('topo-plane-size', parseFloat),
+                verticalScale: getValue('topo-vertical-scale', parseFloat)
+            },
             visualization: {
             },
             occupancy: {
@@ -443,6 +468,11 @@ class Project {
     
             if (daylightingPtsContent) {
                 filesToWrite.push({ path: ['08_results', 'daylighting_sensors.pts'], content: daylightingPtsContent });
+            }
+            // Add topography heightmap to the files to be written
+            const topoFile = this.simulationFiles['topo-heightmap-file'];
+            if (topoFile?.name && topoFile.content) {
+                filesToWrite.push({ path: ['12_topography', topoFile.name], content: topoFile.content });
             }
             if (projectData.epwFileContent && projectData.projectInfo.epwFileName) {
                 filesToWrite.push({ path: ['04_skies', projectData.projectInfo.epwFileName], content: projectData.epwFileContent });
@@ -753,6 +783,20 @@ class Project {
                 }
             };
 
+            const readFileAsBlob = async (pathSegments) => {
+                try {
+                    let currentHandle = dirHandle;
+                    for (let i = 0; i < pathSegments.length - 1; i++) {
+                        currentHandle = await currentHandle.getDirectoryHandle(pathSegments[i]);
+                    }
+                    const fileHandle = await currentHandle.getFileHandle(pathSegments[pathSegments.length - 1]);
+                    return await fileHandle.getFile(); // Returns a File object (which is a Blob)
+                } catch (e) {
+                    console.warn(`Could not read file blob at path: ${pathSegments.join('/')}`, e);
+                    return null;
+                }
+            };
+
             if (settings.projectInfo?.epwFileName) {
                 const content = await readFileContent(['04_skies', settings.projectInfo.epwFileName]);
                 if (content) this.setEpwData(content);
@@ -768,12 +812,22 @@ class Project {
                 });
                 // Restore the daylighting schedule file if it was saved with the lighting state
                 const lightingScheduleInfo = settings.lighting?.daylighting?.scheduleFile;
-                if (lightingScheduleInfo?.name) {
+               if (lightingScheduleInfo?.name) {
                     const content = await readFileContent(['10_schedules', lightingScheduleInfo.name]);
                     if (content) {
                         this.addSimulationFile('daylighting-availability-schedule', lightingScheduleInfo.name, content);
                     }
                 }
+
+                // Load topography heightmap as a Blob
+                if (settings.topography?.heightmapFile?.name) {
+                    const blob = await readFileAsBlob(['12_topography', settings.topography.heightmapFile.name]);
+                    if (blob) {
+                        // Store the blob directly, ui.js will create a URL from it
+                        this.addSimulationFile('topo-heightmap-file', settings.topography.heightmapFile.name, blob);
+                    }
+                }
+                
                 await Promise.all(filePromises);
             }
 
@@ -818,10 +872,16 @@ class Project {
         // --- Project Info & EPW ---
         Object.keys(settings.projectInfo).forEach(key => setValue(key, settings.projectInfo[key]));
         if (this.epwFileContent) {
-            dom['epw-file-name'].textContent = settings.projectInfo.epwFileName || 'climate.epw';
+           dom['epw-file-name'].textContent = settings.projectInfo.epwFileName || 'climate.epw';
         }
 
         // --- Geometry & Apertures ---
+        if (settings.geometry.mode === 'imported') {
+            showAlertCallback("This project uses an imported model. Please re-import the original .obj and .mtl files to continue.", "Model Import Required");
+            ui.switchGeometryMode('imported');
+        } else {
+            ui.switchGeometryMode('parametric');
+        }
         Object.keys(settings.geometry.room).forEach(key => setValue(key, settings.geometry.room[key]));
         ['n', 's', 'e', 'w'].forEach(dir => {
             const key = dir.toUpperCase();
@@ -896,6 +956,22 @@ class Project {
             });
         }
 
+        // --- Context Massing ---
+        if (settings.geometry.contextMassing && Array.isArray(settings.geometry.contextMassing)) {
+            const { addMassingBlock, contextObject } = await import('./geometry.js');
+            // Clear any default or existing massing blocks before loading
+            const existingBlocks = contextObject.children.filter(c => c.userData.isMassingBlock);
+            existingBlocks.forEach(b => contextObject.remove(b));
+            
+            settings.geometry.contextMassing.forEach(item => {
+                const newBlock = addMassingBlock(); // Creates a block with default geometry
+                if (newBlock) {
+                    newBlock.position.fromArray(item.position);
+                    newBlock.quaternion.fromArray(item.quaternion);
+                    newBlock.scale.fromArray(item.scale);
+                }
+            });
+        }
 
         // --- Artificial Lighting ---
         // Manually update the file input display for daylighting schedule if it exists
@@ -1037,6 +1113,24 @@ class Project {
         ui.loadSavedViews(viewsToLoad);
     } else {
         ui.loadSavedViews([]); // Clear views if none are in the project file
+    }
+
+    // --- Topography ---
+    if (settings.topography) {
+        if (settings.topography.enabled) {
+            dom['context-mode-topo']?.click();
+            setValue('topo-plane-size', settings.topography.planeSize);
+            setValue('topo-vertical-scale', settings.topography.verticalScale);
+            // The file content (as a Blob) is already in `this.simulationFiles`.
+            // We need to trigger the geometry creation from the UI handler.
+            const topoFile = this.simulationFiles['topo-heightmap-file'];
+            if (topoFile && topoFile.content) { // content is a Blob
+                const event = new Event('change');
+                // Simulate a file input change event for ui.js to handle
+                Object.defineProperty(event, 'target', { writable: false, value: { files: [topoFile.content] } });
+                dom['topo-heightmap-file']?.dispatchEvent(event);
+            }
+        }
     }
 
     // --- Final UI & Scene Updates ---

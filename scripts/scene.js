@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
-import { roomObject, shadingObject, sensorGridObject, axesObject, northArrowObject, groundObject, wallSelectionGroup } from './geometry.js';
+import { roomObject, shadingObject, sensorGridObject, axesObject, northArrowObject, groundObject, wallSelectionGroup, contextObject } from './geometry.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
@@ -44,6 +44,7 @@ export let horizontalClipPlane, verticalClipPlane;
 export let daylightingSensorsGroup;
 export let isFirstPersonView = false;
 export let currentViewType = 'v'; // Default to perspective
+export let importedModelObject;
 let preFpvCamera; // To store the camera state before entering FPV
 
 // --- CORE FUNCTIONS ---
@@ -143,7 +144,8 @@ export async function setupScene(container) {
 
    // 9. Add Geometry Groups to Scene
     const { furnitureObject, resizeHandlesObject } = await import('./geometry.js');
-    scene.add(roomObject, shadingObject, sensorGridObject, axesObject, northArrowObject, groundObject, daylightingSensorsGroup, wallSelectionGroup, furnitureObject, resizeHandlesObject);
+    importedModelObject = new THREE.Group();
+    scene.add(roomObject, shadingObject, sensorGridObject, axesObject, northArrowObject, groundObject, daylightingSensorsGroup, wallSelectionGroup, furnitureObject, resizeHandlesObject, importedModelObject, contextObject);
 
     // 10. Signal that the scene is initialized and ready for interaction.
     container.dispatchEvent(new CustomEvent('sceneReady', { bubbles: true }));

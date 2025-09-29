@@ -23,6 +23,11 @@ const availableModules = [
     { id: 'template-recipe-lighting-energy', name: 'Recipe: Lighting Energy Analysis' }
 ];
 
+const FOLDER_STRUCTURE = [
+    '01_geometry', '02_materials', '03_views', '04_skies', '05_bsdf',
+    '06_octrees', '07_scripts', '08_results', '09_images', '10_schedules', '11_files', '12_topography'
+];
+
 // --- CORE PUBLIC FUNCTIONS ---
 export function setupSimulationSidebar() {
     const moduleList = document.getElementById('simulation-module-list');

@@ -1,12 +1,14 @@
-
 // scripts/geometry.js
 
 import * as THREE from 'three';
-import { renderer, horizontalClipPlane, verticalClipPlane, sensorTransformControls, daylightingSensorsGroup } from './scene.js';
-import { getDom, getAllWindowParams, getAllShadingParams, validateInputs, getWindowParamsForWall, getSensorGridParams } from './ui.js';
+import { renderer, horizontalClipPlane, verticalClipPlane, sensorTransformControls, daylightingSensorsGroup, importedModelObject } from './scene.js';
+import { getDom, getAllWindowParams, getAllShadingParams, validateInputs, getWindowParamsForWall, getSensorGridParams, scheduleUpdate } from './ui.js';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { resultsManager } from './resultsManager.js';
+import { project } from './project.js';
+
 /**
  * Surface type classification system for ray interaction behavior.
  */
@@ -32,12 +34,18 @@ export const axesObject = new THREE.Group();
 export const groundObject = new THREE.Group();
 export const northArrowObject = new THREE.Group();
 export const furnitureObject = new THREE.Group();
+export const contextObject = new THREE.Group();
 const taskAreaHelpersGroup = new THREE.Group();
 
 // --- MODULE STATE & SHARED RESOURCES ---
+export let currentImportedModel = null;
 export let sensorMeshes = []; // Store references to instanced meshes for results
 export let daylightingSensorMeshes = []; // Store references to individual sensor meshes for gizmo control
 export let importedShadingObjects = []; // Store references to imported OBJ meshes for selection
+
+// Context Object Management System
+export let contextObjects = new Map(); // Store context objects with unique IDs
+let nextContextObjectId = 1;
 
 const highlightMaterial = new THREE.MeshBasicMaterial({
     color: new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--highlight-color').trim() || '#3b82f6'),
@@ -59,6 +67,8 @@ const shared = {
     }),
     shadeMat: new THREE.MeshBasicMaterial({ color: '#1a1a1a', side: THREE.DoubleSide }), // Fallback color
     taskAreaMat: new THREE.MeshBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.2, side: THREE.DoubleSide }),
+    surroundingAreaMat: new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.2, side: THREE.DoubleSide }),
+    contextMat: new THREE.MeshBasicMaterial({ color: 0x888888, side: THREE.DoubleSide }),
 };
 
 // --- HELPER FUNCTIONS ---
@@ -117,6 +127,9 @@ function clearGroup(group) {
     if (group === shadingObject) {
         importedShadingObjects.length = 0;
     }
+    if (group === contextObject) {
+        // No specific cleanup needed yet, but good to have the case
+    }
     group.traverse(child => {
         if (child.element && child.removeFromParent) {
             child.element.remove();
@@ -131,9 +144,10 @@ function readParams() {
     const W = parseFloat(dom.width.value);
     const L = parseFloat(dom.length.value);
     const H = parseFloat(dom.height.value);
+    const elevation = parseFloat(dom.elevation.value);
     const rotationY = THREE.MathUtils.degToRad(parseFloat(dom['room-orientation'].value));
     const surfaceThickness = parseFloat(dom['surface-thickness'].value);
-    return { W, L, H, rotationY, wallThickness: surfaceThickness, floorThickness: surfaceThickness, ceilingThickness: surfaceThickness };
+    return { W, L, H, elevation, rotationY, wallThickness: surfaceThickness, floorThickness: surfaceThickness, ceilingThickness: surfaceThickness };
 }
 
 // --- MAIN UPDATE FUNCTION ---
@@ -147,7 +161,7 @@ export async function updateScene(changedId = null) {
     const dom = getDom();
 
     validateInputs(changedId);
-    const { W, L, H, rotationY } = readParams();
+    const { W, L, H, rotationY, elevation } = readParams();
 
     const showGround = dom['ground-plane-toggle'].checked;
     groundObject.visible = showGround;
@@ -166,14 +180,12 @@ export async function updateScene(changedId = null) {
     }
     renderer.clippingPlanes = activeClippingPlanes;
 
-    // Apply room rotation to all relevant geometry groups
-    roomObject.rotation.y = rotationY;
-    shadingObject.rotation.y = rotationY;
-    sensorGridObject.rotation.y = rotationY;
-    wallSelectionGroup.rotation.y = rotationY;
-    furnitureObject.rotation.y = rotationY;
-    daylightingSensorsGroup.rotation.y = rotationY;
-    resizeHandlesObject.rotation.y = rotationY;
+    // Apply room rotation and elevation to all relevant geometry groups
+    const groupsToTransform = [roomObject, shadingObject, sensorGridObject, wallSelectionGroup, furnitureObject, daylightingSensorsGroup, resizeHandlesObject];
+    groupsToTransform.forEach(group => {
+        group.rotation.y = rotationY;
+        group.position.y = elevation;
+    });
 
     // If the room orientation changed, re-sync the viewpoint camera from the UI sliders.
     if (changedId === 'room-orientation') {
@@ -247,29 +259,89 @@ function createSchematicObject(geometry, group, material, surfaceType) {
 }
 
 /**
- * Creates the ground plane and grid.
+ * Creates the ground plane, which can be a flat grid or a 3D topography.
  */
 function createGroundPlane() {
     clearGroup(groundObject);
+    const dom = getDom();
     const { W, L } = readParams();
-    const size = Math.max(W, L) * 6;
+    const isTopoMode = dom['context-mode-topo']?.classList.contains('active');
+    const topoFile = project.simulationFiles['topo-heightmap-file'];
 
-    const gridHelper = new THREE.GridHelper(size, 60, shared.lineColor, shared.gridMinorColor);
-    gridHelper.position.set(0, -0.001, 0);
+    if (isTopoMode && topoFile && topoFile.content instanceof Blob) {
+        // --- Create Topography from Heightmap ---
+        const imageUrl = URL.createObjectURL(topoFile.content);
+        const planeSize = parseFloat(dom['topo-plane-size'].value);
+        const verticalScale = parseFloat(dom['topo-vertical-scale'].value);
 
-    const mat = new THREE.MeshBasicMaterial({
-        color: 0xdddddd,
-        transparent: true,
-        opacity: 0.15,
-        side: THREE.DoubleSide
-    });
-    applyClippingToMaterial(mat, renderer.clippingPlanes);
+        const img = new Image();
+        img.onerror = () => {
+            import('./ui.js').then(({ showAlert }) => {
+                showAlert(`Failed to load the specified heightmap image: ${topoFile.name}. Please check if the file is a valid image.`, 'Topography Error');
+            });
+            URL.revokeObjectURL(imageUrl); // Clean up
+        };
+        img.onload = () => {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = img.width;
+            tempCanvas.height = img.height;
+            const ctx = tempCanvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            const imageData = ctx.getImageData(0, 0, img.width, img.height);
+            const data = imageData.data;
 
-    const plane = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
-    plane.rotation.x = -Math.PI / 2;
-    plane.position.y = -0.002;
+            const geometry = new THREE.PlaneGeometry(planeSize, planeSize, img.width - 1, img.height - 1);
+            const vertices = geometry.attributes.position;
 
-    groundObject.add(gridHelper, plane);
+            for (let i = 0; i < vertices.count; i++) {
+                const u = (vertices.getX(i) / planeSize + 0.5);
+                const v = 1 - (vertices.getY(i) / planeSize + 0.5);
+                const px = Math.floor(u * (img.width - 1));
+                const py = Math.floor(v * (img.height - 1));
+                const pixelIndex = (py * img.width + px) * 4;
+                const height = data[pixelIndex] / 255.0; // Use red channel as height
+                vertices.setZ(i, height * verticalScale);
+            }
+            vertices.needsUpdate = true;
+            geometry.computeVertexNormals();
+
+            const groundMaterial = new THREE.MeshStandardMaterial({
+                color: 0x5a687a,
+                wireframe: true,
+                side: THREE.DoubleSide
+            });
+            applyClippingToMaterial(groundMaterial, renderer.clippingPlanes);
+
+            const mesh = new THREE.Mesh(geometry, groundMaterial);
+            mesh.rotation.x = -Math.PI / 2; // Orient plane correctly
+            mesh.userData.isGround = true; // Flag for Radiance export
+            groundObject.add(mesh);
+            URL.revokeObjectURL(imageUrl); // Clean up
+        };
+        img.onerror = () => {
+            console.error("Failed to load heightmap image.");
+            URL.revokeObjectURL(imageUrl);
+        };
+        img.src = imageUrl;
+    } else {
+        // --- Create Default Flat Grid ---
+        const size = Math.max(W, L) * 6;
+        const gridHelper = new THREE.GridHelper(size, 60, shared.lineColor, shared.gridMinorColor);
+        gridHelper.position.set(0, -0.001, 0);
+
+        const mat = new THREE.MeshBasicMaterial({
+            color: 0xdddddd,
+            transparent: true,
+            opacity: 0.15,
+            side: THREE.DoubleSide
+        });
+        applyClippingToMaterial(mat, renderer.clippingPlanes);
+        const plane = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
+        plane.rotation.x = -Math.PI / 2;
+        plane.position.y = -0.002;
+        plane.userData.isGround = true; // Flag for Radiance export
+        groundObject.add(gridHelper, plane);
+    }
 }
 
 /**
@@ -277,6 +349,12 @@ function createGroundPlane() {
  * Walls are now individual, selectable meshes.
  */
 function createRoomGeometry() {
+    // If an imported model is active, do not generate parametric geometry.
+    if (currentImportedModel) {
+        clearGroup(roomObject);
+        clearGroup(wallSelectionGroup);
+        return;
+    }
     const dom = getDom();
     clearGroup(roomObject);
     clearGroup(wallSelectionGroup);
@@ -896,6 +974,108 @@ function createRoller(winWidth, winHeight, params, color) {
 }
 
 /**
+ * Clears any imported model from the scene.
+ */
+export function clearImportedModel() {
+    if (currentImportedModel) {
+        clearGroup(importedModelObject);
+        currentImportedModel = null;
+    }
+}
+
+/**
+ * Loads an OBJ model into the scene.
+ * @param {string} objContent - The string content of the .obj file.
+ * @param {string|null} mtlContent - The string content of the .mtl file.
+ * @param {object} options - Import options like scale and center.
+ * @returns {Promise<Array<object>>} A promise that resolves with an array of material info.
+ */
+export async function loadImportedModel(objContent, mtlContent, options) {
+    clearImportedModel(); // Clear any previous model
+
+    const objLoader = new OBJLoader();
+    const mtlLoader = new MTLLoader();
+
+    if (mtlContent) {
+        const materials = mtlLoader.parse(mtlContent, '');
+        materials.preload();
+        objLoader.setMaterials(materials);
+    }
+
+    const object = objLoader.parse(objContent);
+    currentImportedModel = object;
+
+    // --- Scaling and Centering ---
+    const box = new THREE.Box3().setFromObject(object);
+    const center = box.getCenter(new THREE.Vector3());
+
+    if (options.center) {
+        object.position.sub(center);
+    }
+
+    if (options.scale && options.scale !== 1.0) {
+        object.scale.setScalar(options.scale);
+    }
+
+    object.traverse(child => {
+        if (child.isMesh) {
+            // Ensure material properties are suitable for our scene
+            if (child.material) {
+                const materials = Array.isArray(child.material) ? child.material : [child.material];
+                materials.forEach(mat => {
+                    mat.side = THREE.DoubleSide;
+                    applyClippingToMaterial(mat, renderer.clippingPlanes);
+                });
+            }
+        }
+    });
+
+    importedModelObject.add(object);
+    scheduleUpdate();
+
+    // Extract material info for the tagger UI
+    const materialInfo = [];
+    const seenMaterials = new Set();
+    object.traverse(child => {
+        if (child.isMesh && child.material) {
+            const materials = Array.isArray(child.material) ? child.material : [child.material];
+            materials.forEach(mat => {
+                if (mat.name && !seenMaterials.has(mat.name)) {
+                    materialInfo.push({ name: mat.name, color: mat.color });
+                    seenMaterials.add(mat.name);
+                }
+            });
+        }
+    });
+
+    return materialInfo;
+}
+
+/**
+ * Applies surface type tags to the materials of the imported model.
+ * @param {Map<string, string>} tagMap - A map of material names to surface types.
+ */
+export function applySurfaceTags(tagMap) {
+    if (!currentImportedModel) return;
+
+    currentImportedModel.traverse(child => {
+        if (child.isMesh && child.material) {
+            const materials = Array.isArray(child.material) ? child.material : [child.material];
+            materials.forEach(mat => {
+                const surfaceType = tagMap.get(mat.name);
+                if (surfaceType && surfaceType !== 'IGNORE') {
+                    mat.userData.surfaceType = surfaceType;
+                    mat.visible = true;
+                } else {
+                    // If ignored or not in map, make it invisible
+                    mat.visible = false;
+                }
+            });
+        }
+    });
+}
+
+/**
  * Creates a shading device from an imported OBJ file.
  */
 async function createImportedShading(params, color, orientation, index) {
@@ -1232,6 +1412,332 @@ export function addFurniture(assetType, position) {
 }
 
 /**
+ * Creates a massing block with customizable parameters and adds it to the scene's context group.
+ * @param {object} params - Configuration parameters for the massing block.
+ * @param {string} params.shape - Shape type: 'box', 'cylinder', 'pyramid', 'sphere'.
+ * @param {number} params.width - Width/X dimension in meters.
+ * @param {number} params.depth - Depth/Z dimension in meters.
+ * @param {number} params.height - Height/Y dimension in meters.
+ * @param {number} params.radius - Radius for cylinder/sphere shapes.
+ * @param {number} params.positionX - X position in meters.
+ * @param {number} params.positionY - Y position in meters.
+ * @param {number} params.positionZ - Z position in meters.
+ * @param {string} params.name - Optional name for the massing block.
+ * @returns {THREE.Mesh|THREE.Group} The created mesh or group object for the massing block.
+ */
+export function addMassingBlock(params = {}) {
+    const {
+        shape = 'box',
+        width = 10,
+        depth = 10,
+        height = 15,
+        radius = 5,
+        positionX = 20,
+        positionY = height / 2,
+        positionZ = 0,
+        name = `Massing Block ${contextObject.children.length + 1}`
+    } = params;
+
+    let geometry, mesh;
+
+    // Create geometry based on shape
+    switch (shape) {
+        case 'cylinder':
+            geometry = new THREE.CylinderGeometry(radius, radius, height, 16);
+            break;
+        case 'pyramid':
+            // Create pyramid using cone geometry
+            geometry = new THREE.ConeGeometry(radius, height, 4);
+            break;
+        case 'sphere':
+            geometry = new THREE.SphereGeometry(radius, 16, 12);
+            break;
+        case 'box':
+        default:
+            geometry = new THREE.BoxGeometry(width, height, depth);
+            break;
+    }
+
+    // Use the same shared material as OSM context buildings
+    const material = shared.contextMat.clone();
+    applyClippingToMaterial(material, renderer.clippingPlanes);
+
+    mesh = new THREE.Mesh(geometry, material);
+
+    // Set userData for identification during raycasting and saving
+    mesh.userData = {
+        isContext: true,
+        isMassingBlock: true,
+        shape: shape,
+        width: width,
+        depth: depth,
+        height: height,
+        radius: radius,
+        name: name,
+        id: generateContextObjectId(),
+        type: 'mass',
+        createdAt: new Date().toISOString(),
+        position: { x: positionX, y: positionY, z: positionZ }
+    };
+
+    // Position the mesh
+    mesh.position.set(positionX, positionY, positionZ);
+
+    // For pyramid (cone), adjust position to sit on ground
+    if (shape === 'pyramid') {
+        mesh.position.y = height / 2;
+    }
+
+    contextObject.add(mesh);
+
+    // Register the object in our management system
+    registerContextObject(mesh);
+
+    return mesh;
+}
+
+/**
+ * Generates a unique ID for a context object.
+ * @returns {string} A unique identifier.
+ */
+function generateContextObjectId() {
+    return `ctx_${nextContextObjectId++}_${Date.now()}`;
+}
+
+/**
+ * Registers a context object in the management system.
+ * @param {THREE.Object3D} object - The context object to register.
+ */
+export function registerContextObject(object) {
+    if (!object.userData.id) {
+        object.userData.id = generateContextObjectId();
+    }
+    contextObjects.set(object.userData.id, object);
+    updateContextObjectUI();
+}
+
+/**
+ * Unregisters a context object from the management system.
+ * @param {string} id - The ID of the object to unregister.
+ */
+export function unregisterContextObject(id) {
+    const object = contextObjects.get(id);
+    if (object) {
+        // Remove from scene
+        if (object.parent) {
+            object.parent.remove(object);
+        }
+        // Remove from our registry
+        contextObjects.delete(id);
+        updateContextObjectUI();
+    }
+}
+
+/**
+ * Gets all context objects.
+ * @returns {Map} The context objects map.
+ */
+export function getContextObjects() {
+    return contextObjects;
+}
+
+/**
+ * Gets a context object by ID.
+ * @param {string} id - The object ID.
+ * @returns {THREE.Object3D|null} The context object or null if not found.
+ */
+export function getContextObjectById(id) {
+    return contextObjects.get(id) || null;
+}
+
+/**
+ * Deletes a context object by ID.
+ * @param {string} id - The ID of the object to delete.
+ * @returns {boolean} True if the object was deleted, false otherwise.
+ */
+export function deleteContextObject(id) {
+    if (contextObjects.has(id)) {
+        unregisterContextObject(id);
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Copies a context object.
+ * @param {string} id - The ID of the object to copy.
+ * @param {object} offset - Optional position offset for the copy.
+ * @returns {THREE.Object3D|null} The copied object or null if original not found.
+ */
+export function copyContextObject(id, offset = { x: 1, y: 0, z: 1 }) {
+    const original = contextObjects.get(id);
+    if (!original) return null;
+
+    // Clone the geometry and create new object
+    const clonedGeometry = original.geometry.clone();
+    const material = original.material.clone();
+    const copy = new THREE.Mesh(clonedGeometry, material);
+
+    // Copy userData and update it
+    copy.userData = { ...original.userData };
+    copy.userData.id = generateContextObjectId();
+    copy.userData.name = `${original.userData.name} Copy`;
+    copy.userData.createdAt = new Date().toISOString();
+    copy.userData.isCopy = true;
+
+    // Apply offset to position
+    copy.position.copy(original.position).add(new THREE.Vector3(offset.x, offset.y, offset.z));
+
+    contextObject.add(copy);
+    registerContextObject(copy);
+
+    return copy;
+}
+
+/**
+ * Gets properties of a context object.
+ * @param {string} id - The object ID.
+ * @returns {object|null} Object properties or null if not found.
+ */
+export function getContextObjectProperties(id) {
+    const object = contextObjects.get(id);
+    if (!object) return null;
+
+    const bbox = new THREE.Box3().setFromObject(object);
+    const dimensions = {
+        width: bbox.max.x - bbox.min.x,
+        height: bbox.max.y - bbox.min.y,
+        depth: bbox.max.z - bbox.min.z
+    };
+
+    let volume = 0;
+    switch (object.userData.shape) {
+        case 'box':
+            volume = object.userData.width * object.userData.height * object.userData.depth;
+            break;
+        case 'cylinder':
+            volume = Math.PI * object.userData.radius * object.userData.radius * object.userData.height;
+            break;
+        case 'sphere':
+            volume = (4/3) * Math.PI * object.userData.radius * object.userData.radius * object.userData.radius;
+            break;
+        case 'pyramid':
+            volume = (1/3) * Math.PI * object.userData.radius * object.userData.radius * object.userData.height;
+            break;
+    }
+
+    return {
+        id: object.userData.id,
+        name: object.userData.name,
+        type: object.userData.type,
+        shape: object.userData.shape,
+        position: { ...object.position },
+        dimensions: dimensions,
+        volume: volume,
+        createdAt: object.userData.createdAt,
+        isCopy: object.userData.isCopy || false
+    };
+}
+
+/**
+ * Updates the material for all context objects of a specific type.
+ * @param {string} type - The object type ('mass', 'building', etc.).
+ * @param {THREE.Material} material - The new material to apply.
+ */
+export function updateContextObjectsMaterial(type, material) {
+    contextObjects.forEach(object => {
+        if (object.userData.type === type) {
+            object.material = material;
+        }
+    });
+}
+
+/**
+ * Gets all context objects of a specific type.
+ * @param {string} type - The object type to filter by.
+ * @returns {Array} Array of matching objects.
+ */
+export function getContextObjectsByType(type) {
+    const objects = [];
+    contextObjects.forEach(object => {
+        if (object.userData.type === type) {
+            objects.push(object);
+        }
+    });
+    return objects;
+}
+
+/**
+ * Performs bulk operations on selected context objects.
+ * @param {string} operation - The operation type ('delete', 'copy', 'changeMaterial').
+ * @param {Array} objectIds - Array of object IDs to operate on.
+ * @param {object} params - Operation parameters.
+ * @returns {object} Result of the operation.
+ */
+export function performBulkOperation(operation, objectIds, params = {}) {
+    const results = {
+        success: [],
+        failed: [],
+        count: objectIds.length
+    };
+
+    switch (operation) {
+        case 'delete':
+            objectIds.forEach(id => {
+                if (deleteContextObject(id)) {
+                    results.success.push(id);
+                } else {
+                    results.failed.push(id);
+                }
+            });
+            break;
+
+        case 'copy':
+            const offset = params.offset || { x: 1, y: 0, z: 1 };
+            objectIds.forEach(id => {
+                const copy = copyContextObject(id, offset);
+                if (copy) {
+                    results.success.push(copy.userData.id);
+                } else {
+                    results.failed.push(id);
+                }
+            });
+            break;
+
+        case 'changeMaterial':
+            const material = params.material;
+            if (material) {
+                objectIds.forEach(id => {
+                    const object = contextObjects.get(id);
+                    if (object) {
+                        object.material = material;
+                        results.success.push(id);
+                    } else {
+                        results.failed.push(id);
+                    }
+                });
+            }
+            break;
+    }
+
+    // Update UI after bulk operations
+    updateContextObjectUI();
+
+    return results;
+}
+
+/**
+ * Updates the context object management UI.
+ * This function should be called from ui.js to refresh the object list.
+ */
+export function updateContextObjectUI() {
+    // This will be implemented in ui.js to update the DOM
+    if (typeof window !== 'undefined' && window.updateContextObjectUI) {
+        window.updateContextObjectUI();
+    }
+}
+
+/**
  * Creates transparent planes on the exterior of the room to act as resize handles.
  */
 export function createResizeHandles() {
@@ -1275,4 +1781,77 @@ export function createResizeHandles() {
         };
         resizeHandlesObject.add(plane);
     });
+}
+
+/**
+ * Clears all context objects from the scene.
+ */
+export function clearContextObjects() {
+    clearGroup(contextObject);
+}
+
+/**
+ * Updates the material for all context buildings based on UI controls.
+ */
+export function updateContextMaterial() {
+    const dom = getDom();
+    const refl = parseFloat(dom['context-refl']?.value || 0.2);
+    // We'll use a simple gray color based on reflectance for the 3D view
+    shared.contextMat.color.setScalar(refl);
+}
+
+/**
+ * Creates 3D building masses from parsed OpenStreetMaps data.
+ * @param {object} osmData - The raw JSON data from the Overpass API.
+ * @param {number} centerLat - The latitude of the project center.
+ * @param {number} centerLon - The longitude of the project center.
+ */
+export function createContextFromOsm(osmData, centerLat, centerLon) {
+    clearContextObjects();
+
+    const nodes = new Map();
+    osmData.elements.forEach(el => {
+        if (el.type === 'node') {
+            nodes.set(el.id, { lat: el.lat, lon: el.lon });
+        }
+    });
+
+    osmData.elements.forEach(el => {
+        if (el.type === 'way' && el.tags?.building && el.nodes) {
+            const points = [];
+            el.nodes.forEach(nodeId => {
+                const node = nodes.get(nodeId);
+                if (node) {
+                    // Convert lat/lon to meters from the center point
+                    const metersPerLat = 111132.954 - 559.822 * Math.cos(2 * centerLat) + 1.175 * Math.cos(4 * centerLat);
+                    const metersPerLon = 111319.488 * Math.cos(centerLat * Math.PI / 180);
+                    const x = (node.lon - centerLon) * metersPerLon;
+                    const z = -(node.lat - centerLat) * metersPerLat; // Z is negative latitude
+                    points.push(new THREE.Vector2(x, z));
+                }
+            });
+
+            if (points.length > 2) {
+                const shape = new THREE.Shape(points);
+                const height = parseFloat(el.tags.height) || (parseFloat(el.tags['building:levels']) || 3) * 3.5;
+
+                const extrudeSettings = { depth: height, bevelEnabled: false };
+                const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+                geometry.translate(0, 0, -height); // Move extrusion origin to the top
+                geometry.rotateX(Math.PI / 2); // Rotate to stand up (Y-up)
+
+                const building = new THREE.Mesh(geometry, shared.contextMat);
+                contextObject.add(building);
+            }
+        }
+    });
+
+    const buildingsCreated = contextObject.children.length > 0;
+    if (!buildingsCreated && osmData.elements.length > 0) {
+        import('./ui.js').then(({ showAlert }) => {
+            showAlert('OSM data fetched successfully, but no building footprints were found in the specified area.', 'No Buildings Found');
+        });
+    }
+
+    updateContextMaterial(); // Apply initial material color
 }

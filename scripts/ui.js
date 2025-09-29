@@ -1,7 +1,7 @@
-
 // scripts/ui.js
 
-import { updateScene, axesObject, updateSensorGridColors, roomObject, shadingObject, sensorMeshes, wallSelectionGroup, highlightWall, clearWallHighlights, updateHighlightColor, furnitureObject, addFurniture, updateFurnitureColor, resizeHandlesObject } from './geometry.js';
+import { updateScene, axesObject, updateSensorGridColors, roomObject, shadingObject, sensorMeshes, wallSelectionGroup, highlightWall, clearWallHighlights, updateHighlightColor, furnitureObject, addFurniture, updateFurnitureColor, resizeHandlesObject, contextObject } from './geometry.js';
+
 import { activeCamera, perspectiveCamera, orthoCamera, setActiveCamera, onWindowResize, controls, transformControls, sensorTransformControls, viewpointCamera, scene, updateLiveViewType, renderer, toggleFirstPersonView as sceneToggleFPV, isFirstPersonView as sceneIsFPV, fpvOrthoCamera, updateViewpointFromUI, setGizmoVisibility, setUpdatingFromSliders, isUpdatingCameraFromSliders, setGizmoMode } from './scene.js';
 import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
@@ -298,9 +298,11 @@ const ids = [
     'latitude', 'longitude', 'map', 'location-inputs-container', 'radiance-path',
 
     // Dimensions Panel
-    'width', 'width-val', 'length', 'length-val', 'height', 'height-val', 'room-orientation', 'room-orientation-val',
+    'width', 'width-val', 'length', 'length-val', 'height', 'height-val', 'elevation', 'elevation-val', 'room-orientation', 'room-orientation-val',
     'resize-mode-toggle', 'resize-mode-info',
     'surface-thickness', 'surface-thickness-val',
+    'mode-parametric-btn', 'mode-import-btn', 'parametric-controls', 'import-controls',
+    'import-obj-file', 'import-scale', 'import-center-toggle', 'load-model-btn',
 
     // Apertures Panel (Frames)
     'frame-toggle', 'frame-controls', 'frame-thick', 'frame-thick-val',
@@ -492,14 +494,59 @@ const ids = [
     'sun-ray-tracing-toggle-n', 'sun-ray-tracing-toggle-s', 'sun-ray-tracing-toggle-e', 'sun-ray-tracing-toggle-w',
 
     // Saved Views
-    'save-view-btn', 'saved-views-list'
+    'save-view-btn', 'saved-views-list',
+
+    // Context & Site Modeling
+    'context-mode-none', 'context-mode-osm', 'context-mode-massing', 'context-mode-topo',
+    'osm-controls', 'osm-radius', 'osm-radius-val', 'fetch-osm-data-btn', 'context-visibility-toggle',
+    'massing-controls', 'add-massing-block-btn',
+
+    // Enhanced Massing Controls
+    'massing-shape', 'massing-width', 'massing-width-val', 'massing-depth', 'massing-depth-val',
+    'massing-height', 'massing-height-val', 'massing-radius', 'massing-radius-val',
+    'massing-pos-x', 'massing-pos-x-val', 'massing-pos-y', 'massing-pos-y-val', 'massing-pos-z', 'massing-pos-z-val',
+    'massing-count', 'massing-count-val', 'massing-spacing', 'massing-spacing-val',
+    'massing-pattern', 'create-massing-blocks-btn', 'clear-massing-blocks-btn',
+    'massing-info', 'massing-count-display', 'massing-volume-display',
+    'topo-controls', 'topo-heightmap-file', 'topo-plane-size', 'topo-plane-size-val', 'topo-vertical-scale', 'topo-vertical-scale-val',
+    'context-material-controls', 'context-mat-type', 'context-refl', 'context-refl-val',
+
+    // Enhanced Massing Controls
+    'massing-shape', 'massing-width', 'massing-width-val', 'massing-depth', 'massing-depth-val',
+    'massing-height', 'massing-height-val', 'massing-radius', 'massing-radius-val',
+    'massing-pos-x', 'massing-pos-x-val', 'massing-pos-y', 'massing-pos-y-val', 'massing-pos-z', 'massing-pos-z-val',
+    'massing-count', 'massing-count-val', 'massing-spacing', 'massing-spacing-val',
+    'massing-pattern', 'create-massing-blocks-btn', 'clear-massing-blocks-btn',
+    'massing-info', 'massing-count-display', 'massing-volume-display',
+
+    // Context Object Management
+    'context-object-management', 'context-object-search', 'context-object-filter',
+    'select-all-objects', 'clear-selection', 'invert-selection',
+    'context-object-list', 'bulk-delete', 'bulk-copy', 'bulk-change-material', 'bulk-select-by-type',
+    'context-object-properties', 'object-info-display', 'obj-name', 'obj-type', 'obj-position',
+    'obj-dimensions', 'obj-volume', 'delete-single-object', 'copy-single-object', 'focus-object',
+
+    // Enhanced Massing Controls
+    'massing-shape', 'massing-width', 'massing-width-val', 'massing-depth', 'massing-depth-val',
+    'massing-height', 'massing-height-val', 'massing-radius', 'massing-radius-val',
+    'massing-pos-x', 'massing-pos-x-val', 'massing-pos-y', 'massing-pos-y-val', 'massing-pos-z', 'massing-pos-z-val',
+    'massing-count', 'massing-count-val', 'massing-spacing', 'massing-spacing-val',
+    'massing-pattern', 'create-massing-blocks-btn', 'clear-massing-blocks-btn',
+    'massing-info', 'massing-count-display', 'massing-volume-display',
+
+    // Context Object Management
+    'context-object-management', 'context-object-search', 'context-object-filter',
+    'select-all-objects', 'clear-selection', 'invert-selection',
+    'context-object-list', 'bulk-delete', 'bulk-copy', 'bulk-change-material', 'bulk-select-by-type',
+    'context-object-properties', 'object-info-display', 'obj-name', 'obj-type', 'obj-position',
+    'obj-dimensions', 'obj-volume', 'delete-single-object', 'copy-single-object', 'focus-object'
 ];
 
     ids.forEach(id => { const el = document.getElementById(id); if(el) dom[id] = el; });
     
     // Aperture panel IDs are generated dynamically
     wallDirections.forEach(dir => {
-const controlIds = [
+    const controlIds = [
             `aperture-controls-${dir}`, `win-count-${dir}`, `win-count-${dir}-val`,
             `mode-wwr-btn-${dir}`, `mode-manual-btn-${dir}`, `wwr-controls-${dir}`, `manual-controls-${dir}`,
             `wwr-${dir}`, `wwr-${dir}-val`, `wwr-sill-height-${dir}`, `wwr-sill-height-${dir}-val`,
@@ -927,6 +974,12 @@ export async function setupEventListeners() {
     // The import from annualDashboard is updated to include the new functions
     initHdrViewer(); // Initialize the HDR viewer
     observeAndInitDynamicPanels();
+
+    // Geometry Mode Switcher
+    dom['mode-parametric-btn']?.addEventListener('click', () => switchGeometryMode('parametric'));
+    dom['mode-import-btn']?.addEventListener('click', () => switchGeometryMode('import'));
+    dom['load-model-btn']?.addEventListener('click', handleModelImport);
+
 
     Object.keys(dom).forEach(id => {
         const el = dom[id];
@@ -1636,6 +1689,7 @@ async function render2DHeatmap() {
     dom['view-bsdf-btn']?.addEventListener('click', openBsdfViewer);
 
     // --- Saved Views Listeners ---
+    setupContextControls();
     dom['save-view-btn']?.addEventListener('click', saveCurrentView);
     dom['saved-views-list']?.addEventListener('click', (e) => {
         const target = e.target;
@@ -1778,17 +1832,16 @@ function setupPanelToggleButtons() {
         'toggle-panel-lighting-btn': 'panel-lighting',
         'toggle-panel-materials-btn': 'panel-materials',
         'toggle-panel-sensor-btn': 'panel-sensor',
-        'toggle-panel-sensor-btn': 'panel-sensor',
         'toggle-panel-viewpoint-btn': 'panel-viewpoint',
         'toggle-panel-scene-btn': 'panel-scene-elements',
         'info-button': 'panel-info',
         'ai-assistant-button': 'panel-ai-assistant'
-        };
+    };
 
-        for (const [btnId, panelId] of Object.entries(panelMap)) {
-            const button = dom[btnId];
+    for (const [btnId, panelId] of Object.entries(panelMap)) {
+        const button = dom[btnId];
         if (button) {
-             button.addEventListener('click', () => togglePanelVisibility(panelId, btnId));
+            button.addEventListener('click', () => togglePanelVisibility(panelId, btnId));
         } else {
             console.warn(`Button with ID '${btnId}' not found in the DOM.`);
         }
@@ -1886,7 +1939,9 @@ export function initializePanelControls(win) {
                     'panel-materials': 'toggle-panel-materials-btn',
                     'panel-sensor': 'toggle-panel-sensor-btn',
                     'panel-viewpoint': 'toggle-panel-viewpoint-btn',
-                    'panel-view-options': 'toggle-panel-view-options-btn'
+                    'panel-scene-elements': 'toggle-panel-scene-btn',
+                    'panel-info': 'info-button',
+                    'panel-ai-assistant': 'ai-assistant-button'
                 };
                 const btnId = panelMap[win.id];
                 if (btnId && dom[btnId]) {
@@ -4023,24 +4078,21 @@ function onSceneClick(event) {
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(pointer, activeCamera);
 
-    const objectsToIntersect = [wallSelectionGroup];
-    if (furnitureObject.children.length > 0) {
-        objectsToIntersect.push(furnitureObject);
-    }
+    const objectsToIntersect = [wallSelectionGroup, furnitureObject, contextObject];
     const intersects = raycaster.intersectObjects(objectsToIntersect, true);
 
     const wallIntersect = intersects.find(i => i.object.userData.isSelectableWall === true);
     const furnitureIntersect = intersects.find(i => i.object.userData.isFurniture === true);
+    const massingIntersect = intersects.find(i => i.object.userData.isMassingBlock === true);
 
     if (furnitureIntersect) {
-        // Clicked on a piece of furniture, select it
-        handleFurnitureSelection(furnitureIntersect.object);
+        selectTransformableObject(furnitureIntersect.object);
+    } else if (massingIntersect) {
+        selectTransformableObject(massingIntersect.object);
     } else if (wallIntersect) {
-        // Clicked on a wall, handle wall selection logic
-        transformControls.detach(); // Detach from any furniture
+        transformControls.detach(); // Detach from any other object
         handleWallInteraction(wallIntersect);
     } else {
-        // Clicked on empty space
         handleDeselection();
     }
 }
@@ -4108,14 +4160,41 @@ function showApertureControlsFor(id) {
 }
 
 /**
- * Handles the logic for selecting a furniture object and attaching the transform gizmo.
- * @param {THREE.Mesh} furnitureMesh The mesh object of the furniture that was clicked.
+* Handles the logic for selecting any transformable object (furniture, massing block) and attaching the gizmo.
+ * @param {THREE.Object3D} object The object that was clicked.
  */
-function handleFurnitureSelection(furnitureMesh) {
+function selectTransformableObject(object) {
     handleWallDeselection(); // Deselect any walls first
-    transformControls.attach(furnitureMesh);
+    transformControls.attach(object);
     dom['transform-controls-section']?.classList.remove('hidden');
-    _updateTransformSlidersFromObject(furnitureMesh);
+    _updateTransformSlidersFromObject(object);
+
+    // If it's a massing block, also update the massing creation panel
+    if (object.userData.isMassingBlock) {
+        const data = object.userData;
+
+        // Set shape radio button and update UI accordingly
+        const shapeRadio = document.querySelector(`input[name="massing-shape"][value="${data.shape}"]`);
+        if (shapeRadio) {
+            shapeRadio.checked = true;
+            handleMassingShapeChange();
+        }
+
+        // Populate dimension sliders from the object's properties
+        if (data.shape === 'box') {
+            _setValueAndLabel('massing-width', data.width, 'm');
+            _setValueAndLabel('massing-depth', data.depth, 'm');
+            _setValueAndLabel('massing-height', data.height, 'm');
+        } else {
+            _setValueAndLabel('massing-radius', data.radius, 'm');
+            _setValueAndLabel('massing-height', data.height, 'm');
+        }
+
+        // Populate position sliders
+        _setValueAndLabel('massing-pos-x', object.position.x, 'm');
+        _setValueAndLabel('massing-pos-y', object.position.y, 'm');
+        _setValueAndLabel('massing-pos-z', object.position.z, 'm');
+    }
 }
 
 /**
@@ -4874,6 +4953,110 @@ async function applySavedView(index) {
 }
 
 /**
+ * Sets up event listeners and logic for the Context & Site Modeling panel.
+ */
+async function setupContextControls() {
+    const { contextObject, clearContextObjects, updateContextMaterial, createContextFromOsm } = await import('./geometry.js');
+
+    const toggleContextMode = (mode) => {
+        dom['osm-controls']?.classList.toggle('hidden', mode !== 'osm');
+        dom['massing-controls']?.classList.toggle('hidden', mode !== 'massing');
+        dom['topo-controls']?.classList.toggle('hidden', mode !== 'topo');
+        dom['context-material-controls']?.classList.toggle('hidden', mode === 'none');
+
+        ['none', 'osm', 'massing', 'topo'].forEach(m => {
+            dom[`context-mode-${m}`]?.classList.toggle('active', m === mode);
+        });
+
+        if (mode === 'none') {
+            transformControls.detach();
+            clearContextObjects();
+        }
+    };
+
+    dom['context-mode-none']?.addEventListener('click', () => toggleContextMode('none'));
+    dom['context-mode-osm']?.addEventListener('click', () => toggleContextMode('osm'));
+    dom['context-mode-massing']?.addEventListener('click', () => toggleContextMode('massing'));
+    dom['context-mode-topo']?.addEventListener('click', () => toggleContextMode('topo'));
+
+    dom['add-massing-block-btn']?.addEventListener('click', async () => {
+        const { addMassingBlock } = await import('./geometry.js');
+        const newBlock = addMassingBlock();
+        selectTransformableObject(newBlock); // Select the new block immediately
+    });
+
+    // Enhanced Massing Tools Event Handlers
+    setupMassingTools();
+
+    dom['topo-heightmap-file']?.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        const display = dom['topo-heightmap-file'].parentElement.querySelector('[data-file-display-for]');
+        if (file) {
+            project.addSimulationFile('topo-heightmap-file', file.name, file); // Store the Blob
+            if (display) display.textContent = file.name;
+            scheduleUpdate(); // Trigger a scene update to build the topography
+        } else {
+            project.addSimulationFile('topo-heightmap-file', null, null);
+            if (display) display.textContent = 'No file selected.';
+            scheduleUpdate();
+        }
+    });
+
+    dom['context-visibility-toggle']?.addEventListener('change', (e) => {
+        if (contextObject) contextObject.visible = e.target.checked;
+    });
+
+    dom['fetch-osm-data-btn']?.addEventListener('click', async () => {
+        const btn = dom['fetch-osm-data-btn'];
+        btn.textContent = 'Fetching...';
+        btn.disabled = true;
+        try {
+            const lat = parseFloat(dom.latitude.value);
+            const lon = parseFloat(dom.longitude.value);
+            const radius = parseInt(dom['osm-radius'].value, 10);
+
+            if (isNaN(lat) || isNaN(lon)) {
+                showAlert('Please set a valid project latitude and longitude before fetching data.', 'Location Not Set');
+                // Automatically open the project panel to guide the user
+                togglePanelVisibility('panel-project', 'toggle-panel-project-btn');
+                return;
+            }
+
+            const query = `
+                [out:json][timeout:25];
+                (
+                    way(around:${radius},${lat},${lon})["building"];
+                );
+                (._;>;);
+                out;
+            `;
+            const response = await fetch('https://overpass-api.de/api/interpreter', {
+                method: 'POST',
+                body: query
+            });
+
+            if (!response.ok) {
+                throw new Error(`API request failed with status ${response.status}`);
+            }
+            const osmData = await response.json();
+            createContextFromOsm(osmData, lat, lon);
+            showAlert(`${osmData.elements.filter(e => e.type === 'way').length} buildings loaded.`, 'Context Loaded');
+
+        } catch (error) {
+            console.error('Failed to fetch OSM data:', error);
+            showAlert(`Error fetching site context: ${error.message}`, 'API Error');
+        } finally {
+            btn.textContent = 'Fetch Building Data';
+            btn.disabled = false;
+        }
+    });
+
+    ['context-refl', 'context-mat-type'].forEach(id => {
+        dom[id]?.addEventListener('input', updateContextMaterial);
+    });
+}
+
+/**
  * Deletes a saved camera view from the list.
  * @param {number} index - The index of the view to delete from the savedViews array.
  */
@@ -5205,15 +5388,20 @@ function onPointerMove(event) {
         delta.applyQuaternion(roomInverseQuaternion);
 
         const handleData = draggedHandle.userData;
+        // Update the slider value and its text label directly, but do NOT dispatch the 'input' event.
+        // This prevents the scene from being rebuilt on every mouse movement during the drag.
         if (handleData.axis === 'x') {
-            dom.width.value = Math.max(1, initialDimension.width + delta.x * handleData.direction * 2).toFixed(1);
-            dom.width.dispatchEvent(new Event('input', { bubbles: true }));
+            const newValue = Math.max(1, initialDimension.width + delta.x * handleData.direction * 2).toFixed(1);
+            dom.width.value = newValue;
+            updateValueLabel(dom['width-val'], newValue, 'm', 'width');
         } else if (handleData.axis === 'z') {
-            dom.length.value = Math.max(1, initialDimension.length + delta.z * handleData.direction * 2).toFixed(1);
-            dom.length.dispatchEvent(new Event('input', { bubbles: true }));
+            const newValue = Math.max(1, initialDimension.length + delta.z * handleData.direction * 2).toFixed(1);
+            dom.length.value = newValue;
+            updateValueLabel(dom['length-val'], newValue, 'm', 'length');
         } else if (handleData.axis === 'y') {
-            dom.height.value = Math.max(1, initialDimension.height + delta.y * handleData.direction).toFixed(1);
-            dom.height.dispatchEvent(new Event('input', { bubbles: true }));
+            const newValue = Math.max(1, initialDimension.height + delta.y * handleData.direction).toFixed(1);
+            dom.height.value = newValue;
+            updateValueLabel(dom['height-val'], newValue, 'm', 'height');
         }
     }
 }
@@ -5223,11 +5411,14 @@ function onPointerMove(event) {
  */
 function onPointerUp(event) {
     if (draggedHandle) {
-        // This was the end of a resize drag
+        // This was the end of a resize drag.
+        // Now, trigger a single scene update to rebuild the geometry with the final dimensions.
+        scheduleUpdate();
+
         draggedHandle = null;
         controls.enabled = true;
         renderer.domElement.style.cursor = 'auto';
-        return; 
+        return;
     }
 
     // Check if the mouse moved significantly. If not, treat it as a click.
@@ -5251,16 +5442,22 @@ function handleSceneClick(event) {
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(pointer, activeCamera);
 
-    const objectsToIntersect = [wallSelectionGroup, furnitureObject];
+    // Add contextObject to allow selecting massing blocks
+    const objectsToIntersect = [wallSelectionGroup, furnitureObject, contextObject];
     const intersects = raycaster.intersectObjects(objectsToIntersect, true);
 
     const wallIntersect = intersects.find(i => i.object.userData.isSelectableWall === true);
     const furnitureIntersect = intersects.find(i => i.object.userData.isFurniture === true);
+    const massingIntersect = intersects.find(i => i.object.userData.isMassingBlock === true);
 
     if (furnitureIntersect) {
-        handleFurnitureSelection(furnitureIntersect.object);
+        // Use the generic function to select and attach gizmo
+        selectTransformableObject(furnitureIntersect.object);
+    } else if (massingIntersect) {
+        // New case to handle selecting a massing block
+        selectTransformableObject(massingIntersect.object);
     } else if (wallIntersect) {
-        transformControls.detach();
+        transformControls.detach(); // Detach from any other object
         handleWallInteraction(wallIntersect);
     } else {
         handleDeselection();
@@ -5294,4 +5491,424 @@ function updateResizeCursor(event) {
     } else {
         renderer.domElement.style.cursor = 'auto';
     }
+}
+
+export function switchGeometryMode(mode) {
+const isParametric = mode === 'parametric';
+
+// Toggle button active state
+dom['mode-parametric-btn']?.classList.toggle('active', isParametric);
+dom['mode-import-btn']?.classList.toggle('active', !isParametric);
+
+// Toggle panel visibility
+dom['parametric-controls']?.classList.toggle('hidden', !isParametric);
+dom['import-controls']?.classList.toggle('hidden', isParametric);
+
+// Using an async IIFE to handle the dynamic import
+(async () => {
+    const { clearImportedModel, roomObject, wallSelectionGroup, shadingObject } = await import('./geometry.js');
+    if (!isParametric) {
+        // When switching to import mode, hide the parametric geometry
+        roomObject.visible = false;
+        wallSelectionGroup.visible = false;
+        shadingObject.visible = false; // Hide parametric shading too
+    } else {
+        // When switching back to parametric, restore geometry visibility and clear any imported model.
+        clearImportedModel();
+        roomObject.visible = true;
+        wallSelectionGroup.visible = true;
+        shadingObject.visible = true;
+        scheduleUpdate(); // Rebuild parametric geometry
+    }
+})();
+}
+
+async function handleModelImport() {
+const { loadImportedModel } = await import('./geometry.js');
+const fileInput = dom['import-obj-file'];
+
+if (!fileInput || fileInput.files.length === 0) {
+    showAlert('Please select an OBJ file to import.', 'No File Selected');
+    return;
+}
+
+let objFile = null;
+let mtlFile = null;
+
+for (const file of fileInput.files) {
+    if (file.name.toLowerCase().endsWith('.obj')) {
+        objFile = file;
+    } else if (file.name.toLowerCase().endsWith('.mtl')) {
+        mtlFile = file;
+    }
+}
+
+if (!objFile) {
+    showAlert('An .obj file is required for import.', 'File Missing');
+    return;
+}
+
+const readAsText = (file) => new Promise((resolve, reject) => {
+    if (!file) {
+        resolve(null);
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsText(file);
+});
+
+try {
+    const [objContent, mtlContent] = await Promise.all([
+        readAsText(objFile),
+        readAsText(mtlFile)
+    ]);
+
+    const options = {
+        scale: parseFloat(dom['import-scale'].value) || 1.0,
+        center: dom['import-center-toggle'].checked
+    };
+
+    const materials = await loadImportedModel(objContent, mtlContent, options);
+
+    if (materials.length > 0) {
+        openMaterialTagger(materials);
+    } else {
+        showAlert('Model loaded, but no materials were found to tag. The model will be treated as a single object.', 'No Materials');
+    }
+} catch (error) {
+    console.error("Error importing model:", error);
+    showAlert(`Failed to import model: ${error.message}`, 'Import Error');
+}
+}
+
+function openMaterialTagger(materials) {
+const template = document.getElementById('template-material-tagger');
+if (!template) return;
+
+// Remove any existing tagger panel
+document.getElementById('material-tagger-panel')?.remove();
+
+const taggerPanel = template.content.cloneNode(true).firstElementChild;
+taggerPanel.id = 'material-tagger-panel';
+document.getElementById('window-container').appendChild(taggerPanel);
+initializePanelControls(taggerPanel); // Make it draggable, etc.
+
+const list = taggerPanel.querySelector('#material-tag-list');
+const itemTemplate = document.getElementById('template-material-tag-item');
+
+materials.forEach(mat => {
+    const item = itemTemplate.content.cloneNode(true).firstElementChild;
+    item.querySelector('.material-name').textContent = mat.name;
+    const swatch = item.querySelector('.material-swatch');
+    if (mat.color) {
+        swatch.style.backgroundColor = `#${mat.color.getHexString()}`;
+    }
+    list.appendChild(item);
+});
+
+taggerPanel.querySelector('#finalize-import-btn').addEventListener('click', () => {
+    const tagMap = new Map();
+    list.querySelectorAll('.material-tag-item').forEach(item => {
+        const name = item.querySelector('.material-name').textContent;
+        const type = item.querySelector('.surface-type-selector').value;
+        tagMap.set(name, type);
+    });
+
+    // Apply tags in geometry.js
+    import('./geometry.js').then(({ applySurfaceTags }) => {
+        applySurfaceTags(tagMap);
+        showAlert('Surface types applied successfully.', 'Import Complete');
+        taggerPanel.remove();
+    });
+});
+
+ensureWindowInView(taggerPanel);
+}
+
+/**
+ * Sets up all event listeners and functionality for the enhanced massing tools.
+ * @private
+ */
+function setupMassingTools() {
+    // Shape selection radio buttons
+    const shapeRadios = document.querySelectorAll('input[name="massing-shape"]');
+    shapeRadios.forEach(radio => {
+        radio.addEventListener('change', handleMassingShapeChange);
+    });
+
+    // Dimension sliders
+    const dimensionSliders = ['massing-width', 'massing-depth', 'massing-height', 'massing-radius'];
+    dimensionSliders.forEach(id => {
+        const slider = dom[id];
+        const label = dom[`${id}-val`];
+        if (slider && label) {
+            slider.addEventListener('input', () => {
+                let unit = 'm';
+                updateValueLabel(label, slider.value, unit, id);
+
+                // If a massing block is selected, update it live
+                if (transformControls.object && transformControls.object.userData.isMassingBlock) {
+                    _updateSelectedMassingBlock();
+                } else {
+                    updateMassingInfo();
+                }
+            });
+        }
+    });
+
+    // Position sliders
+    const positionSliders = ['massing-pos-x', 'massing-pos-y', 'massing-pos-z'];
+    positionSliders.forEach(id => {
+        const slider = dom[id];
+        const label = dom[`${id}-val`];
+        if (slider && label) {
+            slider.addEventListener('input', () => {
+                let unit = 'm';
+                updateValueLabel(label, slider.value, unit, id);
+            });
+        }
+    });
+
+    // Multiple block controls
+    const blockCountSlider = dom['massing-count'];
+    const spacingSlider = dom['massing-spacing'];
+    if (blockCountSlider) {
+        blockCountSlider.addEventListener('input', () => {
+            updateValueLabel(dom['massing-count-val'], blockCountSlider.value, '', 'massing-count');
+            updateMassingInfo();
+        });
+    }
+    if (spacingSlider) {
+        spacingSlider.addEventListener('input', () => {
+            updateValueLabel(dom['massing-spacing-val'], spacingSlider.value, 'm', 'massing-spacing');
+        });
+    }
+
+    // Pattern selection
+    const patternRadios = document.querySelectorAll('input[name="massing-pattern"]');
+    patternRadios.forEach(radio => {
+        radio.addEventListener('change', updateMassingInfo);
+    });
+
+    // Main action buttons
+    dom['create-massing-blocks-btn']?.addEventListener('click', createMassingBlocks);
+    dom['clear-massing-blocks-btn']?.addEventListener('click', clearAllMassingBlocks);
+
+    // Initialize display values
+    updateMassingInfo();
+}
+
+/**
+ * Handles changes to the massing shape selection.
+ * Shows/hides radius control based on selected shape.
+ * @private
+ */
+function handleMassingShapeChange() {
+    const selectedShape = document.querySelector('input[name="massing-shape"]:checked').value;
+    const boxDimensions = dom['box-dimensions'];
+    const radiusDimension = dom['radius-dimension'];
+    const heightSlider = dom['massing-height'].parentElement.parentElement;
+
+    if (selectedShape === 'box') {
+        boxDimensions?.classList.remove('hidden');
+        radiusDimension?.classList.add('hidden');
+        heightSlider.classList.remove('hidden');
+    } else if (selectedShape === 'sphere') {
+        boxDimensions?.classList.add('hidden');
+        radiusDimension?.classList.remove('hidden');
+        heightSlider.classList.add('hidden'); // Height is implicit in sphere radius
+    } else { // Cylinder or Pyramid
+        boxDimensions?.classList.add('hidden');
+        radiusDimension?.classList.remove('hidden');
+        heightSlider.classList.remove('hidden');
+    }
+
+    updateMassingInfo();
+}
+
+/**
+ * Updates the massing info display with current settings.
+ * @private
+ */
+function updateMassingInfo() {
+    const shape = document.querySelector('input[name="massing-shape"]:checked').value;
+    const count = parseInt(dom['massing-count'].value);
+    const infoEl = dom['massing-info'];
+
+    if (!infoEl) return;
+
+    // Calculate volume based on shape
+    let volume = 0;
+    if (shape === 'box') {
+        const width = parseFloat(dom['massing-width'].value);
+        const depth = parseFloat(dom['massing-depth'].value);
+        const height = parseFloat(dom['massing-height'].value);
+        volume = width * depth * height;
+    } else {
+        const radius = parseFloat(dom['massing-radius'].value);
+        const height = parseFloat(dom['massing-height'].value);
+        if (shape === 'cylinder') {
+            volume = Math.PI * radius * radius * height;
+        } else if (shape === 'sphere') {
+            volume = (4/3) * Math.PI * radius * radius * radius;
+        } else if (shape === 'pyramid') {
+            // Approximate pyramid volume (cone geometry)
+            volume = (1/3) * Math.PI * radius * radius * height;
+        }
+    }
+
+    const totalVolume = volume * count;
+
+    dom['massing-count-display'].textContent = count;
+    dom['massing-volume-display'].textContent = `${totalVolume.toFixed(1)}m³`;
+}
+
+/**
+ * Creates multiple massing blocks based on current UI settings.
+ * @private
+ */
+async function createMassingBlocks() {
+    const shape = document.querySelector('input[name="massing-shape"]:checked').value;
+    const count = parseInt(dom['massing-count'].value);
+    const spacing = parseFloat(dom['massing-spacing'].value);
+    const pattern = document.querySelector('input[name="massing-pattern"]:checked').value;
+
+    const baseParams = {
+        shape: shape,
+        positionX: parseFloat(dom['massing-pos-x'].value),
+        positionY: parseFloat(dom['massing-pos-y'].value),
+        positionZ: parseFloat(dom['massing-pos-z'].value)
+    };
+
+    // Add shape-specific parameters
+    if (shape === 'box') {
+        baseParams.width = parseFloat(dom['massing-width'].value);
+        baseParams.depth = parseFloat(dom['massing-depth'].value);
+        baseParams.height = parseFloat(dom['massing-height'].value);
+    } else {
+        baseParams.radius = parseFloat(dom['massing-radius'].value);
+        baseParams.height = parseFloat(dom['massing-height'].value);
+    }
+
+    const { addMassingBlock } = await import('./geometry.js');
+
+    // Create blocks based on pattern
+    for (let i = 0; i < count; i++) {
+        const params = { ...baseParams };
+
+        // Calculate position based on pattern
+        switch (pattern) {
+            case 'linear':
+                params.positionX += i * spacing;
+                break;
+            case 'grid':
+                const cols = Math.ceil(Math.sqrt(count));
+                const row = Math.floor(i / cols);
+                const col = i % cols;
+                params.positionX += col * spacing;
+                params.positionZ += row * spacing;
+                break;
+            case 'random':
+                params.positionX += (Math.random() - 0.5) * spacing * 2;
+                params.positionZ += (Math.random() - 0.5) * spacing * 2;
+                break;
+        }
+
+        params.name = `${shape.charAt(0).toUpperCase() + shape.slice(1)} Block ${i + 1}`;
+        addMassingBlock(params);
+    }
+
+    showAlert(`${count} ${shape} massing block(s) created successfully.`, 'Blocks Created');
+    updateMassingInfo();
+}
+
+/**
+ * Clears all massing blocks from the scene.
+ * @private
+ */
+async function clearAllMassingBlocks() {
+    const { clearContextObjects } = await import('./geometry.js');
+    clearContextObjects();
+    showAlert('All massing blocks cleared.', 'Blocks Cleared');
+    updateMassingInfo();
+}
+
+/**
+ * Programmatically sets the value of a slider and updates its text label.
+ * @param {string} id - The base ID of the slider (e.g., 'massing-width').
+ * @param {number} value - The new numeric value for the slider.
+ * @param {string} unit - The unit string (e.g., 'm').
+ * @private
+ */
+function _setValueAndLabel(id, value, unit) {
+    const slider = dom[id];
+    if (!slider) return;
+    slider.value = value;
+    const label = dom[`${id}-val`];
+    if (label) {
+        updateValueLabel(label, value, unit, id);
+    }
+}
+
+/**
+ * Updates the geometry and properties of the currently selected massing block.
+ * @private
+ */
+async function _updateSelectedMassingBlock() {
+    const object = transformControls.object;
+    if (!object || !object.userData.isMassingBlock) return;
+
+    // Update userData first, so it's saved correctly
+    const shape = document.querySelector('input[name="massing-shape"]:checked').value;
+    object.userData.shape = shape;
+
+    let newGeom;
+    if (shape === 'box') {
+        const width = parseFloat(dom['massing-width'].value);
+        const depth = parseFloat(dom['massing-depth'].value);
+        const height = parseFloat(dom['massing-height'].value);
+        object.userData.width = width;
+        object.userData.depth = depth;
+        object.userData.height = height;
+        newGeom = new THREE.BoxGeometry(width, height, depth);
+        object.position.y = height / 2; // Recenter based on new height
+    } else {
+        const radius = parseFloat(dom['massing-radius'].value);
+        const height = parseFloat(dom['massing-height'].value);
+        object.userData.radius = radius;
+        object.userData.height = height; // Store height even for sphere for consistency
+        if (shape === 'cylinder') {
+            newGeom = new THREE.CylinderGeometry(radius, radius, height, 16);
+            object.position.y = height / 2;
+        } else if (shape === 'pyramid') {
+            newGeom = new THREE.ConeGeometry(radius, height, 4);
+            object.position.y = height / 2;
+        } else if (shape === 'sphere') {
+            newGeom = new THREE.SphereGeometry(radius, 16, 12);
+            object.position.y = radius; // Sphere origin is center, place it on the ground
+        }
+    }
+
+    if (newGeom) {
+        object.geometry.dispose(); // Dispose old geometry to prevent memory leaks
+        object.geometry = newGeom;
+    }
+    updateMassingInfo();
+}
+
+/**
+ * Sets up event listeners for the massing shape radio buttons.
+ */
+function setupMassingShapeListeners() {
+    const shapeRadios = document.querySelectorAll('input[name="massing-shape"]');
+    shapeRadios.forEach(radio => {
+        radio.addEventListener('change', () => {
+            handleMassingShapeChange();
+            if (transformControls.object && transformControls.object.userData.isMassingBlock) {
+                _updateSelectedMassingBlock();
+            }
+        });
+    });
 }

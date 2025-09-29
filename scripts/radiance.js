@@ -315,6 +315,8 @@ export function generateViewpointFileContent(viewpointData, roomData) {
 export async function generateRadFileContent(options = {}) {
   const { channelSet, clippingPlanes } = options; // e.g., 'c1-3', 'c4-6', 'c7-9' for spectral runs
   const dom = getDom();
+  const { currentImportedModel } = await import('./geometry.js');
+
 
   // --- Headers and Setup ---
   let geoHeader = `# Radiance scene geometry generated on ${new Date().toISOString()}\n`;
@@ -374,13 +376,57 @@ export async function generateRadFileContent(options = {}) {
   radMaterials += getMaterialDef('ceiling');
   radMaterials += getMaterialDef('frame');
   radMaterials += getMaterialDef('shading');
-  radMaterials += getMaterialDef('furniture');
+ radMaterials += getMaterialDef('furniture');
+  radMaterials += getMaterialDef('context');
+  radMaterials += `void plastic ground_mat\n0\n0\n5 0.15 0.15 0.15 0 0\n\n`; // A dark, diffuse ground material
 
   const Tn = parseFloat(dom['glazing-trans'].value);
   const tn = transmittanceToTransmissivity(Tn);
   radMaterials += `void glass glass_mat\n0\n0\n3 ${tn} ${tn} ${tn}\n\n`;
 
   // --- Geometry Generation ---
+  // Check if we are in imported geometry mode
+  if (currentImportedModel) {
+      radGeometry += `\n# --- IMPORTED GEOMETRY ---\n`;
+      
+      const surfaceTypeToMaterialName = {
+          'INTERIOR_WALL': 'wall_mat',
+          'INTERIOR_FLOOR': 'floor_mat',
+          'INTERIOR_CEILING': 'ceiling_mat',
+          'GLAZING': 'glass_mat',
+          'FRAME': 'frame_mat',
+          'SHADING_DEVICE': 'shading_mat',
+      };
+      // Transform from Three.js Y-up to Radiance Z-up
+      const threeToRadTransform = (p) => `${p[0].toFixed(4)} ${p[2].toFixed(4)} ${p[1].toFixed(4)}`;
+
+      currentImportedModel.traverse(child => {
+          if (child.isMesh) {
+              const materials = Array.isArray(child.material) ? child.material : [child.material];
+              materials.forEach(mat => {
+                  const surfaceType = mat.userData.surfaceType;
+                  const radMaterialName = surfaceTypeToMaterialName[surfaceType];
+
+                  if (radMaterialName) {
+                      radGeometry += _generateRadFromMesh(
+                          child, 
+                          radMaterialName, 
+                          `${child.name || 'imported'}_${mat.name.replace(/\s/g, '_')}`, 
+                          threeToRadTransform,
+                          mat.name 
+                      );
+                  }
+              });
+          }
+      });
+      
+      // Return early after processing the imported model
+      return {
+          materials: matHeader + radMaterials + dynamicMaterialDefs,
+          geometry: geoHeader + radGeometry
+      };
+  }
+
   const W = parseFloat(dom.width.value), L = parseFloat(dom.length.value), H = parseFloat(dom.height.value);
   const allWindows = getAllWindowParams();
   const allShading = getAllShadingParams();
@@ -511,6 +557,9 @@ for (const [orientation, winParams] of Object.entries(allWindows)) {
             const frame_u1 = offset + ww;
             const frame_v0 = sh;
             const frame_v1 = sh + wh;
+            const inwardNormal = { 'N': [0, 1, 0], 'S': [0, -1, 0], 'W': [1, 0, 0], 'E': [-1, 0, 0] }[orientation];
+            const depthVec = inwardNormal.map(n => n * (winDepthPos - (surfaceThickness / 2) - fd/2));
+
 
             // Frame Bottom
             const botVerts = quadVerts(orientation, frame_u0, frame_u1, frame_v0, frame_v0 + ft);
@@ -534,24 +583,24 @@ for (const [orientation, winParams] of Object.entries(allWindows)) {
 
 // --- Generate Imported OBJ Shading ---
 // Find the Three.js objects for imported shading from the scene
-const { importedShadingObjects, furnitureObject } = await import('./geometry.js');
-importedShadingObjects.forEach((objGroup, index) => {
+const { importedShadingObjects, furnitureObject, contextObject } = await import('./geometry.js');
+    importedShadingObjects.forEach((objGroup, index) => {
     // Traverse the group to find the actual mesh
-    objGroup.traverse(child => {
-        if (child.isMesh) {
-            shadingGeometry += _generateRadFromMesh(child, 'shading_mat', `imported_obj_${index}`, transformAndFormat);
-        }
+        objGroup.traverse(child => {
+            if (child.isMesh) {
+                shadingGeometry += _generateRadFromMesh(child, 'shading_mat', `imported_obj_${index}`, transformAndFormat);
+            }
+        });
     });
-});
 
-// --- Generate Furniture Geometry ---
-let furnitureGeometry = '\n# --- FURNITURE & PARTITIONS ---\n';
-if (furnitureObject.children.length > 0) {
-    const furnitureContainer = furnitureObject.children[0];
-    furnitureContainer.children.forEach((mesh, index) => {
-        furnitureGeometry += _generateRadFromMesh(mesh, 'furniture_mat', `${mesh.userData.assetType}_${index}`, transformAndFormat);
-    });
-}
+    // --- Generate Furniture Geometry ---
+    let furnitureGeometry = '\n# --- FURNITURE & PARTITIONS ---\n';
+    if (furnitureObject.children.length > 0) {
+        const furnitureContainer = furnitureObject.children[0];
+        furnitureContainer.children.forEach((mesh, index) => {
+            furnitureGeometry += _generateRadFromMesh(mesh, 'furniture_mat', `${mesh.userData.assetType}_${index}`, transformAndFormat);
+        });
+    }
 
 
   for (const [orientation, winParams] of Object.entries(allWindows)) {
@@ -578,10 +627,10 @@ if (furnitureObject.children.length > 0) {
               const dv = depth * Math.sin(tiltRad);
               const dh = depth * Math.cos(tiltRad);
               let p3_outer, p4_outer;
-              if (orientation === 'N')      { p3_outer = [p2_hinge[0], p2_hinge[1], p2_hinge[2] + dv]; p4_outer = [p1_hinge[0], p1_hinge[1], p1_hinge[2] + dv]; p2_hinge[1] -= dh; p1_hinge[1] -= dh;}
-              else if (orientation === 'S') { p3_outer = [p2_hinge[0], p2_hinge[1], p2_hinge[2] + dv]; p4_outer = [p1_hinge[0], p1_hinge[1], p1_hinge[2] + dv]; p2_hinge[1] += dh; p1_hinge[1] += dh;}
-              else if (orientation === 'W') { p3_outer = [p2_hinge[0], p2_hinge[1], p2_hinge[2] + dv]; p4_outer = [p1_hinge[0], p1_hinge[1], p1_hinge[2] + dv]; p2_hinge[0] -= dh; p1_hinge[0] -= dh;}
-              else                          { p3_outer = [p2_hinge[0], p2_hinge[1], p2_hinge[2] + dv]; p4_outer = [p1_hinge[0], p1_hinge[1], p1_hinge[2] + dv]; p2_hinge[0] += dh; p1_hinge[0] += dh;}
+              if (orientation === 'N')      { p3_outer = [p2_hinge[0], p2_hinge[1]-dh, p2_hinge[2] + dv]; p4_outer = [p1_hinge[0], p1_hinge[1]-dh, p1_hinge[2] + dv]; }
+              else if (orientation === 'S') { p3_outer = [p2_hinge[0], p2_hinge[1]+dh, p2_hinge[2] + dv]; p4_outer = [p1_hinge[0], p1_hinge[1]+dh, p1_hinge[2] + dv]; }
+              else if (orientation === 'W') { p3_outer = [p2_hinge[0]-dh, p2_hinge[1], p2_hinge[2] + dv]; p4_outer = [p1_hinge[0]-dh, p1_hinge[1], p1_hinge[2] + dv]; }
+              else                          { p3_outer = [p2_hinge[0]+dh, p2_hinge[1], p2_hinge[2] + dv]; p4_outer = [p1_hinge[0]+dh, p1_hinge[1], p1_hinge[2] + dv]; }
               const topVerts = [p1_hinge, p2_hinge, p3_outer, p4_outer];
               shadingGeometry += generateRadBox(topVerts, thick, 'shading_mat', `overhang_${winId}`, transformAndFormat);
           }
@@ -694,6 +743,26 @@ if (furnitureObject.children.length > 0) {
     }
   }
 
+  let contextGeometry = '\n# --- CONTEXT & SITE ---\n';
+  if (contextObject.visible && contextObject.children.length > 0) {
+      contextObject.children.forEach((mesh, index) => {
+         // Context geometry is already in world coordinates, so we use a direct transform
+          const directTransform = (p) => `${p[0].toFixed(4)} ${p[2].toFixed(4)} ${p[1].toFixed(4)}`;
+          contextGeometry += _generateRadFromMesh(mesh, 'context_mat', `context_building_${index}`, directTransform);
+      });
+  }
+
+  // Add ground plane geometry (flat or topographic)
+    const { groundObject } = await import('./geometry.js');
+    if (groundObject.visible && groundObject.children.length > 0) {
+        groundObject.children.forEach((mesh) => {
+            if (mesh.isMesh && mesh.userData.isGround) { // Check for a flag to only export the ground mesh
+                const directTransform = (p) => `${p[0].toFixed(4)} ${p[2].toFixed(4)} ${p[1].toFixed(4)}`;
+                contextGeometry += _generateRadFromMesh(mesh, 'ground_mat', `ground_plane`, directTransform);
+            }
+        });
+    }
+
   let clippingGeometry = '';
   if (clippingPlanes) {
       clippingGeometry = "\n# --- CLIPPING PLANES ---\n";
@@ -726,7 +795,7 @@ if (furnitureObject.children.length > 0) {
 
   return {
       materials: matHeader + radMaterials + dynamicMaterialDefs,
-      geometry: geoHeader + radGeometry + shadingGeometry + furnitureGeometry + clippingGeometry
+      geometry: geoHeader + radGeometry + shadingGeometry + furnitureGeometry + contextGeometry + clippingGeometry
   };
 }
 
@@ -825,48 +894,65 @@ export function generateViewpointFileContentFromState(cameraState) {
  * @param {string} material - The name of the Radiance material.
  * @param {string} name - The base name for the polygons.
  * @param {function} transformFunc - The function to transform vertices to the final Radiance coordinate system.
+ * @param {string|null} targetMaterialName - If the mesh is multi-material, only process faces with this material name.
  * @returns {string} A string containing Radiance polygon definitions.
  * @private
  */
-function _generateRadFromMesh(mesh, material, name, transformFunc) {
-    let radString = `\n# Imported Mesh: ${name}\n`;
+function _generateRadFromMesh(mesh, material, name, transformFunc, targetMaterialName = null) {
+    let radString = `\n# Mesh: ${name}\n`;
     const position = mesh.geometry.attributes.position;
     const index = mesh.geometry.index;
+    const groups = mesh.geometry.groups;
 
-    // Ensure the mesh's world matrix is up-to-date
     mesh.updateWorldMatrix(true, false);
     const matrix = mesh.matrixWorld;
 
     const vertices = [];
     for (let i = 0; i < position.count; i++) {
         const v = new THREE.Vector3().fromBufferAttribute(position, i);
-        v.applyMatrix4(matrix); // Apply object's world transform
-        vertices.push([v.x, v.y, v.z]); // Store as array [x, y, z]
+        v.applyMatrix4(matrix);
+        vertices.push([v.x, v.y, v.z]);
     }
 
-    if (index) { // Indexed geometry
+    const allMaterials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+
+    if (groups && groups.length > 0 && allMaterials.length > 1) { // Handle multi-material objects
+        groups.forEach((group, groupIndex) => {
+            const mat = allMaterials[group.materialIndex];
+            if (!targetMaterialName || mat.name === targetMaterialName) {
+                const radMaterialName = material;
+                for (let i = group.start; i < group.start + group.count; i += 3) {
+                    const vA = vertices[index.getX(i)];
+                    const vB = vertices[index.getX(i + 1)];
+                    const vC = vertices[index.getX(i + 2)];
+                    
+                    radString += `${radMaterialName} polygon ${name}_g${groupIndex}_f${i/3}\n0\n0\n9\n`;
+                    radString += transformFunc(vA) + '\n';
+                    radString += transformFunc(vB) + '\n';
+                    radString += transformFunc(vC) + '\n\n';
+                }
+            }
+        });
+    } else if (index) { // Single material, indexed
         for (let i = 0; i < index.count; i += 3) {
             const vA = vertices[index.getX(i)];
             const vB = vertices[index.getX(i + 1)];
             const vC = vertices[index.getX(i + 2)];
-
-            radString += `${material} polygon ${name}_face_${i / 3}\n0\n0\n9\n`;
+            radString += `${material} polygon ${name}_face_${i/3}\n0\n0\n9\n`;
             radString += transformFunc(vA) + '\n';
             radString += transformFunc(vB) + '\n';
             radString += transformFunc(vC) + '\n\n';
         }
-    } else { // Non-indexed geometry (triangles)
+    } else { // Single material, non-indexed
         for (let i = 0; i < vertices.length; i += 3) {
-            const vA = vertices[i];
-            const vB = vertices[i + 1];
-            const vC = vertices[i + 2];
-
-            radString += `${material} polygon ${name}_face_${i / 3}\n0\n0\n9\n`;
-            radString += transformFunc(vA) + '\n';
-            radString += transformFunc(vB) + '\n';
-            radString += transformFunc(vC) + '\n\n';
+             const vA = vertices[i];
+             const vB = vertices[i + 1];
+             const vC = vertices[i + 2];
+             radString += `${material} polygon ${name}_face_${i/3}\n0\n0\n9\n`;
+             radString += transformFunc(vA) + '\n';
+             radString += transformFunc(vB) + '\n';
+             radString += transformFunc(vC) + '\n\n';
         }
     }
-
     return radString;
 }

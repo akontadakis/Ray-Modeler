@@ -40,6 +40,12 @@ Ray Modeler is packed with features that automate and enhance the Radiance workf
 
 - **Parametric Scene Modeling**: Visually define room dimensions, orientation, window-to-wall ratios (WWR), and complex shading devices like overhangs, light shelves, louvers, and roller shades.
 
+- **Geometry Importer**: Import complex models from `.obj` files, with an interactive UI to tag surfaces (walls, floors, glazing) for accurate simulation setup.
+
+- **Context & Site Modeling**: Improve simulation accuracy by adding surrounding context, either through simple massing tools, topography from heightmaps, or by automatically fetching building data from OpenStreetMaps.
+
+- **Interior Furniture Library**: Place simple furniture and partition objects from a pre-built library via drag-and-drop to create more realistic interior scenes.
+
 - **Radiance Material Editor**: Configure standard Radiance materials (`plastic`, `metal`, `glass`) by adjusting properties like reflectance, specularity, and roughness. It also supports spectral data (`.dat`) files for advanced material definitions.
 
 - **Advanced Glazing Systems**: Model glazing using simple transmittance values or incorporate complex fenestration data via Bidirectional Scattering Distribution Function (BSDF) `.xml` files. The application correctly converts intuitive transmittance to physically-based transmissivity for simulations.
@@ -48,11 +54,17 @@ Ray Modeler is packed with features that automate and enhance the Radiance workf
 
 - **Electric Lighting Design**: Place and configure multiple Radiance light source types (light, spotlight, glow, illum) or import real-world luminaire data using IES photometric files in individual or grid-based layouts.
 
+- **Advanced IES Photometry Viewer**: In addition to a 2D polar plot, visualize luminaire distributions with an interactive 3D photometric web and view key metadata like lumens and wattage directly from the `.ies` file.
+
 - **Daylighting Controls**: Simulate energy savings by implementing photosensor-controlled lighting systems with continuous, stepped, or off modes.
-  
+
+- **Daylighting Control Zone Visualization**: Instantly visualize which luminaires are controlled by which photosensors with color-coded 3D gizmos, providing immediate feedback on the daylighting strategy.
+
 - **Automated Radiance Workflow**: Generates a complete, organized project folder structure (e.g., 01_geometry, 04_skies, 07_scripts) and populates it with geometry files, material definitions, sensor points, and executable run scripts for both Windows (`.bat`) and macOS/Linux (`.sh`).
 
 - **First-Person View (FPV) Mode**: Enter the Radiance viewpoint camera directly to preview the exact perspective, fisheye, or parallel view that will be rendered for analysis.
+
+- **Saved Camera Views ("Snapshots")**: Save and load specific camera positions and angles, complete with thumbnails, to quickly return to key perspectives during analysis.
 
 - **Advanced Annual Analysis**: Generate and view temporal heatmaps, glare rose diagrams, and combined daylight/glare scatter plots to deeply understand annual performance.
 
@@ -78,7 +90,9 @@ Ray Modeler is packed with features that automate and enhance the Radiance workf
 
 - **Daylight Autonomy Heatmaps**: Visualize annual performance not just as point-in-time illuminance, but also as Daylight Autonomy (DA), showing the percentage of occupied hours that each sensor point meets a specific illuminance threshold.
 
-- **Daylighting Control Zone Visualization**: Instantly visualize which luminaires are controlled by which photosensors. The 3D gizmos for light sources are color-coded based on their assigned control zone, providing immediate feedback on the daylighting strategy.
+- **Climate Data Analysis**: Generate an interactive dashboard from the loaded EPW file, including a wind rose, solar radiation charts, and temperature profiles to better understand the site context.
+
+- **Advanced Circadian Health Dashboard**: Analyze results from spectral simulations to calculate and visualize key circadian lighting metrics like Circadian Stimulus (CS), Equivalent Melanopic Lux (EML), and check for compliance with WELL building standards.
 
 ## 🚀 Getting Started
 
@@ -216,10 +230,12 @@ The panels on the left toolbar are used to define the scene.
 
 - **Dimensions**: Set the foundational geometry of the room.
 
-  - *Width (X), Length (Z), Height (Y)*: Sliders to control the room's interior dimensions.
+  - *Geometry Mode*: Choose between **Parametric** (for the simple box model) or **Imported** (for complex models).
   
-  - *Orientation*: A slider to rotate the entire room, affecting its solar exposure relative to North.
+  - *Parametric Controls*: Set the **Width (X), Length (Z), Height (Y)** and rotate the entire room with the **Orientation** slider.
   
+  - *Geometry Importer*: Import `.obj` models. Includes tools for automatic scaling and centering. After import, a **Surface Tagger** UI appears, allowing you to assign Radiance-relevant surface types (wall, floor, glazing, etc.) to each material from the original file.
+
 - **Apertures & Shading**: Control openings and shading systems on a per-wall basis.
 
   - *Wall Selection*: Click on a wall in the 3D view to select it for editing. The selection can be locked to prevent accidental changes.
@@ -228,207 +244,96 @@ The panels on the left toolbar are used to define the scene.
   
   - *Shading Devices*: Each wall can have its own complex shading system, including:
   
-    - Overhangs: With controls for depth, tilt, thickness, and extension.
-  
-    - Light Shelves: Can be placed externally, internally, or both, with independent controls for each.
-  
-    - Louvers: Can be horizontal or vertical, with controls for slat dimensions, spacing, angle, and distance to glass.
-  
-    - Roller Shades: Defined with detailed physical properties for simulation (transmittance, reflectance, emissivity, etc.) and placement controls.
+    - Overhangs, Light Shelves, Louvers, and Roller Shades with detailed parametric controls.
+    - **Imported OBJ**: Import a custom shading device from an `.obj` file, with in-scene controls for position, rotation, and scale.
 
-- *Interactive Sun Ray Tracer*: Integrated directly into the wall selection workflow, this tool allows you to trace a specified number of rays from the sun's position for any date and time. It provides immediate visual feedback on sun penetration and internal reflections, showing the path of each ray as it bounces off surfaces. This is invaluable for quickly diagnosing direct sun issues without running a full simulation.
+- *Interactive Sun Ray Tracer*: Integrated directly into the wall selection workflow, this tool allows you to trace a specified number of rays from the sun's position for any date and time. It provides immediate visual feedback on sun penetration and internal reflections.
 
 - **Artificial Lighting**: Add and configure electric light sources.
 
-  - *Light Source Types*: Choose from standard Radiance primitives (light, spotlight, glow, illum) or upload an .ies file for a specific luminaire.
+  - *Light Source Types*: Choose from standard Radiance primitives or upload an `.ies` file.
   
-  - *Geometry*: Define the light source shape (Polygon, Sphere, Cylinder, Ring).
+  - *Interactive IES Photometry Viewer*: When an `.ies` file is loaded, the application generates an interactive 2D polar plot and a **3D Photometric Web** to visualize the luminaire's distribution. Key data like total lumens, wattage, and efficacy are also displayed.
+
+  - *Daylighting Controls*: Define up to two photosensors with 3D position and direction vectors to create distinct control zones.
   
-  - *Placement*: Place lights individually or arrange them automatically in a grid with defined row/column spacing.
+  - *Interactive Control Zone Visualization*: A "Visualize Control Zones" toggle color-codes the 3D luminaire gizmos based on their assigned sensor, providing immediate feedback on the daylighting strategy.
+
+- **Material Properties**: Define the surface characteristics of the room's parametric or imported geometry.
   
-  - *Daylighting Controls*: Define a daylighting sensor with a specific position and direction, and set control parameters (setpoint, continuous/stepped dimming, etc.) for energy simulations.
-
-  - *Interactive IES Photometry Viewer*: When an `.ies` file is loaded, the application parses the photometric data and generates an interactive 2D polar plot directly in the lighting panel. This visualization shows the luminaire's light distribution curve and key data like total lumens and maximum candela, providing immediate feedback on the selected file.
-
-  - *Detailed Daylighting Controls*: Beyond simple activation, the daylighting control system can be configured with up to two photosensors, creating distinct control zones. Each sensor has a manipulable 3D position and direction vector. Advanced parameters from Radiance's `gendaylit` are exposed in the UI, including:
-    - **Control Strategy**: `Continuous`, `Stepped`, or `Continuous/Off`.
-    - **Dimming Curve**: Minimum power fraction and minimum light output fraction for continuous dimming systems.
-    - **Stepped Dimming**: The number of steps for stepped control systems.
-    - **Availability Schedule**: An optional `.csv` schedule file can be provided to define when the daylighting system is active.
-    - **Interactive Control Zone Visualization**: A 2D canvas allows you to interactively drag a divider to define what percentage of luminaires (by row or column) is controlled by each photosensor. The 3D luminaire gizmos are also color-coded based on their assigned control zone (e.g., Zone 1 in blue, Zone 2 in green), providing immediate visual feedback to verify the control strategy.
-
-- *EN 12464-1 Luminaire Specification*: To support lighting for workplaces compliance, each light source can be defined with a **Maintenance Factor (MF)**, **Color Rendering Index ($R_a$)**, and **Correlated Color Temperature (TCP)**.
-
-- *Enhanced 3D Gizmos*: To aid in placement, all light sources are visualized with a direction arrow helper indicating their orientation. Spotlights are further enhanced with a wireframe cone that visualizes their cone angle and beam spread.
-
-- **Material Properties**: Define the surface characteristics of the room.
-
-  - *Surface Selection*: Tabs for Walls, Floor, Ceiling, Frames, and Shading devices.
-  
-  - *Material Type*: Choose between Plastic, Glass, or Metal.
-  
-  - *Reflectance Mode*: Define reflectance using a simple grayscale value or an advanced spectral data file (`.dat`).
-  
-  - *Parameters*: Adjust reflectance, specularity, and roughness for each material.
-  
-  - *Glazing*: Control the visual transmittance of the glass. For advanced simulations, you can attach a BSDF XML file.
-
 - **Sensor Grid**: Create measurement points for simulations.
-
-  - *Illuminance Grid*: Generates a grid of points on any selected surface (walls, floor, ceiling) with a defined spacing and offset. These points are used for illuminance map and annual daylight simulations.
   
-  - *View Grid*: Generates a grid of points on a horizontal plane, with multiple view directions at each point. This is used for imageless annual glare analysis.
+- **Viewpoint**: Controls the specific camera view used by Radiance for generating renderings.
 
-  - *Interactive Task & Surrounding Area Definition*: For EN 12464-1 compliance workflows, the UI includes a dedicated section to define a specific **Task Area** on the floor grid. This is managed through an interactive 2D canvas that provides a top-down view of the room, where the task area can be dragged and resized. The corresponding sliders for start position, width, and depth are updated in real-time. A **Surrounding Area** band can also be automatically generated around the defined task area.
-
-  - *3D Visualization*: Both grid types can be toggled for visibility in the 3D viewport.
-
-- **Viewpoint**: Controls the specific camera view used by Radiance for generating renderings (`rpict`) and glare images (`evalglare`).
-
-  - *View Type*: Select from Perspective, Fisheye, Cylindrical, Parallel, or Angular Fisheye.
+  - *FPV Mode*: Enter a first-person view to see exactly what Radiance will render.
   
-  - *FPV Mode*: Enter a first-person view to see exactly what Radiance will render from the camera's position.
+  - *3D Gizmo*: A transform gizmo allows you to visually manipulate the camera's position and rotation.
+
+  - *Saved Views ("Snapshots")*: A "Save Current View" button captures the camera's state. The UI displays a list of saved views with thumbnails, which can be clicked to instantly restore a perspective.
+
+- **Scene Elements**: Add and manage non-architectural objects in the scene.
+
+  - *Interior Furniture Library*: A panel with pre-built, low-polygon assets (desks, chairs, partitions) that can be dragged and dropped into the 3D scene.
   
-  - *3D Gizmo*: A transform gizmo allows you to visually manipulate the camera's position and rotation directly in the 3D scene.
-
-- **View Options**: Adjust the live 3D preview for better inspection.
-
-  - *Transparency*: Make all surfaces semi-transparent to see inside the model.
-  
-  - *Section Cuts*: Enable horizontal or vertical clipping planes to create live section views of the interior.
-  
-  - *Live Preview*: When a section cut is active, you can render a real-time preview of that view using the loaded weather data (Electron version only).
-
-  - *UI Theming*: The application includes multiple UI themes (Light, Dark, Cyber, Cafe 58) that can be cycled through. The selected theme affects all UI panels, the 3D viewport background, and the map tiles for a consistent user experience.
-
-- **Sensor Point Context Menu**: Right-clicking on any sensor point in the 3D view (when results are loaded) opens a context menu. This menu provides an option to instantly move the Radiance **Viewpoint** camera to that exact sensor's location, making it easy to investigate specific areas of interest.
-
-- **3D Glare Source Projection**: When viewing an `evalglare` report in the analysis panel, each detected glare source is listed. Clicking on a source in the list will project a ray from the camera's position into the 3D scene to identify and highlight the object that caused the glare, providing an intuitive way to verify results.
-
-- **Sensor Point Context Menu**: Right-clicking on any sensor point in the 3D view (when results are loaded) opens a context menu. This menu provides an option to instantly move the Radiance **Viewpoint** camera to that exact sensor's location, making it easy to investigate specific areas of interest.
+  - *Context & Site Modeling*: Tools to model the surrounding environment for more accurate simulations.
+    - **Simple Massing Tools**: Create and place simple 3D shapes (boxes, cylinders) to represent surrounding buildings.
+    - **Topography Import**: Generate a ground plane with topography from a grayscale heightmap image.
+    - **OpenStreetMaps Integration**: Automatically fetch building footprints and height data for a given location to generate a basic urban context.
 
 ### 📜 Simulation Modules (Recipes)
 
 Each recipe in the Simulation Sidebar automates a specific Radiance workflow by generating scripts that call core commands like `oconv`, `rpict`, `rcontrib`, and `evalglare`. Global simulation parameters (`-ab`, `-ad`) can be set once and overridden per recipe.
 
-- **Global Simulation Parameters**: Sets default Radiance parameters (e.g., `-ab`, `-ad`, `-aa`) that are inherited by all other recipes, ensuring consistency. Each recipe panel allows for overriding these globals. [Ambient Calculation-Crash Course](https://share.google/zPsplY69eNWSAJlJB), [Radiance Primer](https://share.google/xgioEptLWbUZt87Sm).
+- **Global Simulation Parameters**: Sets default Radiance parameters (e.g., `-ab`, `-ad`, `-aa`) that are inherited by all other recipes, ensuring consistency.
 
 - **Illuminance Map**: A point-in-time calculation that produces illuminance (lux) values for each point in your sensor grid.
 
-- **Photorealistic Rendering**: Creates a high-dynamic-range (HDR) image from the specified Viewpoint. [The RADIANCE Lighting Simulation and Rendering System](https://www.radiance-online.org/learning/tutorials).
+- **Photorealistic Rendering**: Creates a high-dynamic-range (HDR) image from the specified Viewpoint.
 
-- **Daylight Glare Probability (DGP)**: Renders a 180° fisheye image and analyzes it for glare using evalglare, producing a DGP value and a detailed report on glare sources.
+- **Daylight Glare Probability (DGP)**: Renders a 180° fisheye image and analyzes it for glare using `evalglare`.
 
 - **Daylight Factor (DF)**: Calculates the ratio of internal to external illuminance under a standard CIE overcast sky.
 
-- **Annual Daylight (3-Phase)**: Generates scripts to run rcontrib to create the View, Daylight, and Sky matrices and then uses dctimestep to perform the final annual calculation.
+- **Annual Daylight (3-Phase & 5-Phase)**: Generates scripts for advanced annual simulations using matrix-based methods.
 
-- **Annual Daylight (5-Phase)**: An extended version of the 3-Phase method for higher accuracy with complex fenestration by precisely modeling direct sun contributions.
+- **Imageless Annual Glare**: An advanced recipe using `rcontrib` and `dcglare` to efficiently calculate an 8760-hour DGP profile.
 
-- **Imageless Annual Glare**: An advanced recipe using rcontrib and dcglare to efficiently calculate an 8760-hour DGP profile for the defined view grid, enabling Glare Autonomy (GA) calculations.
+- **Spectral Analysis (Lark)**: Implements the Lark methodology for multi-channel spectral simulations to calculate non-visual lighting metrics.
 
-- **Spectral Analysis (Lark)**: Implements the [Lark v3.0](https://faculty.washington.edu/inanici/Lark/Lark_home_page.html) methodology for 3-channel and 9-channel spectral simulations, producing spectral irradiance and HDR images from spectral data files (`.spd`, `.dat`).
+- **Compliance Recipes**: A suite of specialized recipes for checking compliance with major industry standards:
+  - `IES LM-83 (sDA/ASE)`
+  - `EN 17037 (Daylight in Buildings)`
+  - `EN 12464-1 (Illuminance & UGR for Work Places)`
 
-- **sDA & ASE (LM-83)**: A dedicated recipe that runs the full IES LM-83 workflow for calculating Spatial Daylight Autonomy (sDA) and Annual Sun Exposure (ASE), including the simulation of dynamic blind operation based on direct sunlight.
-
-- **EN 17037 Compliance (Daylight in Buildings)**: A comprehensive recipe that automates the four core checks for the European daylighting standard: Daylight Provision, Exposure to Sunlight, View Out, and Protection from Glare.
-
-  - *Daylight Provision*: Runs a full annual simulation and uses a Python helper script to check illuminance targets against daylight hours derived from the EPW file.
-  
-  - *Sunlight Exposure*: Runs a point-in-time raytracing analysis for a specific day to calculate the duration of direct sun access.
-  
-  - *View Out*: Generates a fisheye image for manual verification.
-  
-  - *Protection from Glare*: Runs the Imageless Annual Glare recipe and uses a Python helper script to check results against the standard's threshold.
-
-- **EN 12464-1 Illuminance & UGR**: Two separate recipes to verify lighting quality in work places.
-
-  - The Illuminance recipe calculates maintained illuminance (Em) and uniformity (U0​) on the Task and Surrounding grids.
-  
-  - The UGR recipe uses evalglare to calculate the Unified Glare Rating from the observer's viewpoint.
-
-- **Lighting Energy Analysis**: Extends the electric lighting design capabilities to include energy consumption analysis. This recipe runs an annual simulation using the defined daylighting controls to estimate the total annual energy consumption (kWh/year) and calculates the percentage of energy saved due to the control strategy. It provides a more holistic view of the lighting strategy by connecting design decisions to tangible outcomes like energy usage and Lighting Power Density (LPD).
-
-  - The simulation of the electric lighting control is based on the following methodology:
-  
-  The fractional electric lighting output, `f_L`, required to meet the illuminance setpoint `I_{set}` given the available daylight illuminance `I_{tot}` at a reference point is:
-
-  ```Bash
-  f_L = \max\left[0, \frac{I_{set} - I_{tot}}{I_{set}}\right]
-  ```
-
-  The fractional electric lighting input power, `f_P`, is then calculated based on the control type:
-
-  - **Continuous Dimming Control**: Assumes power increases linearly from a minimum level.
-
-    ``` Bash
-    f_P = \begin{cases} 
-    f_{P,min} & \text{for } f_L < f_{L,min} \\ 
-    f_{P,min} + (f_L - f_{L,min}) \frac{1 - f_{P,min}}{1 - f_{L,min}} & \text{for } f_{L,min} \le f_L \le 1 
-    \end{cases}
-    ```
-
-  - **Continuous/Off Dimming Control**: Same as continuous, but the lights switch off completely at minimum output.
-
-  - **Stepped Control**: Power takes on discrete values depending on the number of steps, `N_L`.
-
-    ```Bash
-    f_P = \begin{cases} 
-    0 & \text{for } f_L = 0 \\ 
-    \frac{\lceil N_L \cdot f_L \rceil}{N_L} & \text{for } 0 < f_L < 1 \\ 
-    1 & \text{for } f_L = 1 
-    \end{cases}
-    ```
+- **Lighting Energy Analysis**: Runs an annual simulation with daylighting controls to estimate energy consumption (kWh/year) and savings.
 
 ## Analysis Modules 📊
 
 The Analysis Sidebar uses a background Web Worker to parse various Radiance result files without freezing the interface. The application automatically detects the file type and enables the relevant visualization tools.
 
-- **3D Visualization**: Illuminance data (`.txt`, `.ill`) is mapped as a false-color grid onto the 3D model. The color scale and palette are fully customizable. A comparison mode allows for visualizing the difference between two datasets.
+- **3D Visualization**: Illuminance data is mapped as a false-color grid onto the 3D model, with a customizable color scale and support for comparing two datasets.
 
-- **Annual Metrics Dashboard**: For annual `.ill` files, this dashboard visualizes key climate-based metrics like Spatial Daylight Autonomy (sDA) and Annual Sunlight Exposure (ASE), and a stacked bar chart detailing the percentages of Useful Daylight Illuminance (UDI).
+- **Annual Metrics Dashboard**: For annual `.ill` files, this dashboard visualizes key metrics like Spatial Daylight Autonomy (sDA), Annual Sunlight Exposure (ASE), and Useful Daylight Illuminance (UDI).
 
-- **Temporal Map**: After loading annual results, clicking on any sensor point in the 3D view generates a 24x365 heatmap showing the hour-by-hour illuminance profile for that specific point throughout the year.
+- **Climate Analysis Dashboard**: When an EPW file is loaded, this dashboard provides interactive visualizations of the climate data, including a Wind Rose, Solar Radiation chart, and Annual Temperature chart.
 
-- **Glare Rose Diagram**: For annual `.dgp` files, this generates a polar chart showing the number of occupied hours that exceed a DGP threshold, organized by the sun's position in the sky.
+- **Temporal Map**: After loading annual results, clicking on any sensor point in the 3D view generates a 24x365 heatmap showing the hour-by-hour illuminance profile for that specific point.
+
+- **Glare Rose Diagram**: For annual `.dgp` files, this generates a polar chart showing the number of occupied hours that exceed a DGP threshold, organized by the sun's position.
 
 - **Combined Daylight vs. Glare Plot**: When both annual illuminance and glare files are loaded, this scatter plot is available. Each point represents a sensor, plotting its percentage of useful daylight hours against its percentage of glare hours.
 
-- **HDR Viewer**: Loads and displays rendered .hdr images. Features include exposure controls, a false-color mode based on luminance, a mouse-over probe to get exact cd/m² values, and an overlay for detected glare sources.
+- **HDR Viewer**: Loads and displays rendered `.hdr` images with exposure controls, a false-color luminance mode, and a mouse-over probe to get exact cd/m² values.
 
-- **Spectral Metrics Dashboard**: When results from the Lark spectral recipe are loaded, this dashboard displays space-averaged values for key non-visual lighting metrics, including Photopic Illuminance (lux), Melanopic EDI (m-EDI lux), and Neuropic Irradiance (W/m²).
+- **Advanced Circadian Health Dashboard**: Visualizes results from spectral simulations, including key metrics like Circadian Stimulus (CS), Equivalent Melanopic Lux (EML), and checks for compliance with WELL building standards.
 
-- **Interactive Data Table**: When results are loaded, an interactive table becomes available. Users can sort data by point ID or value, and apply filters (e.g., `> 500`, `<= 100`) to isolate specific data points. Clicking a row in the table highlights the corresponding sensor in the 3D view.
-
-- **2D Daylight Autonomy Heatmap**: In addition to illuminance, the 2D floor plan heatmap can display Daylight Autonomy (DA). This mode shows the percentage of occupied hours that each point on the grid meets a user-defined illuminance threshold, providing a clear spatial overview of annual daylight performance.
-
-- **Automated HTML Report Generation**: A "Generate Report" button in the analysis panel compiles all project information, a 3D snapshot, key metrics (sDA, ASE, DGP), and all dashboard charts into a single, self-contained HTML file. This report can be opened in a new tab for printing or saving as a PDF.
+- **Automated Report Generation**: A "Generate Report" button compiles all project information, a 3D snapshot, key metrics, and all dashboard charts into a single, self-contained HTML file for printing or saving as a PDF.
 
 ### Desktop Integration (Electron)
 
 Ray Modeler operates as an Electron-based desktop application, enabling direct interaction with your file system.
 
-- **Standardized Project Folder**: When you save a project, the application creates a complete, organized folder structure on your local machine:
-
-  - `01_geometry/`
-  
-  - `02_materials/`
-  
-  - `03_views/`
-  
-  - `04_skies/`
-  
-  - `05_bsdf/`
-
-  - `07_scripts/`
-  
-  - `08_results/`
-
-  - `10_schedules/` (For occupancy and lighting control schedules)
-
-  - `11_files/`(For IES, spectral data, etc.)
-
-  - `project_name.json` (The master project settings file)
+- **Standardized Project Folder**: When you save a project, the application creates a complete, organized folder structure on your local machine.
 
 - **Simulation Console**: A built-in console window appears when you run a simulation, showing the live output from the Radiance processes and reporting the final exit code (success or failure).
 
