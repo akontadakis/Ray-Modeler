@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
-import { roomObject, shadingObject, sensorGridObject, axesObject, northArrowObject, groundObject, wallSelectionGroup, contextObject } from './geometry.js';
+import { roomObject, shadingObject, sensorGridObject, axesObject, northArrowObject, groundObject, wallSelectionGroup, contextObject, furnitureObject, resizeHandlesObject, vegetationObject, daylightingSensorsGroup } from './geometry.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
@@ -38,10 +38,12 @@ export function setUpdatingFromSliders(value) {
 }
 
 // --- EXPORTED VARIABLES ---
-export let scene, perspectiveCamera, orthoCamera, activeCamera, renderer, labelRenderer, controls;
+export let scene, perspectiveCamera, orthoCamera, activeCamera, renderer, controls;
 export let viewpointCamera, viewCamHelper, transformControls, fpvOrthoCamera, sensorTransformControls;
 export let horizontalClipPlane, verticalClipPlane;
-export let daylightingSensorsGroup;
+
+// --- MODULE-LEVEL VARIABLES ---
+let labelRenderer, topLabelRenderer, frontLabelRenderer, sideLabelRenderer;
 export let isFirstPersonView = false;
 export let currentViewType = 'v'; // Default to perspective
 export let importedModelObject;
@@ -149,22 +151,19 @@ export async function setupScene(container) {
     _setupHelpersAndGizmos();
 
     // 7. Daylighting Sensor Group Setup
-    daylightingSensorsGroup = new THREE.Group();
-    daylightingSensorsGroup.name = 'DaylightingControlSensors';
 
     // 8. Clipping Plane Setup
     horizontalClipPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
     verticalClipPlane = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0);
 
    // 9. Add Geometry Groups to Scene
-    const { furnitureObject, resizeHandlesObject } = await import('./geometry.js');
     importedModelObject = new THREE.Group();
-    scene.add(roomObject, shadingObject, sensorGridObject, axesObject, northArrowObject, groundObject, daylightingSensorsGroup, wallSelectionGroup, furnitureObject, resizeHandlesObject, importedModelObject, contextObject);
+    scene.add(roomObject, shadingObject, sensorGridObject, axesObject, northArrowObject, groundObject, daylightingSensorsGroup, wallSelectionGroup, furnitureObject, resizeHandlesObject, importedModelObject, contextObject, vegetationObject);
+
 
     // 10. Signal that the scene is initialized and ready for interaction.
     container.dispatchEvent(new CustomEvent('sceneReady', { bubbles: true }));
 }
-
 
 /**
 * The main animation loop, called every frame to render the scene.
@@ -189,6 +188,7 @@ export function animate() {
         renderer.setScissor(top.left, top.bottom, top.width, top.height);
         renderer.setViewport(top.left, top.bottom, top.width, top.height);
         renderer.render(scene, topCamera);
+        topLabelRenderer.render(scene, topCamera);
         topControls.update();
 
         // Render front viewport
@@ -196,6 +196,7 @@ export function animate() {
         renderer.setScissor(front.left, front.bottom, front.width, front.height);
         renderer.setViewport(front.left, front.bottom, front.width, front.height);
         renderer.render(scene, frontCamera);
+        frontLabelRenderer.render(scene, frontCamera);
         frontControls.update();
 
         // Render side viewport
@@ -203,12 +204,13 @@ export function animate() {
         renderer.setScissor(side.left, side.bottom, side.width, side.height);
         renderer.setViewport(side.left, side.bottom, side.width, side.height);
         renderer.render(scene, sideCamera);
+        sideLabelRenderer.render(scene, sideCamera);
         sideControls.update();
 
         renderer.setScissorTest(false);
 
     } else {
-        // --- Single View Rendering ---
+        // Single View Rendering
         composer.render();
         labelRenderer.render(scene, activeCamera);
         if (controls.enabled) {
@@ -289,8 +291,17 @@ export function onWindowResize() {
     }
 
     renderer.setSize(container.clientWidth, container.clientHeight);
-    labelRenderer.setSize(container.clientWidth, container.clientHeight);
     composer.setSize(container.clientWidth, container.clientHeight);
+
+    if (isQuadView) {
+        labelRenderer.setSize(viewports.main.width, viewports.main.height);
+        topLabelRenderer.setSize(viewports.top.width, viewports.top.height);
+        frontLabelRenderer.setSize(viewports.front.width, viewports.front.height);
+        sideLabelRenderer.setSize(viewports.side.width, viewports.side.height);
+    } else {
+        labelRenderer.setSize(container.clientWidth, container.clientHeight);
+    }
+
     fisheyePass.uniforms['aspect'].value = mainAspect;
 }
 
@@ -424,12 +435,26 @@ function _setupRenderers(container) {
     container.appendChild(renderer.domElement);
 
     // CSS2D renderer for HTML-based labels
+    // CSS2D renderers for HTML-based labels in each viewport
+    const mainViewport = document.querySelector('#viewport-main .label-container');
     labelRenderer = new CSS2DRenderer();
-    labelRenderer.setSize(container.clientWidth, container.clientHeight);
-    labelRenderer.domElement.style.position = 'absolute';
-    labelRenderer.domElement.style.top = '0px';
-    labelRenderer.domElement.style.pointerEvents = 'none';
-    container.appendChild(labelRenderer.domElement);
+    labelRenderer.setSize(mainViewport.clientWidth, mainViewport.clientHeight);
+    mainViewport.appendChild(labelRenderer.domElement);
+
+    const topViewport = document.querySelector('#viewport-top .label-container');
+    topLabelRenderer = new CSS2DRenderer();
+    topLabelRenderer.setSize(topViewport.clientWidth, topViewport.clientHeight);
+    topViewport.appendChild(topLabelRenderer.domElement);
+
+    const frontViewport = document.querySelector('#viewport-front .label-container');
+    frontLabelRenderer = new CSS2DRenderer();
+    frontLabelRenderer.setSize(frontViewport.clientWidth, frontViewport.clientHeight);
+    frontViewport.appendChild(frontLabelRenderer.domElement);
+
+    const sideViewport = document.querySelector('#viewport-side .label-container');
+    sideLabelRenderer = new CSS2DRenderer();
+    sideLabelRenderer.setSize(sideViewport.clientWidth, sideViewport.clientHeight);
+    sideViewport.appendChild(sideLabelRenderer.domElement);
 }
 
 /**
@@ -497,6 +522,7 @@ function _setupQuadViewports() {
     topCamera = new THREE.OrthographicCamera(-frustumSize / 2, frustumSize / 2, frustumSize / 2, -frustumSize / 2, 0.1, 1000);
     topCamera.position.set(0, 10, 0);
     topCamera.lookAt(0, 0, 0);
+    topCamera.up.set(0, 0, -1); // Set UP vector to avoid gimbal lock issues
     topControls = new OrbitControls(topCamera, viewports.top.element);
     topControls.enableRotate = false;
     topControls.enableDamping = true;

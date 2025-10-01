@@ -94,6 +94,16 @@ Ray Modeler is packed with features that automate and enhance the Radiance workf
 
 - **Advanced Circadian Health Dashboard**: Analyze results from spectral simulations to calculate and visualize key circadian lighting metrics like Circadian Stimulus (CS), Equivalent Melanopic Lux (EML), and check for compliance with WELL building standards.
 
+- **Advanced IES Photometry Viewer**: In addition to a 2D polar plot, visualize luminaire distributions with an interactive 3D photometric web and view key metadata like lumens and wattage directly from the `.ies` file.
+
+- **Interactive 3D Room Resizing**: A "Resize Mode" that allows you to directly manipulate the room's dimensions in the 3D viewport by dragging its exterior faces, providing immediate tactile feedback.
+
+- **Keyboard Shortcuts**: Accelerate your workflow with keyboard shortcuts for common actions, such as `T` for Top View, `P` for Perspective, and `Ctrl+S` to save the project. A help modal (`?`) displays all available shortcuts.
+
+- **Multi-View Layout (Quad View)**: Split the main viewport into four synchronized cameras (Perspective, Top, Front, Side) for comprehensive spatial awareness and precise object placement, a standard in professional 3D software.
+
+- **Vegetation & Tree Modeling**: Add simple procedural trees and bushes from the Scene Elements library to your site. The vegetation canopy uses a Radiance `trans` material to accurately simulate its light-filtering effects, improving the realism of site-specific analyses.
+
 ## 🚀 Getting Started
 
 To use Ray Modeler, you will need a modern web browser and a local installation of the Radiance Lighting Simulation Suite.
@@ -152,6 +162,17 @@ The AI Assistant panel provides a chat interface to help you with your workflow.
   - If the user enables a **View Grid**, it will suggest opening the Imageless Annual Glare recipe.
 
   - If the **DGP recipe is open but the viewpoint is not set to fisheye**, it will offer to correct the setting.
+
+- **Generative Design**: Leverage the AI to perform automated, multi-step design optimization. Instead of manually testing variations, you can define a goal, constraints, and a design variable, and the assistant will orchestrate the entire workflow. For example:
+
+  > "Find an overhang depth for the south wall between 0.5m and 2.0m that maximizes sDA while keeping ASE below 10%."
+
+  The assistant will then:
+  1. Iterate through the design space (e.g., testing multiple overhang depths).
+  2. Programmatically run an sDA/ASE simulation for each step.
+  3. Post live progress updates to the chat window.
+  4. Analyze the results of all simulations.
+  5. Report back with the optimal design that best meets your goal while satisfying your constraints.
 
 ### API Key Configuration
 
@@ -306,6 +327,10 @@ Each recipe in the Simulation Sidebar automates a specific Radiance workflow by 
   - `EN 12464-1 (Illuminance & UGR for Work Places)`
 
 - **Lighting Energy Analysis**: Runs an annual simulation with daylighting controls to estimate energy consumption (kWh/year) and savings.
+
+- **Façade Irradiation Analysis**: A recipe to calculate the total annual solar irradiation (in kWh/m²/year) on an exterior façade, essential for envelope design and assessing potential for building-integrated photovoltaics (BIPV).
+
+- **Annual Solar Radiation Maps**: An annual simulation that calculates the cumulative solar radiation on interior surfaces, visualized as a heatmap. This is critical for understanding passive solar heating potential and predicting long-term material degradation.
 
 ## Analysis Modules 📊
 

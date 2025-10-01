@@ -35,8 +35,17 @@
         #render-container.quad-view-active {
             grid-template-columns: 1fr 1fr;
             grid-template-rows: 1fr 1fr;
-            gap: 2px;
-            background-color: var(--text-secondary);
+        gap: 2px;
+        background-color: var(--text-secondary);
+        }
+        .label-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: hidden;
         }
         .viewport {
             position: relative;
@@ -129,7 +138,7 @@
     </div>
     </div>
 
-    <div id="theme-switcher-container" class="fixed top-4 left-4 z-[10001] pointer-events-auto">
+    <div id="theme-switcher-container" class="fixed top-10 left-6 z-[10001] pointer-events-auto">
     <button id="theme-btn-cafe58" class="theme-btn" style="display: none;" aria-label="Switch to Cafe 58 Theme">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
         <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
@@ -158,23 +167,27 @@
     </div>
 
     <div id="render-container">
-        <div id="viewport-main" class="viewport">
-            <div class="viewport-label">Perspective</div>
-        </div>
-        <div id="viewport-top" class="viewport">
-            <div class="viewport-label">Top</div>
-        </div>
-        <div id="viewport-front" class="viewport">
-            <div class="viewport-label">Front</div>
-        </div>
-        <div id="viewport-side" class="viewport">
-            <div class="viewport-label">Right</div>
-        </div>
+    <div id="viewport-main" class="viewport">
+        <div class="viewport-label">Perspective</div>
+        <div class="label-container"></div>
     </div>
+    <div id="viewport-top" class="viewport">
+        <div class="viewport-label">Top</div>
+        <div class="label-container"></div>
+    </div>
+    <div id="viewport-front" class="viewport">
+        <div class="viewport-label">Front</div>
+        <div class="label-container"></div>
+    </div>
+    <div id="viewport-side" class="viewport">
+        <div class="viewport-label">Right</div>
+        <div class="label-container"></div>
+    </div>
+</div>
     
-    <div id="left-controls-container" class="fixed top-1/2 -translate-y-1/2 left-4 z-50 pointer-events-auto flex flex-col gap-4">
-        <div id="left-toolbar" class="ui-panel p-1">
-            <div class="btn-group flex-col">
+    <div id="left-controls-container" class="absolute top-1/2 -translate-y-1/2 left-4 z-50 pointer-events-auto flex flex-col gap-4">
+    <div id="left-toolbar" class="ui-panel p-1">
+        <div class="btn-group flex-col">
                 <div class="action-button-container">
                     <button id="toggle-panel-project-btn" class="btn" aria-label="Project Setup">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
@@ -227,7 +240,7 @@
         </div>
     </div>
 
-    <div id="view-controls" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
+    <div id="view-controls" class="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
         <div class="ui-panel p-1">
             <div class="btn-group">
                 <div class="action-button-container"><button id="view-btn-persp" class="btn active" aria-label="Perspective View"><svg viewBox="0 0 24 24"><path d="M3 8l8-4 8 4-8 4-8-4z" /><path d="M11 8v8M19 12l-8 4" /><path d="M3 8v8l8 4" /></svg></button><span class="tooltip" role="tooltip">Perspective View</span></div>
@@ -1651,11 +1664,30 @@
                         <div class="asset-item" draggable="true" data-asset-type="shelf" title="Shelf">
                             <div class="asset-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.54 5.23a.9.9 0 0 0-.81-.43H4.27a.9.9 0 0 0-.81.43l-1.5 6a.9.9 0 0 0 .81 1.37h18.46a.9.9 0 0 0 .81-1.37l-1.5-6zM4 12v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/></svg></div>
                             <span class="asset-name">Shelf</span>
+                        </div>
                     </div>
                 </div>
-                 <div id="transform-controls-section" class="hidden param-section pt-4 border-t border-dashed border-[--grid-color]">
-                <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Selected Object Transform</h4>
-                <div class="flex items-center justify-between mt-2">
+                <div class="param-section pt-4 border-t border-dashed border-[--grid-color]">
+                    <h3 class="font-semibold text-sm uppercase">Vegetation & Tree Modeling</h3>
+                    <p class="info-box !text-xs !py-2 !px-3">Drag vegetation assets onto your site. The canopy uses a 'trans' material in Radiance to simulate light filtering.</p>
+                    <div id="asset-library-vegetation" class="grid grid-cols-4 gap-2 mt-4">
+                        <div class="asset-item" draggable="true" data-asset-type="tree-deciduous" title="Deciduous Tree">
+                            <div class="asset-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-8"/><path d="M20 8.5A5.5 5.5 0 0 0 14.5 3H9.5a5.5 5.5 0 0 0 0 11h5a5.5 5.5 0 0 1 0 11H9.5a5.5 5.5 0 0 1-5.5-5.5V14"/><path d="M4 11.5a5.5 5.5 0 0 0 5.5 5.5h5a5.5 5.5 0 0 0 0-11H9.5a5.5 5.5 0 0 1-5.5-5.5V6"/></svg></div>
+                            <span class="asset-name">Tree</span>
+                        </div>
+                        <div class="asset-item" draggable="true" data-asset-type="tree-coniferous" title="Coniferous Tree">
+                            <div class="asset-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 22-5-5h10z"/><path d="m12 17-4-4h8z"/><path d="M12 13 9 9h6z"/><path d="M12 2v7"/></svg></div>
+                            <span class="asset-name">Pine</span>
+                        </div>
+                        <div class="asset-item" draggable="true" data-asset-type="bush" title="Bush">
+                            <div class="asset-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a7 7 0 0 0 7-7h-4a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3h4a7 7 0 0 0-7-7 7 7 0 0 0-7 7h4a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H5a7 7 0 0 0 7 7z"/></svg></div>
+                            <span class="asset-name">Bush</span>
+                        </div>
+                    </div>
+                </div>
+                <div id="transform-controls-section" class="hidden param-section pt-4 border-t border-dashed border-[--grid-color]">
+                    <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Selected Object Transform</h4>
+                    <div class="flex items-center justify-between mt-2">
                     <div class="btn-group">
                         <button id="gizmo-mode-translate" class="btn active" data-mode="translate">Move</button>
                         <button id="gizmo-mode-rotate" class="btn" data-mode="rotate">Rotate</button>
@@ -3788,6 +3820,124 @@
                   <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
               </div>
           </template>
+
+            <template id="template-recipe-facade-irradiation">
+                    <div class="floating-window ui-panel">
+                        <div class="window-header">
+                            <span>Recipe: Façade Irradiation Analysis</span>
+                            <div class="window-controls">
+                                <div class="window-icon-max"></div>
+                                <div class="collapse-icon"></div>
+                                <div class="window-icon-close"></div>
+                            </div>
+                        </div>
+                        <div class="window-content">
+                            <p class="info-box">Calculates the total annual solar irradiation (kWh/m²/year) on a vertical surface placed in front of a selected façade, accounting for shading from the building itself and any attached shading devices.</p>
+                            
+                            <div class="param-section">
+                                <h4 class="text-base font-semibold">Analysis Plane & Grid</h4>
+                                <div class="space-y-3 mt-4">
+                                    <div>
+                                        <label for="facade-selection" class="label">Target Façade</label>
+                                        <select id="facade-selection" class="w-full mt-1">
+                                            <option value="S" selected>South</option>
+                                            <option value="N">North</option>
+                                            <option value="E">East</option>
+                                            <option value="W">West</option>
+                                        </select>
+                                    </div>
+                                    <div class="param-item">
+                                        <div class="param-item-row">
+                                            <label for="facade-offset" class="label">Offset from Façade (m)</label>
+                                            <input type="number" class="param-input-num" id="facade-offset-num" step="0.05" min="0" max="5">
+                                        </div>
+                                        <input type="range" id="facade-offset" min="0" max="5" value="0.05" step="0.05">
+                                    </div>
+                                    <div class="param-item">
+                                        <div class="param-item-row">
+                                            <label for="facade-grid-spacing" class="label">Grid Spacing (m)</label>
+                                            <input type="number" class="param-input-num" id="facade-grid-spacing-num" step="0.1" min="0.1" max="5">
+                                        </div>
+                                        <input type="range" id="facade-grid-spacing" min="0.1" max="5" value="0.5" step="0.1">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="param-section">
+                                <h4 class="text-base font-semibold">Required Inputs</h4>
+                                <div class="space-y-3 mt-4">
+                                    <div>
+                                        <label class="label" for="weather-file">Weather File (.epw)</label>
+                                        <input type="file" id="weather-file" accept=".epw" class="w-full text-sm">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="accordion-item mt-4 pt-4 border-t border-dashed border-[--grid-color]">
+                                <div class="accordion-header">Simulation Quality (Overrides)<div class="accordion-chevron">▶</div></div>
+                                <div class="accordion-content" style="display: none;"></div>
+                            </div>
+
+                            <div class="execution-section mt-4 pt-4 border-t-2 border-[--grid-color]">
+                            <button data-action="generate" class="btn btn-primary w-full">Generate Irradiation Analysis Package</button>
+                        </div>
+                    </div>
+                    <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+                </div>
+            </template>
+
+<template id="template-recipe-annual-radiation">
+                <div class="floating-window ui-panel">
+                    <div class="window-header">
+                        <span>Recipe: Annual Solar Radiation</span>
+                        <div class="window-controls">
+                            <div class="window-icon-max"></div>
+                            <div class="collapse-icon"></div>
+                            <div class="window-icon-close"></div>
+                        </div>
+                    </div>
+                    <div class="window-content">
+                        <p class="info-box">Calculates the total annual solar radiation (kWh/m²/year) on interior surfaces, including the effect of shading devices. Ensure you have enabled sensor grids on the desired surfaces (e.g., floor, walls) in the Sensor Grid panel.</p>
+                        <div class="param-section">
+                            <label for="quality-preset" class="label">Calculation Quality</label>
+                            <select id="quality-preset" class="w-full mt-1">
+                                <option value="draft">Draft (Fast)</option>
+                                <option value="medium" selected>Medium (Balanced)</option>
+                                <option value="high">High (Accurate)</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                        <div class="param-section space-y-3">
+                            <div>
+                                <label class="label" for="weather-file">Weather File (.epw)</label>
+                                <input type="file" id="weather-file" accept=".epw" class="w-full text-sm">
+                            </div>
+                        </div>
+
+                        <div class="accordion-item mt-4 pt-4 border-t border-dashed border-[--grid-color]">
+                            <div class="accordion-header">Advanced Parameters (Overrides)<div class="accordion-chevron">▶</div></div>
+                            <div class="accordion-content" style="display: none;">
+                                 </div>
+                        </div>
+
+                        <div class="execution-section mt-4 pt-4 border-t-2 border-[--grid-color]">
+                            <h4 class="text-base font-semibold mb-3">Execution</h4>
+                            <div class="space-y-3">
+                                <button data-action="generate" class="btn btn-primary w-full">Generate Annual Radiation Package</button>
+                                <button data-action="run" class="btn btn-secondary w-full" disabled>Run Simulation</button>
+                            </div>
+                            <div class="command-center hidden mt-4 pt-4 border-t border-dashed border-[--grid-color]">
+                                <div class="flex justify-between items-center mb-2">
+                                    <h5 class="font-semibold text-xs uppercase text-[--text-secondary]">Generated Script</h5>
+                                    <button class="btn btn-xs btn-secondary" title="Copy to clipboard">Copy</button>
+                                </div>
+                                <textarea readonly class="w-full h-48 font-mono text-xs p-2 rounded bg-[--grid-color] border border-gray-500/50 resize-y"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+            </div>
+        </template>
 
         </div>
 

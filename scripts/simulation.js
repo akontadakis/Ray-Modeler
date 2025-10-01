@@ -20,7 +20,9 @@ const availableModules = [
     { id: 'template-recipe-en17037', name: 'Recipe: EN 17037 Compliance' },
     { id: 'template-recipe-en-illuminance', name: 'Recipe: EN 12464-1 Illuminance' },
     { id: 'template-recipe-en-ugr', name: 'Recipe: EN 12464-1 UGR' },
-    { id: 'template-recipe-lighting-energy', name: 'Recipe: Lighting Energy Analysis' }
+    { id: 'template-recipe-lighting-energy', name: 'Recipe: Lighting Energy Analysis' },
+    { id: 'template-recipe-facade-irradiation', name: 'Recipe: Façade Irradiation Analysis' },
+    { id: 'template-recipe-annual-radiation', name: 'Recipe: Annual Solar Radiation' }
 ];
 
 const FOLDER_STRUCTURE = [

@@ -186,6 +186,9 @@ export function generateScripts(projectData, recipeType) {
         case 'template-recipe-en-ugr':
             scriptSet = createEnUgrScript(projectData);
             break;
+        case 'template-recipe-annual-radiation':
+            scriptSet = createAnnualRadiationScript(projectData);
+            break;
     }
 
     if (scriptSet) {
@@ -2913,9 +2916,265 @@ echo "--- Energy Analysis Workflow Complete ---"
 
     const batContent = `# BAT file for this complex workflow is not provided. Please use a bash interpreter.`;
 
-    return [
+        return [
         { fileName: `RUN_${projectName}_Energy_Analysis.sh`, content: shContent },
         { fileName: `RUN_${projectName}_Energy_Analysis.bat`, content: batContent },
         { fileName: 'process_energy.py', content: pythonScriptContent }
     ];
+}
+
+/**
+ * Creates scripts for an annual façade irradiation analysis.
+ * @param {object} projectData - The complete project data object.
+ * @returns {object} An object containing the shell and bat script files.
+ */
+function createFacadeIrradiationScript(projectData) {
+    const { projectInfo: pi, mergedSimParams: p, geometry } = projectData;
+    const projectName = pi['project-name'].replace(/\s+/g, '_') || 'scene';
+    const epwFileName = p['weather-file']?.name || 'weather.epw';
+    
+    const ab = p['ab'] || 5;
+    const ad = p['ad'] || 2048;
+    const as = p['as'] || 1024;
+    const ar = p['ar'] || 512;
+    const aa = p['aa'] || 0.15;
+    const lw = p['lw'] || 0.005;
+
+    // --- Generate Façade Points File ---
+    const { W, L, H, rotationY } = geometry.room;
+    const { 'facade-selection': facade, 'facade-offset': offset, 'facade-grid-spacing': spacing } = p;
+
+    const points = [];
+    let start, vecU, vecV, normal, numU, numV;
+
+    // Define plane based on facade, accounting for room rotation
+    const rotRad = (rotationY * Math.PI) / 180;
+    const cosR = Math.cos(rotRad);
+    const sinR = Math.sin(rotRad);
+
+    const rotate = (v) => ({ x: v.x * cosR - v.y * sinR, y: v.x * sinR + v.y * cosR });
+
+    switch (facade) {
+        case 'S':
+            start = rotate({ x: -W / 2, y: L / 2 + offset });
+            vecU = rotate({ x: 1, y: 0 }); // Along width
+            vecV = { x: 0, y: 0, z: 1 }; // Vertical
+            normal = rotate({ x: 0, y: -1 }); // Pointing towards building
+            numU = Math.floor(W / spacing);
+            numV = Math.floor(H / spacing);
+            break;
+        case 'N':
+            start = rotate({ x: W/2, y: -L/2 - offset });
+            vecU = rotate({ x: -1, y: 0 });
+            vecV = { x: 0, y: 0, z: 1 };
+            normal = rotate({ x: 0, y: 1 });
+            numU = Math.floor(W / spacing);
+            numV = Math.floor(H / spacing);
+            break;
+        case 'E':
+            start = rotate({ x: W / 2 + offset, y: L / 2 });
+            vecU = rotate({ x: 0, y: -1 });
+            vecV = { x: 0, y: 0, z: 1 };
+            normal = rotate({ x: -1, y: 0 });
+            numU = Math.floor(L / spacing);
+            numV = Math.floor(H / spacing);
+            break;
+        case 'W':
+            start = rotate({ x: -W / 2 - offset, y: -L/2 });
+            vecU = rotate({ x: 0, y: 1 });
+            vecV = { x: 0, y: 0, z: 1 };
+            normal = rotate({ x: 1, y: 0 });
+            numU = Math.floor(L / spacing);
+            numV = Math.floor(H / spacing);
+            break;
+    }
+
+    for (let i = 0; i <= numU; i++) {
+        for (let j = 0; j <= numV; j++) {
+            const px = start.x + i * spacing * vecU.x;
+            const py = start.y + i * spacing * vecU.y;
+            const pz = j * spacing * vecV.z;
+            points.push(`${px.toFixed(4)} ${py.toFixed(4)} ${pz.toFixed(4)} ${normal.x.toFixed(4)} ${normal.y.toFixed(4)} 0.0`);
+        }
+    }
+    const facadePtsContent = points.join('\n');
+    project.addSimulationFile('facade-grid-file', 'facade_grid.pts', facadePtsContent);
+    // --- End of Points File Generation ---
+    
+    const shContent = `#!/bin/bash
+    # RUN_Facade_Irradiation.sh
+    # Calculates annual solar irradiation on a facade, including shading effects.
+
+    # --- Configuration ---
+    PROJECT_NAME="${projectName}"
+    WEATHER_FILE="../04_skies/${epwFileName}"
+    GEOM_FILE="../01_geometry/\${PROJECT_NAME}.rad"
+    MAT_FILE="../02_materials/\${PROJECT_NAME}_materials.rad"
+    POINTS_FILE="../08_results/facade_grid.pts"
+
+    # Radiance Parameters
+    AB=${ab}; AD=${ad}; AS=${as}; AR=${ar}; AA=${aa}; LW=${lw}
+
+    # --- Directory Setup ---
+    OCT_DIR="../06_octrees"
+    RESULTS_DIR="../08_results"
+    MATRIX_DIR="\${RESULTS_DIR}/matrices"
+    mkdir -p \$OCT_DIR \$RESULTS_DIR \$MATRIX_DIR
+
+    echo "--- Starting Annual Façade Irradiation Analysis ---"
+
+    # 1. Generate Sky Matrix from EPW
+    echo "1. Generating annual sky matrix..."
+    SKY_MTX="\${MATRIX_DIR}/sky.smx"
+    gendaymtx -m 1 "\${WEATHER_FILE}" > "\${SKY_MTX}"
+
+    # 2. Create Scene Octree (includes room, shading, context)
+    echo "2. Creating scene octree..."
+    OCTREE="\${OCT_DIR}/\${PROJECT_NAME}.oct"
+    oconv "\${GEOM_FILE}" "\${MAT_FILE}" > "\${OCTREE}"
+
+    # 3. Calculate Daylight Coefficients for the facade grid
+    echo "3. Calculating daylight coefficients (rcontrib)..."
+    FACADE_DCMTX="\${MATRIX_DIR}/facade_dc.mtx"
+    rcontrib -I+ -w -ab \${AB} -ad \${AD} -as \${AS} -ar \${AR} -aa \${AA} -lw \${LW} \\
+        -f reinhart.cal -b tbin -bn 145 -m sky_glow \\
+        "\${OCTREE}" < "\${POINTS_FILE}" > "\${FACADE_DCMTX}"
+
+    # 4. Calculate hourly irradiance for the year
+    echo "4. Calculating hourly irradiance (dctimestep)..."
+    HOURLY_IRRAD="\${RESULTS_DIR}/facade_hourly_W.ill"
+    dctimestep "\${FACADE_DCMTX}" "\${SKY_MTX}" > "\${HOURLY_IRRAD}"
+
+    # 5. Sum hourly results to get annual total in kWh/m^2
+    echo "5. Summing annual results..."
+    ANNUAL_IRRAD="\${RESULTS_DIR}/facade_annual_kWh.txt"
+    total -if3 "\${HOURLY_IRRAD}" | rcalc -e 'total_solar=$1+$2+$3; $1=total_solar * 8760 / 1000' > "\${ANNUAL_IRRAD}"
+
+    echo "---"
+    echo "Analysis Complete."
+    echo "Annual irradiation results (kWh/m²/year) saved to: \${ANNUAL_IRRAD}"
+    echo "---"
+    `;
+
+    const batContent = `REM This workflow uses advanced shell features. Please run the .sh script using a bash interpreter (e.g., Git Bash, WSL).`;
+    
+    return {
+        sh: { fileName: `RUN_${projectName}_Facade_Irradiation.sh`, content: shContent },
+        bat: { fileName: `RUN_${projectName}_Facade_Irradiation.bat`, content: batContent }
+    };
+
+    /**
+     * Creates scripts for an annual solar radiation analysis on interior surfaces.
+     * @param {object} projectData - The complete project data object.
+     * @returns {object} An object containing the shell and bat script files.
+     */
+    function createAnnualRadiationScript(projectData) {
+        const { projectInfo: pi, mergedSimParams: p } = projectData;
+        const projectName = pi['project-name'].replace(/\s+/g, '_') || 'scene';
+        const epwFileName = p['weather-file']?.name || 'weather.epw';
+
+        // Use high-quality parameters from merged params, with strong defaults for matrix generation
+        const ab = p['ab'] || 6;
+        const ad = p['ad'] || 2048;
+        const as = p['as'] || 1024;
+        const ar = p['ar'] || 512;
+        const aa = p['aa'] || 0.15;
+        const lw = p['lw'] || 0.005;
+        const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room);
+
+        const shContent = `#!/bin/bash
+    # RUN_Annual_Radiation.sh
+    # Calculates the total annual solar radiation (kWh/m²/year) on interior surfaces.
+    # Generated by Ray Modeler.
+
+    # --- Configuration ---
+    PROJECT_NAME="${projectName}"
+    WEATHER_FILE="../04_skies/${epwFileName}"
+
+    # High-quality parameters for matrix generation
+    AB=${ab}; AD=${ad}; AS=${as}; AR=${ar}; AA=${aa}; LW=${lw}
+
+    # --- File & Directory Setup ---
+    GEOM_FILE="../01_geometry/\${PROJECT_NAME}.rad"
+    MAT_FILE="../02_materials/\${PROJECT_NAME}_materials.rad"
+    OCT_DIR="../06_octrees"
+    RESULTS_DIR="../08_results"
+    MATRIX_DIR="\${RESULTS_DIR}/matrices"
+    POINTS_FILE="../08_results/grid.pts"
+
+    mkdir -p \$OCT_DIR \$RESULTS_DIR \$MATRIX_DIR
+
+    # Check for points file
+    if [ ! -s "\${POINTS_FILE}" ]; then
+        echo "ERROR: Sensor points file (grid.pts) is empty or not found."
+        echo "Please enable sensor grids on interior surfaces in the 'Sensor Grid' panel."
+        exit 1
+    fi
+    NUM_POINTS=\$(wc -l < "\${POINTS_FILE}")
+
+    echo "--- Starting Annual Solar Radiation Analysis for \${NUM_POINTS} points ---"
+
+    # 1. Create Master Octree
+    echo "1. Creating master octree (including shading devices)..."
+    OCTREE="\${OCT_DIR}/\${PROJECT_NAME}.oct"
+    (
+    cat "\${GEOM_FILE}"
+    cat "\${MAT_FILE}"
+    echo
+    echo "${lightDefs}"
+    ) | oconv - > "\${OCTREE}"
+    if [ \$? -ne 0 ]; then echo "Error creating master octree."; exit 1; fi
+
+    # 2. Generate Annual Sky Matrix (S)
+    echo "2. Generating annual sky matrix from EPW..."
+    SKY_MTX="\${MATRIX_DIR}/sky.smx"
+    gendaymtx -m 1 "\${WEATHER_FILE}" > "\${SKY_MTX}"
+    if [ \$? -ne 0 ]; then echo "Error generating Sky Matrix."; exit 1; fi
+
+    # 3. Generate Daylight Coefficients for Irradiance (DC)
+    echo "3. Generating Daylight Coefficients (-I+)..."
+    DC_MTX="\${MATRIX_DIR}/dc_irradiance.mtx"
+    rcontrib -I+ -w -ab \${AB} -ad \${AD} -as \${AS} -ar \${AR} -aa \${AA} -lw \${LW} \\
+        -f reinhart.cal -b tbin -bn 145 -m sky_glow \\
+        "\${OCTREE}" < "\${POINTS_FILE}" > "\${DC_MTX}"
+    if [ \$? -ne 0 ]; then echo "Error generating Daylight Coefficient Matrix."; exit 1; fi
+
+    # 4. Calculate hourly solar irradiance for the year
+    echo "4. Calculating hourly solar irradiance (dctimestep)..."
+    HOURLY_IRRAD_RGB="\${RESULTS_DIR}/hourly_solar_rgb.ill"
+    dctimestep "\${DC_MTX}" "\${SKY_MTX}" > "\${HOURLY_IRRAD_RGB}"
+    if [ \$? -ne 0 ]; then echo "Error during dctimestep."; exit 1; fi
+
+    # 5. Sum RGB channels to get total hourly solar irradiance
+    echo "5. Summing RGB channels to get total hourly irradiance..."
+    HOURLY_IRRAD_TOTAL="\${RESULTS_DIR}/hourly_solar_total.txt"
+    rmtxop -fa -c 1 1 1 "\${HOURLY_IRRAD_RGB}" > "\${HOURLY_IRRAD_TOTAL}"
+    if [ \$? -ne 0 ]; then echo "Error summing RGB channels with rmtxop."; exit 1; fi
+
+    # 6. Sum hourly results to get annual total in kWh/m^2
+    echo "6. Summing annual results and converting to kWh/m^2..."
+    ANNUAL_KWH="\${RESULTS_DIR}/\${PROJECT_NAME}_annual_radiation.txt"
+    total "\${HOURLY_IRRAD_TOTAL}" | rmtxop -s 0.001 -fa -c 1 \${NUM_POINTS} - > "\${ANNUAL_KWH}"
+    if [ \$? -ne 0 ]; then echo "Error summing annual results."; exit 1; fi
+
+    echo "---"
+    echo "Annual Solar Radiation analysis complete."
+    echo "Final results (kWh/m²/year) saved to: \${ANNUAL_KWH}"
+    echo "You can load this file in the Analysis sidebar to visualize the results."
+    echo "---"
+    `;
+
+        const batContent = `@echo off
+    REM RUN_Annual_Radiation.bat
+    REM This workflow uses advanced shell features.
+    REM Please run the .sh script using a bash interpreter (e.g., Git Bash, WSL on Windows).
+    echo This recipe requires a bash environment to run correctly.
+    echo Please execute the RUN_Annual_Radiation.sh script.
+    `;
+
+        return {
+            sh: { fileName: `RUN_${projectName}_Annual_Radiation.sh`, content: shContent },
+            bat: { fileName: `RUN_${projectName}_Annual_Radiation.bat`, content: batContent }
+        };
+    }
 }

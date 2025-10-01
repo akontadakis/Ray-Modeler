@@ -134,6 +134,22 @@ const availableTools = [
                 }
             },
             {
+                "name": "runGenerativeDesign",
+                "description": "Runs an iterative design study to optimize a parameter based on a goal and constraints. For example, 'find the best overhang depth to maximize sDA while keeping ASE below 10%'. This is a long-running process that runs simulations in the background and reports the result when complete.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "goal": { "type": "STRING", "description": "The optimization objective. Must be 'maximize sDA' or 'minimize ASE'." },
+                        "variable": { "type": "STRING", "description": "The design parameter to iterate. Currently, only 'overhang depth' is supported." },
+                        "targetElement": { "type": "STRING", "description": "The scene element to modify. For 'overhang depth', this must be the wall, e.g., 'south'." },
+                        "range": { "type": "ARRAY", "description": "A two-element array with the [min, max] values for the variable in meters." },
+                        "steps": { "type": "NUMBER", "description": "The number of simulations to run within the range (e.g., 5)." },
+                        "constraints": { "type": "STRING", "description": "The constraint for valid solutions, e.g., 'ASE < 10' or 'sDA >= 60'." }
+                    },
+                    "required": ["goal", "variable", "targetElement", "range", "steps", "constraints"]
+                }
+            },
+            {
                 "name": "configureSimulationRecipe",
                 "description": "Sets parameters within an already OPEN simulation recipe panel.",
                 "parameters": {
@@ -664,6 +680,8 @@ function addMessage(sender, text) {
     messageWrapper.appendChild(messageBubble);
     messagesContainer.appendChild(messageWrapper);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    return messageWrapper; // Return the created element
 }
 
 /**
@@ -832,6 +850,27 @@ async function _executeToolCall(toolCall) {
                     if (args.setpoint !== undefined) updateUI('daylighting-setpoint', args.setpoint);
                 }
                 return { success: true, message: `Daylighting system ${args.enable ? 'enabled and configured' : 'disabled'}.` };
+            }
+            case 'runGenerativeDesign': {
+                // Acknowledge the request immediately and run the process in the background.
+                addMessage('ai', `Starting generative design study for ${args.variable} on the ${args.targetElement}. This will run ${args.steps} simulations and may take a significant amount of time. I will post the results here when complete.`);
+                setLoadingState(true); // Keep UI locked until initial setup is done
+
+                // Run the actual optimization without blocking the AI's immediate response.
+                _performGenerativeDesign(args)
+                    .then(result => {
+                        addMessage('ai', result.message);
+                    })
+                    .catch(error => {
+                        console.error("Generative Design failed:", error);
+                        addMessage('ai', `🔴 **Generative Design Failed:**\n${error.message}`);
+                    })
+                    .finally(() => {
+                        setLoadingState(false);
+                    });
+
+                // Return an immediate response to the model so it knows the tool was called.
+                return { success: true, message: "Generative design process initiated. The results will be reported in a new message upon completion." };
             }
             case 'configureSimulationRecipe': {
                 const templateId = recipeMap[args.recipeType];
@@ -1456,3 +1495,186 @@ export function triggerProactiveSuggestion(context) {
 }
 
 export { initAiAssistant };
+
+/**
+ * Executes the full generative design workflow asynchronously.
+ * @param {object} args - The arguments for the design study from the AI tool call.
+ * @returns {Promise<object>} A promise that resolves with the final summary message.
+ * @private
+ */
+async function _performGenerativeDesign(args) {
+    const { goal, variable, targetElement, range, steps, constraints } = args;
+    const [min, max] = range;
+    const results = [];
+    let progressMessage = `Running generative design study...\n\n**Goal:** ${goal}\n**Constraint:** ${constraints}\n\n`;
+
+    // The generative design feature requires the sDA/ASE recipe.
+    const recipeToRun = 'sda-ase';
+
+    // Ensure the necessary recipe panel is open for configuration.
+    await _executeToolCall({ functionCall: { name: 'openSimulationRecipe', args: { recipeType: recipeToRun } } });
+    
+    // Add a status message to the chat that we can update with progress.
+    const statusMessageElement = addMessage('ai', progressMessage + `Initializing (0/${steps})...`);
+
+    // The user must generate the 3-Phase matrices first. We'll check for this.
+    // NOTE: This assumes an Electron API function `checkFileExists` is available.
+    if (window.electronAPI?.checkFileExists) {
+        const matrixFileExists = await window.electronAPI.checkFileExists({
+            projectPath: project.dirPath,
+            filePath: `08_results/matrices/view.mtx`
+        });
+        if (!matrixFileExists) {
+            throw new Error("The required 3-Phase matrix files (e.g., view.mtx) were not found. Please run the 'Annual Daylight (3-Phase)' recipe's matrix generation script first.");
+        }
+    }
+
+    for (let i = 0; i < steps; i++) {
+        const currentValue = min + (i / (steps - 1)) * (max - min);
+
+        // 1. Configure the design variable for this iteration.
+        if (variable === 'overhang depth') {
+            await _executeToolCall({ functionCall: {
+                name: 'configureShading',
+                args: { wall: targetElement, enable: true, deviceType: 'overhang', depth: currentValue }
+            }});
+        } else {
+            throw new Error(`This generative design workflow currently only supports the 'overhang depth' variable.`);
+        }
+        
+        // Update progress message in the chat window.
+        statusMessageElement.querySelector('.message-bubble').innerHTML = progressMessage + `<p>Running simulation ${i + 1}/${steps} with depth ${currentValue.toFixed(2)}m...</p>`;
+
+        // 2. Generate the simulation package and run the script, waiting for completion.
+        const sdaPanel = document.querySelector('[data-template-id="template-recipe-sda-ase"]');
+        if (!sdaPanel) throw new Error("sDA/ASE recipe panel could not be found.");
+        
+        const scriptInfo = await programmaticallyGeneratePackage(sdaPanel);
+        await runScriptAndWait(scriptInfo.shFile);
+
+        // 3. Load and query results from the output files.
+        // NOTE: This assumes an Electron API function `readFile` is available.
+        const projectName = project.projectName || 'scene';
+        const aseFile = await getFileFromElectron(`08_results/${projectName}_ASE_direct_only.ill`);
+        const sdaFile = await getFileFromElectron(`08_results/${projectName}_sDA_final.ill`);
+        
+        // Load into the results manager to calculate metrics.
+        await resultsManager.loadAndProcessFile(aseFile, 'a');
+        const aseMetrics = resultsManager.calculateAnnualMetrics('a', {});
+        
+        await resultsManager.loadAndProcessFile(sdaFile, 'a');
+        const sdaMetrics = resultsManager.calculateAnnualMetrics('a', {});
+
+        const iterationResult = {
+            variableValue: currentValue,
+            sDA: sdaMetrics.sDA,
+            ASE: aseMetrics.ASE
+        };
+        results.push(iterationResult);
+        
+        // Append this step's results to the progress message.
+        progressMessage += `<p>Step ${i + 1}: Depth ${currentValue.toFixed(2)}m → sDA: ${iterationResult.sDA.toFixed(1)}%, ASE: ${iterationResult.ASE.toFixed(1)}%</p>`;
+        statusMessageElement.querySelector('.message-bubble').innerHTML = progressMessage;
+    }
+
+    // 4. Analyze all results to find the best option.
+    const constraintRegex = /(sDA|ASE)\s*(<|<=|>|>=)\s*(\d+\.?\d*)/;
+    const constraintMatch = constraints.match(constraintRegex);
+    if (!constraintMatch) throw new Error("Could not parse the provided constraint string: " + constraints);
+    
+    const [, constraintMetric, operator, constraintValueStr] = constraintMatch;
+    const constraintValue = parseFloat(constraintValueStr);
+
+    const validOptions = results.filter(res => {
+        const metricValue = res[constraintMetric];
+        switch (operator) {
+            case '<': return metricValue < constraintValue;
+            case '<=': return metricValue <= constraintValue;
+            case '>': return metricValue > constraintValue;
+            case '>=': return metricValue >= constraintValue;
+            default: return false;
+        }
+    });
+
+    if (validOptions.length === 0) {
+        return { message: "✅ **Generative Design Complete.**\n\nUnfortunately, none of the tested options met your constraint." };
+    }
+
+    const goalMetric = goal.includes('sDA') ? 'sDA' : 'ASE';
+    const sortDirection = goal.startsWith('maximize') ? -1 : 1;
+
+    validOptions.sort((a, b) => (a[goalMetric] - b[goalMetric]) * sortDirection);
+    
+    const bestOption = validOptions[0];
+
+    let summary = `✅ **Generative Design Complete!**\n\nFound ${validOptions.length} valid options that met your constraint (${constraints}).\n\n**🏆 Best Result:**\n`;
+    summary += `* **${variable}:** ${bestOption.variableValue.toFixed(2)}m\n`;
+    summary += `* **sDA:** ${bestOption.sDA.toFixed(1)}%\n`;
+    summary += `* **ASE:** ${bestOption.ASE.toFixed(1)}%\n\n`;
+    summary += `This option provides the best performance for your goal ("${goal}").`;
+
+    // Clean up the progress message by replacing it with the final summary.
+    statusMessageElement.querySelector('.message-bubble').innerHTML = summary;
+
+    return { message: summary }; // This return is for the internal promise handling.
+}
+
+/**
+ * Wraps the Electron script execution process in a promise.
+ * @param {string} scriptName - The name of the script to run (e.g., 'RUN_project_sDA_ASE.sh').
+ * @returns {Promise<object>} A promise that resolves on success or rejects on failure.
+ * @private
+ */
+function runScriptAndWait(scriptName) {
+    return new Promise((resolve, reject) => {
+        if (!window.electronAPI?.runScript || !project.dirPath) {
+            return reject(new Error("Simulation execution requires the Electron app and a saved project directory."));
+        }
+        
+        let output = '';
+        const handleExit = (code) => {
+            unsubscribeExit();
+            unsubscribeOutput();
+            if (code === 0) resolve({ success: true, output: output });
+            else reject(new Error(`Script '${scriptName}' failed with exit code ${code}. See console for full output.`));
+        };
+
+        const handleOutput = (data) => {
+            output += data;
+            console.log(`[Sim Output] ${data}`); // Log output for debugging
+        };
+
+        const unsubscribeExit = window.electronAPI.onScriptExit(handleExit);
+        const unsubscribeOutput = window.electronAPI.onScriptOutput(handleOutput);
+
+        window.electronAPI.runScript({
+            projectPath: project.dirPath,
+            scriptName: scriptName
+        });
+    });
+}
+
+/**
+ * Reads a result file from the project directory using the Electron backend.
+ * NOTE: This requires extending the Electron API to include a 'readFile' function.
+ * @param {string} filePath - The relative path to the file within the project folder.
+ * @returns {Promise<File>} A promise that resolves with a File object.
+ * @private
+ */
+async function getFileFromElectron(filePath) {
+    if (!window.electronAPI?.readFile || !project.dirPath) {
+        throw new Error("File access requires the Electron app and a saved project directory. The `readFile` API must be exposed.");
+    }
+    try {
+        // Assume the backend returns an object with binary content and a filename.
+        const { content, name } = await window.electronAPI.readFile({
+            projectPath: project.dirPath,
+            filePath: filePath
+        });
+        const buffer = new Uint8Array(content.data).buffer;
+        const blob = new Blob([buffer]);
+        return new File([blob], name, { type: 'application/octet-stream' });
+    } catch (e) {
+        throw new Error(`Could not read result file '${filePath}'. Make sure the simulation ran correctly. Error: ${e.message}`);
+    }
+}

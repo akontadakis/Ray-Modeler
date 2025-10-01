@@ -1,6 +1,6 @@
 // scripts/ui.js
 
-import { updateScene, axesObject, updateSensorGridColors, roomObject, shadingObject, sensorMeshes, wallSelectionGroup, highlightWall, clearWallHighlights, updateHighlightColor, furnitureObject, addFurniture, updateFurnitureColor, resizeHandlesObject, contextObject } from './geometry.js';
+import { updateScene, axesObject, updateSensorGridColors, roomObject, shadingObject, sensorMeshes, wallSelectionGroup, highlightWall, clearWallHighlights, updateHighlightColor, furnitureObject, addFurniture, updateFurnitureColor, resizeHandlesObject, contextObject, vegetationObject } from './geometry.js';
 
 import { activeCamera, perspectiveCamera, orthoCamera, setActiveCamera, onWindowResize, controls, transformControls, sensorTransformControls, viewpointCamera, scene, updateLiveViewType, renderer, toggleFirstPersonView as sceneToggleFPV, isFirstPersonView as sceneIsFPV, fpvOrthoCamera, updateViewpointFromUI, setGizmoVisibility, setUpdatingFromSliders, isUpdatingCameraFromSliders, setGizmoMode } from './scene.js';
 import * as THREE from 'three';
@@ -384,14 +384,14 @@ const ids = [
     'custom-alert-title', 'custom-alert-message', 'custom-alert-close',
 
     // Toolbars
-    'left-toolbar', 'toggle-panel-project-btn', 'toggle-panel-dimensions-btn', 
+    'left-toolbar', 'left-controls-container', 'toggle-panel-project-btn', 'toggle-panel-dimensions-btn', 
     'toggle-panel-aperture-btn', 'toggle-panel-lighting-btn', 'toggle-panel-materials-btn',
     'toggle-panel-sensor-btn', 'toggle-panel-viewpoint-btn', 'toggle-panel-scene-btn',
     'view-controls', 'view-btn-persp', 'view-btn-ortho', 'view-btn-top', 'view-btn-front', 'view-btn-back', 'view-btn-left', 'view-btn-right', 'view-btn-quad',
     'viewport-main', 'viewport-top', 'viewport-front', 'viewport-side',
 
     // Scene Elements Panel
-    'panel-scene-elements', 'asset-library', 'transform-controls-section',
+    'panel-scene-elements', 'asset-library', 'asset-library-vegetation', 'transform-controls-section',
     'gizmo-mode-translate', 'gizmo-mode-rotate', 'gizmo-mode-scale', 'remove-selected-object-btn',
     'obj-pos-x', 'obj-pos-y', 'obj-pos-z', 'obj-pos-x-val', 'obj-pos-y-val', 'obj-pos-z-val',
     'obj-rot-y', 'obj-rot-y-val', // We now only have a single rotation slider for simplicity
@@ -617,14 +617,6 @@ const ids = [
     'topo-controls', 'topo-heightmap-file', 'topo-plane-size', 'topo-plane-size-val', 'topo-vertical-scale', 'topo-vertical-scale-val',
     'context-material-controls', 'context-mat-type', 'context-refl', 'context-refl-val',
 
-    // Enhanced Massing Controls
-    'massing-shape', 'massing-width', 'massing-width-val', 'massing-depth', 'massing-depth-val',
-    'massing-height', 'massing-height-val', 'massing-radius', 'massing-radius-val',
-    'massing-pos-x', 'massing-pos-x-val', 'massing-pos-y', 'massing-pos-y-val', 'massing-pos-z', 'massing-pos-z-val',
-    'massing-count', 'massing-count-val', 'massing-spacing', 'massing-spacing-val',
-    'massing-pattern', 'create-massing-blocks-btn', 'clear-massing-blocks-btn',
-    'massing-info', 'massing-count-display', 'massing-volume-display',
-
     // Context Object Management
     'context-object-management', 'context-object-search', 'context-object-filter',
     'select-all-objects', 'clear-selection', 'invert-selection',
@@ -632,21 +624,6 @@ const ids = [
     'context-object-properties', 'object-info-display', 'obj-name', 'obj-type', 'obj-position',
     'obj-dimensions', 'obj-volume', 'delete-single-object', 'copy-single-object', 'focus-object',
 
-    // Enhanced Massing Controls
-    'massing-shape', 'massing-width', 'massing-width-val', 'massing-depth', 'massing-depth-val',
-    'massing-height', 'massing-height-val', 'massing-radius', 'massing-radius-val',
-    'massing-pos-x', 'massing-pos-x-val', 'massing-pos-y', 'massing-pos-y-val', 'massing-pos-z', 'massing-pos-z-val',
-    'massing-count', 'massing-count-val', 'massing-spacing', 'massing-spacing-val',
-    'massing-pattern', 'create-massing-blocks-btn', 'clear-massing-blocks-btn',
-    'massing-info', 'massing-count-display', 'massing-volume-display',
-
-    // Context Object Management
-    'context-object-management', 'context-object-search', 'context-object-filter',
-    'select-all-objects', 'clear-selection', 'invert-selection',
-    'context-object-list', 'bulk-delete', 'bulk-copy', 'bulk-change-material', 'bulk-select-by-type',
-    'context-object-properties', 'object-info-display', 'obj-name', 'obj-type', 'obj-position',
-    'obj-dimensions', 'obj-volume', 'delete-single-object', 'copy-single-object', 'focus-object',
-    
     // Shortcut Modal
     'shortcut-help-btn', 'shortcut-help-modal', 'shortcut-modal-close-btn',
 ];
@@ -1745,11 +1722,34 @@ async function render2DHeatmap() {
             }
         }
     });
+});
 
-    promptForProjectDirectory();
+// Make toolbars draggable
+const leftToolbarContainer = dom['left-controls-container'];
+const viewControlsContainer = dom['view-controls'];
 
-    // Defer initial state settings until the 3D scene is fully initialized.
-    dom['render-container'].addEventListener('sceneReady', () => {
+if (leftToolbarContainer) {
+    // Use the whole container as the handle
+    makeDraggable(leftToolbarContainer, leftToolbarContainer);
+    // Bring to front on click
+    leftToolbarContainer.addEventListener('mousedown', () => {
+        leftToolbarContainer.style.zIndex = getNewZIndex();
+    });
+}
+
+if (viewControlsContainer) {
+    // Use the whole container as the handle
+    makeDraggable(viewControlsContainer, viewControlsContainer);
+    // Bring to front on click
+    viewControlsContainer.addEventListener('mousedown', () => {
+        viewControlsContainer.style.zIndex = getNewZIndex();
+    });
+}
+
+promptForProjectDirectory();
+
+// Defer initial state settings until the 3D scene is fully initialized.
+dom['render-container'].addEventListener('sceneReady', () => {
         // Set the camera helper's visibility based on the default checkbox state.
         setGizmoVisibility(dom['gizmo-toggle'].checked);
         }, { once: true }); // The event should only fire once.
@@ -1814,17 +1814,12 @@ async function render2DHeatmap() {
                     dom['simulation-status'].classList.remove('text-yellow-500', 'text-green-500');
                 }
             }
-        });
-    }
-
-   const hourlyData = resultsManager.getIlluminanceForHour(hour);
-    if (hourlyData) {
-        updateSensorGridColors(hourlyData);
-        }
     });
-    dom['view-bsdf-btn']?.addEventListener('click', openBsdfViewer);
+}
 
-    // --- Saved Views Listeners ---
+dom['view-bsdf-btn']?.addEventListener('click', openBsdfViewer);
+
+// --- Saved Views Listeners ---
     setupContextControls();
     dom['save-view-btn']?.addEventListener('click', saveCurrentView);
     dom['saved-views-list']?.addEventListener('click', (e) => {
@@ -2187,62 +2182,45 @@ export function setupFloatingWindows() {
 }
 
 export function makeDraggable(element, handle) {
-    let initialX, initialY, xOffset = 0, yOffset = 0;
-        handle.onmousedown = e => {
-            if (e.target.closest('.window-controls') || e.target.classList.contains('resize-handle')) return;
+    let offsetX, offsetY;
+    handle.onmousedown = e => {
+        if (e.target.closest('.window-controls') || e.target.classList.contains('resize-handle')) return;
+        e.preventDefault();
+
+        const rect = element.getBoundingClientRect();
+        offsetX = e.clientX - rect.left;
+        offsetY = e.clientY - rect.top;
+
+        // On the first drag, we switch the element to a pure transform-based positioning
+        // to neutralize any conflicting CSS classes (like top-1/2, left-1/2, etc.).
+        if (!element.dataset.transformPositioned) {
+             element.style.left = '0px';
+             element.style.top = '0px';
+             element.style.transform = `translate3d(${rect.left}px, ${rect.top}px, 0)`;
+             element.dataset.transformPositioned = 'true';
+        }
+
+        controls.enabled = false;
+        document.onmouseup = () => { document.onmouseup = null; document.onmousemove = null; controls.enabled = true; };
+        document.onmousemove = (e) => {
             e.preventDefault();
-            const transform = getComputedStyle(element).transform;
-            
-            if (transform === 'none') {
-                // If not positioned by transform, use offsetLeft/Top as the starting point.
-                // This correctly handles newly created panels positioned by standard CSS.
-                xOffset = element.offsetLeft;
-                yOffset = element.offsetTop;
-            } else {
-                // If already transformed, read the position from the matrix.
-                const matrix = new DOMMatrix(transform);
-                xOffset = matrix.m41;
-                yOffset = matrix.m42;
-            }
-            
-            initialX = e.clientX - xOffset; initialY = e.clientY - yOffset;
-            controls.enabled = false;
-            document.onmouseup = () => { document.onmouseup = null; document.onmousemove = null; controls.enabled = true; };
-            document.onmousemove = (e) => {
-                e.preventDefault();
-                if (element.classList.contains('maximized')) return;
+            if (element.classList.contains('maximized')) return;
 
-                // Once dragging begins, ensure transform is the sole positioning method going forward.
-                if (element.style.top || element.style.left) {
-                    element.style.top = '';
-                    element.style.left = '';
-                }
-                
-              xOffset = e.clientX - initialX; yOffset = e.clientY - initialY;
+            // Calculate the new desired top-left position in viewport coordinates
+            let newX = e.clientX - offsetX;
+            let newY = e.clientY - offsetY;
 
-            // Constrain the panel within its container using viewport-relative coordinates for robustness
-            const container = element.parentElement;
-            const containerRect = container.getBoundingClientRect();
+            // Constrain the element within the viewport for smooth dragging
             const elementWidth = element.offsetWidth;
             const elementHeight = element.offsetHeight;
 
-            // The desired 'left' position of the element in viewport coordinates is containerRect.left + xOffset
-            // We clamp this desired viewport position to stay within the container's bounds.
-            const minLeftEdge = containerRect.left;
-            const maxLeftEdge = containerRect.right - elementWidth;
-            const desiredLeftEdge = containerRect.left + xOffset;
-            const clampedLeftEdge = Math.max(minLeftEdge, Math.min(desiredLeftEdge, maxLeftEdge));
+            const finalX = Math.max(0, Math.min(newX, window.innerWidth - elementWidth));
+            const finalY = Math.max(0, Math.min(newY, window.innerHeight - elementHeight));
 
-            // Convert the clamped viewport position back to a transform value (relative to the container)
-            const finalX = clampedLeftEdge - containerRect.left;
-
-            // For vertical clamping, we can still use the simpler method against the viewport height
-            const clampedY = Math.max(0, Math.min(yOffset, window.innerHeight - elementHeight));
-
-            element.style.transform = `translate3d(${finalX}px, ${clampedY}px, 0)`;
+            element.style.transform = `translate3d(${finalX}px, ${finalY}px, 0)`;
         };
     };
-  }
+}
 
 export function makeResizable(element, handles) {
     handles.forEach(handle => {
@@ -3739,9 +3717,9 @@ async function onSensorClick(event) {
 
         const finalIndex = baseIndex + instanceId;
             const { openTemporalMapForPoint } = await import('./annualDashboard.js');
-            openTemporalMapForPoint(finalIndex);
-        }
+        openTemporalMapForPoint(finalIndex);
     }
+}
 
 /**
  * Projects a 2D pixel coordinate from a fisheye image into the 3D scene to find a glare source.
@@ -4232,10 +4210,13 @@ function onSceneClick(event) {
 
     const wallIntersect = intersects.find(i => i.object.userData.isSelectableWall === true);
     const furnitureIntersect = intersects.find(i => i.object.userData.isFurniture === true);
+    const vegetationIntersect = intersects.find(i => i.object.userData.isVegetation === true);
     const massingIntersect = intersects.find(i => i.object.userData.isMassingBlock === true);
 
     if (furnitureIntersect) {
         selectTransformableObject(furnitureIntersect.object);
+    } else if (vegetationIntersect) {
+        selectTransformableObject(vegetationIntersect.object);
     } else if (massingIntersect) {
         selectTransformableObject(massingIntersect.object);
     } else if (wallIntersect) {
@@ -5389,13 +5370,20 @@ function _setupAssetLibraryDragDrop() {
 
     let draggedAssetType = null;
 
-    assetLibrary.addEventListener('dragstart', (e) => {
-        const item = e.target.closest('.asset-item');
-        if (item && item.dataset.assetType) {
-            draggedAssetType = item.dataset.assetType;
-            e.dataTransfer.effectAllowed = 'copy';
-        }
-    });
+    const setupDragStart = (library) => {
+        if (!library) return;
+        library.addEventListener('dragstart', (e) => {
+            const item = e.target.closest('.asset-item');
+            if (item && item.dataset.assetType) {
+                draggedAssetType = item.dataset.assetType;
+                e.dataTransfer.effectAllowed = 'copy';
+                console.log(`[DEBUG] Drag Start. Asset: ${draggedAssetType}`);
+            }
+        });
+    };
+
+    setupDragStart(assetLibrary);
+    setupDragStart(dom['asset-library-vegetation']);
 
     renderContainer.addEventListener('dragover', (e) => {
         e.preventDefault();
@@ -5406,6 +5394,9 @@ function _setupAssetLibraryDragDrop() {
         e.preventDefault();
         if (!draggedAssetType) return;
 
+        // Capture the asset type in a constant. This is the main fix.
+        const assetTypeToCreate = draggedAssetType;
+
         const rect = renderContainer.getBoundingClientRect();
         const pointer = new THREE.Vector2();
         pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -5414,13 +5405,23 @@ function _setupAssetLibraryDragDrop() {
         const raycaster = new THREE.Raycaster();
         raycaster.setFromCamera(pointer, activeCamera);
 
-        // Intersect with the ground plane to find the drop position
         const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
         const intersectPoint = new THREE.Vector3();
-        raycaster.ray.intersectPlane(groundPlane, intersectPoint);
+        const didIntersect = raycaster.ray.intersectPlane(groundPlane, intersectPoint);
 
-        if (intersectPoint) {
-            addFurniture(draggedAssetType, intersectPoint);
+        if (didIntersect) {
+            const vegetationTypes = ['tree-deciduous', 'tree-coniferous', 'bush'];
+            if (vegetationTypes.includes(assetTypeToCreate)) {
+                import('./geometry.js').then(({ addVegetation }) => {
+                    const vegetation = addVegetation(assetTypeToCreate, intersectPoint);
+                    if (!vegetation) {
+                        // If creation fails, log an error to the console instead of showing a popup.
+                        console.error(`Failed to create vegetation asset: ${assetTypeToCreate}`);
+                    }
+                });
+            } else {
+                addFurniture(assetTypeToCreate, intersectPoint);
+            }
         }
         draggedAssetType = null;
     });
@@ -5477,35 +5478,35 @@ function _updateObjectFromTransformSliders() {
 }
 
 /**
-* Removes the currently selected object (furniture or massing block) from the scene.
+* Removes the currently selected object (furniture, vegetation, or massing block) from the scene.
 * @private
 */
 async function _removeSelectedObject() {
     const object = transformControls.object;
     if (!object) {
-    return; // Nothing selected, do nothing.
+        return; // Nothing selected, do nothing.
     }
 
     const objectName = object.userData.assetType || object.userData.name || 'object';
 
-    if (object.userData.isFurniture) {
-    // Detach gizmo and hide controls
-    transformControls.detach();
-    dom['transform-controls-section']?.classList.add('hidden');
+    if (object.userData.isFurniture || object.userData.isVegetation) {
+        // Detach gizmo and hide controls
+        transformControls.detach();
+        dom['transform-controls-section']?.classList.add('hidden');
 
-    // Remove from parent (which should be a group inside furnitureObject)
-    if (object.parent) {
-        object.parent.remove(object);
-    }
+        // Remove from its parent group
+        if (object.parent) {
+            object.parent.remove(object);
+        }
 
-    showAlert(`Removed ${objectName}.`, 'Object Removed');
+        showAlert(`Removed ${objectName}.`, 'Object Removed');
     } else if (object.userData.isMassingBlock) {
-    // Detach gizmo and hide controls
-    transformControls.detach();
-    dom['transform-controls-section']?.classList.add('hidden');
+        // Detach gizmo and hide controls
+        transformControls.detach();
+        dom['transform-controls-section']?.classList.add('hidden');
 
-    // Use the manager function to handle removal and UI update
-    const { deleteContextObject } = await import('./geometry.js');
+        // Use the manager function to handle removal and UI update
+        const { deleteContextObject } = await import('./geometry.js');
         deleteContextObject(object.userData.id);
         showAlert(`Removed ${objectName}.`, 'Object Removed');
     } else {
@@ -5626,7 +5627,7 @@ function onPointerUp(event) {
 function handleSceneClick(event) {
     if (transformControls.dragging || sensorTransformControls.dragging || isResizeMode) return;
 
-    const { isQuadView, topCamera, frontCamera, sideCamera } = MESH.scene;
+    const { isQuadView, topCamera, frontCamera, sideCamera } = MESH;
     const pointer = new THREE.Vector2();
     let cameraForRaycast = activeCamera;
 
@@ -5658,25 +5659,43 @@ function handleSceneClick(event) {
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
     const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(pointer, cameraForRaycast);
+raycaster.setFromCamera(pointer, cameraForRaycast);
 
-    const objectsToIntersect = [wallSelectionGroup, furnitureObject, contextObject];
-    const intersects = raycaster.intersectObjects(objectsToIntersect, true);
+const objectsToIntersect = [wallSelectionGroup, furnitureObject, contextObject, vegetationObject];
+const intersects = raycaster.intersectObjects(objectsToIntersect, true);
 
-    const wallIntersect = intersects.find(i => i.object.userData.isSelectableWall === true);
-    const furnitureIntersect = intersects.find(i => i.object.userData.isFurniture === true);
-    const massingIntersect = intersects.find(i => i.object.userData.isMassingBlock === true);
-
-    if (furnitureIntersect) {
-        selectTransformableObject(furnitureIntersect.object);
-    } else if (massingIntersect) {
-        selectTransformableObject(massingIntersect.object);
-    } else if (wallIntersect) {
-        transformControls.detach();
-        handleWallInteraction(wallIntersect);
-    } else {
-        handleDeselection();
+const wallIntersect = intersects.find(i => i.object.userData.isSelectableWall === true);
+const furnitureIntersect = intersects.find(i => i.object.userData.isFurniture === true);
+const massingIntersect = intersects.find(i => i.object.userData.isMassingBlock === true);
+const vegetationIntersect = intersects.find(i => {
+    let parent = i.object;
+    while (parent) {
+        if (parent.userData.isVegetation) return true;
+        parent = parent.parent;
     }
+    return false;
+});
+
+if (furnitureIntersect) {
+    selectTransformableObject(furnitureIntersect.object);
+} else if (vegetationIntersect) {
+    let targetGroup = vegetationIntersect.object;
+    while (targetGroup && !targetGroup.userData.isVegetation) {
+        targetGroup = targetGroup.parent;
+    }
+    if (targetGroup) {
+        selectTransformableObject(targetGroup);
+        // Show transform controls for vegetation
+        dom['transform-controls-section']?.classList.remove('hidden');
+    }
+} else if (massingIntersect) {
+    selectTransformableObject(massingIntersect.object);
+} else if (wallIntersect) {
+    transformControls.detach();
+    handleWallInteraction(wallIntersect);
+} else {
+    handleDeselection();
+}
 }
 
 /**

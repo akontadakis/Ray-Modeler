@@ -379,6 +379,7 @@ export async function generateRadFileContent(options = {}) {
  radMaterials += getMaterialDef('furniture');
   radMaterials += getMaterialDef('context');
   radMaterials += `void plastic ground_mat\n0\n0\n5 0.15 0.15 0.15 0 0\n\n`; // A dark, diffuse ground material
+  radMaterials += `void trans vegetation_canopy_mat\n0\n0\n7 0.1 0.2 0.1 0 0.5 0.3 0\n\n`; // Green, diffuse, 30% transparent material for canopy
 
   const Tn = parseFloat(dom['glazing-trans'].value);
   const tn = transmittanceToTransmissivity(Tn);
@@ -396,6 +397,8 @@ export async function generateRadFileContent(options = {}) {
           'GLAZING': 'glass_mat',
           'FRAME': 'frame_mat',
           'SHADING_DEVICE': 'shading_mat',
+          'VEGETATION_CANOPY': 'vegetation_canopy_mat',
+          'VEGETATION_TRUNK': 'furniture_mat',
       };
       // Transform from Three.js Y-up to Radiance Z-up
       const threeToRadTransform = (p) => `${p[0].toFixed(4)} ${p[2].toFixed(4)} ${p[1].toFixed(4)}`;
@@ -583,7 +586,7 @@ for (const [orientation, winParams] of Object.entries(allWindows)) {
 
 // --- Generate Imported OBJ Shading ---
 // Find the Three.js objects for imported shading from the scene
-const { importedShadingObjects, furnitureObject, contextObject } = await import('./geometry.js');
+const { importedShadingObjects, furnitureObject, contextObject, vegetationObject } = await import('./geometry.js');
     importedShadingObjects.forEach((objGroup, index) => {
     // Traverse the group to find the actual mesh
         objGroup.traverse(child => {
@@ -602,15 +605,29 @@ const { importedShadingObjects, furnitureObject, contextObject } = await import(
         });
     }
 
+    // --- Generate Vegetation Geometry ---
+    let vegetationGeometry = '\n# --- VEGETATION & TREES ---\n';
+    if (vegetationObject.children.length > 0) {
+        const directTransform = (p) => `${p[0].toFixed(4)} ${p[2].toFixed(4)} ${p[1].toFixed(4)}`;
+        vegetationObject.children.forEach((treeGroup, index) => {
+            // Each child is a group containing trunk and canopy meshes
+            treeGroup.children.forEach(mesh => {
+                const surfaceType = mesh.userData.surfaceType;
+                const radMaterialName = surfaceType === 'VEGETATION_CANOPY' ? 'vegetation_canopy_mat' : 'furniture_mat';
+                vegetationGeometry += _generateRadFromMesh(mesh, radMaterialName, `${treeGroup.userData.assetType}_${index}`, directTransform);
+            });
+        });
+    }
 
-  for (const [orientation, winParams] of Object.entries(allWindows)) {
-    const { ww, wh, sh, wallWidth, winCount, mode } = winParams || {};
-    if (!(ww > 0 && wh > 0 && winCount > 0)) continue;
-    const spacing = (mode === 'wwr') ? 0.1 : ww / 2;
-    const groupWidth = (winCount * ww) + (Math.max(0, winCount - 1) * spacing);
-    const startOffset = (wallWidth - groupWidth) / 2;
-    const shadeParams = allShading[orientation];
-    if (!shadeParams) continue;
+
+    for (const [orientation, winParams] of Object.entries(allWindows)) {
+        const { ww, wh, sh, wallWidth, winCount, mode } = winParams || {};
+        if (!(ww > 0 && wh > 0 && winCount > 0)) continue;
+        const spacing = (mode === 'wwr') ? 0.1 : ww / 2;
+        const groupWidth = (winCount * ww) + (Math.max(0, winCount - 1) * spacing);
+        const startOffset = (wallWidth - groupWidth) / 2;
+        const shadeParams = allShading[orientation];
+        if (!shadeParams) continue;
 
     for (let i = 0; i < winCount; i++) {
       const offset = startOffset + i * (ww + spacing);
@@ -795,7 +812,7 @@ const { importedShadingObjects, furnitureObject, contextObject } = await import(
 
   return {
       materials: matHeader + radMaterials + dynamicMaterialDefs,
-      geometry: geoHeader + radGeometry + shadingGeometry + furnitureGeometry + contextGeometry + clippingGeometry
+      geometry: geoHeader + radGeometry + shadingGeometry + furnitureGeometry + vegetationGeometry + contextGeometry + clippingGeometry
   };
 }
 

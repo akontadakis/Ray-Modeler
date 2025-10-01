@@ -1,7 +1,7 @@
 // scripts/geometry.js
 
 import * as THREE from 'three';
-import { renderer, horizontalClipPlane, verticalClipPlane, sensorTransformControls, daylightingSensorsGroup, importedModelObject } from './scene.js';
+import { renderer, horizontalClipPlane, verticalClipPlane, sensorTransformControls, importedModelObject } from './scene.js';
 import { getDom, getAllWindowParams, getAllShadingParams, validateInputs, getWindowParamsForWall, getSensorGridParams, scheduleUpdate } from './ui.js';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
@@ -34,7 +34,15 @@ export const axesObject = new THREE.Group();
 export const groundObject = new THREE.Group();
 export const northArrowObject = new THREE.Group();
 export const furnitureObject = new THREE.Group();
+const furnitureContainer = new THREE.Group();
+furnitureObject.add(furnitureContainer);
+
 export const contextObject = new THREE.Group();
+export const vegetationObject = new THREE.Group();
+const vegetationContainer = new THREE.Group();
+vegetationObject.add(vegetationContainer);
+
+export const daylightingSensorsGroup = new THREE.Group();
 const taskAreaHelpersGroup = new THREE.Group();
 
 // --- MODULE STATE & SHARED RESOURCES ---
@@ -69,6 +77,7 @@ const shared = {
     taskAreaMat: new THREE.MeshBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.2, side: THREE.DoubleSide }),
     surroundingAreaMat: new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.2, side: THREE.DoubleSide }),
     contextMat: new THREE.MeshBasicMaterial({ color: 0x888888, side: THREE.DoubleSide }),
+    vegetationCanopyMat: new THREE.MeshBasicMaterial({ color: 0x4caf50, transparent: true, opacity: 0.8, side: THREE.DoubleSide }),
 };
 
 // --- HELPER FUNCTIONS ---
@@ -130,6 +139,9 @@ function clearGroup(group) {
     if (group === contextObject) {
         // No specific cleanup needed yet, but good to have the case
     }
+    if (group === vegetationObject) {
+        // No specific cleanup needed
+    }
     group.traverse(child => {
         if (child.element && child.removeFromParent) {
             child.element.remove();
@@ -163,6 +175,13 @@ export async function updateScene(changedId = null) {
     validateInputs(changedId);
     const { W, L, H, rotationY, elevation } = readParams();
 
+    // Apply room rotation and elevation to all relevant geometry groups
+    const groupsToTransform = [roomObject, shadingObject, sensorGridObject, wallSelectionGroup, furnitureObject, daylightingSensorsGroup, resizeHandlesObject, vegetationObject];
+    groupsToTransform.forEach(group => {
+        group.rotation.y = rotationY;
+        group.position.y = elevation;
+    });
+
     const showGround = dom['ground-plane-toggle'].checked;
     groundObject.visible = showGround;
     northArrowObject.visible = true; // North Arrow is now always visible
@@ -179,13 +198,6 @@ export async function updateScene(changedId = null) {
         activeClippingPlanes.push(verticalClipPlane);
     }
     renderer.clippingPlanes = activeClippingPlanes;
-
-    // Apply room rotation and elevation to all relevant geometry groups
-    const groupsToTransform = [roomObject, shadingObject, sensorGridObject, wallSelectionGroup, furnitureObject, daylightingSensorsGroup, resizeHandlesObject];
-    groupsToTransform.forEach(group => {
-        group.rotation.y = rotationY;
-        group.position.y = elevation;
-    });
 
     // If the room orientation changed, re-sync the viewpoint camera from the UI sliders.
     if (changedId === 'room-orientation') {
@@ -1346,43 +1358,41 @@ export function attachGizmoToSelectedSensor() {
  */
 export function addFurniture(assetType, position) {
     const dom = getDom();
-    // Use the single, shared material for all furniture
-        const material = shared.furnitureMat;
-        applyClippingToMaterial(material, renderer.clippingPlanes);
+    const material = shared.furnitureMat;
+    applyClippingToMaterial(material, renderer.clippingPlanes);
 
-        let geometry;
-        let mesh;
+    let geometry;
+    let mesh;
 
     switch (assetType) {
         case 'desk':
-            geometry = new THREE.BoxGeometry(1.2, 0.75, 0.05); // L, D, H for tabletop
+            geometry = new THREE.BoxGeometry(1.2, 0.05, 0.75); // W, H, D
             mesh = new THREE.Mesh(geometry, material);
-            mesh.position.y = 0.725; // Top of desk at 0.75m
-            // Simple legs
-            const legGeom = new THREE.BoxGeometry(0.05, 0.05, 0.7);
-            const leg1 = new THREE.Mesh(legGeom, material); leg1.position.set(-0.55, -0.35, -0.35);
-            const leg2 = new THREE.Mesh(legGeom, material); leg2.position.set(0.55, -0.35, -0.35);
-            const leg3 = new THREE.Mesh(legGeom, material); leg3.position.set(-0.55, 0.35, -0.35);
-            const leg4 = new THREE.Mesh(legGeom, material); leg4.position.set(0.55, 0.35, -0.35);
+            mesh.position.y = 0.725;
+            const legGeom = new THREE.BoxGeometry(0.05, 0.7, 0.05);
+            const leg1 = new THREE.Mesh(legGeom, material); leg1.position.set(-0.55, -0.375, -0.35);
+            const leg2 = new THREE.Mesh(legGeom, material); leg2.position.set(0.55, -0.375, -0.35);
+            const leg3 = new THREE.Mesh(legGeom, material); leg3.position.set(-0.55, -0.375, 0.35);
+            const leg4 = new THREE.Mesh(legGeom, material); leg4.position.set(0.55, -0.375, 0.35);
             mesh.add(leg1, leg2, leg3, leg4);
             break;
         case 'chair':
-            geometry = new THREE.BoxGeometry(0.4, 0.4, 0.04);
+            geometry = new THREE.BoxGeometry(0.4, 0.04, 0.4);
             mesh = new THREE.Mesh(geometry, material);
-            mesh.position.y = 0.42; // Seat height
-            const backGeom = new THREE.BoxGeometry(0.4, 0.04, 0.5);
+            mesh.position.y = 0.42;
+            const backGeom = new THREE.BoxGeometry(0.4, 0.5, 0.04);
             const back = new THREE.Mesh(backGeom, material);
-            back.position.set(0, 0.2, 0.27);
-            back.rotation.x = -0.1;
+            back.position.set(0, 0.27, -0.18);
+            back.rotation.x = 0.1;
             mesh.add(back);
             break;
         case 'partition':
-            geometry = new THREE.BoxGeometry(1.2, 0.05, 1.5);
+            geometry = new THREE.BoxGeometry(1.2, 1.5, 0.05);
             mesh = new THREE.Mesh(geometry, material);
             mesh.position.y = 0.75;
             break;
         case 'shelf':
-            geometry = new THREE.BoxGeometry(0.9, 0.3, 1.8);
+            geometry = new THREE.BoxGeometry(0.9, 1.8, 0.3);
             mesh = new THREE.Mesh(geometry, material);
             mesh.position.y = 0.9;
             break;
@@ -1395,17 +1405,11 @@ export function addFurniture(assetType, position) {
         assetType: assetType,
     };
 
-    const { W, L } = readParams();
-    // Position is in world space, needs to be converted to local space of the furniture container
-    mesh.position.add(position);
-    mesh.position.x -= W / 2;
-    mesh.position.z -= L / 2;
+    // The drop position is in world coordinates. We need to convert it to the
+    // local coordinate system of the parent `furnitureObject`.
+    const localPosition = furnitureObject.worldToLocal(position.clone());
+    mesh.position.add(localPosition);
 
-    const furnitureContainer = furnitureObject.children[0] || new THREE.Group();
-    if (furnitureObject.children.length === 0) {
-        furnitureContainer.position.set(-W / 2, 0, -L / 2);
-        furnitureObject.add(furnitureContainer);
-    }
     furnitureContainer.add(mesh);
 
     return mesh;
@@ -1854,4 +1858,88 @@ export function createContextFromOsm(osmData, centerLat, centerLon) {
     }
 
     updateContextMaterial(); // Apply initial material color
+}
+
+/**
+ * Creates and adds a vegetation asset to the scene.
+ * @param {string} assetType - The type of asset to create (e.g., 'tree-deciduous').
+ * @param {THREE.Vector3} position - The initial world position for the asset.
+ * @returns {THREE.Group|null} The created group object, or null if asset type is unknown.
+ */
+export function addVegetation(assetType, position) {
+    console.log(`[DEBUG] addVegetation function started. Type: "${assetType}", World Position:`, position);
+
+    const treeGroup = new THREE.Group();
+    let geometryCreated = false;
+
+    switch (assetType) {
+        case 'tree-deciduous': {
+            const trunkGeom = new THREE.CylinderGeometry(0.15, 0.2, 2.5, 8);
+            const trunkMesh = new THREE.Mesh(trunkGeom, shared.furnitureMat.clone()); // Use clone for safety
+            trunkMesh.userData.surfaceType = 'VEGETATION_TRUNK';
+            trunkMesh.position.y = 1.25;
+
+            const canopyGeom = new THREE.SphereGeometry(1.5, 12, 8);
+            const canopyMesh = new THREE.Mesh(canopyGeom, shared.vegetationCanopyMat.clone());
+            canopyMesh.userData.surfaceType = 'VEGETATION_CANOPY';
+            canopyMesh.position.y = 3.5;
+
+            treeGroup.add(trunkMesh, canopyMesh);
+            geometryCreated = true;
+            break;
+        }
+        case 'tree-coniferous': {
+            const conTrunkGeom = new THREE.CylinderGeometry(0.2, 0.25, 2.0, 8);
+            const conTrunkMesh = new THREE.Mesh(conTrunkGeom, shared.furnitureMat.clone()); // Use clone for safety
+            conTrunkMesh.userData.surfaceType = 'VEGETATION_TRUNK';
+            conTrunkMesh.position.y = 1.0;
+
+            const canopyGeomCone = new THREE.ConeGeometry(1.2, 4.0, 12);
+            const canopyMeshCone = new THREE.Mesh(canopyGeomCone, shared.vegetationCanopyMat.clone());
+            canopyMeshCone.userData.surfaceType = 'VEGETATION_CANOPY';
+            canopyMeshCone.position.y = 2.0 + 4.0 / 2;
+
+            treeGroup.add(conTrunkMesh, canopyMeshCone);
+            geometryCreated = true;
+            break;
+        }
+        case 'bush': {
+            const bushGeom = new THREE.SphereGeometry(0.7, 10, 6);
+            const bushMesh = new THREE.Mesh(bushGeom, shared.vegetationCanopyMat.clone());
+            bushMesh.userData.surfaceType = 'VEGETATION_CANOPY';
+            bushMesh.position.y = 0.7;
+            treeGroup.add(bushMesh);
+            geometryCreated = true;
+            break;
+        }
+        default:
+            console.error(`[DEBUG] Unknown vegetation asset type in switch: ${assetType}`);
+            return null;
+    }
+
+    if (!geometryCreated) {
+        console.error('[DEBUG] Geometry was not created for the asset type.');
+        return null;
+    }
+    console.log('[DEBUG] Geometry created. Resulting treeGroup:', treeGroup);
+
+    treeGroup.userData = {
+        isVegetation: true,
+        assetType: assetType,
+    };
+
+    // The drop position is in world coordinates. Convert it to the local
+    // coordinate system of the parent `vegetationObject`.
+    const localPosition = vegetationObject.worldToLocal(position.clone());
+    treeGroup.position.add(localPosition);
+
+    vegetationObject.add(treeGroup);
+    
+    // Force matrix update to get immediate world position
+    treeGroup.updateMatrixWorld(true);
+    const finalWorldPos = new THREE.Vector3();
+    treeGroup.getWorldPosition(finalWorldPos);
+    console.log('[DEBUG] Final calculated world position of new object:', finalWorldPos);
+
+    return treeGroup;
 }

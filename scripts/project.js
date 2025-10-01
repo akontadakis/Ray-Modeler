@@ -121,7 +121,8 @@ class Project {
                 furniture: (async () => {
                     const { furnitureObject } = await import('./geometry.js');
                     const furnitureData = [];
-                    if (furnitureObject.children.length > 0) {
+                    // The container is now guaranteed to be the first child.
+                    if (furnitureObject.children.length > 0 && furnitureObject.children[0].children) {
                         const furnitureContainer = furnitureObject.children[0];
                         furnitureContainer.children.forEach(obj => {
                             furnitureData.push({
@@ -133,6 +134,22 @@ class Project {
                         });
                     }
                     return furnitureData;
+                })(),
+                vegetation: (async () => {
+                    const { vegetationObject } = await import('./geometry.js');
+                    const vegetationData = [];
+                    if (vegetationObject.children.length > 0 && vegetationObject.children[0].children) {
+                        const vegetationContainer = vegetationObject.children[0];
+                        vegetationContainer.children.forEach(obj => {
+                            vegetationData.push({
+                                assetType: obj.userData.assetType,
+                                position: obj.position.toArray(),
+                                quaternion: obj.quaternion.toArray(),
+                                scale: obj.scale.toArray(),
+                            });
+                        });
+                    }
+                    return vegetationData;
                 })(),
                 contextMassing: (async () => {
                     const { contextObject } = await import('./geometry.js');
