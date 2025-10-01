@@ -221,6 +221,7 @@ OpenRouter provides access to a wide variety of models from different providers 
 The interface is designed around a logical workflow, guiding the user from setup to analysis.
 
 ![Ray Modeler Main UI](./Pictures/main_ui.png)
+![Ray Modeler Main UI](./Pictures/main_ui_quad.png)
 ![Ray Modeler Panels](./Pictures/panels_ui.png)
 
 - **3D Viewport (Center)**: The main interactive area where the 3D scene is displayed. You can navigate the scene using standard orbit controls (mouse drag, scroll).
@@ -300,6 +301,8 @@ The panels on the left toolbar are used to define the scene.
     - **Simple Massing Tools**: Create and place simple 3D shapes (boxes, cylinders) to represent surrounding buildings.
     - **Topography Import**: Generate a ground plane with topography from a grayscale heightmap image.
     - **OpenStreetMaps Integration**: Automatically fetch building footprints and height data for a given location to generate a basic urban context.
+
+![Ray Modeler Main UI](./Pictures/panels_ui_ray.png)
 
 ### 📜 Simulation Modules (Recipes)
 
