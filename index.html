@@ -3681,8 +3681,12 @@
                                 <h4 class="ml-3 font-semibold text-sm uppercase">3. View Out</h4>
                             </label>
                             <div id="en17037-view-controls" class="space-y-3 pt-2 mt-2 border-t border-dashed border-[--grid-color]">
-                                <p class="text-xs text-gray-400">Generates a fisheye image for manual verification of view quality.</p>
-                                <div>
+                                <p class="text-xs text-gray-400">Generates a fisheye image for manual verification of view quality (Horizontal Sight Angle, Layers, etc.).</p>
+                                <label for="en17037-view-factor-toggle" class="flex items-center cursor-pointer w-full !text-xs !text-gray-400 mt-2">
+                                    <input type="checkbox" id="en17037-view-factor-toggle">
+                                    <span class="ml-3 label !text-gray-400 !uppercase-none !font-normal">Also run quantitative View Factor calculation</span>
+                                </label>
+                                <div class="pt-2">
                                     <label for="en17037-view-level" class="label">Target Performance Level</label>
                                     <select id="en17037-view-level" class="w-full mt-1">
                                         <option value="minimum" selected>Minimum</option>

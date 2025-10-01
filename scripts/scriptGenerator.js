@@ -2172,6 +2172,7 @@ function createEn17037ComplianceScript(projectData) {
     const sunlightLevel = p['en17037-sunlight-level'];
     const checkView = p['en17037-view-toggle'];
     const viewLevel = p['en17037-view-level'];
+    const checkViewFactor = p['en17037-view-factor-toggle']; // New line
     const checkGlare = p['en17037-glare-toggle'];
     const glareLevel = p['en17037-glare-level'];
 
@@ -2439,9 +2440,69 @@ if [ "${checkView}" = true ]; then
     rpict -vta -vh 180 -vv 180 -vf ../03_views/viewpoint.vf -x 1024 -y 1024 \\
         \${RAD_PARAMS} "\${OCT_DIR}/${projectName}.oct" > "\${IMG_DIR}/${projectName}_view_out.hdr"
     echo "Fisheye image for View Out analysis generated: \${IMG_DIR}/${projectName}_view_out.hdr"
-    echo "Please manually verify Horizontal Sight Angle, Outside Distance, and Layers."
+   echo "Please manually verify Horizontal Sight Angle, Outside Distance, and Layers."
     echo ">>> STATUS: MANUAL CHECK REQUIRED"
 fi
+
+# ==============================================================================
+# --- 3b. VIEW FACTOR (QUANTITATIVE) ---
+# ==============================================================================
+if [ "${checkViewFactor}" = true ]; then
+    echo ""
+    echo "### RUNNING CHECK 3b: VIEW FACTOR CALCULATION ###"
+
+    # 1. Create a modified scene file for view factor analysis
+    echo "1. Creating modified scene for analysis..."
+    MODIFIED_GEOM_VF="\${RESULTS_DIR}/${projectName}_vf.rad"
+    MODIFIED_MATS_VF="\${RESULTS_DIR}/materials_vf.rad"
+
+    # Define special materials: 'window_light' emits white light, 'black' absorbs everything.
+    cat > "\${MODIFIED_MATS_VF}" << EOF
+void light window_light
+0
+0
+3 1 1 1
+
+void plastic black
+0
+0
+5 0 0 0 0 0
+EOF
+
+    # Use replmarks to swap all materials except glazing to 'black'.
+    replmarks -m glass_mat=window_light \\
+              -m wall_mat=black -m floor_mat=black -m ceiling_mat=black \\
+              -m frame_mat=black -m shading_mat=black -m furniture_mat=black \\
+              -m context_mat=black -m ground_mat=black \\
+              "../01_geometry/${projectName}.rad" > "\${MODIFIED_GEOM_VF}"
+
+    # 2. Create the octree for the modified scene
+    echo "2. Creating analysis octree..."
+    OCTREE_VF="\${OCT_DIR}/${projectName}_vf.oct"
+    oconv "\${MODIFIED_MATS_VF}" "\${MODIFIED_GEOM_VF}" > "\${OCTREE_VF}"
+
+    # 3. Calculate the View Factor using rtrace
+    echo "3. Calculating numerical view factor..."
+    VIEW_FACTOR_FILE="\${RESULTS_DIR}/${projectName}_view_factor.txt"
+    
+    # Generate rays from the viewpoint, trace them, and average the results.
+    # The average is the view factor because window hits = 1 and other hits = 0.
+    (cnt 5000 | rcalc -e '$1=0;$2=0;$3=0' | xform -vf ../03_views/viewpoint.vf) \\
+    | rtrace -h -w -ov -ab 0 "\${OCTREE_VF}" \\
+    | total -m \\
+    | rcalc -e '$1=$1*100' > "\${VIEW_FACTOR_FILE}"
+
+    VIEW_FACTOR_PERCENTAGE=$(cat "\${VIEW_FACTOR_FILE}")
+    
+    # 4. Generate a visualization image
+    echo "4. Generating fisheye visualization..."
+    VIZ_IMAGE="\${IMG_DIR}/${projectName}_view_factor_viz.hdr"
+    rpict -vth -vh 180 -vv 180 -ab 0 -vf ../03_views/viewpoint_fisheye.vf "\${OCTREE_VF}" > "\${VIZ_IMAGE}"
+    
+    echo ">>> STATUS: COMPLETE. View Factor is \${VIEW_FACTOR_PERCENTAGE}%. Visualization saved to \${VIZ_IMAGE}"
+fi
+
+# ==============================================================================
 
 # ==============================================================================
 # --- 4. GLARE PROTECTION ---

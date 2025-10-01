@@ -626,6 +626,9 @@ const ids = [
 
     // Shortcut Modal
     'shortcut-help-btn', 'shortcut-help-modal', 'shortcut-modal-close-btn',
+
+    // EN 17037 Compliance Recipe
+    'en17037-view-factor-toggle',
 ];
 
     ids.forEach(id => { const el = document.getElementById(id); if(el) dom[id] = el; });
