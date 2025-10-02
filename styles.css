@@ -1505,4 +1505,65 @@ html[data-theme="cafe58"] #welcome-logo-cafe58 {
     width: 80px; /* Give the send button a fixed width */
 }
 
-/* --- END: NEW AI ASSISTANT STYLES --- */
+/* --- SCENE ELEMENTS ASSET LIBRARY --- */
+.asset-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem; /* 4px */
+  padding: 0.5rem; /* 8px */
+  border-radius: 0.375rem; /* 6px */
+  cursor: grab;
+  transition: background-color 0.2s ease;
+  background-color: var(--btn-secondary-bg);
+  border: 1px solid transparent;
+}
+
+.asset-item:hover {
+  background-color: var(--btn-secondary-hover-bg);
+  border-color: var(--grid-color);
+}
+
+.asset-item:active {
+  cursor: grabbing;
+  background-color: var(--bg-selection);
+  color: var(--text-on-selection);
+}
+
+.asset-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.asset-icon svg {
+  width: 24px;
+  height: 24px;
+  stroke: var(--text-primary);
+  fill: var(--text-primary);
+  transition: all 0.2s ease;
+}
+
+.asset-item:active .asset-icon svg {
+    stroke: var(--text-on-selection);
+    fill: var(--text-on-selection);
+}
+
+.asset-name {
+  font-size: 0.65rem; /* 10.4px */
+  text-align: center;
+  user-select: none;
+}
+
+/* Increase size for specific icons */
+.asset-item[data-asset-type="desk"] .asset-icon svg,
+.asset-item[data-asset-type="shelf"] .asset-icon svg,
+.asset-item[data-asset-type="tree-deciduous"] .asset-icon svg,
+.asset-item[data-asset-type="tree-coniferous"] .asset-icon svg,
+.asset-item[data-asset-type="bush"] .asset-icon svg {
+  width: 28px;
+  height: 28px;
+}

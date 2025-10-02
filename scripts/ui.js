@@ -1,6 +1,6 @@
 // scripts/ui.js
 
-import { updateScene, axesObject, updateSensorGridColors, roomObject, shadingObject, sensorMeshes, wallSelectionGroup, highlightWall, clearWallHighlights, updateHighlightColor, furnitureObject, addFurniture, updateFurnitureColor, resizeHandlesObject, contextObject, vegetationObject } from './geometry.js';
+import { updateScene, axesObject, updateSensorGridColors, roomObject, shadingObject, sensorMeshes, wallSelectionGroup, highlightWall, clearWallHighlights, updateHighlightColor, furnitureObject, addFurniture, updateFurnitureColor, resizeHandlesObject, contextObject, vegetationObject, addImportedAsset } from './geometry.js';
 
 import { activeCamera, perspectiveCamera, orthoCamera, setActiveCamera, onWindowResize, controls, transformControls, sensorTransformControls, viewpointCamera, scene, updateLiveViewType, renderer, toggleFirstPersonView as sceneToggleFPV, isFirstPersonView as sceneIsFPV, fpvOrthoCamera, updateViewpointFromUI, setGizmoVisibility, setUpdatingFromSliders, isUpdatingCameraFromSliders, setGizmoMode } from './scene.js';
 import * as THREE from 'three';
@@ -626,6 +626,9 @@ const ids = [
 
     // Shortcut Modal
     'shortcut-help-btn', 'shortcut-help-modal', 'shortcut-modal-close-btn',
+
+    // Custom Asset Importer
+    'custom-asset-importer',
 
     // EN 17037 Compliance Recipe
     'en17037-view-factor-toggle',
@@ -4293,7 +4296,7 @@ function showApertureControlsFor(id) {
 }
 
 /**
-* Handles the logic for selecting any transformable object (furniture, massing block) and attaching the gizmo.
+ * Handles the logic for selecting any transformable object (furniture, massing block) and attaching the gizmo.
  * @param {THREE.Object3D} object The object that was clicked.
  */
 function selectTransformableObject(object) {
@@ -5388,6 +5391,69 @@ function _setupAssetLibraryDragDrop() {
     setupDragStart(assetLibrary);
     setupDragStart(dom['asset-library-vegetation']);
 
+    const customAssetImporter = dom['custom-asset-importer'];
+    let assetTypeToImport = null;
+
+    const handleAssetClick = (e) => {
+    const item = e.target.closest('.asset-item');
+    if (!item) return;
+
+    const assetType = item.dataset.assetType;
+        if (assetType === 'custom-obj-furniture' || assetType === 'custom-obj-vegetation') {
+            assetTypeToImport = assetType;
+            customAssetImporter.click();
+        }
+    };
+
+    assetLibrary.addEventListener('click', handleAssetClick);
+    dom['asset-library-vegetation']?.addEventListener('click', handleAssetClick);
+
+    customAssetImporter?.addEventListener('change', async (e) => {
+    if (!assetTypeToImport) return;
+
+    let objFile = null;
+    let mtlFile = null;
+
+    for (const file of e.target.files) {
+        if (file.name.toLowerCase().endsWith('.obj')) objFile = file;
+        else if (file.name.toLowerCase().endsWith('.mtl')) mtlFile = file;
+        }
+
+        if (!objFile) {
+            showAlert('An .obj file is required for import.', 'File Missing');
+            return;
+        }
+
+    const readAsText = (file) => new Promise((resolve, reject) => {
+        if (!file) { resolve(null); return; }
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsText(file);
+    });
+
+    try {
+        const [objContent, mtlContent] = await Promise.all([readAsText(objFile), readAsText(mtlFile)]);
+
+        const newAsset = await addImportedAsset(objContent, mtlContent, assetTypeToImport);
+
+        if (newAsset) {
+            selectTransformableObject(newAsset);
+            showAlert(`Imported ${objFile.name} successfully.`, 'Asset Imported');
+        } else {
+            throw new Error("Asset creation failed in geometry module.");
+        }
+
+        } catch (error) {
+            console.error("Error importing custom asset:", error);
+            showAlert(`Failed to import asset: ${error.message}`, 'Import Error');
+        } finally {
+            // Reset for next import
+            assetTypeToImport = null;
+            e.target.value = ''; // Allows re-importing the same file
+        }
+    });
+
     renderContainer.addEventListener('dragover', (e) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'copy';
@@ -5662,43 +5728,43 @@ function handleSceneClick(event) {
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
     const raycaster = new THREE.Raycaster();
-raycaster.setFromCamera(pointer, cameraForRaycast);
+    raycaster.setFromCamera(pointer, cameraForRaycast);
 
-const objectsToIntersect = [wallSelectionGroup, furnitureObject, contextObject, vegetationObject];
-const intersects = raycaster.intersectObjects(objectsToIntersect, true);
+    const objectsToIntersect = [wallSelectionGroup, furnitureObject, contextObject, vegetationObject];
+    const intersects = raycaster.intersectObjects(objectsToIntersect, true);
 
-const wallIntersect = intersects.find(i => i.object.userData.isSelectableWall === true);
-const furnitureIntersect = intersects.find(i => i.object.userData.isFurniture === true);
-const massingIntersect = intersects.find(i => i.object.userData.isMassingBlock === true);
-const vegetationIntersect = intersects.find(i => {
-    let parent = i.object;
-    while (parent) {
-        if (parent.userData.isVegetation) return true;
-        parent = parent.parent;
-    }
-    return false;
-});
+    const wallIntersect = intersects.find(i => i.object.userData.isSelectableWall === true);
+    const furnitureIntersect = intersects.find(i => i.object.userData.isFurniture === true);
+    const massingIntersect = intersects.find(i => i.object.userData.isMassingBlock === true);
+    const vegetationIntersect = intersects.find(i => {
+        let parent = i.object;
+        while (parent) {
+            if (parent.userData.isVegetation) return true;
+            parent = parent.parent;
+        }
+        return false;
+    });
 
-if (furnitureIntersect) {
-    selectTransformableObject(furnitureIntersect.object);
-} else if (vegetationIntersect) {
-    let targetGroup = vegetationIntersect.object;
-    while (targetGroup && !targetGroup.userData.isVegetation) {
-        targetGroup = targetGroup.parent;
+    if (furnitureIntersect) {
+        selectTransformableObject(furnitureIntersect.object);
+    } else if (vegetationIntersect) {
+        let targetGroup = vegetationIntersect.object;
+        while (targetGroup && !targetGroup.userData.isVegetation) {
+            targetGroup = targetGroup.parent;
+        }
+        if (targetGroup) {
+            selectTransformableObject(targetGroup);
+            // Show transform controls for vegetation
+            dom['transform-controls-section']?.classList.remove('hidden');
+        }
+    } else if (massingIntersect) {
+        selectTransformableObject(massingIntersect.object);
+    } else if (wallIntersect) {
+        transformControls.detach();
+        handleWallInteraction(wallIntersect);
+    } else {
+        handleDeselection();
     }
-    if (targetGroup) {
-        selectTransformableObject(targetGroup);
-        // Show transform controls for vegetation
-        dom['transform-controls-section']?.classList.remove('hidden');
-    }
-} else if (massingIntersect) {
-    selectTransformableObject(massingIntersect.object);
-} else if (wallIntersect) {
-    transformControls.detach();
-    handleWallInteraction(wallIntersect);
-} else {
-    handleDeselection();
-}
 }
 
 /**

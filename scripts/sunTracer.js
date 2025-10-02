@@ -97,7 +97,7 @@ export function traceSunRays(params) {
 
     const sunDirection = sunVector.clone().negate();
     const raycaster = new THREE.Raycaster();
-    const allObjects = [roomObject, wallSelectionGroup, shadingObject];
+    const allObjects = [roomObject, wallSelectionGroup, shadingObject, furnitureObject, vegetationObject];
 
     // Iterate through each glazing panel and cast a grid of rays
     glazingPanels.forEach(panel => {

@@ -350,8 +350,8 @@
         <div id="geometry-mode-selector" class="pb-4 border-b border-[--grid-color]">
             <label class="label">Geometry Mode</label>
             <div class="btn-group mt-1">
-                <button id="mode-parametric-btn" class="btn active">Parametric</button>
-                <button id="mode-import-btn" class="btn">Imported</button>
+                <button id="mode-parametric-btn" class="btn active">Box</button>
+                <button id="mode-import-btn" class="btn">Import</button>
             </div>
         </div>
 
@@ -1649,43 +1649,47 @@
                     <h3 class="font-semibold text-sm uppercase">Interior Furniture & Partitions</h3>
                     <p class="info-box !text-xs !py-2 !px-3">Drag assets into the 3D scene. Select an object to transform it.</p>
                     <div id="asset-library" class="grid grid-cols-4 gap-2 mt-4">
-                        <div class="asset-item" draggable="true" data-asset-type="desk" title="Desk">
-                            <div class="asset-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 2v7h16v-7z"/><path d="M6 10V4"/><path d="M18 10V4"/><path d="M4 17h16"/></svg></div>
-                            <span class="asset-name">Desk</span>
-                        </div>
-                        <div class="asset-item" draggable="true" data-asset-type="chair" title="Chair">
-                            <div class="asset-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2.5a.5.5 0 0 1-.5-.5V4a2 2 0 0 0-2-2h-3a2 2 0 0 0-2 2v2.5a.5.5 0 0 1-.5.5H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12zm-6-5h.01"/><path d="M6 11.5V14h12v-2.5"/><path d="M6.5 18.5l1.5-3.5"/><path d="M17.5 18.5l-1.5-3.5"/></svg></div>
-                            <span class="asset-name">Chair</span>
-                        </div>
-                        <div class="asset-item" draggable="true" data-asset-type="partition" title="Partition">
-                            <div class="asset-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg></div>
-                            <span class="asset-name">Partition</span>
-                        </div>
-                        <div class="asset-item" draggable="true" data-asset-type="shelf" title="Shelf">
-                            <div class="asset-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.54 5.23a.9.9 0 0 0-.81-.43H4.27a.9.9 0 0 0-.81.43l-1.5 6a.9.9 0 0 0 .81 1.37h18.46a.9.9 0 0 0 .81-1.37l-1.5-6zM4 12v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/></svg></div>
-                            <span class="asset-name">Shelf</span>
-                        </div>
-                    </div>
+            <div class="asset-item" draggable="true" data-asset-type="desk" title="Desk">
+                <div class="asset-icon"><svg viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M320.547 139.676c-17.421-.673-16.786-.83-38.428-.531-43.37.6-84.987 1.594-129.012 1.594-18.369 0-58.946-1.467-74.107 0m23.662 7.956c-1.422 37.694-5.228 75.327-5.228 112.622M295.43 148.695c1.21 37.146 5.331 74.947 3.178 112.622" stroke="currentColor" stroke-opacity=".9" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                <span class="asset-name">Desk</span>
+            </div>
+                <div class="asset-item" draggable="true" data-asset-type="chair" title="Chair">
+            <div class="asset-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 279.334 279.334" fill="currentColor"><path d="M232.423 101.03h-20.497a6 6 0 0 0 0 12h4.429v31.517l-13.396 7.135c-3.289-4.313-8.479-7.053-14.139-7.053h-32.76v-16.088h20.107c5.563 0 10.744-2.214 14.59-6.233s5.828-9.294 5.582-14.851L192.44 19.3A20.156 20.156 0 0 0 172.267 0h-63.08a20.155 20.155 0 0 0-20.173 19.3l-3.899 88.156c-.246 5.557 1.736 10.832 5.582 14.851s9.027 6.233 14.59 6.233h20.107v16.088H90.595a17.76 17.76 0 0 0-14.366 7.325l-1.478-.787-11.771-6.269v-31.516h4.429a6 6 0 0 0 0-12H46.911a6 6 0 0 0 0 12h4.068V148.5a6 6 0 0 0 3.18 5.296l18.172 9.678-.839 4.529c-.965 5.205.422 10.523 3.807 14.593S83.66 189 88.954 189h33.159v11.667a6 6 0 0 0 6 6h6.712a6 6 0 0 0-.099 1.056v14.823c-23.277.46-46.396 3.589-68.808 9.333a6.005 6.005 0 0 0-4.511 5.816v12.942c-5.265 2.317-8.954 7.576-8.954 13.688 0 8.246 6.708 14.954 14.954 14.954 8.245 0 14.953-6.708 14.953-14.954 0-6.111-3.689-11.37-8.953-13.687v-8.251c20.025-4.786 40.604-7.411 61.318-7.837v16.171c-5.234 2.33-8.897 7.571-8.897 13.66 0 8.246 6.708 14.954 14.953 14.954 8.246 0 14.954-6.708 14.954-14.954 0-6.133-3.715-11.41-9.01-13.714V234.55c20.713.426 41.29 3.051 61.317 7.837v8.251c-5.264 2.317-8.953 7.576-8.953 13.687 0 8.246 6.708 14.954 14.954 14.954 8.245 0 14.953-6.708 14.953-14.954 0-6.112-3.689-11.371-8.954-13.688v-12.791a6 6 0 0 0-4.51-5.967c-22.414-5.744-45.532-8.872-68.808-9.332v-14.823a6 6 0 0 0-.099-1.056h6.711a6 6 0 0 0 6-6V189h31.395a17.68 17.68 0 0 0 13.821-6.607 17.68 17.68 0 0 0 3.537-14.906l-.959-4.433 18.042-9.609a6 6 0 0 0 3.18-5.296V113.03h4.068a6 6 0 0 0 .003-12M64.454 264.324a2.96 2.96 0 0 1 2.954-2.954c1.628 0 2.953 1.325 2.953 2.954s-1.325 2.954-2.953 2.954a2.957 2.957 0 0 1-2.954-2.954m146.637 0a2.96 2.96 0 0 1 2.954-2.954c1.628 0 2.953 1.325 2.953 2.954s-1.325 2.954-2.953 2.954a2.957 2.957 0 0 1-2.954-2.954m-70.309 3.01c-1.628 0-2.953-1.325-2.953-2.954s1.325-2.954 2.953-2.954c1.629 0 2.954 1.325 2.954 2.954s-1.325 2.954-2.954 2.954m6.557-72.667h-13.226V189h13.226zM88.954 177c-2.351 0-3.783-1.301-4.429-2.077-.645-.775-1.663-2.421-1.234-4.732l1.641-8.852a5.76 5.76 0 0 1 5.663-4.71h98.225a5.79 5.79 0 0 1 5.63 4.542l1.914 8.852c.369 1.71-.049 3.473-1.147 4.834S192.483 177 190.733 177zm10.413-62.988a8.12 8.12 0 0 1-2.265-6.025l3.899-88.156A8.177 8.177 0 0 1 109.186 12h63.08a8.177 8.177 0 0 1 8.185 7.83l3.899 88.156c.1 2.255-.704 4.395-2.265 6.025s-3.662 2.529-5.919 2.529h-70.881a8.12 8.12 0 0 1-5.918-2.528m44.693 14.529v16.088h-6.666v-16.088z"/></svg></div>
+            <span class="asset-name">Chair</span>
+        </div>
+            <div class="asset-item" draggable="true" data-asset-type="partition" title="Partition">
+            <div class="asset-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" xml:space="preserve" fill="currentColor"><path d="M273.507 0H46.495C21.896 0 1.882 20.21 1.882 45.051v229.897C1.882 299.79 21.896 320 46.495 320h227.012c24.599 0 44.611-20.21 44.611-45.052V45.051C318.118 20.21 298.105 0 273.507 0M95.943 224.689v-55.31H224.06v55.31zm138.755-75.309c-.212-.013-.423-.032-.638-.032s-.426.019-.638.032h-63.42V94.069h128.117v55.311zM95.943 74.069V20H224.06v54.069zm54.058 20v55.311H86.582c-.212-.013-.423-.032-.638-.032s-.426.019-.638.032H21.882V94.069zM21.882 169.38h54.062v55.31H21.882zm222.178 0h54.059v55.31H244.06zm54.058-124.329V74.07H244.06V20h29.447c13.57 0 24.611 11.237 24.611 25.051M46.495 20h29.448v54.069H21.882V45.051C21.882 31.237 32.923 20 46.495 20M21.882 274.948v-30.259h128.119V300H46.495c-13.572 0-24.613-11.238-24.613-25.052M273.507 300H170.001v-55.311h128.117v30.259c0 13.814-11.041 25.052-24.611 25.052"/></svg></div>
+            <span class="asset-name">Partition</span>
+        </div>
+        <div class="asset-item" draggable="true" data-asset-type="custom-obj-furniture" title="Import Custom OBJ">
+            <div class="asset-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 417.164 417.164" fill="currentColor"><path d="M409.664 279.579H351.95l7.013-69.75a7.5 7.5 0 0 0-7.462-8.251H339v-39h12.5a7.5 7.5 0 0 0 7.5-7.5v-26a7.5 7.5 0 0 0-15 0v18.5h-5v-29.5c0-12.407-10.093-22.5-22.5-22.5s-22.5 10.093-22.5 22.5v83.5h-12.5a7.5 7.5 0 0 0-7.462 8.251l7.013 69.75H225.7l9.505-4.482a7.5 7.5 0 0 0 3.585-9.982l-62.708-132.989a7.5 7.5 0 0 0-9.982-3.585l-29.1 13.72v-2.214a7.5 7.5 0 0 0-7.5-7.5H93v-5.969a7.5 7.5 0 0 0-7.5-7.5h-44a7.5 7.5 0 0 0-7.5 7.5v153.001H7.5a7.5 7.5 0 0 0-7.5 7.5v27.006a7.5 7.5 0 0 0 7.5 7.5h402.164a7.5 7.5 0 0 0 7.5-7.5v-27.006a7.5 7.5 0 0 0-7.5-7.5M309 118.079c0-4.136 3.365-7.5 7.5-7.5s7.5 3.364 7.5 7.5v83.5h-15zm-19.208 98.5h53.416l-6.334 63h-40.748zm-124.079-71.272 56.311 119.422-26.23 12.368-56.311-119.422zm14.667 134.272H137V187.58zM122 147.547v132.032H93V147.547zm-73-13.469h29v145.501H49zm353.164 172.507H15v-12.006h387.164z"/></svg></div>
+            <span class="asset-name">Import OBJ</span>
+        </div>
+            </div>
                 </div>
                 <div class="param-section pt-4 border-t border-dashed border-[--grid-color]">
-                    <h3 class="font-semibold text-sm uppercase">Vegetation & Tree Modeling</h3>
-                    <p class="info-box !text-xs !py-2 !px-3">Drag vegetation assets onto your site. The canopy uses a 'trans' material in Radiance to simulate light filtering.</p>
-                    <div id="asset-library-vegetation" class="grid grid-cols-4 gap-2 mt-4">
-                        <div class="asset-item" draggable="true" data-asset-type="tree-deciduous" title="Deciduous Tree">
-                            <div class="asset-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-8"/><path d="M20 8.5A5.5 5.5 0 0 0 14.5 3H9.5a5.5 5.5 0 0 0 0 11h5a5.5 5.5 0 0 1 0 11H9.5a5.5 5.5 0 0 1-5.5-5.5V14"/><path d="M4 11.5a5.5 5.5 0 0 0 5.5 5.5h5a5.5 5.5 0 0 0 0-11H9.5a5.5 5.5 0 0 1-5.5-5.5V6"/></svg></div>
-                            <span class="asset-name">Tree</span>
-                        </div>
-                        <div class="asset-item" draggable="true" data-asset-type="tree-coniferous" title="Coniferous Tree">
-                            <div class="asset-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 22-5-5h10z"/><path d="m12 17-4-4h8z"/><path d="M12 13 9 9h6z"/><path d="M12 2v7"/></svg></div>
-                            <span class="asset-name">Pine</span>
-                        </div>
-                        <div class="asset-item" draggable="true" data-asset-type="bush" title="Bush">
-                            <div class="asset-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a7 7 0 0 0 7-7h-4a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3h4a7 7 0 0 0-7-7 7 7 0 0 0-7 7h4a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H5a7 7 0 0 0 7 7z"/></svg></div>
-                            <span class="asset-name">Bush</span>
-                        </div>
-                    </div>
+                <h3 class="font-semibold text-sm uppercase">Vegetation & Tree Modeling</h3>
+                <p class="info-box !text-xs !py-2 !px-3">Drag vegetation assets onto your site. The canopy uses a 'trans' material in Radiance to simulate light filtering.</p>
+                <div id="asset-library-vegetation" class="grid grid-cols-4 gap-2 mt-4">
+                    <div class="asset-item" draggable="true" data-asset-type="tree-deciduous" title="Deciduous Tree">
+                <div class="asset-icon"><svg viewBox="0 0 24 24" id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg"><defs><style>.cls-1{fill:none;stroke:currentColor;stroke-miterlimit:10;stroke-width:1.91px}.cls-2{fill:currentColor;stroke:currentColor;stroke-miterlimit:10;stroke-width:1.91px}</style></defs><path class="cls-1" d="M12 5.32V22.5m3.82 0H8.18m.96-12.41L12 12"/><circle class="cls-2" cx="12" cy="8.18" r="6.68"/><path class="cls-1" d="M14.86 7.23 12 10.09"/></svg></div>
+                <span class="asset-name">Tree</span>
+            </div>
+            <div class="asset-item" draggable="true" data-asset-type="tree-coniferous" title="Coniferous Tree">
+                    <div class="asset-icon"><svg width="24" height="24" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 370 370" xml:space="preserve" fill="currentColor"><path d="M221.216 31.777C209.472 10.68 197.278 0 184.973 0h-.006c-12.191 0-24.309 10.722-36.013 31.747-31.026 55.734-50.181 166.609-27.263 203.571 13.299 21.447 34.021 28.994 49.278 31.507V342h-29.127c-4.415 0-7.873 3.454-7.873 7.863v12.295c0 4.397 3.458 7.842 7.873 7.842h87.092c4.506 0 8.036-3.444 8.036-7.842v-12.295c0-4.336-3.605-7.863-8.036-7.863H199.97v-75.26c20.734-3.578 37.881-14.645 48.278-31.413 22.965-37.035 3.934-147.923-27.032-203.55"/></svg></div>
+                    <span class="asset-name">Pine</span>
                 </div>
-                <div id="transform-controls-section" class="hidden param-section pt-4 border-t border-dashed border-[--grid-color]">
+                <div class="asset-item" draggable="true" data-asset-type="bush" title="Bush">
+        <div class="asset-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512.001 512.001" xml:space="preserve" fill="currentColor"><path d="M331.824 368.38a20.44 20.44 0 0 0-15.463-7.073h-39.922v-94.944c-6.638 1.195-13.46 1.854-20.438 1.854s-13.8-.659-20.438-1.854v94.944h-39.922a20.436 20.436 0 0 0-20.222 23.396l16.067 109.819c1.469 10.038 10.077 17.48 20.222 17.48h88.585c10.144 0 18.754-7.441 20.222-17.48l16.067-109.819a20.43 20.43 0 0 0-4.758-16.323M256.001 0c-69.439 0-125.935 56.493-125.935 125.933 0 22.383 5.878 43.418 16.159 61.654 21.616 38.333 62.719 64.279 109.775 64.279s88.159-25.946 109.774-64.281c10.282-18.235 16.159-39.269 16.159-61.654C381.935 56.493 325.441 0 256.001 0"/></svg></div>
+        <span class="asset-name">Bush</span>
+    </div>
+    <div class="asset-item" draggable="true" data-asset-type="custom-obj-vegetation" title="Import Custom OBJ">
+        <div class="asset-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 225 225" xml:space="preserve" fill="currentColor"><path d="M225 210.508c0 4.143-3.357 7.5-7.5 7.5H7.5c-4.143 0-7.5-3.357-7.5-7.5s3.357-7.5 7.5-7.5h58.834v-16.874H41.247a7.502 7.502 0 0 1-7.293-9.252L73.385 12.74a7.501 7.501 0 0 1 14.586 0l18.337 76.336c-12.521 11.297-20.407 27.64-20.407 45.792a61.3 61.3 0 0 0 7.608 29.644c.385.511.71 1.07.955 1.671a62.2 62.2 0 0 0 18.865 19.951H95.021v16.874h37.947v-23.816c-18.602-6.149-32.067-23.688-32.067-44.325 0-25.74 20.941-46.682 46.682-46.682s46.681 20.941 46.681 46.682c0 20.636-13.465 38.176-32.066 44.325v23.816H217.5a7.5 7.5 0 0 1 7.5 7.5"/></svg></div>
+        <span class="asset-name">Import OBJ</span>
+    </div>
+        </div>
+            </div>
+            <div id="transform-controls-section" class="hidden param-section pt-4 border-t border-dashed border-[--grid-color]">
                     <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Selected Object Transform</h4>
                     <div class="flex items-center justify-between mt-2">
                     <div class="btn-group">
@@ -2866,9 +2870,11 @@
             </div>
         </template>
 
+        <input type="file" id="custom-asset-importer" class="hidden" accept=".obj,.mtl" multiple>
+
         <div id="panel-templates">
-                <template id="template-global-sim-params">
-                    <div class="floating-window ui-panel">
+            <template id="template-global-sim-params">
+                <div class="floating-window ui-panel">
                         <div class="window-header">
                             <span>Global Simulation Parameters</span>
                             <div class="window-controls">

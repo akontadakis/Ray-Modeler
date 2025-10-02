@@ -1933,8 +1933,8 @@ export function addVegetation(assetType, position) {
     const localPosition = vegetationObject.worldToLocal(position.clone());
     treeGroup.position.add(localPosition);
 
-    vegetationObject.add(treeGroup);
-    
+    vegetationContainer.add(treeGroup);
+
     // Force matrix update to get immediate world position
     treeGroup.updateMatrixWorld(true);
     const finalWorldPos = new THREE.Vector3();
@@ -1942,4 +1942,61 @@ export function addVegetation(assetType, position) {
     console.log('[DEBUG] Final calculated world position of new object:', finalWorldPos);
 
     return treeGroup;
+}
+
+/**
+ * Creates and adds an imported asset (.obj) to the scene.
+ * @param {string} objContent - The string content of the .obj file.
+ * @param {string|null} mtlContent - The string content of the .mtl file.
+ * @param {string} assetType - The type of asset ('custom-obj-furniture' or 'custom-obj-vegetation').
+ * @returns {Promise<THREE.Group|null>} The created group, or null on failure.
+ */
+export async function addImportedAsset(objContent, mtlContent, assetType) {
+    const objLoader = new OBJLoader();
+
+    if (mtlContent) {
+        const mtlLoader = new MTLLoader();
+        const materials = mtlLoader.parse(mtlContent, '');
+        materials.preload();
+        objLoader.setMaterials(materials);
+    }
+
+    const objectGroup = objLoader.parse(objContent);
+
+    // Center the geometry before adding to the scene
+    const box = new THREE.Box3().setFromObject(objectGroup);
+    const center = box.getCenter(new THREE.Vector3());
+    objectGroup.position.sub(center);
+
+    let isFurniture = assetType === 'custom-obj-furniture';
+    let isVegetation = assetType === 'custom-obj-vegetation';
+
+    // Apply a standard material for simulation consistency and assign user data
+    objectGroup.traverse(child => {
+        if (child.isMesh) {
+            if (isFurniture) {
+                child.material = shared.furnitureMat.clone();
+                child.userData.surfaceType = 'FURNITURE';
+            } else if (isVegetation) {
+                child.material = shared.vegetationCanopyMat.clone();
+                child.userData.surfaceType = 'VEGETATION_CANOPY';
+            }
+            applyClippingToMaterial(child.material, renderer.clippingPlanes);
+        }
+    });
+
+    objectGroup.userData = {
+        isFurniture: isFurniture,
+        isVegetation: isVegetation,
+        assetType: assetType,
+    };
+
+    // Add to the correct container
+    if (isFurniture) {
+        furnitureContainer.add(objectGroup);
+    } else if (isVegetation) {
+        vegetationContainer.add(objectGroup);
+    }
+
+    return objectGroup;
 }
