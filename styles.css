@@ -30,6 +30,11 @@
   --select-arrow-icon: url('data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns="http://www.w3.org/2000/svg" width="292.4" height="292.4"%3E%3Cpath fill="%23343434" d="M287 69.4a17.6 17.6 0 0 0-13-5.4H18.4c-5 0-9.3 1.8-12.9 5.4A17.6 17.6 0 0 0 0 82.2c0 5 1.8 9.3 5.4 12.9l128 127.9c3.6 3.6 7.8 5.4 12.8 5.4s9.2-1.8 12.8-5.4L287 95c3.5-3.5 5.4-7.8 5.4-12.8 0-5-1.9-9.2-5.5-12.8z"%2F%3E%3C/svg%3E');
   --btn-secondary-bg: #DDDEE3;
   --btn-secondary-hover-bg: #D2D2D7;
+
+    /* Welcome Screen Positioning Options */
+  --welcome-header-margin-bottom: 1rem;
+  --welcome-description-margin-bottom: 2rem;
+
 }
 
 html[data-theme="dark"] {
@@ -276,6 +281,12 @@ canvas {
 
 .btn-group .btn.active svg {
   stroke: var(--text-on-selection);
+}
+
+/* Override for fill-based icons in the left toolbar */
+#left-toolbar .btn svg {
+  fill: currentColor;
+  stroke: none;
 }
 
 /* Specific styling for view control icons */
@@ -1328,7 +1339,7 @@ html[data-theme="light"] .leaflet-tile-pane {
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
+    cursor: default;
     transition: opacity 0.5s ease-out;
 }
 
@@ -1346,10 +1357,25 @@ html[data-theme="light"] .leaflet-tile-pane {
     color: var(--text-primary);
     user-select: none;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 1.0rem; /* Space between logo and text */
-    padding-bottom: 40px; /* Make space for the subtitle */
+    gap: -4rem; /* Space between logo/title and options */
+}
+
+.welcome-header {
+    margin-bottom: var(--welcome-header-margin-bottom);
+}
+
+.welcome-description {
+    margin-bottom: var(--welcome-description-margin-bottom);
+}
+
+.welcome-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
 }
 
 .welcome-title {
@@ -1358,18 +1384,59 @@ html[data-theme="light"] .leaflet-tile-pane {
     letter-spacing: -0.05em;
 }
 
-.welcome-subtitle {
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
+.welcome-options {
+    display: flex;
+    gap: 2rem;
+    position: relative;
+    z-index: 1;
     width: 100%;
-    text-align: center;
-    font-size: 1.25rem;
-    font-weight: 400;
+    max-width: 600px;
+    justify-content: center;
+}
+
+.welcome-option-card {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    background-color: var(--panel-bg);
+    border: 1px solid var(--grid-color);
+    border-radius: 0.75rem;
+    padding: 1.25rem 2rem;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.welcome-option-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--highlight-color);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+}
+
+.welcome-option-card .option-icon {
+    width: 40px;
+    height: 40px;
+    margin: 0;
+    color: var(--highlight-color);
+    flex-shrink: 0;
+}
+
+.welcome-option-card .option-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.welcome-option-card .option-description {
+    font-size: 0.9rem;
     color: var(--text-secondary);
-    margin-top: 0;
-    animation: pulse 2s infinite ease-in-out;
+    margin: 0.25rem 0 0;
+    line-height: 1.4;
 }
 
 @keyframes pulse {
@@ -1382,10 +1449,10 @@ html[data-theme="light"] .leaflet-tile-pane {
 }
 
 #welcome-logo-container {
-    width: 100px;
-    height: 100px;
+    width: 140px;
+    height: 140px;
     position: relative;
-    top: -3.5px; /* Adjust this value to shift the logo vertically */
+    top: -12px; /* Adjust this value to shift the logo vertically */
 }
 
 .welcome-logo {

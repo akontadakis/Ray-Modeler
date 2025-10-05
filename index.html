@@ -97,46 +97,73 @@
     <div id="glow-portal"></div>
     <canvas id="glow-canvas"></canvas>
     <div class="welcome-content">
-        <div id="welcome-logo-container">
-            <svg id="welcome-logo-light" class="welcome-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 511.987 511.987" xml:space="preserve">
-                <path transform="rotate(-103.951 75.54 279.672)" style="fill:#cccccc" d="M66.717 204.027h17.648v151.29H66.717z"/>
-                <path style="fill:#858585" d="m235.67 98.502 181.854 314.982H53.815z"/>
-                <path style="fill:#ffbf00" d="M511.987 268.44v47.297l-143.803 21.754-23.312-8.236-48.237-94.122z"/>
-                <path style="fill:#3b82f6" d="M511.987 315.737v47.285l-127.101-6.083h-.012l-40.002-27.684 11.942-20.93z"/>
-                <path style="fill:#fa2c15" d="M511.987 221.156v47.284l-183.257-8.753-52.096-11.612 24.024-37.014z"/>
-                <path style="fill:#cccccc" d="m384.874 356.939 1 1.73-271.994-95.111 186.778-52.497 28.072 48.626 28.072 48.638h.012z"/>
+        <div class="welcome-header">
+            <div id="welcome-logo-container">
+                <svg id="welcome-logo-light" class="welcome-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 511.987 511.987" xml:space="preserve">
+                    <path transform="rotate(-103.951 75.54 279.672)" style="fill:#cccccc" d="M66.717 204.027h17.648v151.29H66.717z"/>
+                    <path style="fill:#858585" d="m235.67 98.502 181.854 314.982H53.815z"/>
+                    <path style="fill:#ffbf00" d="M511.987 268.44v47.297l-143.803 21.754-23.312-8.236-48.237-94.122z"/>
+                    <path style="fill:#3b82f6" d="M511.987 315.737v47.285l-127.101-6.083h-.012l-40.002-27.684 11.942-20.93z"/>
+                    <path style="fill:#fa2c15" d="M511.987 221.156v47.284l-183.257-8.753-52.096-11.612 24.024-37.014z"/>
+                    <path style="fill:#cccccc" d="m384.874 356.939 1 1.73-271.994-95.111 186.778-52.497 28.072 48.626 28.072 48.638h.012z"/>
+                </svg>
+                <svg id="welcome-logo-dark" class="welcome-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 511.987 511.987" xml:space="preserve">
+                    <path transform="rotate(-103.951 75.54 279.672)" style="fill:#616161" d="M66.717 204.027h17.648v151.29H66.717z"/>
+                    <path style="fill:#bdbdbd" d="m235.67 98.502 181.854 314.982H53.815z"/>
+                    <path style="fill:#ffff00" d="M511.987 268.44v47.297l-143.803 21.754-23.312-8.236-48.237-94.122z"/>
+                    <path style="fill:#3b82f6" d="M511.987 315.737v47.285l-127.101-6.083h-.012l-40.002-27.684 11.942-20.93z"/>
+                    <path style="fill:#fa2c15" d="M511.987 221.156v47.284l-183.257-8.753-52.096-11.612 24.024-37.014z"/>
+                    <path style="fill:#616161" d="m384.874 356.939 1 1.73-271.994-95.111 186.778-52.497 28.072 48.626 28.072 48.638h.012z"/>
+                </svg>
+                <svg id="welcome-logo-cyber" class="welcome-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 511.987 511.987" xml:space="preserve">
+                    <path transform="rotate(-103.951 75.54 279.672)" style="fill:#4d8bee" d="M66.717 204.027h17.648v151.29H66.717z"/>
+                    <path style="fill:#11215e" d="m235.67 98.502 181.854 314.982H53.815z"/>
+                    <path style="fill:#ffd400" d="M511.987 268.44v47.297l-143.803 21.754-23.312-8.236-48.237-94.122z"/>
+                    <path style="fill:#00f6ff" d="M511.987 315.737v47.285l-127.101-6.083h-.012l-40.002-27.684 11.942-20.93z"/>
+                    <path style="fill:#ff2e97" d="M511.987 221.156v47.284l-183.257-8.753-52.096-11.612 24.024-37.014z"/>
+                    <path style="fill:#4d8bee" d="m384.874 356.939 1 1.73-271.994-95.111 186.778-52.497 28.072 48.626 28.072 48.638h.012z"/>
+                </svg>
+                <svg id="welcome-logo-cafe58" class="welcome-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 511.987 511.987" xml:space="preserve">
+                <path transform="rotate(-103.951 75.54 279.672)" style="fill:#707C8A" d="M66.717 204.027h17.648v151.29H66.717z"/>
+                <path style="fill:#26303D" d="m235.67 98.502 181.854 314.982H53.815z"/>
+                <path style="fill:#FFA518" d="M511.987 268.44v47.297l-143.803 21.754-23.312-8.236-48.237-94.122z"/>
+                <path style="fill:#FF6D1D" d="M511.987 315.737v47.285l-127.101-6.083h-.012l-40.002-27.684 11.942-20.93z"/>
+                <path style="fill:#5a687a" d="M511.987 221.156v47.284l-183.257-8.753-52.096-11.612 24.024-37.014z"/>
+                <path style="fill:#707C8A" d="m384.874 356.939 1 1.73-271.994-95.111 186.778-52.497 28.072 48.626 28.072 48.638h.012z"/>
             </svg>
-            <svg id="welcome-logo-dark" class="welcome-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 511.987 511.987" xml:space="preserve">
-                <path transform="rotate(-103.951 75.54 279.672)" style="fill:#616161" d="M66.717 204.027h17.648v151.29H66.717z"/>
-                <path style="fill:#bdbdbd" d="m235.67 98.502 181.854 314.982H53.815z"/>
-                <path style="fill:#ffff00" d="M511.987 268.44v47.297l-143.803 21.754-23.312-8.236-48.237-94.122z"/>
-                <path style="fill:#3b82f6" d="M511.987 315.737v47.285l-127.101-6.083h-.012l-40.002-27.684 11.942-20.93z"/>
-                <path style="fill:#fa2c15" d="M511.987 221.156v47.284l-183.257-8.753-52.096-11.612 24.024-37.014z"/>
-                <path style="fill:#616161" d="m384.874 356.939 1 1.73-271.994-95.111 186.778-52.497 28.072 48.626 28.072 48.638h.012z"/>
-            </svg>
-            <svg id="welcome-logo-cyber" class="welcome-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 511.987 511.987" xml:space="preserve">
-                <path transform="rotate(-103.951 75.54 279.672)" style="fill:#4d8bee" d="M66.717 204.027h17.648v151.29H66.717z"/>
-                <path style="fill:#11215e" d="m235.67 98.502 181.854 314.982H53.815z"/>
-                <path style="fill:#ffd400" d="M511.987 268.44v47.297l-143.803 21.754-23.312-8.236-48.237-94.122z"/>
-                <path style="fill:#00f6ff" d="M511.987 315.737v47.285l-127.101-6.083h-.012l-40.002-27.684 11.942-20.93z"/>
-                <path style="fill:#ff2e97" d="M511.987 221.156v47.284l-183.257-8.753-52.096-11.612 24.024-37.014z"/>
-                <path style="fill:#4d8bee" d="m384.874 356.939 1 1.73-271.994-95.111 186.778-52.497 28.072 48.626 28.072 48.638h.012z"/>
-            </svg>
-            <svg id="welcome-logo-cafe58" class="welcome-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 511.987 511.987" xml:space="preserve">
-            <path transform="rotate(-103.951 75.54 279.672)" style="fill:#707C8A" d="M66.717 204.027h17.648v151.29H66.717z"/>
-            <path style="fill:#26303D" d="m235.67 98.502 181.854 314.982H53.815z"/>
-            <path style="fill:#FFA518" d="M511.987 268.44v47.297l-143.803 21.754-23.312-8.236-48.237-94.122z"/>
-            <path style="fill:#FF6D1D" d="M511.987 315.737v47.285l-127.101-6.083h-.012l-40.002-27.684 11.942-20.93z"/>
-            <path style="fill:#5a687a" d="M511.987 221.156v47.284l-183.257-8.753-52.096-11.612 24.024-37.014z"/>
-            <path style="fill:#707C8A" d="m384.874 356.939 1 1.73-271.994-95.111 186.778-52.497 28.072 48.626 28.072 48.638h.012z"/>
-        </svg>
+            </div>
+            <div class="welcome-text-container">
+                <h1 class="welcome-title">Ray Modeler</h1>
+            </div>
         </div>
-        <div class="welcome-text-container">
-            <h1 class="welcome-title">Ray Modeler</h1>
-            <p class="welcome-subtitle">Click anywhere to start</p>
-        </div>
+            <p class="welcome-description text-center max-w-lg text-lg text-[--text-secondary]">
+                Choose how you'd like to begin your modeling project. You can start with a predefined parametric shape or import your own custom model.
+            </p>
+        <div class="welcome-options">
+                <button id="start-with-shoebox" class="welcome-option-card">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="option-icon" viewBox="0 0 100 100" fill="currentColor">
+                        <path d="M94.924 5.62A1 1 0 0 0 94 5H30a1 1 0 0 0-.707.293l-24 24A1 1 0 0 0 5 30v64a1 1 0 0 0 1 1h64l.01-.002a1 1 0 0 0 .697-.29l24-24A1 1 0 0 0 95 70V6a1 1 0 0 0-.076-.38M29.07 8.344A.995.995 0 0 0 31 8V7h60.586l-22 22H8.414ZM8.3 93A1 1 0 0 0 7 91.7V31h22v1a1 1 0 0 0 2 0v-1h38v38h-1a1 1 0 0 0 0 2h1v22ZM71 30.414l22-22V69h-1a.995.995 0 0 0-.345 1.93L71 91.586Z"/>
+                        <path d="M30 61a1 1 0 0 0-1 1v2a1 1 0 0 0 2 0v-2a1 1 0 0 0-1-1m0-8a1 1 0 0 0-1 1v2a1 1 0 0 0 2 0v-2a1 1 0 0 0-1-1m0-36a1 1 0 0 0 1-1v-2a1 1 0 0 0-2 0v2a1 1 0 0 0 1 1m0 28a1 1 0 0 0-1 1v2a1 1 0 0 0 2 0v-2a1 1 0 0 0-1-1m1-21v-2a1 1 0 0 0-2 0v2a1 1 0 0 0 2 0m-1 13a1 1 0 0 0-1 1v2a1 1 0 0 0 2 0v-2a1 1 0 0 0-1-1m24 32h-2a1 1 0 0 0 0 2h2a1 1 0 0 0 0-2m8 0h-2a1 1 0 0 0 0 2h2a1 1 0 0 0 0-2m16 0h-2a1 1 0 0 0 0 2h2a1 1 0 0 0 0-2m8 0h-2a1 1 0 0 0 0 2h2a1 1 0 0 0 0-2m-40 0h-2a1 1 0 0 0 0 2h2a1 1 0 0 0 0-2m-8 0h-2a1 1 0 0 0 0 2h2a1 1 0 0 0 0-2m-7.077.618a1 1 0 0 0-1.626-.328l-.004.003-1.414 1.414a1 1 0 1 0 1.414 1.414l1.414-1.414a1 1 0 0 0 .216-1.09m-7.287 5.333-1.414 1.414a1 1 0 0 0 1.414 1.414l1.414-1.414a1 1 0 0 0-1.414-1.414m-5.656 5.657-1.415 1.414a1 1 0 0 0 1.414 1.414l1.414-1.414a1 1 0 0 0-1.414-1.414m-5.657 5.656-1.414 1.415a1 1 0 0 0 1.414 1.414l1.414-1.414a1 1 0 1 0-1.414-1.415"/>
+                    </svg>
+                    <div class="option-text-wrapper">
+                        <h3 class="option-title">Parametric Model</h3>
+                        <p class="option-description">Start with a customizable box shape.</p>
+                    </div>
+                </button>
+                <button id="start-with-import" class="welcome-option-card">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="option-icon" viewBox="0 0 24 24" fill="none">
+                        <rect x="5" y="15" width="14" height="4" rx="2" fill="currentColor" fill-opacity=".24"/>
+                        <path d="m12 14-.424.424.424.425.424-.425zm.6-9a.6.6 0 1 0-1.2 0zM6.576 9.424l5 5 .848-.848-5-5zm5.848 5 5-5-.848-.848-5 5zM12.6 14V5h-1.2v9z" fill="currentColor"/>
+                        <path d="M5 16v1a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1" stroke="currentColor" stroke-width="1.2"/>
+                    </svg>
+                    <div class="option-text-wrapper">
+                        <h3 class="option-title">Import Model</h3>
+                        <p class="option-description">Bring in your own .obj file.</p>
+                    </div>
+                </button>
+            </div>
     </div>
-    </div>
+</div>
 
     <div id="theme-switcher-container" class="fixed top-10 left-6 z-[10001] pointer-events-auto">
     <button id="theme-btn-cafe58" class="theme-btn" style="display: none;" aria-label="Switch to Cafe 58 Theme">
@@ -188,54 +215,63 @@
     <div id="left-controls-container" class="absolute top-1/2 -translate-y-1/2 left-4 z-50 pointer-events-auto flex flex-col gap-4">
     <div id="left-toolbar" class="ui-panel p-1">
         <div class="btn-group flex-col">
+
                 <div class="action-button-container">
                     <button id="toggle-panel-project-btn" class="btn" aria-label="Project Setup">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
-                    </button>
-                    <span class="tooltip" role="tooltip">Project Setup</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 567.917 567.917" xml:space="preserve" fill="currentColor" stroke="none"><path d="M32.902 161.491h502.106l4.302-35.974c1.004-8.39-5.033-15.192-13.482-15.192H287.017c-8.448 0-21.019-3.767-28.075-8.415l-46.175-30.417c-7.056-4.648-19.627-8.415-28.079-8.415H35.109c-8.449 0-14.397 6.79-13.284 15.166zm32.547 328.412c1.833 8.25 10.168 14.936 18.62 14.936h399.777c8.448 0 16.787-6.686 18.62-14.936l65.092-292.913c1.833-8.25-3.531-14.936-11.979-14.936H12.339c-8.449 0-13.813 6.686-11.98 14.936z"/></svg>
+                </button>
+                <span class="tooltip" role="tooltip">Project Setup</span>
                 </div>
+
                 <div class="action-button-container">
                     <button id="toggle-panel-dimensions-btn" class="btn" aria-label="Dimensions">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" /><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12" /></svg>
-                    </button>
-                    <span class="tooltip" role="tooltip">Dimensions</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" xml:space="preserve"><path d="M160 213.333c-5.888 0-10.667-4.779-10.667-10.667H0v202.667C0 411.221 4.779 416 10.667 416h330.667v-85.333c-5.888 0-10.667-4.779-10.667-10.667s4.779-10.667 10.667-10.667V202.667H170.667c0 5.888-4.779 10.666-10.667 10.666m-10.667 32c0-5.888 4.779-10.667 10.667-10.667s10.667 4.779 10.667 10.667v21.333c0 5.888-4.779 10.667-10.667 10.667s-10.667-4.779-10.667-10.667zM46.592 398.507l-9.216 5.376a10.64 10.64 0 0 1-5.355 1.451 10.66 10.66 0 0 1-9.216-5.291c-2.965-5.077-1.259-11.605 3.84-14.592l9.216-5.376c5.099-2.965 11.627-1.259 14.592 3.84 2.923 5.077 1.216 11.626-3.861 14.592m65.749-38.336L90.432 372.95a10.64 10.64 0 0 1-5.355 1.451 10.72 10.72 0 0 1-9.237-5.291c-2.965-5.099-1.237-11.627 3.84-14.592l21.909-12.779c5.099-2.944 11.627-1.237 14.592 3.84 2.944 5.077 1.238 11.626-3.84 14.592m164.992-50.838h21.333c5.888 0 10.667 4.779 10.667 10.667s-4.779 10.667-10.667 10.667h-21.333c-5.888 0-10.667-4.779-10.667-10.667s4.779-10.667 10.667-10.667m-64 0h21.333c5.888 0 10.667 4.779 10.667 10.667s-4.779 10.667-10.667 10.667h-21.333c-5.888 0-10.667-4.779-10.667-10.667s4.779-10.667 10.667-10.667M181.355 320c0 5.888-4.8 10.667-10.688 10.667h-7.787l-6.72 3.925a10.64 10.64 0 0 1-5.355 1.451 10.66 10.66 0 0 1-9.216-5.291c-2.965-5.077-1.259-11.605 3.84-14.592l3.925-2.283v-4.544c0-5.888 4.779-10.667 10.667-10.667s10.667 4.779 10.667 10.667c5.888 0 10.667 4.779 10.667 10.667m181.312-121.771v111.104c5.888 0 10.667 4.779 10.667 10.667s-4.779 10.667-10.667 10.667v80.853l143.957-82.261A10.67 10.67 0 0 0 512 320V114.24zm64 132.438h-21.333c-5.888 0-10.667-4.779-10.667-10.667s4.779-10.667 10.667-10.667h21.333c5.888 0 10.667 4.779 10.667 10.667s-4.779 10.667-10.667 10.667m53.333 0h-10.667c-5.888 0-10.667-4.779-10.667-10.667s4.779-10.667 10.667-10.667H480c5.888 0 10.667 4.779 10.667 10.667s-4.779 10.667-10.667 10.667M160 96c-1.856 0-3.669.491-5.291 1.408L7.829 181.333h141.504c0-5.888 4.779-10.667 10.667-10.667s10.667 4.779 10.667 10.667h178.539L500.907 96zm10.667 42.667c0 5.888-4.779 10.667-10.667 10.667s-10.667-4.779-10.667-10.667V128c0-5.888 4.779-10.667 10.667-10.667s10.667 4.779 10.667 10.667z"/></svg>
+                        </button>
+                    <span class="tooltip" role="tooltip">Dimensions & Geometry</span>
                 </div>
-                 <div class="action-button-container">
+                
+                <div class="action-button-container">
                     <button id="toggle-panel-aperture-btn" class="btn" aria-label="Apertures & Shading">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M3 9h18"/></svg>
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.4 3h13.2A2.4 2.4 0 0 1 21 5.4v13.2a2.4 2.4 0 0 1-2.4 2.4H5.4A2.4 2.4 0 0 1 3 18.6V5.4A2.4 2.4 0 0 1 5.4 3M13 4v7h7v2h-7v7h-2v-7H4v-2h7V4z" fill="currentColor"/></svg>
                     </button>
                     <span class="tooltip" role="tooltip">Apertures & Shading</span>
                 </div>
-                 <div class="action-button-container">
-                    <button id="toggle-panel-lighting-btn" class="btn" aria-label="Artificial Lighting">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M9 16a5 5 0 1 0 6 0a5 5 0 0 0 -6 0"></path><path d="M12 16v6"></path><path d="M8 16h8"></path><path d="M12 2v4"></path><path d="M3.5 5.5l1.5 1.5"></path><path d="M19 7l-1.5 -1.5"></path><path d="M5 13l-2 0"></path><path d="M19 13l2 0"></path></svg>
-                    </button>
-                    <span class="tooltip" role="tooltip">Artificial Lighting</span>
-                </div>
+                
+            <div class="action-button-container">
+                <button id="toggle-panel-lighting-btn" class="btn" aria-label="Artificial Lighting">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 569.16 569.16" xml:space="preserve" fill="currentColor" stroke="none"><path d="M220.875 515.154H348.29c10.549 0 19.08-8.534 19.08-19.079s-8.535-19.079-19.08-19.079H220.875c-10.545 0-19.079 8.534-19.079 19.079s8.532 19.079 19.079 19.079m0 54.006H348.29c10.549 0 19.08-8.534 19.08-19.079s-8.535-19.079-19.08-19.079H220.875c-10.545 0-19.079 8.534-19.079 19.079s8.532 19.079 19.079 19.079M284.582 0C179.195 0 93.784 85.411 93.784 190.797c0 66.962 34.896 125.234 87.143 159.251 4.489 2.922 8.256 9.434 8.256 14.792v54.915c0 21.092 17.068 38.158 38.158 38.158h114.478c21.053 0 38.158-17.069 38.158-38.158v-54.918c0-5.358 3.77-11.867 8.262-14.789 52.242-33.987 87.137-92.29 87.137-159.251C475.378 85.411 389.968 0 284.582 0"/></svg>
+                </button>
+                <span class="tooltip" role="tooltip">Artificial Lighting</span>
+            </div>
+                
                 <div class="action-button-container">
                     <button id="toggle-panel-materials-btn" class="btn" aria-label="Material Properties">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M17 4a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-10a1 1 0 0 1 -1 -1v-2a1 1 0 0 1 1 -1h10z"></path><path d="M6 8v-1a1 1 0 0 1 1 -1h2"></path><path d="M15 8v-1a1 1 0 0 1 1 -1h2"></path><path d="M12 12l0 9"></path><path d="M9 21h6"></path></svg>
+                        <svg viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg" fill="currentColor" stroke="none"><path d="m35.435 9.494 7.071 7.071.002-.002a4 4 0 0 1 0 5.657l-.002.002L24 40.703V15.264l5.777-5.771h.001a4 4 0 0 1 5.656.002zM50 36v10a4 4 0 0 1-4 4H21l18-18h7a4 4 0 0 1 4 4M2 41.046V6a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v35.046a9 9 0 0 1-18 0M11 45a4 4 0 1 0 0-8 4 4 0 0 0 0 8"/></svg>
                     </button>
                     <span class="tooltip" role="tooltip">Material Properties</span>
                 </div>
+                
                 <div class="action-button-container">
                     <button id="toggle-panel-sensor-btn" class="btn" aria-label="Sensor Grid">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="5" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="19" cy="5" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="19" r="1"/><circle cx="12" cy="19" r="1"/><circle cx="19" cy="19" r="1"/></svg>                    
-                    </button>
-                    <span class="tooltip" role="tooltip">Sensor Grid</span>
-                </div>
-                 <div class="action-button-container">
-                    <button id="toggle-panel-viewpoint-btn" class="btn" aria-label="Viewpoint">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>                    
-                    </button>
-                    <span class="tooltip" role="tooltip">Viewpoint</span>
-                </div>
-                <div class="action-button-container">
-                    <button id="toggle-panel-scene-btn" class="btn" aria-label="Scene Elements">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-                    </button>
-                    <span class="tooltip" role="tooltip">Scene Elements</span>
-                </div>
+                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M23.584 47.441a3.5 3.5 0 0 0-2.393 1.024l-4.949 4.95a3.5 3.5 0 0 0 0 4.948l7.746 7.746-7.746 7.746a3.5 3.5 0 0 0 0 4.95l4.95 4.95a3.5 3.5 0 0 0 4.95 0l7.747-7.743 7.744 7.744a3.5 3.5 0 0 0 4.951 0l4.951-4.951a3.5 3.5 0 0 0 0-4.95L43.79 66.11l7.746-7.746a3.5 3.5 0 0 0-.002-4.949l-4.951-4.95a3.5 3.5 0 0 0-4.95 0l-7.743 7.747-7.746-7.746a3.5 3.5 0 0 0-2.559-1.024zm.084 4.913 10.22 10.22 10.221-10.22 3.537 3.535-10.22 10.22 10.22 10.221-3.537 3.537-10.22-10.22-10.221 10.22-3.535-3.537 10.22-10.22-10.22-10.221z" fill-rule="evenodd"/><path d="M11.896 12h12.041v12.041h-12.04zm16.041 0H39.98v12.041H27.938zm16.042 0h12.04v12.041H43.98zm16.04 0h12.042v12.041H60.02zm16.042 0H88.1v12.041H76.06zM11.896 28.041h12.041v12.041h-12.04zm16.041 0H39.98v12.041H27.938zm16.042 0h12.04v12.041H43.98zm16.04 0h12.042v12.041H60.02zm16.042 0H88.1v12.041H76.06zM60.02 44.082h12.04v12.041H60.02zm16.04 0h12.042v12.041H76.06zM60.02 60.123h12.04v12.041H60.02zm16.04 0h12.042v12.041H76.06zM60.02 76.164h12.04v12.041H60.02zm16.04 0h12.042v12.041H76.06zM7.897.102V8H0v4h7.896v12.041H0v4h7.896v12.041H0v4h7.896v12.041H0v4h7.896v12.041H0v4h7.896v12.041H0v4h7.896v7.897h4v-7.897h12.041v7.897h4v-7.897H39.98v7.897h4v-7.897h12.04v7.897h4v-7.897h12.042v7.897h4v-7.897H88.1v7.897h4v-7.897h7.9v-4h-7.898v-12.04H100v-4h-7.898V60.122H100v-4h-7.898v-12.04H100v-4h-7.898V28.041H100v-4h-7.898V12H100V8h-7.898V.102h-4V8H76.06V.102h-4V8H60.02V.102h-4V8H43.979V.102h-4V8H27.938V.102h-4V8H11.896V.102zm4 43.98h12.041v1.373a5.6 5.6 0 0 1 2.442.707c.55.392 1.062.836 1.558 1.295v-3.375H39.98v3.186a5.84 5.84 0 0 1 4-1.797v-1.389h12.04v12.041h-1.5c-.025.84-.215 1.674-.632 2.418-.395.56-.846 1.078-1.31 1.582h3.443v12.041h-3.325a5.84 5.84 0 0 1 1.836 4h1.489v12.041H43.979v-1.46c-.87-.01-1.737-.2-2.508-.63a15 15 0 0 1-1.492-1.222v3.312H27.938v-3.4c-1.007 1.152-2.484 1.854-4 1.947v1.453H11.896v-12.04h1.36c.015-.85.2-1.693.613-2.448a15 15 0 0 1 1.27-1.553h-3.243V60.123h3.26c-1.137-1.014-1.815-2.487-1.898-4h-1.362z" fill-rule="evenodd" fill-opacity="0.4"/></svg>
+                </button>
+                <span class="tooltip" role="tooltip">Sensor Grid</span>
+            </div>
+
+            <div class="action-button-container">
+                <button id="toggle-panel-viewpoint-btn" class="btn" aria-label="Viewpoint">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" xml:space="preserve" fill="currentColor" stroke="none"><path d="M32 5.074v21.854a.5.5 0 0 1-.807.396l-7.939-6.121v3.129a.5.5 0 0 1-.5.5H.5a.5.5 0 0 1-.5-.5V7.667c0-.275.225-.5.5-.5h22.254c.275 0 .5.225.5.5v3.899l7.918-6.872a.5.5 0 0 1 .537-.078.51.51 0 0 1 .291.458"/></svg>
+                </button>
+                <span class="tooltip" role="tooltip">Viewpoint</span>
+            </div>
+                
+             <div class="action-button-container">
+                <button id="toggle-panel-scene-btn" class="btn" aria-label="Scene Elements">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 294.004 294.004" xml:space="preserve" fill="currentColor" stroke="none"><path d="M0 10.27v273.465h294.004V10.27zm61.01 26.058c19.873 0 35.983 16.11 35.983 35.983s-16.11 35.983-35.983 35.983-35.983-16.11-35.983-35.983c-.001-19.872 16.11-35.983 35.983-35.983m43.87 216.14H25.429l61.286-122.869 61.286 122.869zm73.293 0-45.368-87.972 47.4-95.031 91.281 183.004z"/></svg>
+                </button>
+                <span class="tooltip" role="tooltip">Scene Elements</span>
+            </div>
+            
             </div>
         </div>
     </div>
@@ -347,13 +383,6 @@
             </div>
             </div>
     <div class="window-content space-y-4">
-        <div id="geometry-mode-selector" class="pb-4 border-b border-[--grid-color]">
-            <label class="label">Geometry Mode</label>
-            <div class="btn-group mt-1">
-                <button id="mode-parametric-btn" class="btn active">Box</button>
-                <button id="mode-import-btn" class="btn">Import</button>
-            </div>
-        </div>
 
         <div id="import-controls" class="hidden space-y-4">
             <p class="info-box !text-xs !py-2 !px-3">Import a .obj model. Parametric controls will be disabled. Ensure your model is in meters.</p>

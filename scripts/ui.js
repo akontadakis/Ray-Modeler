@@ -378,7 +378,7 @@ const ids = [
     // Global
     'theme-btn-light', 'theme-btn-dark', 'theme-btn-cyber', 'theme-btn-cafe58', 'theme-switcher-container',
     'render-container', 'sidebar-wrapper', 'right-sidebar', 'analysis-sidebar',
-    'welcome-screen', 'glow-canvas',
+    'welcome-screen', 'glow-canvas', 'start-with-shoebox', 'start-with-import',
     'toggle-modules-btn', 'toggle-analysis-btn', 'generate-scene-button',
     'save-project-button', 'load-project-button', 'run-simulation-button', 'custom-alert', 
     'custom-alert-title', 'custom-alert-message', 'custom-alert-close',
@@ -4187,7 +4187,20 @@ export function setupWelcomeScreen() {
     resizeObserver.observe(welcomeScreen);
 
     window.addEventListener('mousemove', onMouseMove);
-    welcomeScreen.addEventListener('click', hideWelcomeScreen, { once: true });
+
+    dom['start-with-shoebox']?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        switchGeometryMode('parametric');
+        hideWelcomeScreen();
+    });
+
+    dom['start-with-import']?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        switchGeometryMode('import');
+        hideWelcomeScreen();
+        // Open the dimensions panel to guide the user to the import controls.
+        togglePanelVisibility('panel-dimensions', 'toggle-panel-dimensions-btn');
+    });
 
     resizeCanvas(); // Initial setup
     animateRaycast();
