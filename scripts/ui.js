@@ -535,8 +535,8 @@ const ids = [
     // Info Panel & AI Assistant
     'info-button', 'panel-info',
     'ai-assistant-button', 'panel-ai-assistant', 'ai-chat-messages', 'ai-chat-form', 'ai-chat-input', 'ai-chat-send',
-    'ai-mode-chat', 'ai-mode-inspector', 'run-inspector-btn', 'ai-inspector-results',
-    'ai-settings-btn', 'ai-settings-modal', 'ai-settings-close-btn', 'ai-settings-form', 'ai-provider-select', 'ai-model-select', 'ai-api-key-input', 'openrouter-info-box',
+    'ai-mode-chat', 'ai-mode-generate', 'ai-mode-inspector', 'run-inspector-btn', 'ai-inspector-results',
+    'ai-settings-btn', 'ai-settings-modal', 'ai-settings-close-btn', 'ai-settings-form', 'ai-provider-select', 'ai-model-select', 'ai-api-key-input', 'ai-custom-model-input', 'openrouter-info-box',
 
     // Project Access Prompt
     'project-access-prompt', 'select-folder-btn', 'dismiss-prompt-btn',
@@ -1759,9 +1759,6 @@ dom['render-container'].addEventListener('sceneReady', () => {
         // Set the camera helper's visibility based on the default checkbox state.
         setGizmoVisibility(dom['gizmo-toggle'].checked);
         }, { once: true }); // The event should only fire once.
-
-        // --- AI Settings Modal ---
-        _setupAiSettingsModal();
 
         // --- Electron-Specific Listeners ---
         // Listen for the 'run-simulation-button' which is dynamically created
@@ -4465,71 +4462,6 @@ function _updateLpdDisplay() {
     const totalPower = wattage * numLuminaires;
     const lpd = totalPower / area;
     dom['lpd-display'].textContent = `${lpd.toFixed(2)} W/m²`;
-}
-
-/**
- * Sets up event listeners and logic for the AI Assistant settings modal.
- * @private
- */
-function _setupAiSettingsModal() {
-    const {
-        'ai-settings-btn': settingsBtn,
-        'ai-settings-modal': modal,
-        'ai-settings-close-btn': closeBtn,
-        'ai-settings-form': form,
-        'ai-provider-select': providerSelect,
-        'ai-model-select': modelSelect,
-        'ai-api-key-input': apiKeyInput,
-        'openrouter-info-box': orInfoBox
-    } = dom;
-
-    if (!settingsBtn || !modal || !closeBtn || !form) return;
-
-    const models = {
-        gemini: ['gemini-pro', 'gemini-1.5-pro-latest', 'gemini-1.5-flash-latest'],
-        openrouter: [
-            'google/gemini-pro', 'google/gemini-flash-1.5', 'openai/gpt-4o', 'anthropic/claude-3-haiku'
-        ]
-    };
-
-    const updateModelList = () => {
-        const provider = providerSelect.value;
-        modelSelect.innerHTML = '';
-        models[provider].forEach(modelName => {
-            const option = document.createElement('option');
-            option.value = modelName;
-            option.textContent = modelName;
-            modelSelect.appendChild(option);
-        });
-        orInfoBox.classList.toggle('hidden', provider !== 'openrouter');
-    };
-
-    const openModal = () => {
-        updateModelList();
-        // Load saved settings from localStorage
-        const savedProvider = localStorage.getItem('ai_provider') || 'gemini';
-        providerSelect.value = savedProvider;
-        updateModelList(); // Update again to set correct list
-        modelSelect.value = localStorage.getItem('ai_model') || models[savedProvider][0];
-        apiKeyInput.value = localStorage.getItem('ai_api_key') || '';
-        modal.classList.replace('hidden', 'flex');
-        modal.style.zIndex = getNewZIndex();
-    };
-
-    const closeModal = () => modal.classList.replace('flex', 'hidden');
-
-    settingsBtn.addEventListener('click', openModal);
-    closeBtn.addEventListener('click', closeModal);
-    providerSelect.addEventListener('change', updateModelList);
-
-    form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        localStorage.setItem('ai_provider', providerSelect.value);
-        localStorage.setItem('ai_model', modelSelect.value);
-        localStorage.setItem('ai_api_key', apiKeyInput.value);
-        showAlert('AI settings saved successfully.', 'Settings Saved');
-        closeModal();
-    });
 }
 
 /**

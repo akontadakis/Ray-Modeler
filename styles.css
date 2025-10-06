@@ -340,11 +340,30 @@ canvas {
   border-color: transparent var(--text-primary) transparent transparent;
 }
 
+/* Override for tooltips inside certain containers to appear below */
+.btn-group .action-button-container .tooltip,
+.ai-mode-selector .action-button-container .tooltip {
+    top: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.btn-group .action-button-container .tooltip::after,
+.ai-mode-selector .action-button-container .tooltip::after {
+    bottom: 100%;
+    left: 50%;
+    top: auto;
+    right: auto;
+    transform: translateX(-50%);
+    margin-top: 0;
+    margin-bottom: -1px; /* Prevents a small gap */
+    border-color: transparent transparent var(--text-primary) transparent;
+}
+
 .action-button-container:hover .tooltip {
   visibility: visible;
   opacity: 1;
 }
-
 
 /* --- FLOATING WINDOWS --- */
 .floating-window {
@@ -1520,6 +1539,12 @@ html[data-theme="cafe58"] #welcome-logo-cafe58 {
 .window-icon-settings:hover {
     opacity: 1;
     color: var(--text-primary);
+}
+
+.ai-mode-selector {
+    display: flex;
+    gap: 0.5rem; /* 8px */
+    align-items: center;
 }
 
 .chat-message {

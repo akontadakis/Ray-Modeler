@@ -2230,16 +2230,29 @@
             </div>
           <div class="window-content !p-0 flex flex-col">
               <div class="p-2 border-b border-[--grid-color] flex items-center justify-between">
-                  <div class="btn-group">
-                      <button id="ai-mode-chat" class="btn btn-sm active">
-                          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 5v8a2 2 0 01-2 2h-5l-5 4v-4H4a2 2 0 01-2-2V5a2 2 0 012-2h12a2 2 0 012 2zM7 8H5v2h2V8zm2 0h2v2H9V8zm6 0h-2v2h2V8z" clip-rule="evenodd" /></svg>
-                          Chat
+                  <div class="ai-mode-selector">
+                  <div class="action-button-container">
+                      <button id="ai-mode-chat" class="btn active" aria-label="Chat Mode">
+                          <svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 5v8a2 2 0 01-2 2h-5l-5 4v-4H4a2 2 0 01-2-2V5a2 2 0 012-2h12a2 2 0 012 2zM7 8H5v2h2V8zm2 0h2v2H9V8zm6 0h-2v2h2V8z" clip-rule="evenodd" /></svg>
+                          <span>Chat</span>
                       </button>
-                      <button id="ai-mode-inspector" class="btn btn-sm">
-                          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" viewBox="0 0 20 20" fill="currentColor"><path d="M9 9a2 2 0 114 0 2 2 0 01-4 0z" /><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a4 4 0 100 8 4 4 0 000-8z" clip-rule="evenodd" /></svg>
-                          Inspector
-                      </button>
+                      <span class="tooltip">Chat with Helios</span>
                   </div>
+                  <div class="action-button-container">
+                      <button id="ai-mode-generate" class="btn" aria-label="Generate Scene from Prompt">
+                          <svg width="16" height="16" viewBox="0 0 64 64" xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="currentColor"><path d="M45.49 41.65a7.82 7.82 0 0 0 0-15.55 5.47 5.47 0 0 0-1.19-5.88l-.22-.2c1-.39 1.6-.72 1.68-1.49s-.64-1.33-1.73-2a8.2 8.2 0 0 1-3.27-4c-.47-1.2-.78-2-1.65-2.08s-1.33.64-2 1.73a8.4 8.4 0 0 1-1.45 1.69 7.81 7.81 0 0 0-12.81 5.47 5.43 5.43 0 0 0-6.72 6.73 7.82 7.82 0 0 0-1.49 15.35 8.3 8.3 0 0 1-1.29.82c-1.15.58-1.91 1-1.91 1.84s.76 1.27 1.91 1.85A8.24 8.24 0 0 1 17 49.57c.58 1.16 1 1.92 1.84 1.92s1.27-.76 1.85-1.92c.07-.15.18-.29.27-.44a5.3 5.3 0 0 0 1.93-.4 7.82 7.82 0 0 0 15.55 0 5.42 5.42 0 0 0 7.08-7.07Zm-6.71-28.39.07-.11v.12A10.27 10.27 0 0 0 43 18.2l.1.07h-.11A10.28 10.28 0 0 0 38 22.39a.6.6 0 0 1-.07.1s0-.08 0-.11a10.3 10.3 0 0 0-4.08-4.94l-.1-.07h.11a10.33 10.33 0 0 0 4.92-4.11m-20 35.53v-.11a10.28 10.28 0 0 0-4.53-4.53l-.11-.06.11-.05a10.48 10.48 0 0 0 4.53-4.53v-.11l.06.11A10.28 10.28 0 0 0 23.4 44l.11.05-.11.06a10.23 10.23 0 0 0-4.53 4.53Zm24.08-2.66a3.45 3.45 0 0 1-4.81 0 1 1 0 0 0-1.65.87 6 6 0 0 1 .06.85 5.82 5.82 0 1 1-11.64 0 6 6 0 0 1 .06-.85 1 1 0 0 0-.53-1h-.11.05c1.16-.58 1.92-1 1.92-1.85s-.76-1.26-1.92-1.84a8.2 8.2 0 0 1-3.63-3.64c-.58-1.15-1-1.91-1.85-1.91s-1.26.76-1.84 1.91a8 8 0 0 1-.65 1.07 5.82 5.82 0 1 1 1.25-11.55 1 1 0 0 0 1-1.57 3.43 3.43 0 0 1 4.79-4.77 1 1 0 0 0 1.11 0 1 1 0 0 0 .46-1 5.81 5.81 0 0 1 9-5.73 8 8 0 0 1-.8.38c-1.2.47-2 .78-2.08 1.66s.64 1.33 1.73 2a8.2 8.2 0 0 1 3.27 4c.47 1.2.78 2 1.66 2.08h.13c.79 0 1.23-.7 1.88-1.74a8.4 8.4 0 0 1 2.36-2.4 3.4 3.4 0 0 1 .82.58 3.45 3.45 0 0 1 0 4.81 1 1 0 0 0 .87 1.68 5.82 5.82 0 1 1 .84 11.58 6 6 0 0 1-.84-.06 1 1 0 0 0-1 .53 1 1 0 0 0 .17 1.15 3.45 3.45 0 0 1-.05 4.76Zm-25.1-30.96A4.79 4.79 0 1 0 13 20a4.79 4.79 0 0 0 4.76-4.83m-7.57 0A2.79 2.79 0 1 1 13 18a2.79 2.79 0 0 1-2.81-2.83m44.43-2.86a4 4 0 1 0-4 4 4 4 0 0 0 4-4m-6 0a2 2 0 1 1 2 2 2 2 0 0 1-2.02-2ZM57 49.85a4 4 0 1 0-4 4 4 4 0 0 0 4-4m-6 0a2 2 0 1 1 2 2 2 2 0 0 1-2-2m-40.53 5.47A3.47 3.47 0 1 0 7 51.85a3.46 3.46 0 0 0 3.47 3.47m0-4.93A1.47 1.47 0 1 1 9 51.85a1.47 1.47 0 0 1 1.47-1.46"/></svg>
+                          <span>Generate</span>
+                      </button>
+                      <span class="tooltip">Generate Scene</span>
+                  </div>
+                  <div class="action-button-container">
+                      <button id="ai-mode-inspector" class="btn" aria-label="Inspector Mode">
+                          <svg width="16" height="16" viewBox="0 0 24 24" xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="2" width="20" height="20" rx="0"/><path d="M6 12h2l2 4 4-9 2 5h2"/></svg>
+                          <span>Inspector</span>
+                      </button>
+                      <span class="tooltip">Design Inspector</span>
+                  </div>
+              </div>
                   <button id="run-inspector-btn" class="btn btn-secondary btn-sm hidden">
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg>
                       Run Inspector
@@ -2650,16 +2663,23 @@
             </button>
             <h3 class="text-lg font-bold mb-4">AI Assistant Settings</h3>
             <form id="ai-settings-form" class="space-y-4">
-            <div>
-                <label for="ai-provider-select" class="label">AI Provider</label>
-                <select id="ai-provider-select" class="w-full">
-                    <option value="gemini">Google Gemini</option>
-                    <option value="openrouter">OpenRouter</option>
-                </select>
-            </div>
-            <div>
+        <div>
+        <label for="ai-provider-select" class="label">AI Provider</label>
+    <select id="ai-provider-select" class="w-full">
+        <option value="openrouter">OpenRouter</option>
+        <option value="openai">OpenAI</option>
+        <option value="gemini">Google Gemini</option>
+        <option value="anthropic">Anthropic</option>
+    </select>
+</div>
+        <div>
                 <label for="ai-model-select" class="label">Model</label>
                 <select id="ai-model-select" class="w-full"></select>
+            </div>
+            <div>
+                <label for="ai-custom-model-input" class="label">Custom Model ID (Optional)</label>
+                <input type="text" id="ai-custom-model-input" placeholder="e.g., gpt-4, claude-3-sonnet" class="w-full">
+                <p class="text-xs text-[--text-secondary] mt-1">Enter a custom model ID if your preferred model isn't in the list above.</p>
             </div>
             <div>
                 <label for="ai-api-key-input" class="label">API Key</label>

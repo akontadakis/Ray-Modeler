@@ -46,9 +46,12 @@ export function searchKnowledgeBase(query, maxResults = 3) {
     });
 
     const scores = knowledgeBase.map((entry, index) => {
-        const contentWords = new Set(entry.content.toLowerCase().match(/\b(\w+)\b/g) || []);
-        const topicWords = new Set(entry.topic.toLowerCase().match(/\b(\w+)\b/g) || []);
-        
+        const contentText = (typeof entry.content === 'string') ? entry.content : '';
+        const topicText = (typeof entry.topic === 'string') ? entry.topic : '';
+
+        const contentWords = new Set(contentText.toLowerCase().match(/\b(\w+)\b/g) || []);
+        const topicWords = new Set(topicText.toLowerCase().match(/\b(\w+)\b/g) || []);
+
         let score = 0;
         queryWords.forEach(qWord => {
             if (contentWords.has(qWord)) {

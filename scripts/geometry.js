@@ -1353,14 +1353,14 @@ export function attachGizmoToSelectedSensor() {
 /**
  * Creates and adds a furniture asset to the scene.
  * @param {string} assetType - The type of asset to create (e.g., 'desk', 'chair').
- * @param {THREE.Vector3} position - The initial world position for the asset.
+ * @param {THREE.Vector3} position - The initial position for the asset.
+ * @param {boolean} [isWorldPosition=true] - If true, the position is treated as world coordinates and converted. If false, it's used directly as local coordinates.
  * @returns {THREE.Mesh|null} The created mesh, or null if asset type is unknown.
  */
-export function addFurniture(assetType, position) {
+export function addFurniture(assetType, position, isWorldPosition = true) {
     const dom = getDom();
     const material = shared.furnitureMat;
     applyClippingToMaterial(material, renderer.clippingPlanes);
-
     let geometry;
     let mesh;
 
@@ -1405,9 +1405,15 @@ export function addFurniture(assetType, position) {
         assetType: assetType,
     };
 
-    // The drop position is in world coordinates. We need to convert it to the
-    // local coordinate system of the parent `furnitureObject`.
-    const localPosition = furnitureObject.worldToLocal(position.clone());
+    let localPosition;
+    if (isWorldPosition) {
+        // The drop position is in world coordinates. We need to convert it to the
+        // local coordinate system of the parent `furnitureObject`.
+        localPosition = furnitureObject.worldToLocal(position.clone());
+    } else {
+        // The position is already in local coordinates relative to the room center.
+        localPosition = position;
+    }
     mesh.position.add(localPosition);
 
     furnitureContainer.add(mesh);
@@ -1863,11 +1869,12 @@ export function createContextFromOsm(osmData, centerLat, centerLon) {
 /**
  * Creates and adds a vegetation asset to the scene.
  * @param {string} assetType - The type of asset to create (e.g., 'tree-deciduous').
- * @param {THREE.Vector3} position - The initial world position for the asset.
+ * @param {THREE.Vector3} position - The initial position for the asset.
+ * @param {boolean} [isWorldPosition=true] - If true, the position is treated as world coordinates and converted. If false, it's used directly as local coordinates.
  * @returns {THREE.Group|null} The created group object, or null if asset type is unknown.
  */
-export function addVegetation(assetType, position) {
-    console.log(`[DEBUG] addVegetation function started. Type: "${assetType}", World Position:`, position);
+export function addVegetation(assetType, position, isWorldPosition = true) {
+    console.log(`[DEBUG] addVegetation function started. Type: "${assetType}", Position:`, position, `Is World: ${isWorldPosition}`);
 
     const treeGroup = new THREE.Group();
     let geometryCreated = false;
@@ -1928,9 +1935,15 @@ export function addVegetation(assetType, position) {
         assetType: assetType,
     };
 
-    // The drop position is in world coordinates. Convert it to the local
-    // coordinate system of the parent `vegetationObject`.
-    const localPosition = vegetationObject.worldToLocal(position.clone());
+    let localPosition;
+    if (isWorldPosition) {
+        // The drop position is in world coordinates. Convert it to the local
+        // coordinate system of the parent `vegetationObject`.
+        localPosition = vegetationObject.worldToLocal(position.clone());
+    } else {
+        // The position is already in local coordinates relative to the room center.
+        localPosition = position;
+    }
     treeGroup.position.add(localPosition);
 
     vegetationContainer.add(treeGroup);

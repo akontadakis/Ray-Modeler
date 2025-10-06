@@ -6,6 +6,8 @@ import { project } from './project.js';
 import { resultsManager } from './resultsManager.js';
 import { openGlareRoseDiagram, openCombinedAnalysisPanel } from './annualDashboard.js';
 import { openRecipePanelByType, programmaticallyGeneratePackage } from './simulation.js';
+import { addFurniture, addVegetation } from './geometry.js';
+import * as THREE from 'three';
 
 // Module-level cache for DOM elements
 let dom;
@@ -16,6 +18,35 @@ const chatHistory = [];
 const availableTools = [
     {
         "functionDeclarations": [
+            {
+                "name": "placeAsset",
+                "description": "Places a 3D asset, such as furniture or vegetation, into the scene at a specific coordinate. The coordinate system's origin (0,0,0) is at the center of the room's floor.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "assetType": { "type": "STRING", "description": "The type of asset to place. Must be one of 'desk', 'chair', 'partition', 'shelf', 'tree-deciduous', 'tree-coniferous', 'bush'." },
+                        "x": { "type": "NUMBER", "description": "The X-coordinate for the asset's center (along the room's width)." },
+                        "y": { "type": "NUMBER", "description": "The Y-coordinate for the asset's base (height from the floor). Should usually be 0." },
+                        "z": { "type": "NUMBER", "description": "The Z-coordinate for the asset's center (along the room's length)." }
+                    },
+                    "required": ["assetType", "x", "y", "z"]
+                }
+            },
+            {
+                "name": "addAperture",
+                "description": "Adds one or more windows (apertures) to a specific wall. This action replaces any existing windows on that wall.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "wall": { "type": "STRING", "description": "The wall to add the window to. Must be one of 'north', 'south', 'east', or 'west'." },
+                        "count": { "type": "NUMBER", "description": "The number of identical windows to add." },
+                        "width": { "type": "NUMBER", "description": "The width of a single window in meters." },
+                        "height": { "type": "NUMBER", "description": "The height of a single window in meters." },
+                        "sillHeight": { "type": "NUMBER", "description": "The height of the bottom of the window from the floor in meters." }
+                    },
+                    "required": ["wall", "count", "width", "height", "sillHeight"]
+                }
+            },
              {
                 "name": "openSimulationRecipe",
                 "description": "Opens a specific simulation recipe panel from the Simulation Modules sidebar if it is not already open.",
@@ -408,39 +439,80 @@ const recipeMap = {
 
 // Define the available models for each provider
 const modelsByProvider = {
-    gemini: [
-        { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
-        { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' }
-    ],
     openrouter: [
+        // Google
         { id: 'google/gemini-2.5-flash-lite', name: 'Google Gemini 2.5 Flash Lite' },
         { id: 'google/gemini-2.5-flash', name: 'Google Gemini 2.5 Flash' },
         { id: 'google/gemini-2.5-pro', name: 'Google Gemini 2.5 Pro' },
+
+        // OpenAI
         { id: 'openai/gpt-5', name: 'OpenAI GPT-5' },
         { id: 'openai/gpt-5-mini', name: 'OpenAI GPT-5 Mini' },
         { id: 'openai/gpt-4.1', name: 'OpenAI GPT-4.1' },
-        { id: 'openai/o3', name: 'OpenAI o3' },
-        { id: 'openai/o3-mini', name: 'OpenAI o3 Mini' },
+        { id: 'openai/gpt-4o', name: 'OpenAI GPT-4o' },
+        { id: 'openai/gpt-4o-mini', name: 'OpenAI GPT-4o Mini' },
+        // OpenAI Free Models
         { id: 'openai/gpt-oss-120b:free', name: 'OpenAI GPT-OSS 120B (Free)' },
-        { id: 'openai/gpt-oss-20b:free', name: 'OpenAI GPT-OSS 20B (Free)' },             
-        { id: 'anthropic/claude-sonnet-4', name: 'Anthropic Claude Sonnet 4' },
-        { id: 'anthropic/claude-3.7-sonnet', name: 'Anthropic Claude 3.7 Sonnet' },
+        { id: 'openai/gpt-oss-20b:free', name: 'OpenAI GPT-OSS 20B (Free)' },
+
+        // Anthropic
+        { id: 'anthropic/claude-3.5-sonnet', name: 'Anthropic Claude 3.5 Sonnet' },
+        { id: 'anthropic/claude-3-opus', name: 'Anthropic Claude 3 Opus' },
+        { id: 'anthropic/claude-3-sonnet', name: 'Anthropic Claude 3 Sonnet' },
+        { id: 'anthropic/claude-3-haiku', name: 'Anthropic Claude 3 Haiku' },
+
+        // xAI
+        { id: 'x-ai/grok-code-fast-1', name: 'xAI Grok Code Fast 1' },
+        { id: 'x-ai/grok-4-fast', name: 'xAI Grok 4 Fast' },
+        { id: 'x-ai/grok-4', name: 'xAI Grok 4' },
+
+        // Meta
+        { id: 'meta-llama/llama-3.1-405b-instruct', name: 'Meta Llama 3.1 405B' },
+        { id: 'meta-llama/llama-3.1-70b-instruct', name: 'Meta Llama 3.1 70B' },
+        { id: 'meta-llama/llama-3-8b-instruct', name: 'Meta Llama 3 8B Instruct' },
+
+        // NVIDIA
+        { id: 'nvidia/nemotron-nano-9b-v2:free', name: 'NVIDIA Nemotron Nano V2 (free)' }, 
+
+        // Mistral
+        { id: 'mistralai/mistral-large-2', name: 'Mistral Large 2' },
+        { id: 'mistralai/mixtral-8x22b-instruct', name: 'Mistral Mixtral 8x22B Instruct' },
+
+        // DeepSeek
         { id: 'deepseek/deepseek-chat-v3.1:free', name: 'DeepSeek Chat v3.1 (Free)' },
-        { id: 'deepseek/deepseek-chat-v3.1', name: 'DeepSeek Chat v3.1' },
-        { id: 'tngtech/deepseek-r1t2-chimera:free', name: 'TNG DeepSeek R1T2 Chimera (free)' },
-        { id: 'deepseek/deepseek-r1-0528:free', name: 'DeepSeek R1 0528 (free)' },
-        { id: 'qwen/qwen3-coder:free', name: 'Qwen Qwen3 Coder 480B A35B (free)' },
-        { id: 'qwen/qwq-32b:free', name: 'Qwen QwQ 32B (free)' },
-        { id: 'qwen/qwq-32b', name: 'Qwen QwQ 32B' },
-        { id: 'qwen/qwen3-max', name: 'Qwen Qwen3 Max' },
-        { id: 'mistralai/mistral-small-3.2-24b-instruct:free', name: 'Mistral Mistral Small 3.2 24B (free' },
-        { id: 'moonshotai/kimi-k2:free', name: 'MoonshotAI Kimi K2 0711 (free)' },
-        { id: 'moonshotai/kimi-dev-72b:free', name: 'MoonshotAI Kimi Dev 72B (free)' },
-        { id: 'moonshotai/kimi-vl-a3b-thinking:free', name: 'MoonshotAI Kimi VL A3B Thinking (free)' },
-        { id: 'deepseek/deepseek-r1-0528:free', name: 'DeepSeek R1 0528 (free)' }   
+        { id: 'deepseek/deepseek-r1-0528:free', name: 'DeepSeek R1 0528 (Free)' },
+        { id: 'qwen/qwen2-72b-instruct', name: 'Qwen 2 72B Instruct' },
+
+        // Other Models
+        { id: 'microsoft/wizardlm-2-8x22b', name: 'Microsoft WizardLM-2 8x22B' },
+
+        // Free Models
+        { id: 'z-ai/glm-4.5-air:free', name: 'GLM 4.5 Air (Free)' },
+        { id: 'qwen/qwen3-coder:free', name: 'Qwen 3 Coder (Free)' },
+        { id: 'google/gemma-3n-e2b-it:free', name: 'Google Gemma 3N E2B IT (Free)' },
+        { id: 'tngtech/deepseek-r1t2-chimera:free', name: 'DeepSeek R1T2 Chimera (Free)' },
+        { id: 'qwen/qwen3-4b:free', name: 'Qwen 3 4B (Free)' },
+        { id: 'meta-llama/llama-4-maverick:free', name: 'Meta Llama 4 Maverick (Free)' }
+    ],
+    openai: [
+        { id: 'gpt-4o', name: 'GPT-4o' },
+        { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
+        { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
+        { id: 'gpt-4', name: 'GPT-4' },
+        { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
+    ],
+    gemini: [
+        { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
+        { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
+        { id: 'gemini-1.0-pro', name: 'Gemini 1.0 Pro' }
+    ],
+    anthropic: [
+        { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet' },
+        { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
+        { id: 'claude-3-sonnet-20240229', name: 'Claude 3 Sonnet' },
+        { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' }
     ]
 };
-
 
 /**
  * Initializes the AI Assistant, setting up all necessary event listeners.
@@ -458,10 +530,27 @@ function initAiAssistant() {
     dom['ai-settings-btn']?.addEventListener('click', openSettingsModal);
     dom['ai-settings-close-btn']?.addEventListener('click', closeSettingsModal);
     dom['ai-settings-form']?.addEventListener('submit', saveSettings);
-    dom['ai-provider-select']?.addEventListener('change', (e) => {
-        updateModelOptions(e.target.value);
-        toggleProviderInfo(e.target.value);
+
+    // Event listener for the new "Generate Scene" button.
+    dom['ai-mode-generate']?.addEventListener('click', () => {
+        // Switch to chat mode if not already active
+        switchToChatMode();
+        // Activate this button and deactivate others
+        dom['ai-mode-generate'].classList.add('active');
+        dom['ai-mode-chat'].classList.remove('active');
+        dom['ai-mode-inspector'].classList.remove('active');
+
+        dom['ai-chat-input'].placeholder = 'e.g., Create a 10m by 8m office...';
+        dom['ai-chat-input'].focus();
+        showAlert('Generative Mode Activated', 'Describe the scene you want to create in the chat box below.');
     });
+
+    dom['ai-provider-select']?.addEventListener('change', (e) => {
+        const provider = e.target.value;
+        updateModelOptions(provider);
+        toggleProviderInfo(provider);
+        updateApiKeyInput(provider); // Update the API key field when provider changes
+        });
 
     // Listeners for Inspector Mode
     dom['ai-mode-chat']?.addEventListener('click', switchToChatMode);
@@ -500,6 +589,18 @@ function switchToInspectorMode() {
 
     dom['ai-chat-messages'].classList.add('hidden');
     dom['ai-chat-form'].classList.add('hidden');
+}
+
+/**
+ * Updates the API key input field when the provider is changed.
+ * @param {string} provider The selected AI provider.
+ */
+function updateApiKeyInput(provider) {
+    const keyInput = dom['ai-api-key-input'];
+    if (keyInput) {
+        const storageKey = `ai_api_key_${provider}`;
+        keyInput.value = localStorage.getItem(storageKey) || '';
+    }
 }
 
 /**
@@ -555,9 +656,9 @@ function displayInspectorResults(findings) {
 
         let actionButton = '';
         if (finding.action) {
-            // Encode params as a JSON string and escape it for the HTML attribute
-            const paramsJson = CSS.escape(JSON.stringify(finding.params || {}));
-            actionButton = `<button class="btn btn-xs btn-secondary finding-action-btn" data-action="${finding.action}" data-params="${paramsJson}">${finding.actionLabel || 'Fix It'}</button>`;
+        // Encode params as a JSON string. Use single quotes for the attribute to contain the double-quoted JSON string.
+        const paramsJson = JSON.stringify(finding.params || {});
+        actionButton = `<button class="btn btn-xs btn-secondary finding-action-btn" data-action="${finding.action}" data-params='${paramsJson}'>${finding.actionLabel || 'Fix It'}</button>`;
         }
 
         el.innerHTML = `
@@ -741,9 +842,15 @@ async function handleSendMessage(event) {
     setLoadingState(true);
 
     try {
-        const apiKey = localStorage.getItem('ai_api_key');
         const provider = localStorage.getItem('ai_provider');
-        const model = localStorage.getItem('ai_model');
+        const apiKey = localStorage.getItem(`ai_api_key_${provider}`);
+        let model = localStorage.getItem('ai_model');
+        const customModel = localStorage.getItem('ai_custom_model');
+
+        // Use custom model if provided, otherwise use selected model
+        if (customModel && customModel.trim()) {
+            model = customModel.trim();
+        }
 
         if (!apiKey || !provider || !model) {
             const errorMessage = 'AI settings are incomplete. Please configure the provider, model, and API key in settings (the ⚙️ icon).';
@@ -792,10 +899,46 @@ async function _executeToolCall(toolCall) {
     };
 
     try {
-        switch (name) {
-            case 'setDimension': {
-                if (!['width', 'length', 'height'].includes(args.dimension)) throw new Error(`Invalid dimension: ${args.dimension}`);
-                updateUI(args.dimension, args.value);
+    switch (name) {
+        case 'addAperture': {
+            const wallDir = args.wall?.charAt(0).toLowerCase();
+            if (!['n', 's', 'e', 'w'].includes(wallDir)) throw new Error(`Invalid wall: ${args.wall}`);
+
+            // 1. Enable the aperture toggle for the wall
+            updateUI(`aperture-${wallDir}-toggle`, true, 'checked');
+
+            // 2. Switch to manual mode to accept direct dimensions
+            const manualModeBtn = document.getElementById(`mode-manual-btn-${wallDir}`);
+            if (manualModeBtn) manualModeBtn.click();
+
+            // 3. Set the dimension values from the arguments
+            updateUI(`win-count-${wallDir}`, args.count);
+            updateUI(`win-width-${wallDir}`, args.width);
+            updateUI(`win-height-${wallDir}`, args.height);
+            updateUI(`sill-height-${wallDir}`, args.sillHeight);
+
+            return { success: true, message: `Added ${args.count} window(s) to the ${args.wall} wall.` };
+        }
+        case 'placeAsset': {
+            const position = new THREE.Vector3(args.x, args.y, args.z);
+            const vegetationTypes = ['tree-deciduous', 'tree-coniferous', 'bush'];
+            let newAsset;
+
+            if (vegetationTypes.includes(args.assetType)) {
+                newAsset = addVegetation(args.assetType, position, false); // isWorldPosition = false
+            } else {
+                newAsset = addFurniture(args.assetType, position, false); // isWorldPosition = false
+            }
+
+            if (newAsset) {
+                return { success: true, message: `Placed a ${args.assetType} at (${args.x}, ${args.y}, ${args.z}).` };
+            } else {
+                throw new Error(`Could not create an asset of type '${args.assetType}'.`);
+            }
+        }
+        case 'setDimension': {
+            if (!['width', 'length', 'height'].includes(args.dimension)) throw new Error(`Invalid dimension: ${args.dimension}`);
+            updateUI(args.dimension, args.value);
                 return { success: true, message: `Set ${args.dimension} to ${args.value}m.` };
             }
             case 'changeView': {
@@ -1278,85 +1421,133 @@ async function _runInspectorChecks() {
 }
 
 /**
- * Calls the selected generative AI provider's API, now with tool-use capabilities.
+ * Calls the AI API with tool-use capabilities, supporting multiple providers.
  * @param {string} apiKey - The user's API key.
- * @param {string} provider - The selected provider ('gemini' or 'openrouter').
+ * @param {string} provider - The selected provider ('openrouter', 'openai', 'gemini', 'anthropic').
+ * @param {string} model - The specific model identifier.
+ * @param {string} systemPrompt - The generated system prompt with context.
  * @returns {Promise<string>} The text response from the AI model.
  */
 async function callGenerativeAI(apiKey, provider, model, systemPrompt) {
-    if (provider !== 'gemini') {
-        addMessage('ai', "Sorry, AI-powered actions are only implemented for the Google Gemini provider in this example.");
-        throw new Error("Tool use is only implemented for Gemini in this example.");
+    let apiUrl, headers, payload;
+
+    // A simple way to handle history: send the system prompt and the most recent user message.
+    const lastUserMessage = chatHistory.filter(m => m.role === 'user').pop();
+    let messages = lastUserMessage ? [{ role: 'user', content: lastUserMessage.parts[0].text }] : [];
+    messages.unshift({ role: 'system', content: systemPrompt });
+
+    const openAITools = convertGeminiToolsToOpenAI(availableTools);
+
+    if (provider === 'openrouter') {
+        apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+            'HTTP-Referer': 'http://localhost',
+            'X-Title': 'Ray Modeler'
+        };
+        payload = { model: model, messages: messages, tools: openAITools, tool_choice: "auto" };
+    } else if (provider === 'openai') {
+        apiUrl = 'https://api.openai.com/v1/chat/completions';
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+        };
+        payload = { model: model, messages: messages, tools: openAITools, tool_choice: "auto" };
+    } else if (provider === 'gemini') {
+        // For Gemini, we need to use the Gemini API format
+        apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        headers = {
+            'Content-Type': 'application/json'
+        };
+        // Convert to Gemini format, including the system prompt correctly
+        const userMessages = messages.filter(m => m.role === 'user' || m.role === 'model' || m.role === 'tool');
+        const geminiContents = userMessages.map(m => ({
+            role: m.role === 'tool' ? 'tool' : (m.role === 'user' ? 'user' : 'model'),
+            parts: m.role === 'tool' ? [{ functionResponse: { name: m.name, response: JSON.parse(m.content) } }] : [{ text: m.content }]
+        }));
+        payload = {
+            contents: geminiContents,
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            tools: availableTools
+        };
+    } else if (provider === 'anthropic') {
+        apiUrl = 'https://api.anthropic.com/v1/messages';
+        headers = {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01'
+        };
+        // Convert to Anthropic format
+        const anthropicMessages = messages.map(m => ({
+            role: m.role === 'user' ? 'user' : 'assistant',
+            content: m.content
+        }));
+        payload = {
+            model: model,
+            max_tokens: 4096,
+            messages: anthropicMessages,
+            system: systemPrompt // Anthropic uses separate system parameter
+        };
+        // Note: Anthropic doesn't support tools in the same way, so we'll handle without tools for now
+        delete payload.tools;
+    } else {
+        throw new Error(`Unsupported provider: ${provider}`);
     }
 
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-    const headers = { 'Content-Type': 'application/json' };
-
-    let payload = {
-        contents: chatHistory,
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        tools: availableTools
-    };
-
-    const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(payload)
-    });
+    const response = await fetch(apiUrl, { method: 'POST', headers: headers, body: JSON.stringify(payload) });
 
     if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error?.message || `API Error: ${response.status}`);
+        throw new Error(errorData.error?.message || errorData.message || `API Error: ${response.status}`);
     }
 
     const data = await response.json();
-    const candidate = data.candidates?.[0];
 
-    if (!candidate) {
-        const promptFeedback = data.promptFeedback;
-        console.warn('Gemini response blocked.', { promptFeedback });
-        return `I am unable to answer that. The prompt was blocked, likely due to safety filters (${promptFeedback?.blockReason}).`;
+    let responseMessage, toolCalls, text;
+
+    if (provider === 'openrouter' || provider === 'openai') {
+        responseMessage = data.choices?.[0]?.message;
+        if (!responseMessage) throw new Error("Invalid response structure from API.");
+        toolCalls = responseMessage.tool_calls;
+        text = responseMessage.content;
+    } else if (provider === 'gemini') {
+        responseMessage = data.candidates?.[0]?.content;
+        if (!responseMessage) throw new Error("Invalid response structure from Gemini API.");
+        // Gemini handles tools differently - for now, just get text
+        text = responseMessage.parts?.[0]?.text || '';
+    } else if (provider === 'anthropic') {
+        text = data.content?.[0]?.text || '';
     }
-    if (candidate.finishReason === "SAFETY") {
-        return "I cannot provide a response due to safety filters. Please try rephrasing your query.";
-    }
 
-    const toolCalls = candidate.content?.parts?.filter(part => part.functionCall);
+    // Add assistant's raw response to our internal history for display
+    chatHistory.push({ role: 'model', parts: [{ text: text || '' }] });
 
-    if (toolCalls && toolCalls.length > 0) {
-        chatHistory.push(candidate.content);
-
-        const toolPromises = toolCalls.map(part => _executeToolCall(part));
+    if (toolCalls && toolCalls.length > 0 && (provider === 'openrouter' || provider === 'openai')) {
+        // Execute tools
+        const toolPromises = toolCalls.map(tc => _executeToolCall({ functionCall: { name: tc.function.name, args: JSON.parse(tc.function.arguments) } }));
         const toolResults = await Promise.all(toolPromises);
 
-        chatHistory.push({
-            role: 'tool',
-            parts: toolResults.map((result, i) => ({
-                functionResponse: {
-                    name: toolCalls[i].functionCall.name,
-                    response: {
-                        name: toolCalls[i].functionCall.name,
-                        content: result,
-                    },
-                },
-            })),
+        // Add the assistant's message (with tool_calls) and our tool results to the messages for the next API call
+        messages.push(responseMessage);
+        toolResults.forEach((result, i) => {
+            messages.push({
+                role: 'tool',
+                tool_call_id: toolCalls[i].id,
+                name: toolCalls[i].function.name,
+                content: JSON.stringify(result)
+            });
         });
 
-        const secondResponse = await fetch(apiUrl, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify({ ...payload, contents: chatHistory })
-        });
+        const secondResponse = await fetch(apiUrl, { method: 'POST', headers, body: JSON.stringify({ ...payload, messages: messages }) });
 
         if (!secondResponse.ok) throw new Error(`API Error after tool call: ${secondResponse.status}`);
-
         const secondData = await secondResponse.json();
-        const text = secondData.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!text) throw new Error('Received an invalid final response from Gemini API after tool call.');
-        return text;
+        const finalText = (provider === 'openrouter' || provider === 'openai') ? secondData.choices?.[0]?.message?.content : secondData.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (finalText === null || finalText === undefined) throw new Error('Received an invalid final response from API after tool call.');
+        return finalText;
     } else {
-        const text = candidate.content?.parts?.[0]?.text;
-        if (!text) throw new Error('Received an invalid response from Gemini API.');
+        if (text === null || text === undefined) throw new Error('Received an invalid response from API.');
         return text;
     }
 }
@@ -1404,10 +1595,15 @@ function saveSettings(event) {
     const keyInput = dom['ai-api-key-input'];
     const providerSelect = dom['ai-provider-select'];
     const modelSelect = dom['ai-model-select'];
+    const customModelInput = dom['ai-custom-model-input'];
 
-    localStorage.setItem('ai_api_key', keyInput.value.trim());
-    localStorage.setItem('ai_provider', providerSelect.value);
+    const provider = providerSelect.value;
+    const storageKey = `ai_api_key_${provider}`;
+    localStorage.setItem(storageKey, keyInput.value.trim());
+
+    localStorage.setItem('ai_provider', provider);
     localStorage.setItem('ai_model', modelSelect.value);
+    localStorage.setItem('ai_custom_model', customModelInput.value.trim());
 
     showAlert('AI settings saved.', 'Success');
     closeSettingsModal();
@@ -1420,25 +1616,67 @@ function loadSettings() {
     const keyInput = dom['ai-api-key-input'];
     const providerSelect = dom['ai-provider-select'];
     const modelSelect = dom['ai-model-select'];
+    const customModelInput = dom['ai-custom-model-input'];
 
-    if (keyInput) {
-        keyInput.value = localStorage.getItem('ai_api_key') || '';
-    }
-
-    if (providerSelect && modelSelect) {
-        const savedProvider = localStorage.getItem('ai_provider') || 'gemini';
+   if (providerSelect && modelSelect && customModelInput && keyInput) {
+        const savedProvider = localStorage.getItem('ai_provider') || 'openrouter';
         providerSelect.value = savedProvider;
+
+        // Load the API key for the saved provider
+        const storageKey = `ai_api_key_${savedProvider}`;
+        keyInput.value = localStorage.getItem(storageKey) || '';
 
         updateModelOptions(savedProvider);
         toggleProviderInfo(savedProvider);
 
         const savedModel = localStorage.getItem('ai_model');
+        const savedCustomModel = localStorage.getItem('ai_custom_model');
+        if (savedCustomModel) {
+            customModelInput.value = savedCustomModel;
+        }
         if (savedModel) {
             modelSelect.value = savedModel;
         } else if (modelsByProvider[savedProvider]?.length > 0) {
             modelSelect.value = modelsByProvider[savedProvider][0].id;
         }
     }
+}
+
+/**
+ * Converts a Gemini-formatted tool array to the OpenAI format required by OpenRouter.
+ * @param {Array} geminiTools - The tool array in Gemini's format.
+ * @returns {Array} The tool array in OpenAI's format.
+ */
+function convertGeminiToolsToOpenAI(geminiTools) {
+    if (!geminiTools || !geminiTools.length || !geminiTools[0].functionDeclarations) {
+        return [];
+    }
+
+    const convertParameters = (params) => {
+        if (!params) return { type: 'object', properties: {} };
+        const newParams = JSON.parse(JSON.stringify(params)); // Deep copy to avoid mutation
+
+        const lowercaseTypes = (obj) => {
+            if (obj.type) obj.type = obj.type.toLowerCase();
+            if (obj.properties) {
+                for (const key in obj.properties) {
+                    lowercaseTypes(obj.properties[key]);
+                }
+            }
+            if (obj.items) lowercaseTypes(obj.items);
+        };
+        lowercaseTypes(newParams);
+        return newParams;
+    };
+
+    return geminiTools[0].functionDeclarations.map(func => ({
+        type: 'function',
+        function: {
+            name: func.name,
+            description: func.description,
+            parameters: convertParameters(func.parameters)
+        }
+    }));
 }
 
 /**
