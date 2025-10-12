@@ -19,6 +19,7 @@ const shortcutActions = {
     // File actions
     'saveProject': () => dom['save-project-button']?.click(),
     'loadProject': () => dom['load-project-button']?.click(),
+    'saveView': () => dom['save-view-btn']?.click(),
 
     // View controls
     'viewPersp': () => setCameraView('persp'),
@@ -41,19 +42,26 @@ const shortcutActions = {
 
     // Other UI toggles
     'toggleInfoPanel': () => togglePanelVisibility('panel-info', 'info-button'),
-    'toggleAIAssistant': () => togglePanelVisibility('panel-ai-assistant', 'ai-assistant-button'),
+    'toggleAIAssistant': () => dom['ai-assistant-button']?.click(),
     'openShortcuts': () => openShortcutHelp(),
 
     // Gizmo modes
     'gizmoTranslate': () => setAndDisplayGizmoMode('translate'),
     'gizmoRotate': () => setAndDisplayGizmoMode('rotate'),
     'gizmoScale': () => setAndDisplayGizmoMode('scale'),
+
+    // Scene Interaction Toggles
+    'toggleQuadView': () => dom['view-btn-quad']?.click(),
+    'toggleFpv': () => dom['fpv-toggle-btn']?.click(),
+    'toggleGizmo': () => dom['gizmo-toggle']?.click(),
+    'toggleResizeMode': () => dom['resize-mode-toggle']?.click(),
 };
 
 // Default key mappings. This structure makes it easier to add a customization UI later.
 const keyMap = {
     'KeyS+Ctrl': 'saveProject',
     'KeyO+Ctrl': 'loadProject',
+    'KeyS+Shift': 'saveView',
     'KeyP': 'viewPersp',
     'KeyO': 'viewOrtho',
     'KeyT': 'viewTop',
@@ -74,6 +82,10 @@ const keyMap = {
     'KeyW': 'gizmoTranslate',
     'KeyE': 'gizmoRotate',
     'KeyR': 'gizmoScale',
+    'KeyQ': 'toggleQuadView',
+    'KeyV': 'toggleFpv',
+    'KeyG': 'toggleGizmo',
+    'KeyM': 'toggleResizeMode',
 };
 
 /**
@@ -163,6 +175,8 @@ function debounce(func, delay) {
 }
 
 const debouncedScheduleUpdate = debounce(scheduleUpdate, 250); // 250ms delay
+
+const debouncedWindowResize = debounce(() => window.dispatchEvent(new Event('resize')), 100);
 
 let map, tileLayer;
 let maxZ = 100;
@@ -377,10 +391,10 @@ export function setupDOM() {
 const ids = [
     // Global
     'theme-btn-light', 'theme-btn-dark', 'theme-btn-cyber', 'theme-btn-cafe58', 'theme-switcher-container',
-    'render-container', 'sidebar-wrapper', 'right-sidebar', 'analysis-sidebar',
+    'render-container', 'sidebar-wrapper', 'right-sidebar',
     'welcome-screen', 'glow-canvas', 'start-with-shoebox', 'start-with-import',
-    'toggle-modules-btn', 'toggle-analysis-btn', 'generate-scene-button',
-    'save-project-button', 'load-project-button', 'run-simulation-button', 'custom-alert', 
+    'generate-scene-button', 'panel-simulation-modules', 'panel-analysis-modules', 'toggle-modules-btn', 'toggle-analysis-btn',
+    'save-project-button', 'load-project-button', 'run-simulation-button', 'custom-alert',
     'custom-alert-title', 'custom-alert-message', 'custom-alert-close',
 
     // Toolbars
@@ -533,10 +547,12 @@ const ids = [
     'spectral-metrics-dashboard', 'metric-photopic-val', 'metric-melanopic-val', 'metric-neuropic-val',
 
     // Info Panel & AI Assistant
-    'info-button', 'panel-info',
-    'ai-assistant-button', 'panel-ai-assistant', 'ai-chat-messages', 'ai-chat-form', 'ai-chat-input', 'ai-chat-send',
-    'ai-mode-chat', 'ai-mode-generate', 'ai-mode-inspector', 'run-inspector-btn', 'ai-inspector-results',
-    'ai-settings-btn', 'ai-settings-modal', 'ai-settings-close-btn', 'ai-settings-form', 'ai-provider-select', 'ai-model-select', 'ai-api-key-input', 'ai-custom-model-input', 'openrouter-info-box',
+    'info-button', 'panel-info', 'ai-assistant-button', 'ai-chat-messages',
+    'ai-chat-form', 'ai-chat-input', 'ai-chat-send', 'ai-mode-select', 'ai-mode-description-box', 
+    'ai-mode-description-text', 'ai-chat-tabs', 'run-inspector-btn', 'ai-inspector-results', 
+    'run-critique-btn', 'ai-critique-results', 'ai-settings-btn', 'ai-settings-modal', 
+    'ai-settings-close-btn', 'ai-settings-form', 'ai-provider-select', 'ai-model-select', 
+    'ai-api-key-input', 'ai-custom-model-input', 'openrouter-info-box',
 
     // Project Access Prompt
     'project-access-prompt', 'select-folder-btn', 'dismiss-prompt-btn',
@@ -631,7 +647,10 @@ const ids = [
     'custom-asset-importer',
 
     // EN 17037 Compliance Recipe
-    'en17037-view-factor-toggle',
+    'en17037-provision-toggle', 'en17037-provision-level',
+    'en17037-sunlight-toggle', 'en17037-sunlight-date', 'en17037-sunlight-level',
+    'en17037-view-toggle', 'en17037-view-level', 'en17037-view-factor-toggle',
+    'en17037-glare-toggle', 'en17037-glare-level',
 ];
 
     ids.forEach(id => { const el = document.getElementById(id); if(el) dom[id] = el; });
@@ -704,18 +723,23 @@ function observeAndInitDynamicPanels() {
 * Clears any highlights on the sensor grid by reapplying the correct data-driven colors.
 */
 export function clearSensorHighlights() {
-    if (resultsManager.resultsData.length > 0) {
-        // Find the most recent data set to re-apply. For annual results, this is the hourly data.
-        const currentHour = dom['time-scrubber'] ? parseInt(dom['time-scrubber'].value, 10) : -1;
-        let dataToDisplay = resultsManager.resultsData; // Default to average or point-in-time
+    const activeData = resultsManager.getActiveData();
+    if (activeData && activeData.length > 0) {
+        const timeScrubber = dom['time-scrubber'];
+        const currentHour = timeScrubber ? parseInt(timeScrubber.value, 10) : -1;
+        let dataToDisplay = activeData;
 
-        if (resultsManager.annualResultsData.length > 0 && currentHour >= 0) {
-            dataToDisplay = resultsManager.getIlluminanceForHour(currentHour);
+        // If annual data is loaded and we are scrubbing, use hourly data
+        if (resultsManager.hasAnnualData(resultsManager.activeView) && currentHour >= 0) {
+            dataToDisplay = resultsManager.getIlluminanceForHour(currentHour, resultsManager.activeView);
         }
 
-        if(dataToDisplay) {
+        if (dataToDisplay) {
             updateSensorGridColors(dataToDisplay);
         }
+    } else {
+        // If there's no data, ensure grid is cleared of colors
+        updateSensorGridColors(null);
     }
 }
 
@@ -724,46 +748,66 @@ export function clearSensorHighlights() {
 * @param {'min' | 'max'} type - The type of value to highlight.
 */
 export function highlightSensorPoint(type) {
-    if (resultsManager.resultsData.length === 0) {
+    const activeData = resultsManager.getActiveData();
+    const activeStats = resultsManager.getActiveStats();
+
+    if (!activeData || activeData.length === 0 || !activeStats) {
         showAlert('No results data available to highlight.', 'Info');
         return;
     }
 
-    const sensorGroup = scene.getObjectByName('sensorPoints');
-    if (!sensorGroup || !sensorGroup.children || sensorGroup.children.length === 0) {
-        console.warn('Sensor point group not found in the scene.');
-        showAlert('Could not find sensor points in the 3D view.', 'Error');
-        return;
-    }
-
-    // First, clear any existing highlights to ensure a clean state
-    clearSensorHighlights();
-
-    const targetValue = (type === 'min') ? resultsManager.stats.min : resultsManager.stats.max;
-
-    // Find ALL indices that match the target value, in case of duplicates
+    const targetValue = (type === 'min') ? activeStats.min : activeStats.max;
     const indices = [];
-    resultsManager.resultsData.forEach((value, index) => {
+    activeData.forEach((value, index) => {
         if (value === targetValue) {
             indices.push(index);
         }
     });
 
-    if (indices.length === 0) {
-        console.warn(`Could not find index for ${type} value: ${targetValue}`);
+    if (indices.length > 0) {
+        const color = (type === 'min') ? 0x0000ff : 0xff0000; // Blue for min, Red for max
+        highlightPointsByIndices(indices, color);
+    } else {
+         console.warn(`Could not find index for ${type} value: ${targetValue}`);
+    }
+}
+
+/**
+* Highlights multiple sensor points in the 3D view by their indices.
+* @param {number[]} indices - An array of sensor point indices to highlight.
+* @param {number} [color=0xffa500] - The hex color to use for highlighting (default is orange).
+*/
+export function highlightPointsByIndices(indices, color = 0xffa500) {
+    if (!resultsManager.getActiveData() || resultsManager.getActiveData().length === 0) {
         return;
     }
+    
+    // Clear existing highlights before applying new ones.
+    clearSensorHighlights();
+    
+    if (!indices || indices.length === 0) {
+        return; // Nothing to highlight
+    }
+    
+    let cumulativeIndex = 0;
+    for (const mesh of sensorMeshes) {
+        if (!mesh.instanceColor) continue; 
 
-    const highlightColor = (type === 'min') ? 0x0000ff : 0xff0000; // Blue for min, Red for max
-
-    indices.forEach(index => {
-        if (index < sensorGroup.children.length) {
-            const point = sensorGroup.children[index];
-            // Clone material to not affect other points, then set color
-            point.material = point.material.clone();
-            point.material.color.setHex(highlightColor);
+        let needsUpdate = false;
+        for (const index of indices) {
+            if (index >= cumulativeIndex && index < cumulativeIndex + mesh.count) {
+                const instanceIndex = index - cumulativeIndex;
+                mesh.setColorAt(instanceIndex, new THREE.Color(color));
+                needsUpdate = true;
+            }
         }
-    });
+        
+        if (needsUpdate) {
+            mesh.instanceColor.needsUpdate = true;
+        }
+        
+        cumulativeIndex += mesh.count;
+    }
 }
 
 /**
@@ -1911,14 +1955,12 @@ export function togglePanelVisibility(panelId, btnId) {
             const yPos = 60 + offset;
             panel.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
             panel.dataset.positioned = 'true';
-        }
+    }
 
-        // Force re-initialization by removing the flag
-        delete panel.dataset.controlsInitialized;
+    initializePanelControls(panel);
 
-        initializePanelControls(panel);
-
-        // Make sure the panel is within the viewport
+    // Make sure the panel is within the viewport
+    ensureWindowInView(panel);
         ensureWindowInView(panel);
 
         // Special case for the map in the project panel
@@ -1969,7 +2011,8 @@ function setupPanelToggleButtons() {
         'toggle-panel-viewpoint-btn': 'panel-viewpoint',
         'toggle-panel-scene-btn': 'panel-scene-elements',
         'info-button': 'panel-info',
-        'ai-assistant-button': 'panel-ai-assistant'
+        'toggle-modules-btn': 'panel-simulation-modules',
+        'toggle-analysis-btn': 'panel-analysis-modules'
     };
 
     for (const [btnId, panelId] of Object.entries(panelMap)) {
@@ -2075,7 +2118,9 @@ export function initializePanelControls(win) {
                     'panel-viewpoint': 'toggle-panel-viewpoint-btn',
                     'panel-scene-elements': 'toggle-panel-scene-btn',
                     'panel-info': 'info-button',
-                    'panel-ai-assistant': 'ai-assistant-button'
+                    'panel-ai-assistant': 'ai-assistant-button',
+                    'panel-simulation-modules': 'toggle-modules-btn',
+                    'panel-analysis-modules': 'toggle-analysis-btn'
                 };
                 const btnId = panelMap[win.id];
                 if (btnId && dom[btnId]) {
@@ -2087,8 +2132,26 @@ export function initializePanelControls(win) {
 
     if (header) makeDraggable(win, header);
 
-
-
+    // Add accordion functionality to panels
+    win.querySelectorAll('.accordion-header').forEach(header => {
+        header.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent panel from dragging when clicking header
+            const content = header.nextElementSibling;
+            const chevron = header.querySelector('.accordion-chevron');
+            if (content && content.classList.contains('accordion-content')) {
+                const isVisible = content.style.display === 'block';
+                content.style.display = isVisible ? 'none' : 'block';
+                header.parentElement.classList.toggle('open', !isVisible);
+                if (chevron) {
+                    chevron.textContent = isVisible ? '▶' : '▼';
+                }
+                // Ensure panel is visible if it was expanded and might go off-screen
+                if (!isVisible) {
+                    ensureWindowInView(win);
+                }
+            }
+        });
+    });
 
     if (resizeHandles.length > 0) makeResizable(win, resizeHandles);
 
@@ -2312,18 +2375,120 @@ export function makeResizable(element, handles) {
     });
 }
 
+/**
+* Makes the AI Assistant sidebar horizontally resizable.
+* @param {HTMLElement} sidebar The sidebar element.
+* @param {HTMLElement} handle The drag handle element.
+*/
+function makeSidebarResizable(sidebar, handle) {
+    handle.onmousedown = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const initialMouseX = e.clientX;
+        const initialWidth = sidebar.offsetWidth;
+        document.body.classList.add('is-resizing-sidebar');
+        document.body.style.cursor = 'ew-resize';
+        document.body.style.userSelect = 'none';
+
+        document.onmousemove = function(moveEvent) {
+            const dx = initialMouseX - moveEvent.clientX;
+            let newWidth = initialWidth + dx;
+
+            const minWidth = 320;
+            const maxWidth = Math.min(800, window.innerWidth - 100);
+            newWidth = Math.max(minWidth, Math.min(newWidth, maxWidth));
+
+            // Only update the CSS variable; the components will react to it.
+            document.documentElement.style.setProperty('--ai-sidebar-width', `${newWidth}px`);
+            debouncedWindowResize();
+        };
+
+        document.onmouseup = function() {
+            document.onmousemove = null;
+            document.onmouseup = null;
+            document.body.classList.remove('is-resizing-sidebar');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        };
+    };
+}
+
+/**
+* Makes the AI chat input area vertically resizable.
+*/
+function makeChatInputResizable() {
+    const handle = dom['chat-resize-handle'];
+    const container = dom['ai-chat-input-container'];
+    if (!handle || !container) return;
+
+    handle.onmousedown = function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const startY = e.clientY;
+    const startHeight = container.offsetHeight;
+        document.body.style.cursor = 'ns-resize';
+        document.body.style.userSelect = 'none';
+
+        document.onmousemove = function(moveEvent) {
+            const dy = startY - moveEvent.clientY;
+            let newHeight = startHeight + dy;
+
+            const minHeight = 60;
+            const maxHeight = 400;
+            newHeight = Math.max(minHeight, Math.min(newHeight, maxHeight));
+
+            container.style.height = `${newHeight}px`;
+        };
+
+        document.onmouseup = function() {
+            document.onmousemove = null;
+            document.onmouseup = null;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        };
+    };
+}
+
 export function setupSidebar() {
-    dom['toggle-modules-btn']?.addEventListener('click', () => dom['right-sidebar']?.classList.toggle('closed'));
-    dom['toggle-analysis-btn']?.addEventListener('click', () => dom['analysis-sidebar']?.classList.toggle('closed'));
+    // This now controls the AI assistant sidebar on the right.
+    dom['ai-assistant-button']?.addEventListener('click', () => {
+        const sidebar = dom['right-sidebar'];
+        if (sidebar) {
+            const isOpening = sidebar.classList.contains('closed');
+            sidebar.classList.toggle('closed');
+            document.body.classList.toggle('ai-sidebar-open', isOpening);
+
+            // Dispatch a window resize event after the transition to fix rendering
+            setTimeout(() => {
+                window.dispatchEvent(new Event('resize'));
+            }, 400); // Should match CSS transition duration
+        }
+    });
+
+    const sidebar = dom['right-sidebar'];
+    const handle = sidebar?.querySelector('.resize-handle-edge.left');
+    if (sidebar && handle) {
+        makeSidebarResizable(sidebar, handle);
+    }
 }
 
 function setupProjectPanel() {
     setupEpwUploadModal();
     checkRadiancePath();
 
+    // Fix for Leaflet's default icon paths when using a bundler or CDN
+    delete L.Icon.Default.prototype._getIconUrl;
+    L.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    });
+
     if (dom.map && dom.latitude && dom.longitude) {
         map = L.map(dom.map, { zoomControl: false }).setView([40.7128, -74.0060], 13);
-        
+
         const lightTiles = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
         const darkTiles = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
         

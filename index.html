@@ -16,8 +16,6 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-    
     <link rel="stylesheet" href="styles.css">
 
     <style>
@@ -85,11 +83,10 @@
         }
     </style>
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 </head>
 
 <body>
@@ -124,19 +121,20 @@
                     <path style="fill:#4d8bee" d="m384.874 356.939 1 1.73-271.994-95.111 186.778-52.497 28.072 48.626 28.072 48.638h.012z"/>
                 </svg>
                 <svg id="welcome-logo-cafe58" class="welcome-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 511.987 511.987" xml:space="preserve">
-                <path transform="rotate(-103.951 75.54 279.672)" style="fill:#707C8A" d="M66.717 204.027h17.648v151.29H66.717z"/>
-                <path style="fill:#26303D" d="m235.67 98.502 181.854 314.982H53.815z"/>
-                <path style="fill:#FFA518" d="M511.987 268.44v47.297l-143.803 21.754-23.312-8.236-48.237-94.122z"/>
-                <path style="fill:#FF6D1D" d="M511.987 315.737v47.285l-127.101-6.083h-.012l-40.002-27.684 11.942-20.93z"/>
-                <path style="fill:#5a687a" d="M511.987 221.156v47.284l-183.257-8.753-52.096-11.612 24.024-37.014z"/>
-                <path style="fill:#707C8A" d="m384.874 356.939 1 1.73-271.994-95.111 186.778-52.497 28.072 48.626 28.072 48.638h.012z"/>
-            </svg>
+                    <path transform="rotate(-103.951 75.54 279.672)" style="fill:#707C8A" d="M66.717 204.027h17.648v151.29H66.717z"/>
+                    <path style="fill:#26303D" d="m235.67 98.502 181.854 314.982H53.815z"/>
+                    <path style="fill:#FFA518" d="M511.987 268.44v47.297l-143.803 21.754-23.312-8.236-48.237-94.122z"/>
+                    <path style="fill:#FF6D1D" d="M511.987 315.737v47.285l-127.101-6.083h-.012l-40.002-27.684 11.942-20.93z"/>
+                    <path style="fill:#5a687a" d="M511.987 221.156v47.284l-183.257-8.753-52.096-11.612 24.024-37.014z"/>
+                    <path style="fill:#707C8A" d="m384.874 356.939 1 1.73-271.994-95.111 186.778-52.497 28.072 48.626 28.072 48.638h.012z"/>
+                </svg>
             </div>
             <div class="welcome-text-container">
-                <h1 class="welcome-title">Ray Modeler</h1>
-            </div>
+            <h1 class="welcome-title">Ray Modeler</h1>
         </div>
-            <p class="welcome-description text-center max-w-lg text-lg text-[--text-secondary]">
+    </div>
+    <p class="welcome-subheader">Your AI Assistant for Advanced Daylighting Simulation</p>
+    <p class="welcome-description text-center max-w-lg text-lg text-[--text-secondary]">
                 Choose how you'd like to begin your modeling project. You can start with a predefined parametric shape or import your own custom model.
             </p>
         <div class="welcome-options">
@@ -231,11 +229,11 @@
                 </div>
                 
                 <div class="action-button-container">
-                    <button id="toggle-panel-aperture-btn" class="btn" aria-label="Apertures & Shading">
-                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.4 3h13.2A2.4 2.4 0 0 1 21 5.4v13.2a2.4 2.4 0 0 1-2.4 2.4H5.4A2.4 2.4 0 0 1 3 18.6V5.4A2.4 2.4 0 0 1 5.4 3M13 4v7h7v2h-7v7h-2v-7H4v-2h7V4z" fill="currentColor"/></svg>
-                    </button>
-                    <span class="tooltip" role="tooltip">Apertures & Shading</span>
-                </div>
+                <button id="toggle-panel-aperture-btn" class="btn" aria-label="Apertures & Shading">
+                    <svg viewBox="0 0 51 51" xmlns="http://www.w3.org/2000/svg" fill="currentColor" stroke="none"><path d="m8.375 8 .098.098L8.57 8zm3.117 0L9.934 9.559l1.46 1.46L14.413 8zm5.842 0-4.479 4.48 1.46 1.46L20.254 8zm5.844 0-7.403 7.4 1.461 1.461L26.1 8zm5.84 0-10.32 10.322 1.46 1.461L31.94 8Zm5.843 0L21.62 21.244l1.46 1.46L37.782 8Zm5.844 0L24.54 24.164 26 25.625l17-17V8zM27.461 27.086 11.547 43h2.922l14.453-14.453Zm2.92 2.92L17.387 43h2.922l11.533-11.533Zm2.922 2.922L23.23 43h2.922l8.612-8.611zm2.922 2.922L29.075 43h2.921l5.69-5.69zm2.92 2.92L34.915 43h2.92l2.77-2.77zm2.921 2.921L40.758 43H43v-.375z"/><path d="m8 7.625 18 18-18 18z"/><path d="M4 4v43h43V4Zm4 4h35v35H8Z"/></svg>
+                </button>
+                <span class="tooltip" role="tooltip">Apertures & Shading</span>
+            </div>
                 
             <div class="action-button-container">
                 <button id="toggle-panel-lighting-btn" class="btn" aria-label="Artificial Lighting">
@@ -253,7 +251,9 @@
                 
                 <div class="action-button-container">
                     <button id="toggle-panel-sensor-btn" class="btn" aria-label="Sensor Grid">
-                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M23.584 47.441a3.5 3.5 0 0 0-2.393 1.024l-4.949 4.95a3.5 3.5 0 0 0 0 4.948l7.746 7.746-7.746 7.746a3.5 3.5 0 0 0 0 4.95l4.95 4.95a3.5 3.5 0 0 0 4.95 0l7.747-7.743 7.744 7.744a3.5 3.5 0 0 0 4.951 0l4.951-4.951a3.5 3.5 0 0 0 0-4.95L43.79 66.11l7.746-7.746a3.5 3.5 0 0 0-.002-4.949l-4.951-4.95a3.5 3.5 0 0 0-4.95 0l-7.743 7.747-7.746-7.746a3.5 3.5 0 0 0-2.559-1.024zm.084 4.913 10.22 10.22 10.221-10.22 3.537 3.535-10.22 10.22 10.22 10.221-3.537 3.537-10.22-10.22-10.221 10.22-3.535-3.537 10.22-10.22-10.22-10.221z" fill-rule="evenodd"/><path d="M11.896 12h12.041v12.041h-12.04zm16.041 0H39.98v12.041H27.938zm16.042 0h12.04v12.041H43.98zm16.04 0h12.042v12.041H60.02zm16.042 0H88.1v12.041H76.06zM11.896 28.041h12.041v12.041h-12.04zm16.041 0H39.98v12.041H27.938zm16.042 0h12.04v12.041H43.98zm16.04 0h12.042v12.041H60.02zm16.042 0H88.1v12.041H76.06zM60.02 44.082h12.04v12.041H60.02zm16.04 0h12.042v12.041H76.06zM60.02 60.123h12.04v12.041H60.02zm16.04 0h12.042v12.041H76.06zM60.02 76.164h12.04v12.041H60.02zm16.04 0h12.042v12.041H76.06zM7.897.102V8H0v4h7.896v12.041H0v4h7.896v12.041H0v4h7.896v12.041H0v4h7.896v12.041H0v4h7.896v12.041H0v4h7.896v7.897h4v-7.897h12.041v7.897h4v-7.897H39.98v7.897h4v-7.897h12.04v7.897h4v-7.897h12.042v7.897h4v-7.897H88.1v7.897h4v-7.897h7.9v-4h-7.898v-12.04H100v-4h-7.898V60.122H100v-4h-7.898v-12.04H100v-4h-7.898V28.041H100v-4h-7.898V12H100V8h-7.898V.102h-4V8H76.06V.102h-4V8H60.02V.102h-4V8H43.979V.102h-4V8H27.938V.102h-4V8H11.896V.102zm4 43.98h12.041v1.373a5.6 5.6 0 0 1 2.442.707c.55.392 1.062.836 1.558 1.295v-3.375H39.98v3.186a5.84 5.84 0 0 1 4-1.797v-1.389h12.04v12.041h-1.5c-.025.84-.215 1.674-.632 2.418-.395.56-.846 1.078-1.31 1.582h3.443v12.041h-3.325a5.84 5.84 0 0 1 1.836 4h1.489v12.041H43.979v-1.46c-.87-.01-1.737-.2-2.508-.63a15 15 0 0 1-1.492-1.222v3.312H27.938v-3.4c-1.007 1.152-2.484 1.854-4 1.947v1.453H11.896v-12.04h1.36c.015-.85.2-1.693.613-2.448a15 15 0 0 1 1.27-1.553h-3.243V60.123h3.26c-1.137-1.014-1.815-2.487-1.898-4h-1.362z" fill-rule="evenodd" fill-opacity="0.4"/></svg>
+                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M23.584 47.441a3.5 3.5 0 0 0-2.393 1.024l-4.949 4.95a3.5 3.5 0 0 0 0 4.948l7.746 7.746-7.746 7.746a3.5 3.5 0 0 0 0 4.95l4.95 4.95a3.5 3.5 0 0 0 4.95 0l7.747-7.743 7.744 7.744a3.5 3.5 0 0 0 4.951 0l4.951-4.951a3.5 3.5 0 0 0 0-4.95L43.79 66.11l7.746-7.746a3.5 3.5 0 0 0-.002-4.949l-4.951-4.95a3.5 3.5 0 0 0-4.95 0l-7.743 7.747-7.746-7.746a3.5 3.5 0 0 0-2.559-1.024z" fill-rule="evenodd"/>
+                    <path d="M11.896 12h12.041v12.041h-12.04zm16.041 0H39.98v12.041H27.938zm16.042 0h12.04v12.041H43.98zm16.04 0h12.042v12.041H60.02zm16.042 0H88.1v12.041H76.06zM11.896 28.041h12.041v12.041h-12.04zm16.041 0H39.98v12.041H27.938zm16.042 0h12.04v12.041H43.98zm16.04 0h12.042v12.041H60.02zm16.042 0H88.1v12.041H76.06zM60.02 44.082h12.04v12.041H60.02zm16.04 0h12.042v12.041H76.06zM60.02 60.123h12.04v12.041H60.02zm16.04 0h12.042v12.041H76.06zM60.02 76.164h12.04v12.041H60.02zm16.04 0h12.042v12.041H76.06zM7.897.102V8H0v4h7.896v12.041H0v4h7.896v12.041H0v4h7.896v12.041H0v4h7.896v12.041H0v4h7.896v12.041H0v4h7.896v7.897h4v-7.897h12.041v7.897h4v-7.897H39.98v7.897h4v-7.897h12.04v7.897h4v-7.897h12.042v7.897h4v-7.897H88.1v7.897h4v-7.897h7.9v-4h-7.898v-12.04H100v-4h-7.898V60.122H100v-4h-7.898v-12.04H100v-4h-7.898V28.041H100v-4h-7.898V12H100V8h-7.898V.102h-4V8H76.06V.102h-4V8H60.02V.102h-4V8H43.979V.102h-4V8H27.938V.102h-4V8H11.896V.102zm4 43.98h12.041v1.373a5.6 5.6 0 0 1 2.442.707c.55.392 1.062.836 1.558 1.295v-3.375H39.98v3.186a5.84 5.84 0 0 1 4-1.797v-1.389h12.04v12.041h-1.5c-.025.84-.215 1.674-.632 2.418-.395.56-.846 1.078-1.31 1.582h3.443v12.041h-3.325a5.84 5.84 0 0 1 1.836 4h1.489v12.041H43.979v-1.46c-.87-.01-1.737-.2-2.508-.63a15 15 0 0 1-1.492-1.222v3.312H27.938v-3.4c-1.007 1.152-2.484 1.854-4 1.947v1.453H11.896v-12.04h1.36c.015-.85.2-1.693.613-2.448a15 15 0 0 1 1.27-1.553h-3.243V60.123h3.26c-1.137-1.014-1.815-2.487-1.898-4h-1.362z" fill-rule="evenodd" fill-opacity="0.4"/>
+                    </svg>
                 </button>
                 <span class="tooltip" role="tooltip">Sensor Grid</span>
             </div>
@@ -270,8 +270,24 @@
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 294.004 294.004" xml:space="preserve" fill="currentColor" stroke="none"><path d="M0 10.27v273.465h294.004V10.27zm61.01 26.058c19.873 0 35.983 16.11 35.983 35.983s-16.11 35.983-35.983 35.983-35.983-16.11-35.983-35.983c-.001-19.872 16.11-35.983 35.983-35.983m43.87 216.14H25.429l61.286-122.869 61.286 122.869zm73.293 0-45.368-87.972 47.4-95.031 91.281 183.004z"/></svg>
                 </button>
                 <span class="tooltip" role="tooltip">Scene Elements</span>
-            </div>
-            
+                </div>
+
+                <div class="w-full my-1 border-t border-[--grid-color]"></div>
+
+                <div class="action-button-container">
+                    <button id="toggle-modules-btn" class="btn" aria-label="Simulation Modules">
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor" stroke="none"><path d="M16 0 0 8l4.7 1.6L5 15l2.5-2.8L10 16zM7.5 10.4l4.3-5.9-6.2 4.3-3-1L14.2 2 9.7 13.8z"/></svg>
+                    </button>
+                    <span class="tooltip" role="tooltip">Simulation</span>
+                </div>
+
+                <div class="action-button-container">
+                    <button id="toggle-analysis-btn" class="btn" aria-label="Analysis Modules">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 495.421 495.421" xml:space="preserve" fill="currentColor" stroke="none"><path d="M490.531 188.099a7.27 7.27 0 0 0-8.089 2.393l-85.909 110.192a15.1 15.1 0 0 1-14.407 5.619l-93.674-15.672c-4.783-.8-9.668.742-13.123 4.159l-85.609 84.633a15.1 15.1 0 0 1-9.148 4.291l-111.28 10.993a15.14 15.14 0 0 0-9.523 4.679L2.414 460.344a8.85 8.85 0 0 0-1.685 9.589 8.87 8.87 0 0 0 8.138 5.339h468.591c9.924 0 17.963-8.036 17.963-17.957V194.956a7.25 7.25 0 0 0-4.89-6.857M29.334 275.472c4.504 0 8.978-1.782 12.312-5.314l24.096-25.411c3.535 1.03 7.229 1.758 11.093 1.758 18.997 0 34.859-13.296 39.018-31.04l38.148-3.762c6.584 13.213 20.086 22.397 35.833 22.397 22.116 0 40.138-18.007 40.138-40.141 0-4.952-1.02-9.648-2.669-14.03l34.049-33.384c5.579 2.947 11.833 4.771 18.567 4.771 14.987 0 27.945-8.368 34.828-20.584l22.137 3.707c5.129 16.25 20.185 28.15 38.108 28.15 22.136 0 40.143-18.007 40.143-40.143 0-6.286-1.585-12.162-4.159-17.462l44.862-57.555c5.743-7.361 4.423-17.983-2.941-23.718-7.328-5.719-17.956-4.417-23.715 2.938l-44.848 56.869c-3.004-.725-6.108-1.212-9.343-1.212-14.192 0-26.605 7.443-33.733 18.584l-23.937-4.002c-5.794-15.077-20.316-25.855-37.403-25.855-22.131 0-40.138 18.007-40.138 40.141 0 2.691.295 5.316.79 7.858l-37.733 37.136c-4.089-1.42-8.434-2.352-13.003-2.352-16.392 0-30.469 9.895-36.708 24l-44.438 4.39c-7.328-9.648-18.817-15.984-31.854-15.984-22.116 0-40.142 18.007-40.142 40.141 0 5.729 1.254 11.157 3.434 16.084l-23.091 24.535c-6.404 6.802-6.073 17.497.71 23.895a16.85 16.85 0 0 0 11.589 4.595m345.658-167.813c8.153 0 14.792 6.634 14.792 14.787 0 8.156-6.639 14.79-14.792 14.79s-14.788-6.634-14.788-14.79c0-8.153 6.635-14.787 14.788-14.787m-95.073-11.272c8.153 0 14.793 6.634 14.793 14.787s-6.64 14.79-14.793 14.79c-8.154 0-14.787-6.637-14.787-14.79s6.633-14.787 14.787-14.787m-90.084 82.782c8.154 0 14.787 6.637 14.787 14.79s-6.633 14.79-14.787 14.79-14.792-6.637-14.792-14.79 6.639-14.79 14.792-14.79m-113 12.405c8.153 0 14.788 6.634 14.788 14.788s-6.634 14.789-14.788 14.789-14.787-6.636-14.787-14.789c0-8.154 6.633-14.788 14.787-14.788"/></svg>
+                    </button>
+                    <span class="tooltip" role="tooltip">Analysis</span>
+                </div>
+
             </div>
         </div>
     </div>
@@ -285,7 +301,6 @@
                 <div class="action-button-container"><button id="view-btn-front" class="btn" aria-label="Front View (South)"><svg viewBox="0 0 24 24"><polygon class="face-fill" points="4,16 12,20 12,12 4,8" /><path d="M4 8l8 4 8-4" /><path d="M12 12v8M20 8l-8 4" /><path d="M4 8v8l8 4" /></svg></button><span class="tooltip" role="tooltip">Front View (South)</span></div>
                 <div class="action-button-container"><button id="view-btn-back" class="btn" aria-label="Back View (North)"><svg viewBox="0 0 24 24"><polygon class="face-fill" points="12,4 20,8 20,16 12,12" /><path d="M4 8l8 4 8-4" /><path d="M12 12v8M20 8l-8 4" /><path d="M4 8v8l8 4" /></svg></button><span class="tooltip" role="tooltip">Back View (North)</span></div>
                 <div class="action-button-container"><button id="view-btn-left" class="btn" aria-label="Left View (West)"><svg viewBox="0 0 24 24"><polygon class="face-fill" points="4,8 12,4 12,12 4,16" /><path d="M4 8l8 4 8-4" /><path d="M12 12v8M20 8l-8 4" /><path d="M4 8v8l8 4" /></svg></button><span class="tooltip" role="tooltip">Left View (West)</span></div>
-                <div class="action-button-container"><button id="view-btn-right" class="btn" aria-label="Right View (East)"><svg viewBox="0 0 24 24"><polygon class="face-fill" points="12,4 20,8 20,16 12,20" /><path d="M4 8l8 4 8-4" /><path d="M12 12v8M20 8l-8 4" /><path d="M4 8v8l8 4" /></svg></button><span class="tooltip" role="tooltip">Right View (East)</span></div>
                 <div class="action-button-container"><button id="view-btn-right" class="btn" aria-label="Right View (East)"><svg viewBox="0 0 24 24"><polygon class="face-fill" points="12,4 20,8 20,16 12,20" /><path d="M4 8l8 4 8-4" /><path d="M12 12v8M20 8l-8 4" /><path d="M4 8v8l8 4" /></svg></button><span class="tooltip" role="tooltip">Right View (East)</span></div>
                 <div class="action-button-container"><button id="view-btn-quad" class="btn" aria-label="Quad View"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="12" x2="21" y2="12"></line><line x1="12" y1="3" x2="12" y2="21"></line></svg></button><span class="tooltip" role="tooltip">Quad View</span></div>
             </div>
@@ -2216,62 +2231,7 @@
               <span id="simulation-status" class="text-sm">Status: Idle</span>
           </div>
         </div> <div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-    </div> <div id="panel-ai-assistant" class="floating-window ui-panel hidden">
-            <div class="window-header">
-                <span>AI Assistant</span>
-                <div class="window-controls">
-                    <button id="ai-settings-btn" class="window-icon-settings" aria-label="AI Settings">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                    </button>
-                    <div class="window-icon-max"></div>
-                    <div class="collapse-icon"></div>
-                    <div class="window-icon-close"></div>
-                </div>
-            </div>
-          <div class="window-content !p-0 flex flex-col">
-              <div class="p-2 border-b border-[--grid-color] flex items-center justify-between">
-                  <div class="ai-mode-selector">
-                  <div class="action-button-container">
-                      <button id="ai-mode-chat" class="btn active" aria-label="Chat Mode">
-                          <svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 5v8a2 2 0 01-2 2h-5l-5 4v-4H4a2 2 0 01-2-2V5a2 2 0 012-2h12a2 2 0 012 2zM7 8H5v2h2V8zm2 0h2v2H9V8zm6 0h-2v2h2V8z" clip-rule="evenodd" /></svg>
-                          <span>Chat</span>
-                      </button>
-                      <span class="tooltip">Chat with Helios</span>
-                  </div>
-                  <div class="action-button-container">
-                      <button id="ai-mode-generate" class="btn" aria-label="Generate Scene from Prompt">
-                          <svg width="16" height="16" viewBox="0 0 64 64" xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="currentColor"><path d="M45.49 41.65a7.82 7.82 0 0 0 0-15.55 5.47 5.47 0 0 0-1.19-5.88l-.22-.2c1-.39 1.6-.72 1.68-1.49s-.64-1.33-1.73-2a8.2 8.2 0 0 1-3.27-4c-.47-1.2-.78-2-1.65-2.08s-1.33.64-2 1.73a8.4 8.4 0 0 1-1.45 1.69 7.81 7.81 0 0 0-12.81 5.47 5.43 5.43 0 0 0-6.72 6.73 7.82 7.82 0 0 0-1.49 15.35 8.3 8.3 0 0 1-1.29.82c-1.15.58-1.91 1-1.91 1.84s.76 1.27 1.91 1.85A8.24 8.24 0 0 1 17 49.57c.58 1.16 1 1.92 1.84 1.92s1.27-.76 1.85-1.92c.07-.15.18-.29.27-.44a5.3 5.3 0 0 0 1.93-.4 7.82 7.82 0 0 0 15.55 0 5.42 5.42 0 0 0 7.08-7.07Zm-6.71-28.39.07-.11v.12A10.27 10.27 0 0 0 43 18.2l.1.07h-.11A10.28 10.28 0 0 0 38 22.39a.6.6 0 0 1-.07.1s0-.08 0-.11a10.3 10.3 0 0 0-4.08-4.94l-.1-.07h.11a10.33 10.33 0 0 0 4.92-4.11m-20 35.53v-.11a10.28 10.28 0 0 0-4.53-4.53l-.11-.06.11-.05a10.48 10.48 0 0 0 4.53-4.53v-.11l.06.11A10.28 10.28 0 0 0 23.4 44l.11.05-.11.06a10.23 10.23 0 0 0-4.53 4.53Zm24.08-2.66a3.45 3.45 0 0 1-4.81 0 1 1 0 0 0-1.65.87 6 6 0 0 1 .06.85 5.82 5.82 0 1 1-11.64 0 6 6 0 0 1 .06-.85 1 1 0 0 0-.53-1h-.11.05c1.16-.58 1.92-1 1.92-1.85s-.76-1.26-1.92-1.84a8.2 8.2 0 0 1-3.63-3.64c-.58-1.15-1-1.91-1.85-1.91s-1.26.76-1.84 1.91a8 8 0 0 1-.65 1.07 5.82 5.82 0 1 1 1.25-11.55 1 1 0 0 0 1-1.57 3.43 3.43 0 0 1 4.79-4.77 1 1 0 0 0 1.11 0 1 1 0 0 0 .46-1 5.81 5.81 0 0 1 9-5.73 8 8 0 0 1-.8.38c-1.2.47-2 .78-2.08 1.66s.64 1.33 1.73 2a8.2 8.2 0 0 1 3.27 4c.47 1.2.78 2 1.66 2.08h.13c.79 0 1.23-.7 1.88-1.74a8.4 8.4 0 0 1 2.36-2.4 3.4 3.4 0 0 1 .82.58 3.45 3.45 0 0 1 0 4.81 1 1 0 0 0 .87 1.68 5.82 5.82 0 1 1 .84 11.58 6 6 0 0 1-.84-.06 1 1 0 0 0-1 .53 1 1 0 0 0 .17 1.15 3.45 3.45 0 0 1-.05 4.76Zm-25.1-30.96A4.79 4.79 0 1 0 13 20a4.79 4.79 0 0 0 4.76-4.83m-7.57 0A2.79 2.79 0 1 1 13 18a2.79 2.79 0 0 1-2.81-2.83m44.43-2.86a4 4 0 1 0-4 4 4 4 0 0 0 4-4m-6 0a2 2 0 1 1 2 2 2 2 0 0 1-2.02-2ZM57 49.85a4 4 0 1 0-4 4 4 4 0 0 0 4-4m-6 0a2 2 0 1 1 2 2 2 2 0 0 1-2-2m-40.53 5.47A3.47 3.47 0 1 0 7 51.85a3.46 3.46 0 0 0 3.47 3.47m0-4.93A1.47 1.47 0 1 1 9 51.85a1.47 1.47 0 0 1 1.47-1.46"/></svg>
-                          <span>Generate</span>
-                      </button>
-                      <span class="tooltip">Generate Scene</span>
-                  </div>
-                  <div class="action-button-container">
-                      <button id="ai-mode-inspector" class="btn" aria-label="Inspector Mode">
-                          <svg width="16" height="16" viewBox="0 0 24 24" xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="2" width="20" height="20" rx="0"/><path d="M6 12h2l2 4 4-9 2 5h2"/></svg>
-                          <span>Inspector</span>
-                      </button>
-                      <span class="tooltip">Design Inspector</span>
-                  </div>
-              </div>
-                  <button id="run-inspector-btn" class="btn btn-secondary btn-sm hidden">
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg>
-                      Run Inspector
-                  </button>
-              </div>
-              <div id="ai-chat-messages" class="flex-grow p-4 space-y-4 overflow-y-auto">
-              </div>
-              <div id="ai-inspector-results" class="flex-grow p-4 space-y-3 overflow-y-auto hidden">
-                  <div class="text-center text-sm text-[--text-secondary] p-4">
-                      <p>Click "Run Inspector" to analyze your current project setup for potential issues and design suggestions.</p>
-                  </div>
-              </div>
-              <div class="p-4 border-t border-[--grid-color]">
-                    <form id="ai-chat-form" class="flex gap-2">
-                    <input type="text" id="ai-chat-input" placeholder="Ask about Radiance or this app..." class="flex-grow" autocomplete="off">
-                    <button type="submit" id="ai-chat-send" class="btn btn-primary">Send</button>
-              </form>
-            </div>
-            </div> <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+    
         </div> <div id="proactive-suggestion-container" class="fixed bottom-24 right-8 z-[10001] flex flex-col items-end gap-2 w-full max-w-sm pointer-events-none"></div>
 
     <div id="climate-analysis-panel" class="floating-window ui-panel hidden" style="width: 950px; height: 820px;">
@@ -2305,189 +2265,349 @@
                 <div class="w-full relative flex-grow"><canvas id="sun-path-canvas"></canvas></div>
             </div>
         </div>
-        <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-    </div>
-        </main>
+        <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div>
+        
+        
+        
+        
+        
+        
+        <div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+</div>
 
-        <div id="sidebar-wrapper">
-            <aside id="right-sidebar" class="ui-panel closed">
-            <button id="toggle-modules-btn" title="Toggle Modules Sidebar" class="sidebar-toggle-btn ui-panel" aria-label="Toggle Modules Sidebar">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-            </button>
-            <div class="sidebar-content">
-                <h2 class="text-lg font-bold mb-4">Simulation Modules</h2>
-                <p class="text-sm text-gray-500 mb-6">Click '+' to open a parameter panel. Click '−' to close it.</p>
-                <ul id="simulation-module-list" class="module-list mt-6"></ul>
+ <div id="panel-simulation-modules" class="floating-window ui-panel hidden">
+          <div class="window-header">
+              <span>Simulation</span>
+              <div class="window-controls">
+                  <div class="window-icon-max"></div>
+                  <div class="collapse-icon"></div>
+                  <div class="window-icon-close"></div>
+              </div>
+          </div>
+          <div class="window-content">
+          <div class="accordion-item open">
+            <div class="accordion-header">
+              <span>Global Simulation Parameters</span>
+              <div class="accordion-chevron">▶</div>
+          </div>
+          <div class="accordion-content" style="display: block;">
+              <div class="param-section">
+                  <h4>Ambient Calculation Settings</h4>
+                    <div class="param-grid-sim">
+                                <div class="param-item">
+                                    <div class="param-item-row"><label for="ab" class="label">Ambient Bounces (-ab) <span class="info-icon">i<span class="info-popover">Max number of diffuse inter-reflections. 0 disables indirect calculation. 2-4 is standard, 5-8 for high accuracy or complex scenes.</span></span></label><input type="number" class="param-input-num" id="ab-num" data-param-name="ab-num" step="1" min="0" max="16" autocomplete="off"></div>
+                                    <input type="range" id="ab" data-param-name="ab" min="0" max="16" value="4" step="1">
+                                </div>
+                                    <div class="param-item">
+                                    <div class="param-item-row"><label for="ad" class="label">Ambient Divisions (-ad) <span class="info-icon">i<span class="info-popover">Number of samples for indirect illuminance. Primary control for "splotchy" artifacts.</span></span></label><input type="number" class="param-input-num" id="ad-num" data-param-name="ad-num" step="64" min="0" max="8192" autocomplete="off"></div>
+                                    <input type="range" id="ad" data-param-name="ad" min="0" max="8192" value="1024" step="64">
+                                </div>
+                              <div class="param-item">
+                              <div class="param-item-row"><label for="as" class="label">Ambient Super-samples (-as) <span class="info-icon">i<span class="info-popover">Additional samples to refine areas with high variance. Use to clean up noise after setting -ad.</span></span></label><input type="number" class="param-input-num" id="as-num" data-param-name="as-num" step="64" min="0" max="8192" autocomplete="off"></div>
+                              <input type="range" id="as" data-param-name="as" min="0" max="8192" value="256" step="64">
+                          </div>
+                              <div class="param-item">
+                              <div class="param-item-row"><label for="aa" class="label">Ambient Accuracy (-aa) <span class="info-icon">i<span class="info-popover">Error tolerance for irradiance cache interpolation. Lower values are more accurate but slower. Does not fix splotches.</span></span></label><input type="number" class="param-input-num" id="aa-num" data-param-name="aa-num" step="0.01" min="0" max="1" autocomplete="off"></div>
+                              <input type="range" id="aa" data-param-name="aa" min="0" max="1" value="0.15" step="0.01">
+                          </div>
+                              <div class="param-item">
+                              <div class="param-item-row"><label for="ar" class="label">Ambient Resolution (-ar) <span class="info-icon">i<span class="info-popover">Sets the density of the irradiance cache relative to scene size. Works with -aa.</span></span></label><input type="number" class="param-input-num" id="ar-num" data-param-name="ar-num" step="32" min="0" max="4096" autocomplete="off"></div>
+                              <input type="range" id="ar" data-param-name="ar" min="0" max="4096" value="128" step="32">
+                          </div>
+                              <div class="param-item">
+                              <div class="param-item-row"><label for="lw" class="label">Limit Weight (-lw) <span class="info-icon">i<span class="info-popover">Minimum contribution for a ray to be traced. Crucial for simulations with high -ab values.</span></span></label><input type="number" class="param-input-num" id="lw-num" data-param-name="lw-num" step="0.0001" min="0" max="0.01" autocomplete="off"></div>
+                              <input type="range" id="lw" data-param-name="lw" min="0" max="0.01" value="0.002" step="0.0001">
+                          </div>
+                          </div>
+                      </div>
+                      <div class="param-section">
+                          <h4>Direct & Specular Calculation Settings</h4>
+                          <div class="param-grid-sim">
+                              <div class="param-item">
+                              <div class="param-item-row"><label for="dc" class="label">Direct Certainty (-dc) <span class="info-icon">i<span class="info-popover">A value of 1 guarantees shadow accuracy. 0.5 is a good balance.</span></span></label><input type="number" class="param-input-num" id="dc-num" data-param-name="dc-num" step="0.05" min="0" max="1" autocomplete="off"></div>
+                              <input type="range" id="dc" data-param-name="dc" min="0" max="1" value="0.5" step="0.05">
+                          </div>
+                              <div class="param-item">
+                              <div class="param-item-row"><label for="dt" class="label">Direct Thresholding (-dt) <span class="info-icon">i<span class="info-popover">Optimization to ignore insignificant light sources. For max accuracy, set to 0.</span></span></label><input type="number" class="param-input-num" id="dt-num" data-param-name="dt-num" step="0.05" min="0" max="1" autocomplete="off"></div>
+                              <input type="range" id="dt" data-param-name="dt" min="0" max="1" value="0.05" step="0.05">
+                          </div>
+                              <div class="param-item">
+                              <div class="param-item-row"><label for="dr" class="label">Direct Relays (-dr) <span class="info-icon">i<span class="info-popover">Number of relays for secondary sources (e.g., reflections in mirrors).</span></span></label><input type="number" class="param-input-num" id="dr-num" data-param-name="dr-num" step="1" min="0" max="6" autocomplete="off"></div>
+                              <input type="range" id="dr" data-param-name="dr" min="0" max="6" value="1" step="1">
+                          </div>
+                              <div class="param-item">
+                              <div class="param-item-row"><label for="dp" class="label">Direct Pre-test Density (-dp) <span class="info-icon">i<span class="info-popover">Number of samples/steradian for pre-testing secondary sources.</span></span></label><input type="number" class="param-input-num" id="dp-num" data-param-name="dp-num" step="32" min="32" max="512"></div>
+                              <input type="range" id="dp" data-param-name="dp" min="32" max="512" value="64" step="32">
+                          </div>
+                              <div class="param-item">
+                              <div class="param-item-row"><label for="ss" class="label">Specular Sampling (-ss) <span class="info-icon">i<span class="info-popover">Sampling for rough specular materials. >1 sends multiple rays to reduce noise.</span></span></label><input type="number" class="param-input-num" id="ss-num" data-param-name="ss-num" step="0.1" min="0" max="2" autocomplete="off"></div>
+                              <input type="range" id="ss" data-param-name="ss" min="0" max="2" value="0.7" step="0.1">
+                          </div>
+                              <div class="param-item">
+                              <div class="param-item-row"><label for="lr" class="label">Limit Reflection (-lr) <span class="info-icon">i<span class="info-popover">Maximum number of specular reflections. 0 uses Russian Roulette for ray termination.</span></span></label><input type="number" class="param-input-num" id="lr-num" data-param-name="lr-num" step="1" min="0" max="16" autocomplete="off"></div>
+                              <input type="range" id="lr" data-param-name="lr" min="0" max="16" value="8" step="1">
+                          </div>
+                          </div>
+                      </div>
             </div>
-        </aside>
-            <aside id="analysis-sidebar" class="ui-panel closed">
-                <button id="toggle-analysis-btn" title="Toggle Analysis Sidebar" class="sidebar-toggle-btn ui-panel" aria-label="Toggle Analysis Sidebar">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
-                </button>
-             <div class="sidebar-content">
-                        <h2 class="text-lg font-bold">Analysis Modules</h2>
-                        <p class="text-sm text-gray-500 mb-6">Load a simulation results file to visualize data on the 3D model.</p>
+          </div>
+            <div id="simulation-recipes-container" class="space-y-4 pt-4 mt-4 border-t-2 border-[--grid-color]">
+                <div class="param-section">
+                <label for="recipe-selector" class="label">Select Recipe</label>
+                  <select id="recipe-selector" class="w-full mt-1" autocomplete="off">
+                          <option value="" selected>-- Select a simulation recipe --</option>
+                      </select>
+                      </div>
+                      <div id="recipe-parameters-container" class="mt-4">
+                          <p class="text-sm text-center text-[--text-secondary] p-4">Select a recipe from the dropdown above to configure a simulation.</p>
+                      </div>
+                       <div class="execution-section mt-4 pt-4 border-t-2 border-[--grid-color]">
+                          <h4 class="text-base font-semibold mb-3">Execution</h4>
+                          <div class="space-y-3">
+                              <button data-action="generate" class="btn btn-primary w-full">Generate Package</button>
+                              <button data-action="run" class="btn btn-secondary w-full" disabled>Run Simulation</button>
+                          </div>
+                          <div class="command-center hidden mt-4 pt-4 border-t border-dashed border-[--grid-color]">
+                              <div class="flex justify-between items-center mb-2">
+                                  <h5 class="font-semibold text-xs uppercase text-[--text-secondary]">Generated Script</h5>
+                                  <button class="btn btn-xs btn-secondary" title="Copy to clipboard" data-action="copy-script">Copy</button>
+                              </div>
+                              <textarea readonly class="w-full h-48 font-mono text-xs p-2 rounded bg-[--grid-color] border border-gray-500/50 resize-y"></textarea>
+                          </div>
+                      </div>
+                  </div>
+          </div>
+          <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+      </div>
 
-                        <div id="results-module-content" class="space-y-5 pt-4 border-t border-dashed border-[--grid-color]">
-                            <div class="param-section">
-                                <label for="results-file-input-a" class="btn btn-secondary w-full cursor-pointer text-center">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="mr-2 inline-block"><path stroke-linecap="round" stroke-linejoin="round" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                                    <span>Load Results File (A)</span>
+      <div id="panel-analysis-modules" class="floating-window ui-panel hidden">
+          <div class="window-header">
+
+
+
+                <span>Analysis Modules</span>
+                <div class="window-controls">
+                    <div class="window-icon-max"></div>
+                    <div class="collapse-icon"></div>
+                    <div class="window-icon-close"></div>
+                </div>
+            </div>
+                <div class="window-content">
+                    <p class="text-sm text-gray-500 mb-6">Load a simulation results file to visualize data on the 3D model.</p>
+                    <div id="results-module-content" class="space-y-5 pt-4 border-t border-dashed border-[--grid-color]">
+                    <div class="param-section">
+                        <label for="results-file-input-a" class="btn btn-secondary w-full cursor-pointer text-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="mr-2 inline-block"><path stroke-linecap="round" stroke-linejoin="round" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            <span>Load Results File (A)</span>
+                        </label>
+                        <input type="file" id="results-file-input-a" class="hidden" accept=".txt,.res,.ill,.hdr,.dgp,.ga,.epw">
+                        <p id="results-file-name-a" class="text-sm text-gray-500 mt-2 text-center truncate"></p>
+                    </div>
+                    <div id="climate-analysis-controls" class="param-section hidden pt-4 border-t border-dashed border-[--grid-color]">
+                        <button id="climate-dashboard-btn" class="btn btn-secondary w-full">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="mr-2 inline-block"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"></path></svg>
+                            <span>Climate Analysis</span>
+                        </button>
+                    </div>
+                    <div class="param-section pt-4 border-t border-dashed border-[--grid-color]">
+                        <label for="compare-mode-toggle" class="flex items-center cursor-pointer w-full">
+                            <input type="checkbox" id="compare-mode-toggle">
+                            <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">
+                                Enable Comparative Analysis
+                            </span>
+                        </label>
+                    </div>
+                    <div id="comparison-file-loader" class="param-section hidden">
+                        <label for="results-file-input-b" class="btn btn-secondary w-full cursor-pointer text-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="mr-2 inline-block"><path stroke-linecap="round" stroke-linejoin="round" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            <span>Load Comparison File (B)</span>
+                        </label>
+                        <input type="file" id="results-file-input-b" class="hidden" accept=".txt,.res,.ill,.hdr,.dgp,.ga">
+                        <p id="results-file-name-b" class="text-sm text-gray-500 mt-2 text-center truncate"></p>
+                    </div>
+                    <div class="param-section">
+                        <button id="view-hdr-btn" class="btn btn-secondary w-full hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="mr-2 inline-block"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                            <span>View HDR Image</span>
+                        </button>
+                    </div>
+                    <div id="results-dashboard" class="hidden space-y-5">
+                        <div class="param-section">
+                            <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">3D Visualization Mode</h4>
+                            <div id="view-mode-selector" class="btn-group mt-1">
+                                <button id="view-mode-a-btn" class="btn active">Dataset A</button>
+                                <button id="view-mode-b-btn" class="btn hidden">Dataset B</button>
+                                <button id="view-mode-diff-btn" class="btn hidden">Difference (A-B)</button>
+                            </div>
+                        </div>
+                        <div id="summary-stats-container" class="param-section">
+                            <div id="summary-a">
+                                <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Summary: Dataset A (lux)</h4>
+                                <div class="grid grid-cols-3 gap-2 text-center mt-2">
+                                    <div><span class="block text-xs">Min</span><span id="results-min-val-a" class="data-value font-mono">--</span></div>
+                                    <div><span class="block text-xs">Avg</span><span id="results-avg-val-a" class="data-value font-mono">--</span></div>
+                                    <div><span class="block text-xs">Max</span><span id="results-max-val-a" class="data-value font-mono">--</span></div>
+                                </div>
+                            </div>
+                            <div id="summary-b" class="hidden mt-3">
+                                <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Summary: Dataset B (lux)</h4>
+                                <div class="grid grid-cols-3 gap-2 text-center mt-2">
+                                    <div><span class="block text-xs">Min</span><span id="results-min-val-b" class="data-value font-mono">--</span></div>
+                                    <div><span class="block text-xs">Avg</span><span id="results-avg-val-b" class="data-value font-mono">--</span></div>
+                                    <div><span class="block text-xs">Max</span><span id="results-max-val-b" class="data-value font-mono">--</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="metric-selector-container" class="param-section hidden">
+                            <label for="metric-selector" class="label">3D View Metric</label>
+                            <select id="metric-selector" class="w-full mt-1">
+                            </select>
+                        </div>
+                        <div id="color-scale-section" class="param-section">
+                            <div id="standard-color-scale">
+                                <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Color Scale (lux)</h4>
+                                <canvas id="results-legend" height="20" class="w-full mt-2 rounded border border-[--grid-color]"></canvas>
+                            </div>
+                            <div id="difference-color-scale" class="hidden">
+                                <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Difference Scale (lux)</h4>
+                                <canvas id="difference-legend" height="20" class="w-full mt-2 rounded border border-[--grid-color]"></canvas>
+                                <div class="flex justify-between text-xs font-mono mt-1">
+                                    <span id="diff-legend-min-label">--</span>
+                                    <span>0</span>
+                                    <span id="diff-legend-max-label">--</span>
+                                </div>
+                            </div>
+                            <div class="flex justify-between text-xs font-mono mt-1">
+                                <span id="legend-min-label">0</span>
+                                <span id="legend-max-label">1000</span>
+                            </div>
+                        </div>
+                        <div class="space-y-3 mt-3">
+                            <div>
+                                <label class="label text-xs flex justify-between" for="results-scale-min">
+                                    <span>Scale Min</span>
+                                    <input type="number" id="results-scale-min-num" class="param-input-num-sm">
                                 </label>
-                                <input type="file" id="results-file-input-a" class="hidden" accept=".txt,.res,.ill,.hdr,.dgp,.ga,.epw">
-                                <p id="results-file-name-a" class="text-sm text-gray-500 mt-2 text-center truncate"></p>
+                                <input type="range" id="results-scale-min" min="0" max="5000" value="0" step="10">
                             </div>
-
-                            <div id="climate-analysis-controls" class="param-section hidden pt-4 border-t border-dashed border-[--grid-color]">
-                                <button id="climate-dashboard-btn" class="btn btn-secondary w-full">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="mr-2 inline-block"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"></path></svg>
-                                    <span>Climate Analysis</span>
-                                </button>
-                            </div>
-
-                            <div class="param-section pt-4 border-t border-dashed border-[--grid-color]">
-                                <label for="compare-mode-toggle" class="flex items-center cursor-pointer w-full">
-                                    <input type="checkbox" id="compare-mode-toggle">
-                                    <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">
-                                        Enable Comparative Analysis
-                                    </span>
+                            <div>
+                                <label class="label text-xs flex justify-between" for="results-scale-max">
+                                    <span>Scale Max</span>
+                                    <input type="number" id="results-scale-max-num" class="param-input-num-sm">
                                 </label>
+                                <input type="range" id="results-scale-max" min="0" max="5000" value="1000" step="10">
                             </div>
-
-                            <div id="comparison-file-loader" class="param-section hidden">
-                                <label for="results-file-input-b" class="btn btn-secondary w-full cursor-pointer text-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="mr-2 inline-block"><path stroke-linecap="round" stroke-linejoin="round" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                                    <span>Load Comparison File (B)</span>
-                                </label>
-                                <input type="file" id="results-file-input-b" class="hidden" accept=".txt,.res,.ill,.hdr,.dgp,.ga">
-                                <p id="results-file-name-b" class="text-sm text-gray-500 mt-2 text-center truncate"></p>
-                            </div>
-
-                            <div class="param-section">
-                                <button id="view-hdr-btn" class="btn btn-secondary w-full hidden">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="mr-2 inline-block"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                                    <span>View HDR Image</span>
-                                </button>
-                            </div>
-
-                            <div id="results-dashboard" class="hidden space-y-5">
-                                <div class="param-section">
-                                    <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">3D Visualization Mode</h4>
-                                    <div id="view-mode-selector" class="btn-group mt-1">
-                                        <button id="view-mode-a-btn" class="btn active">Dataset A</button>
-                                        <button id="view-mode-b-btn" class="btn hidden">Dataset B</button>
-                                        <button id="view-mode-diff-btn" class="btn hidden">Difference (A-B)</button>
-                                    </div>
-                                </div>
-
-                                <div id="summary-stats-container" class="param-section">
-                                    <div id="summary-a">
-                                        <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Summary: Dataset A (lux)</h4>
-                                        <div class="grid grid-cols-3 gap-2 text-center mt-2">
-                                            <div><span class="block text-xs">Min</span><span id="results-min-val-a" class="data-value font-mono">--</span></div>
-                                            <div><span class="block text-xs">Avg</span><span id="results-avg-val-a" class="data-value font-mono">--</span></div>
-                                            <div><span class="block text-xs">Max</span><span id="results-max-val-a" class="data-value font-mono">--</span></div>
-                                        </div>
-                                    </div>
-                                    <div id="summary-b" class="hidden mt-3">
-                                        <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Summary: Dataset B (lux)</h4>
-                                        <div class="grid grid-cols-3 gap-2 text-center mt-2">
-                                            <div><span class="block text-xs">Min</span><span id="results-min-val-b" class="data-value font-mono">--</span></div>
-                                            <div><span class="block text-xs">Avg</span><span id="results-avg-val-b" class="data-value font-mono">--</span></div>
-                                            <div><span class="block text-xs">Max</span><span id="results-max-val-b" class="data-value font-mono">--</span></div>
-                                        </div>
-                                    </div>
-                            </div>
-
-                            <div id="metric-selector-container" class="param-section hidden">
-                                <label for="metric-selector" class="label">3D View Metric</label>
-                                <select id="metric-selector" class="w-full mt-1">
-                                </select>
-                            </div>
-
-                            <div id="color-scale-section" class="param-section">
-                                <div id="standard-color-scale">
-                                    <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Color Scale (lux)</h4>
-                                        <canvas id="results-legend" height="20" class="w-full mt-2 rounded border border-[--grid-color]"></canvas>
-                                    </div>
-                                    <div id="difference-color-scale" class="hidden">
-                                        <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Difference Scale (lux)</h4>
-                                        <canvas id="difference-legend" height="20" class="w-full mt-2 rounded border border-[--grid-color]"></canvas>
-                                        <div class="flex justify-between text-xs font-mono mt-1">
-                                            <span id="diff-legend-min-label">--</span>
-                                            <span>0</span>
-                                            <span id="diff-legend-max-label">--</span>
-                                        </div>
-                                    </div>
-                                    <div class="flex justify-between text-xs font-mono mt-1">
-                                        <span id="legend-min-label">0</span>
-                                        <span id="legend-max-label">1000</span>
-                                    </div>
-                                    </div>
-                                    <div class="space-y-3 mt-3">
-                                        <div>
-                                            <label class="label text-xs flex justify-between" for="results-scale-min">
-                                                <span>Scale Min</span>
-                                                <input type="number" id="results-scale-min-num" class="param-input-num-sm">
-                                            </label>
-                                            <input type="range" id="results-scale-min" min="0" max="5000" value="0" step="10">
-                                        </div>
-                                        <div>
-                                            <label class="label text-xs flex justify-between" for="results-scale-max">
-                                                <span>Scale Max</span>
-                                                <input type="number" id="results-scale-max-num" class="param-input-num-sm">
-                                            </label>
-                                            <input type="range" id="results-scale-max" min="0" max="5000" value="1000" step="10">
-                                        </div>
-                                        </div>
-                                        <div>
-                                            <label for="results-palette" class="label text-xs">Color Palette</label>
-                                            <select id="results-palette" class="w-full mt-1">
-                                                <option value="viridis" selected>Viridis</option>
-                                                <option value="plasma">Plasma</option>
-                                                <option value="inferno">Inferno</option>
-                                                <option value="magma">Magma</option>
-                                                <option value="cividis">Cividis</option>
-                                            </select>
-                                        </div>
-                                </div>
-                            </div>
-                            <div id="glare-analysis-dashboard" class="hidden space-y-5 pt-4 border-t border-dashed border-[--grid-color]">
-                                <div class="param-section">
-                                    <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Glare Analysis (evalglare)</h4>
-                                    <div class="grid grid-cols-2 gap-2 text-center mt-2">
-                                        <div><span id="glare-metric-label" class="block text-xs">DGP</span><span id="glare-val" class="data-value font-mono text-lg">--</span></div>
-                                        <div><span class="block text-xs">Source Count</span><span id="glare-source-count" class="data-value font-mono text-lg">--</span></div>
-                                    </div>
-                                </div>
-                                <div class="param-section">
-                                    <div class="flex justify-between items-center">
-                                        <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Detected Glare Sources</h4>
-                                        <button id="clear-glare-highlight-btn" class="btn btn-xs btn-secondary">Clear</button>
-                                    </div>
-                                    <p class="info-box !text-xs !py-2 !px-3">Click on a source to highlight it in the 3D view.</p>
-                                    <ul id="glare-source-list" class="space-y-1.5 mt-2 text-sm max-h-60 overflow-y-auto">
-                                        </ul>
-                                </div>
-                            </div>
-
-                            <div id="annual-glare-controls" class="hidden space-y-5 pt-4 border-t border-dashed border-[--grid-color]">
-                                <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Annual Glare Analysis</h4>
-                                <button id="glare-rose-btn" class="btn btn-secondary w-full">Generate Glare Rose Diagram</button>
-                                <button id="combined-analysis-btn" class="btn btn-secondary w-full mt-2" style="display: none;">Daylight vs. Glare Plot</button>
-                            </div>
-
-                            <div class="param-section">
-                            <button id="results-dashboard-btn" class="btn btn-primary w-full mt-4">Results Dashboard</button>
-                            <button id="data-table-btn" class="btn btn-secondary w-full mt-2 hidden">Show Data Table</button>
-                            <button id="generate-report-btn" class="btn btn-secondary w-full mt-2 hidden">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="mr-2 inline-block"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                                <span>Generate Report</span>
-                            </button>
+                        </div>
+                        <div>
+                            <label for="results-palette" class="label text-xs">Color Palette</label>
+                            <select id="results-palette" class="w-full mt-1">
+                                <option value="viridis" selected>Viridis</option>
+                                <option value="plasma">Plasma</option>
+                                <option value="inferno">Inferno</option>
+                                <option value="magma">Magma</option>
+                                <option value="cividis">Cividis</option>
+                            </select>
                         </div>
                     </div>
+                    <div id="glare-analysis-dashboard" class="hidden space-y-5 pt-4 border-t border-dashed border-[--grid-color]">
+                        <div class="param-section">
+                            <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Glare Analysis (evalglare)</h4>
+                            <div class="grid grid-cols-2 gap-2 text-center mt-2">
+                                <div><span id="glare-metric-label" class="block text-xs">DGP</span><span id="glare-val" class="data-value font-mono text-lg">--</span></div>
+                                <div><span class="block text-xs">Source Count</span><span id="glare-source-count" class="data-value font-mono text-lg">--</span></div>
+                            </div>
+                        </div>
+                        <div class="param-section">
+                            <div class="flex justify-between items-center">
+                                <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Detected Glare Sources</h4>
+                                <button id="clear-glare-highlight-btn" class="btn btn-xs btn-secondary">Clear</button>
+                            </div>
+                            <p class="info-box !text-xs !py-2 !px-3">Click on a source to highlight it in the 3D view.</p>
+                            <ul id="glare-source-list" class="space-y-1.5 mt-2 text-sm max-h-60 overflow-y-auto">
+                            </ul>
+                        </div>
+                    </div>
+                    <div id="annual-glare-controls" class="hidden space-y-5 pt-4 border-t border-dashed border-[--grid-color]">
+                        <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Annual Glare Analysis</h4>
+                        <button id="glare-rose-btn" class="btn btn-secondary w-full">Generate Glare Rose Diagram</button>
+                        <button id="combined-analysis-btn" class="btn btn-secondary w-full mt-2" style="display: none;">Daylight vs. Glare Plot</button>
+                    </div>
+                    <div class="param-section">
+                        <button id="results-dashboard-btn" class="btn btn-primary w-full mt-4">Results Dashboard</button>
+                        <button id="data-table-btn" class="btn btn-secondary w-full mt-2 hidden">Show Data Table</button>
+                        <button id="generate-report-btn" class="btn btn-secondary w-full mt-2 hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="mr-2 inline-block"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            <span>Generate Report</span>
+                        </button>
+                    </div>
                 </div>
-                </aside>
+            </div>
+            <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+        </div>
+    </main>
+
+    <div id="sidebar-wrapper">
+    <div id="ai-assistant-toggle-container" class="action-button-container">
+        <button id="ai-assistant-button" class="bottom-action-button" aria-label="Open AI Assistant">
+            <svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 0 14 14" width="28px" fill="currentColor">
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M11.958 10.945a1.786 1.786 0 1 1-3.573 0 1.786 1.786 0 0 1 3.573 0Zm-.298-3.84a1.489 1.489 0 1 1-2.978 0 1.489 1.489 0 0 1 2.978 0ZM13 5.287a.744.744 0 1 1-1.489 0 .744.744 0 0 1 1.489 0ZM8.325 4.93a3.663 3.663 0 0 1-3.662 3.662A3.663 3.663 0 0 1 1 4.931a3.663 3.663 0 0 1 3.663-3.663 3.663 3.663 0 0 1 3.662 3.663Z"/>
+            </svg>
+        </button>
+        <span class="tooltip" role="tooltip">AI Assistant</span>
+        </div>
+         </aside>
+        <aside id="right-sidebar" class="ui-panel closed flex flex-col">
+            <div class="resize-handle-edge left" style="cursor: ew-resize;"></div>
+            <div class="window-header">
+            <span>AI Assistant</span>
+            <div class="window-controls">
+                    <button id="ai-settings-btn" class="window-icon-settings" aria-label="AI Settings">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="sidebar-content !p-0 flex flex-col">
+            <div class="p-3 border-b border-[--grid-color] space-y-3">
+                <div class="ai-mode-selector">
+                    <label for="ai-mode-select" class="label !mb-0 flex-shrink-0">Action:</label>
+                    <select id="ai-mode-select" class="flex-grow">
+                        <option value="" disabled selected>Start a new chat...</option>
+                        <option value="chat">Chat Assistant</option>
+                        <option value="generate">Generative Design</option>
+                        <option value="inspector">Design Inspector</option>
+                        <option value="critique">Results Critique</option>
+                        <option value="explorer">Data Explorer</option>
+                        <option value="tutor">Interactive Tutor</option>
+                    </select>
+                </div>
+                <div id="ai-mode-description-box" class="info-box !py-2 !px-3">
+                    <p id="ai-mode-description-text" class="leading-relaxed"></p>
+                </div>
+            </div>
+            <div id="ai-chat-tabs" class="ai-chat-tabs"></div>
+            <div id="ai-chat-messages" class="flex-grow p-4 space-y-4 overflow-y-auto">
+            </div>
+            <div id="ai-inspector-results" class="flex-grow p-4 space-y-3 overflow-y-auto hidden">
+                <div class="text-center text-sm text-[--text-secondary] p-4">
+                    <p>Click "Run Inspector" to analyze your current project setup for potential issues and design suggestions.</p>
+                </div>
+            </div>
+            <div id="ai-critique-results" class="flex-grow p-4 space-y-3 overflow-y-auto hidden">
+            <div class="text-center text-sm text-[--text-secondary] p-4">
+                <p>Load a simulation result file, then click "Analyze Results" for an AI-powered critique and design suggestions.</p>
+            </div>
+        </div>
+        <div id="ai-chat-input-container" class="p-4 border-t border-[--grid-color] relative">
+            <div id="chat-resize-handle"></div>
+                    <form id="ai-chat-form" class="flex gap-2 items-end">
+                        <textarea id="ai-chat-input" placeholder="Ask about Radiance or this app..." class="flex-grow" autocomplete="off" rows="1"></textarea>
+                        <button type="submit" id="ai-chat-send" class="btn btn-primary">Send</button>
+                    </form>
+                </div>
+            </div>
+            </aside>
+        </div>
+
             <div id="results-analysis-panel" class="floating-window ui-panel hidden">
                 <div class="window-header">
                     <span>Results Analysis</span>
@@ -2682,8 +2802,8 @@
                 <p class="text-xs text-[--text-secondary] mt-1">Enter a custom model ID if your preferred model isn't in the list above.</p>
             </div>
             <div>
-                <label for="ai-api-key-input" class="label">API Key</label>
-                <input type="password" id="ai-api-key-input" placeholder="Enter your API key" class="w-full">
+                <label for="ai-model-access-token" class="label">API Key</label>
+                <input type="password" id="ai-model-access-token" placeholder="Enter your API key" class="w-full" autocomplete="off">
             </div>
             <div id="openrouter-info-box" class="info-box !text-xs hidden">
                 <b>Note:</b> To use free models on OpenRouter, you may need to adjust your
@@ -2707,6 +2827,7 @@
                     <div class="space-y-1">
                         <div class="flex justify-between"><span>Save Project</span><div class="flex gap-1"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">S</kbd></div></div>
                         <div class="flex justify-between"><span>Load Project</span><div class="flex gap-1"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">O</kbd></div></div>
+                        <div class="flex justify-between"><span>Save Current View</span><div class="flex gap-1"><kbd class="kbd">Shift</kbd><kbd class="kbd">S</kbd></div></div>
                     </div>
                 </div>
                 <div>
@@ -2719,6 +2840,7 @@
                         <div class="flex justify-between"><span>Back</span><kbd class="kbd">B</kbd></div>
                         <div class="flex justify-between"><span>Left</span><kbd class="kbd">L</kbd></div>
                         <div class="flex justify-between"><span>Right</span><kbd class="kbd">R</kbd></div>
+                        <div class="flex justify-between"><span>Toggle Quad View</span><kbd class="kbd">Q</kbd></div>
                     </div>
                 </div>
                 <div>
@@ -2739,6 +2861,9 @@
                     <div class="space-y-1">
                         <div class="flex justify-between"><span>Info Panel</span><kbd class="kbd">I</kbd></div>
                         <div class="flex justify-between"><span>AI Assistant</span><kbd class="kbd">A</kbd></div>
+                        <div class="flex justify-between"><span>Toggle FPV Mode</span><kbd class="kbd">V</kbd></div>
+                        <div class="flex justify-between"><span>Toggle Gizmo</span><kbd class="kbd">G</kbd></div>
+                        <div class="flex justify-between"><span>Toggle Resize Mode</span><kbd class="kbd">M</kbd></div>
                         <div class="flex justify-between"><span>Move Gizmo</span><kbd class="kbd">W</kbd></div>
                         <div class="flex justify-between"><span>Rotate Gizmo</span><kbd class="kbd">E</kbd></div>
                         <div class="flex justify-between"><span>Scale Gizmo</span><kbd class="kbd">R</kbd></div>
@@ -2766,14 +2891,6 @@
                 <svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 0 24 24" width="28px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
             </button>
             <span class="tooltip" role="tooltip">App Information</span>
-            </div>
-            <div class="action-button-container">
-                <button id="ai-assistant-button" class="bottom-action-button" aria-label="Open AI Assistant">
-                    <svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 0 14 14" width="28px" fill="currentColor">
-                        <path fill-rule="evenodd" clip-rule="evenodd" d="M11.958 10.945a1.786 1.786 0 1 1-3.573 0 1.786 1.786 0 0 1 3.573 0Zm-.298-3.84a1.489 1.489 0 1 1-2.978 0 1.489 1.489 0 0 1 2.978 0ZM13 5.287a.744.744 0 1 1-1.489 0 .744.744 0 0 1 1.489 0ZM8.325 4.93a3.663 3.663 0 0 1-3.662 3.662A3.663 3.663 0 0 1 1 4.931a3.663 3.663 0 0 1 3.663-3.663 3.663 3.663 0 0 1 3.662 3.663Z"/>
-                    </svg>
-                </button>
-                <span class="tooltip" role="tooltip">AI Assistant</span>
             </div>
             <div class="action-button-container">
                 <button id="shortcut-help-btn" class="bottom-action-button" aria-label="Show Keyboard Shortcuts">
@@ -2922,81 +3039,7 @@
         <input type="file" id="custom-asset-importer" class="hidden" accept=".obj,.mtl" multiple>
 
         <div id="panel-templates">
-            <template id="template-global-sim-params">
-                <div class="floating-window ui-panel">
-                        <div class="window-header">
-                            <span>Global Simulation Parameters</span>
-                            <div class="window-controls">
-                                <div class="window-icon-max"></div>
-                                <div class="collapse-icon"></div>
-                                <div class="window-icon-close"></div>
-                            </div>
-                        </div>
-                        <div class="window-content">
-                            <div class="param-section">
-                                <h4>Ambient Calculation Settings</h4>
-                                <div class="param-grid-sim">
-                                    <div class="param-item">
-                                        <div class="param-item-row"><label for="ab" class="label">Ambient Bounces (-ab) <span class="info-icon">i<span class="info-popover">Max number of diffuse inter-reflections. 0 disables indirect calculation. 2-4 is standard, 5-8 for high accuracy or complex scenes.</span></span></label><input type="number" class="param-input-num" id="ab-num" step="1" min="0" max="16"></div>
-                                        <input type="range" id="ab" min="0" max="16" value="4" step="1">
-                                    </div>
-                                    <div class="param-item">
-                                        <div class="param-item-row"><label for="ad" class="label">Ambient Divisions (-ad) <span class="info-icon">i<span class="info-popover">Number of samples for indirect illuminance. Primary control for "splotchy" artifacts.</span></span></label><input type="number" class="param-input-num" id="ad-num" step="64" min="0" max="8192"></div>
-                                        <input type="range" id="ad" min="0" max="8192" value="1024" step="64">
-                                    </div>
-                                    <div class="param-item">
-                                        <div class="param-item-row"><label for="as" class="label">Ambient Super-samples (-as) <span class="info-icon">i<span class="info-popover">Additional samples to refine areas with high variance. Use to clean up noise after setting -ad.</span></span></label><input type="number" class="param-input-num" id="as-num" step="64" min="0" max="8192"></div>
-                                        <input type="range" id="as" min="0" max="8192" value="256" step="64">
-                                    </div>
-                                    <div class="param-item">
-                                        <div class="param-item-row"><label for="aa" class="label">Ambient Accuracy (-aa) <span class="info-icon">i<span class="info-popover">Error tolerance for irradiance cache interpolation. Lower values are more accurate but slower. Does not fix splotches.</span></span></label><input type="number" class="param-input-num" id="aa-num" step="0.01" min="0" max="1"></div>
-                                        <input type="range" id="aa" min="0" max="1" value="0.15" step="0.01">
-                                    </div>
-                                    <div class="param-item">
-                                        <div class="param-item-row"><label for="ar" class="label">Ambient Resolution (-ar) <span class="info-icon">i<span class="info-popover">Sets the density of the irradiance cache relative to scene size. Works with -aa.</span></span></label><input type="number" class="param-input-num" id="ar-num" step="32" min="0" max="4096"></div>
-                                        <input type="range" id="ar" min="0" max="4096" value="128" step="32">
-                                    </div>
-                                    <div class="param-item">
-                                        <div class="param-item-row"><label for="lw" class="label">Limit Weight (-lw) <span class="info-icon">i<span class="info-popover">Minimum contribution for a ray to be traced. Crucial for simulations with high -ab values.</span></span></label><input type="number" class="param-input-num" id="lw-num" step="0.0001" min="0" max="0.01"></div>
-                                        <input type="range" id="lw" min="0" max="0.01" value="0.002" step="0.0001">
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="param-section">
-                                <h4>Direct & Specular Calculation Settings</h4>
-                                <div class="param-grid-sim">
-                                    <div class="param-item">
-                                        <div class="param-item-row"><label for="dc" class="label">Direct Certainty (-dc) <span class="info-icon">i<span class="info-popover">A value of 1 guarantees shadow accuracy. 0.5 is a good balance.</span></span></label><input type="number" class="param-input-num" id="dc-num" step="0.05" min="0" max="1"></div>
-                                        <input type="range" id="dc" min="0" max="1" value="0.5" step="0.05">
-                                    </div>
-                                    <div class="param-item">
-                                        <div class="param-item-row"><label for="dt" class="label">Direct Thresholding (-dt) <span class="info-icon">i<span class="info-popover">Optimization to ignore insignificant light sources. For max accuracy, set to 0.</span></span></label><input type="number" class="param-input-num" id="dt-num" step="0.05" min="0" max="1"></div>
-                                        <input type="range" id="dt" min="0" max="1" value="0.05" step="0.05">
-                                    </div>
-                                    <div class="param-item">
-                                        <div class="param-item-row"><label for="dr" class="label">Direct Relays (-dr) <span class="info-icon">i<span class="info-popover">Number of relays for secondary sources (e.g., reflections in mirrors).</span></span></label><input type="number" class="param-input-num" id="dr-num" step="1" min="0" max="6"></div>
-                                        <input type="range" id="dr" min="0" max="6" value="1" step="1">
-                                    </div>
-                                    <div class="param-item">
-                                        <div class="param-item-row"><label for="dp" class="label">Direct Pre-test Density (-dp) <span class="info-icon">i<span class="info-popover">Number of samples/steradian for pre-testing secondary sources.</span></span></label><input type="number" class="param-input-num" id="dp-num" step="32" min="32" max="512"></div>
-                                        <input type="range" id="dp" min="32" max="512" value="64" step="32">
-                                    </div>
-                                    <div class="param-item">
-                                        <div class="param-item-row"><label for="ss" class="label">Specular Sampling (-ss) <span class="info-icon">i<span class="info-popover">Sampling for rough specular materials. >1 sends multiple rays to reduce noise.</span></span></label><input type="number" class="param-input-num" id="ss-num" step="0.1" min="0" max="2"></div>
-                                        <input type="range" id="ss" min="0" max="2" value="0.7" step="0.1">
-                                    </div>
-                                    <div class="param-item">
-                                        <div class="param-item-row"><label for="lr" class="label">Limit Reflection (-lr) <span class="info-icon">i<span class="info-popover">Maximum number of specular reflections. 0 uses Russian Roulette for ray termination.</span></span></label><input type="number" class="param-input-num" id="lr-num" step="1" min="0" max="16"></div>
-                                        <input type="range" id="lr" min="0" max="16" value="8" step="1">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-            <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-        </div>
-                </template>
-
-                <template id="template-recipe-illuminance">
+            <template id="template-recipe-illuminance">
                     <div class="floating-window ui-panel">
                         <div class="window-header">
                             <span>Recipe: Illuminance Map</span>
@@ -3011,10 +3054,10 @@
                                 <h4>Sky Definition (gensky)</h4>
                                 <p class="info-box !mb-4">Define the sky for a specific moment. Location is taken from the Project Setup panel.</p>
                                 <div class="grid grid-cols-3 gap-4">
-                                    <div><label for="pit-month" class="label">Month</label><input type="number" id="pit-month" min="1" max="12" value="6"></div>
-                                    <div><label for="pit-day" class="label">Day</label><input type="number" id="pit-day" min="1" max="31" value="21"></div>
-                                    <div><label for="pit-time" class="label">Time (HH:MM)</label><input type="time" id="pit-time" value="14:30"></div>
-                                </div>
+                                <div><label for="pit-month" class="label">Month</label><input type="number" id="pit-month" min="1" max="12" value="6" autocomplete="off"></div>
+                                <div><label for="pit-day" class="label">Day</label><input type="number" id="pit-day" min="1" max="31" value="21" autocomplete="off"></div>
+                                <div><label for="pit-time" class="label">Time (HH:MM)</label><input type="time" id="pit-time" value="14:30" autocomplete="off"></div>
+                            </div>
                             </div>
                             <div class="param-section">
                                 <label for="quality-preset" class="label">Quality Preset</label>
@@ -3050,30 +3093,8 @@
                                 </div>
                             </div>
 
-                            <div class="accordion-item mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                                <div class="accordion-header">Advanced Parameters (Overrides)<div class="accordion-chevron">▶</div></div>
-                                <div class="accordion-content" style="display: none;">
-                                    </div>
-                            </div>
-
-                            <div class="execution-section mt-4 pt-4 border-t-2 border-[--grid-color]">
-                                <h4 class="text-base font-semibold mb-3">Execution</h4>
-                                <div class="space-y-3">
-                                    <button data-action="generate" class="btn btn-primary w-full">Generate Illuminance Package</button>
-                                    <button data-action="run" class="btn btn-secondary w-full" disabled>Run Simulation</button>
-                                </div>
-                                <p class="text-xs text-gray-500 mt-3 text-center">Generates a .zip with scene geometry and run scripts.</p>
-                                <div class="command-center hidden mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                                    <div class="flex justify-between items-center mb-2">
-                                        <h5 class="font-semibold text-xs uppercase text-[--text-secondary]">Generated Script</h5>
-                                        <button class="btn btn-xs btn-secondary" title="Copy to clipboard">Copy</button>
-                                    </div>
-                                    <textarea readonly class="w-full h-48 font-mono text-xs p-2 rounded bg-[--grid-color] border border-gray-500/50 resize-y"></textarea>
-                                </div>
-                            </div>
+                            
                         </div>
-            <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-        </div>
                 </template>
 
                 <template id="template-recipe-rendering">
@@ -3091,9 +3112,9 @@
                                 <h4>Sky Definition (gensky)</h4>
                                 <p class="info-box !mb-4">Define the sky for a specific moment. Location is taken from the Project Setup panel.</p>
                                 <div class="grid grid-cols-3 gap-4">
-                                    <div><label for="pit-month" class="label">Month</label><input type="number" id="pit-month" min="1" max="12" value="6"></div>
-                                    <div><label for="pit-day" class="label">Day</label><input type="number" id="pit-day" min="1" max="31" value="21"></div>
-                                    <div><label for="pit-time" class="label">Time (HH:MM)</label><input type="time" id="pit-time" value="14:30"></div>
+                                    <div><label for="pit-month" class="label">Month</label><input type="number" id="pit-month" min="1" max="12" value="6" autocomplete="off"></div>
+                                    <div><label for="pit-day" class="label">Day</label><input type="number" id="pit-day" min="1" max="31" value="21" autocomplete="off"></div>
+                                    <div><label for="pit-time" class="label">Time (HH:MM)</label><input type="time" id="pit-time" value="14:30" autocomplete="off"></div>
                                 </div>
                             </div>
                             <div class="param-section">
@@ -3113,9 +3134,9 @@
                                     <div class="accordion-header">Image Size &amp; Resolution <div class="accordion-chevron">▶</div></div>
                                     <div>
                                         <div class="param-grid-sim">
-                                            <div><label class="label" for="rpict-x">X Resolution (-x)</label><input type="number" id="rpict-x" min="1" value="512"></div>
-                                            <div><label class="label" for="rpict-y">Y Resolution (-y)</label><input type="number" id="rpict-y" min="1" value="512"></div>
-                                            <div><label class="label" for="rpict-pa">Pixel Aspect Ratio (-pa)</label><input type="number" id="rpict-pa" min="0" value="1.0" step="0.1"></div>
+                                            <div><label class="label" for="rpict-x">X Resolution (-x)</label><input type="number" id="rpict-x" min="1" value="512" autocomplete="off"></div>
+                                            <div><label class="label" for="rpict-y">Y Resolution (-y)</label><input type="number" id="rpict-y" min="1" value="512" autocomplete="off"></div>
+                                            <div><label class="label" for="rpict-pa">Pixel Aspect Ratio (-pa)</label><input type="number" id="rpict-pa" min="0" value="1.0" step="0.1" autocomplete="off"></div>
                                         </div>
                                     </div>
                                 </div>
@@ -3128,12 +3149,12 @@
                                                 <input type="range" id="rpict-ps" min="0" max="48" value="8" step="1">
                                             </div>
                                             <div class="param-item">
-                                                <div class="param-item-row"><label for="rpict-pt" class="label">Sampling Threshold (-pt)</label><input type="number" class="param-input-num" id="rpict-pt-num" step="0.01" min="0" max="1"></div>
-                                                <input type="range" id="rpict-pt" min="0" max="1" value="0.05" step="0.01">
+                                                <div class="param-item-row"><label for="rpict-pt" class="label">Sampling Threshold (-pt)</label><input type="number" class="param-input-num" id="rpict-pt-num" step="0.01" min="0" max="1" autocomplete="off"></div>
+                                                <input type="range" id="rpict-pt" min="0" max="1" value="0.05" step="0.01" autocomplete="off">
                                             </div>
                                             <div class="param-item">
-                                                <div class="param-item-row"><label for="rpict-pj" class="label">Pixel Jitter (-pj)</label><input type="number" class="param-input-num" id="rpict-pj-num" step="0.1" min="0" max="1"></div>
-                                                <input type="range" id="rpict-pj" min="0" max="1" value="0.9" step="0.1">
+                                                <div class="param-item-row"><label for="rpict-pj" class="label">Pixel Jitter (-pj)</label><input type="number" class="param-input-num" id="rpict-pj-num" step="0.1" min="0" max="1" autocomplete="off"></div>
+                                                <input type="range" id="rpict-pj" min="0" max="1" value="0.9" step="0.1" autocomplete="off">
                                             </div>
                                         </div>
                                     </div>
@@ -3149,31 +3170,8 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="accordion-item mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                                    <div class="accordion-header">Advanced Parameters (Overrides)<div class="accordion-chevron">▶</div></div>
-                                    <div class="accordion-content" style="display: none;">
-                                        </div>
-                                </div>
-                            </div>
-
-                            <div class="execution-section mt-4 pt-4 border-t-2 border-[--grid-color]">
-                                <h4 class="text-base font-semibold mb-3">Execution</h4>
-                                <div class="space-y-3">
-                                    <button data-action="generate" class="btn btn-primary w-full">Generate Rendering Package</button>
-                                    <button data-action="run" class="btn btn-secondary w-full" disabled>Run Simulation</button>
-                                </div>
-                                <p class="text-xs text-gray-500 mt-3 text-center">Generates a .zip with scene geometry and run scripts.</p>
-                                <div class="command-center hidden mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                                    <div class="flex justify-between items-center mb-2">
-                                        <h5 class="font-semibold text-xs uppercase text-[--text-secondary]">Generated Script</h5>
-                                        <button class="btn btn-xs btn-secondary" title="Copy to clipboard">Copy</button>
-                                    </div>
-                                    <textarea readonly class="w-full h-48 font-mono text-xs p-2 rounded bg-[--grid-color] border border-gray-500/50 resize-y"></textarea>
-                            </div>
-                        </div>
+        
                     </div>
-            <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-        </div>
                 </template>
 
                 <div id="lighting-energy-dashboard" class="hidden space-y-5 pt-4 border-t border-dashed border-[--grid-color]">
@@ -3225,9 +3223,9 @@
                                 <h4>Sky Definition (gensky)</h4>
                                 <p class="info-box !mb-4">Define the sky for a specific moment. Location is taken from the Project Setup panel.</p>
                                 <div class="grid grid-cols-3 gap-4">
-                                    <div><label for="pit-month" class="label">Month</label><input type="number" id="pit-month" min="1" max="12" value="6"></div>
-                                    <div><label for="pit-day" class="label">Day</label><input type="number" id="pit-day" min="1" max="31" value="21"></div>
-                                    <div><label for="pit-time" class="label">Time (HH:MM)</label><input type="time" id="pit-time" value="14:30"></div>
+                                    <div><label for="pit-month" class="label">Month</label><input type="number" id="pit-month" min="1" max="12" value="6" autocomplete="off"></div>
+                                    <div><label for="pit-day" class="label">Day</label><input type="number" id="pit-day" min="1" max="31" value="21" autocomplete="off"></div>
+                                    <div><label for="pit-time" class="label">Time (HH:MM)</label><input type="time" id="pit-time" value="14:30" autocomplete="off"></div>
                                 </div>
                             </div>
                             <div class="param-section">
@@ -3258,30 +3256,7 @@
                                 </div>
                             </div>
 
-                            <div class="accordion-item mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                                <div class="accordion-header">Advanced Parameters (Overrides)<div class="accordion-chevron">▶</div></div>
-                                <div class="accordion-content" style="display: none;">
-                                     </div>
-                            </div>
-
-                            <div class="execution-section mt-4 pt-4 border-t-2 border-[--grid-color]">
-                                <h4 class="text-base font-semibold mb-3">Execution</h4>
-                                <div class="space-y-3">
-                                    <button data-action="generate" class="btn btn-primary w-full">Generate DGP Package</button>
-                                    <button data-action="run" class="btn btn-secondary w-full" disabled>Run Simulation</button>
-                                </div>
-                                <p class="text-xs text-gray-500 mt-3 text-center">Generates a .zip with scene geometry and run scripts.</p>
-                                <div class="command-center hidden mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                                    <div class="flex justify-between items-center mb-2">
-                                        <h5 class="font-semibold text-xs uppercase text-[--text-secondary]">Generated Script</h5>
-                                        <button class="btn btn-xs btn-secondary" title="Copy to clipboard">Copy</button>
-                                    </div>
-                                    <textarea readonly class="w-full h-48 font-mono text-xs p-2 rounded bg-[--grid-color] border border-gray-500/50 resize-y"></textarea>
-                                </div>
-                            </div>
                         </div>
-            <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-        </div>
                 </template>
 
                 <template id="template-recipe-df">
@@ -3325,9 +3300,9 @@
                                         <div class="param-item">
                                             <div class="param-item-row">
                                                 <label for="df-ground-refl" class="label">Ground Reflectance (-g)</label>
-                                                <input type="number" class="param-input-num" id="df-ground-refl-num" step="0.01" min="0" max="1">
+                                                <input type="number" class="param-input-num" id="df-ground-refl-num" step="0.01" min="0" max="1" autocomplete="off">
                                             </div>
-                                            <input type="range" id="df-ground-refl" min="0" max="1" value="0.2" step="0.01">
+                                            <input type="range" id="df-ground-refl" min="0" max="1" value="0.2" step="0.01" autocomplete="off">
                                         </div>
                                     </div>
                                     <div class="param-grid-sim mt-4">
@@ -3336,38 +3311,15 @@
                                                 <label for="df-irrad" class="label">Diffuse Horizontal Irradiance (-B)
                                                     <span class="info-icon">i<span class="info-popover">To achieve a standard outdoor illuminance of 10,000 lux for DF calculations, a horizontal irradiance of <b>55.866 W/m²</b> is used with a CIE Overcast Sky. This may not apply to other sky types.</span></span>
                                                 </label>
-                                                <input type="number" class="param-input-num" id="df-irrad-num" step="0.001" min="0" max="200">
+                                                <input type="number" class="param-input-num" id="df-irrad-num" step="0.001" min="0" max="200" autocomplete="off">
                                             </div>
-                                            <input type="range" id="df-irrad" min="0" max="200" value="55.866" step="0.001">
+                                            <input type="range" id="df-irrad" min="0" max="200" value="55.866" step="0.001" autocomplete="off">
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="accordion-item mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                                <div class="accordion-header">Advanced Parameters (Overrides)<div class="accordion-chevron">▶</div></div>
-                                <div class="accordion-content" style="display: none;">
-                                     </div>
-                            </div>
-
-                            <div class="execution-section mt-4 pt-4 border-t-2 border-[--grid-color]">
-                                <h4 class="text-base font-semibold mb-3">Execution</h4>
-                                <div class="space-y-3">
-                                    <button data-action="generate" class="btn btn-primary w-full">Generate DF Package</button>
-                                    <button data-action="run" class="btn btn-secondary w-full" disabled>Run Simulation</button>
-                                </div>
-                                <p class="text-xs text-gray-500 mt-3 text-center">Generates a .zip with scene geometry and run scripts.</p>
-                                <div class="command-center hidden mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                                    <div class="flex justify-between items-center mb-2">
-                                        <h5 class="font-semibold text-xs uppercase text-[--text-secondary]">Generated Script</h5>
-                                        <button class="btn btn-xs btn-secondary" title="Copy to clipboard">Copy</button>
-                                    </div>
-                                    <textarea readonly class="w-full h-48 font-mono text-xs p-2 rounded bg-[--grid-color] border border-gray-500/50 resize-y"></textarea>
-                                </div>
-                            </div>
                         </div>
-            <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-        </div>
                 </template>
 
                 <template id="template-recipe-annual-3ph">
@@ -3407,30 +3359,7 @@
                                 </div>
                             </div>
 
-                            <div class="accordion-item mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                                <div class="accordion-header">Advanced Parameters (Overrides)<div class="accordion-chevron">▶</div></div>
-                                <div class="accordion-content" style="display: none;">
-                                     </div>
-                            </div>
-
-                            <div class="execution-section mt-4 pt-4 border-t-2 border-[--grid-color]">
-                                <h4 class="text-base font-semibold mb-3">Execution</h4>
-                                <div class="space-y-3">
-                                    <button data-action="generate" class="btn btn-primary w-full">Generate 3-Phase Package</button>
-                                    <button data-action="run" class="btn btn-secondary w-full" disabled>Run Simulation</button>
-                                </div>
-                                <p class="text-xs text-gray-500 mt-3 text-center">Generates a .zip with scene geometry and run scripts.</p>
-                                <div class="command-center hidden mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                                    <div class="flex justify-between items-center mb-2">
-                                        <h5 class="font-semibold text-xs uppercase text-[--text-secondary]">Generated Script</h5>
-                                        <button class="btn btn-xs btn-secondary" title="Copy to clipboard">Copy</button>
-                                    </div>
-                                    <textarea readonly class="w-full h-48 font-mono text-xs p-2 rounded bg-[--grid-color] border border-gray-500/50 resize-y"></textarea>
-                                </div>
-                            </div>
-                        </div>
-            <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-        </div>
+                    </div>
                 </template>
 
                 <template id="template-recipe-annual-5ph">
@@ -3466,32 +3395,8 @@
                                     </div>
                                 </div>
                             </div>
-
-                            <div class="accordion-item mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                                <div class="accordion-header">Advanced Parameters (Overrides)<div class="accordion-chevron">▶</div></div>
-                                <div class="accordion-content" style="display: none;">
-                                     </div>
-                            </div>
-
-                            <div class="execution-section mt-4 pt-4 border-t-2 border-[--grid-color]">
-                                <h4 class="text-base font-semibold mb-3">Execution</h4>
-                                <div class="space-y-3">
-                                    <button data-action="generate" class="btn btn-primary w-full">Generate 5-Phase Package</button>
-                                    <button data-action="run" class="btn btn-secondary w-full" disabled>Run Simulation</button>
-                                </div>
-                                <p class="text-xs text-gray-500 mt-3 text-center">Generates a .zip with scene geometry and run scripts.</p>
-                                <div class="command-center hidden mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                                    <div class="flex justify-between items-center mb-2">
-                                        <h5 class="font-semibold text-xs uppercase text-[--text-secondary]">Generated Script</h5>
-                                        <button class="btn btn-xs btn-secondary" title="Copy to clipboard">Copy</button>
-                                    </div>
-                                    <textarea readonly class="w-full h-48 font-mono text-xs p-2 rounded bg-[--grid-color] border border-gray-500/50 resize-y"></textarea>
-                                </div>
-                            </div>
                         </div>
-            <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-        </div>
-                </template>
+                    </template>
 
                 <template id="template-recipe-imageless-glare">
                     <div class="floating-window ui-panel">
@@ -3518,39 +3423,15 @@
                                 <div><label class="label" for="weather-file">Weather File (.epw)</label><input type="file" id="weather-file" accept=".epw" class="w-full text-sm"></div>
                                 <div><label class="label" for="occupancy-schedule">Occupancy Schedule (.csv) (Optional)</label><input type="file" id="occupancy-schedule" accept=".csv" class="w-full text-sm"></div>
                                 <div class="param-item">
-                                    <div class="param-item-row"><label for="glare-threshold" class="label">Glare Threshold (DGP)</label><input type="number" class="param-input-num" id="glare-threshold-num" step="0.01" min="0" max="1"></div>
-                                    <input type="range" id="glare-threshold" min="0" max="1" value="0.4" step="0.01">
+                                    <div class="param-item-row"><label for="glare-threshold" class="label">Glare Threshold (DGP)</label><input type="number" class="param-input-num" id="glare-threshold-num" step="0.01" min="0" max="1" autocomplete="off"></div>
+                                    <input type="range" id="glare-threshold" min="0" max="1" value="0.4" step="0.01" autocomplete="off">
                                 </div>
                                 <div class="param-item">
                                     <label for="glare-autonomy-target" class="label">Spatial Glare Autonomy Target (%)</label>
-                                    <input type="number" id="glare-autonomy-target" class="w-full mt-1" min="0" max="100" value="95">
-                                </div>
-                            </div>
-
-                            <div class="accordion-item mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                                <div class="accordion-header">Advanced Parameters (Overrides)<div class="accordion-chevron">▶</div></div>
-                                <div class="accordion-content" style="display: none;">
-                                     </div>
-                            </div>
-
-                            <div class="execution-section mt-4 pt-4 border-t-2 border-[--grid-color]">
-                                <h4 class="text-base font-semibold mb-3">Execution</h4>
-                                <div class="space-y-3">
-                                    <button data-action="generate" class="btn btn-primary w-full">Generate Imageless Glare Package</button>
-                                    <button data-action="run" class="btn btn-secondary w-full" disabled>Run Simulation</button>
-                                </div>
-                                <p class="text-xs text-gray-500 mt-3 text-center">Generates a .zip with scene geometry and run scripts.</p>
-                                <div class="command-center hidden mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                                    <div class="flex justify-between items-center mb-2">
-                                        <h5 class="font-semibold text-xs uppercase text-[--text-secondary]">Generated Script</h5>
-                                        <button class="btn btn-xs btn-secondary" title="Copy to clipboard">Copy</button>
-                                    </div>
-                                    <textarea readonly class="w-full h-48 font-mono text-xs p-2 rounded bg-[--grid-color] border border-gray-500/50 resize-y"></textarea>
+                                    <input type="number" id="glare-autonomy-target" class="w-full mt-1" min="0" max="100" value="95" autocomplete="off">
                                 </div>
                             </div>
                         </div>
-                    <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-                </div>
                     </template>
                   <template id="template-recipe-spectral-lark">
                   <div class="floating-window ui-panel">
@@ -3579,13 +3460,13 @@
                           <div class="param-section">
                               <h4>Sky & Sun Definition (Common Inputs)</h4>
                               <div class="grid grid-cols-3 gap-4">
-                                  <div><label for="lark-month" class="label">Month</label><input type="number" id="lark-month" min="1" max="12" value="6"></div>
-                                  <div><label for="lark-day" class="label">Day</label><input type="number" id="lark-day" min="1" max="31" value="21"></div>
-                                  <div><label for="lark-time" class="label">Time (HH:MM)</label><input type="time" id="lark-time" value="14:30"></div>
+                                  <div><label for="lark-month" class="label">Month</label><input type="number" id="lark-month" min="1" max="12" value="6" autocomplete="off"></div>
+                                  <div><label for="lark-day" class="label">Day</label><input type="number" id="lark-day" min="1" max="31" value="21" autocomplete="off"></div>
+                                  <div><label for="lark-time" class="label">Time (HH:MM)</label><input type="time" id="lark-time" value="14:30" autocomplete="off"></div>
                               </div>
                               <div class="grid grid-cols-2 gap-4 mt-4">
-                                  <div><label for="lark-dni" class="label">Direct Normal Irradiance (W/m²)</label><input type="number" id="lark-dni" min="0" value="750"></div>
-                                  <div><label for="lark-dhi" class="label">Diffuse Horizontal Irradiance (W/m²)</label><input type="number" id="lark-dhi" min="0" value="150"></div>
+                                  <div><label for="lark-dni" class="label">Direct Normal Irradiance (W/m²)</label><input type="number" id="lark-dni" min="0" value="750" autocomplete="off"></div>
+                                  <div><label for="lark-dhi" class="label">Diffuse Horizontal Irradiance (W/m²)</label><input type="number" id="lark-dhi" min="0" value="150" autocomplete="off"></div>
                               </div>
                           </div>
 
@@ -3608,24 +3489,9 @@
                           </div>
 
                           <div class="accordion-item mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                              <div class="accordion-header">Advanced Parameters (Overrides)<div class="accordion-chevron">▶</div></div>
-                              <div class="accordion-content" style="display: none;">
-                                  </div>
-                          </div>
-
-                          <div class="execution-section mt-4 pt-4 border-t-2 border-[--grid-color]">
-                              <h4 class="text-base font-semibold mb-3">Execution</h4>
-                              <div class="space-y-3">
-                                  <button data-action="generate" class="btn btn-primary w-full">Generate Spectral Package</button>
-                                  <button data-action="run" class="btn btn-secondary w-full" disabled>Run Simulation(s)</button>
-                              </div>
-                              <div class="command-center hidden mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                                  </div>
-                          </div>
-                      </div>
-                      <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
                   </div>
             </template>
+            
             <template id="template-recipe-sda-ase">
                 <div class="floating-window ui-panel">
                     <div class="window-header">
@@ -3646,33 +3512,15 @@
                                 <div><label class="label" for="bsdf-closed-file">BSDF - Blinds Closed (.xml)</label><input type="file" id="bsdf-closed-file" accept=".xml" class="w-full text-sm"></div>
                             </div>
                         </div>
-                        <div class="param-section">
+                    <div class="param-section">
                             <h4 class="text-base font-semibold">Blind Operation Parameters</h4>
                             <div class="grid grid-cols-2 gap-4">
                                 <div><label class="label" for="blinds-threshold-lux">Illuminance Threshold (lux)</label><input type="number" id="blinds-threshold-lux" value="1000" min="0" step="50" class="w-full mt-1"></div>
-                                <div><label class="label" for="blinds-trigger-percent">Area Trigger (%)</label><input type="number" id="blinds-trigger-percent" value="2" min="0" max="100" step="1" class="w-full mt-1"></div>
+                                <div><label class="label" for="blinds-trigger-percent">Area Trigger (%)</label><input type="number" id="blinds-trigger-percent" value="2" min="0" max="100" step="1" class="w-full mt-1" autocomplete="off"></div>
                             </div>
                         </div>
-                         <div class="accordion-item mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                            <div class="accordion-header">Simulation Quality (Overrides)<div class="accordion-chevron">▶</div></div>
-                            <div class="accordion-content" style="display: none;">
-                                 </div>
-                        </div>
-
-                        <div class="execution-section mt-4 pt-4 border-t-2 border-[--grid-color]">
-                            <h4 class="text-base font-semibold mb-3">Execution</h4>
-                            <button data-action="generate" class="btn btn-primary w-full">Generate sDA/ASE Package</button>
-                            <div class="command-center hidden mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                                <div class="flex justify-between items-center mb-2">
-                                    <h5 class="font-semibold text-xs uppercase text-[--text-secondary]">Generated Script</h5>
-                                    <button class="btn btn-xs btn-secondary" title="Copy to clipboard">Copy</button>
-                                </div>
-                                <textarea readonly class="w-full h-48 font-mono text-xs p-2 rounded bg-[--grid-color] border border-gray-500/50 resize-y"></textarea>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-                </div>
+                  </div>
+                  <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
             </template>
 
             <template id="template-recipe-en17037">
@@ -3769,21 +3617,6 @@
                                 </div>
                             </div>
                         </div>
-
-                        <div class="accordion-item mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                            <div class="accordion-header">Simulation Quality (Overrides)<div class="accordion-chevron">▶</div></div>
-                            <div class="accordion-content" style="display: none;"></div>
-                        </div>
-
-                        <div class="execution-section mt-4 pt-4 border-t-2 border-[--grid-color]">
-                            <h4 class="text-base font-semibold mb-3">Execution</h4>
-                            <div class="space-y-3">
-                                <button data-action="generate" class="btn btn-primary w-full">Generate EN 17037 Package</button>
-                                <button data-action="run" class="btn btn-secondary w-full" disabled>Run Compliance Check</button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
                 </div>
             </template>
 
@@ -3835,8 +3668,8 @@
                     <div class="param-section">
                         <h4 class="text-base font-semibold">Blind Operation Parameters</h4>
                         <div class="grid grid-cols-2 gap-4">
-                            <div><label class="label" for="blinds-threshold-lux">Illuminance Threshold (lux)</label><input type="number" id="blinds-threshold-lux" value="1000" min="0" step="50" class="w-full mt-1"></div>
-                            <div><label class="label" for="blinds-trigger-percent">Area Trigger (%)</label><input type="number" id="blinds-trigger-percent" value="2" min="0" max="100" step="1" class="w-full mt-1"></div>
+                            <div><label class="label" for="blinds-threshold-lux">Illuminance Threshold (lux)</label><input type="number" id="blinds-threshold-lux" value="1000" min="0" step="50" class="w-full mt-1" autocomplete="off"></div>
+                            <div><label class="label" for="blinds-trigger-percent">Area Trigger (%)</label><input type="number" id="blinds-trigger-percent" value="2" min="0" max="100" step="1" class="w-full mt-1" autocomplete="off"></div>
                         </div>
                     </div>
                     <div class="execution-section mt-4 pt-4 border-t-2 border-[--grid-color]">
@@ -3846,18 +3679,76 @@
               </div>
               <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
           </div>
-      </template>
+            </template>
 
-        <template id="template-recipe-en-ugr">
-            <div class="floating-window ui-panel">
-                <div class="window-header">
-                    <span>Recipe: EN 12464-1 UGR</span>
+            <template id="template-recipe-facade-irradiation">
+                <div class="floating-window ui-panel">
+                    <div class="window-header">
+                        <span>Recipe: Façade Irradiation Analysis</span>
+                        <div class="window-controls">
+                            <div class="window-icon-max"></div>
+                            <div class="collapse-icon"></div>
+                            <div class="window-icon-close"></div>
+                        </div>
+                    </div>
+                    <div class="window-content">
+                        <p class="info-box">Calculates the total annual solar irradiation (kWh/m²/year) on a vertical surface placed in front of a selected façade, accounting for shading from the building itself and any attached shading devices.</p>
+                        
+                        <div class="param-section">
+                            <h4 class="text-base font-semibold">Analysis Plane & Grid</h4>
+                            <div class="space-y-3 mt-4">
+                                <div>
+                                    <label for="facade-selection" class="label">Target Façade</label>
+                                    <select id="facade-selection" class="w-full mt-1">
+                                        <option value="S" selected>South</option>
+                                        <option value="N">North</option>
+                                        <option value="E">East</option>
+                                        <option value="W">West</option>
+                                    </select>
+                                </div>
+                                <div class="param-item">
+                                    <div class="param-item-row">
+                                        <label for="facade-offset" class="label">Offset from Façade (m)</label>
+                                        <input type="number" class="param-input-num" id="facade-offset-num" step="0.05" min="0" max="5" autocomplete="off">
+                                    </div>
+                                    <input type="range" id="facade-offset" min="0" max="5" value="0.05" step="0.05" autocomplete="off">
+                                </div>
+                                <div class="param-item">
+                                    <div class="param-item-row">
+                                        <label for="facade-grid-spacing" class="label">Grid Spacing (m)</label>
+                                        <input type="number" class="param-input-num" id="facade-grid-spacing-num" step="0.1" min="0.1" max="5" autocomplete="off">
+                                    </div>
+                                    <input type="range" id="facade-grid-spacing" min="0.1" max="5" value="0.5" step="0.1" autocomplete="off">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="param-section">
+                            <h4 class="text-base font-semibold">Required Inputs</h4>
+                            <div class="space-y-3 mt-4">
+                                <div>
+                                    <label class="label" for="weather-file">Weather File (.epw)</label>
+                                    <input type="file" id="weather-file" accept=".epw" class="w-full text-sm">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="execution-section mt-4 pt-4 border-t-2 border-[--grid-color]">
+                        <button data-action="generate" class="btn btn-primary w-full">Generate Irradiation Analysis Package</button>
+                    </div>
+                </div>
+            </template>
+
+            <template id="template-recipe-en-ugr">
+                <div class="floating-window ui-panel">
+                    <div class="window-header">
+                        <span>Recipe: EN 12464-1 UGR</span>
                         <div class="window-controls"><div class="window-icon-max"></div><div class="collapse-icon"></div><div class="window-icon-close"></div></div>
                     </div>
                     <div class="window-content">
                         <p class="info-box">Calculates the Unified Glare Rating (UGR) from the observer position defined in the Viewpoint panel.</p>
                         <div class="param-section">
-                            <div><label for="ugr-limit" class="label">UGR Limit ($UGR_L$)</label><input type="number" id="ugr-limit" value="19" min="0" step="1" class="w-full mt-1"></div>
+                            <div><label for="ugr-limit" class="label">UGR Limit ($UGR_L$)</label><input type="number" id="ugr-limit" value="19" min="0" step="1" class="w-full mt-1" autocomplete="off"></div>
                         </div>
                         <div class="param-section">
                             <label for="quality-preset" class="label">Calculation Quality</label>
@@ -3868,17 +3759,8 @@
                                 <option value="custom">Custom</option>
                             </select>
                         </div>
-                        <div class="accordion-item mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                            <div class="accordion-header">Advanced Parameters (Overrides)<div class="accordion-chevron">▶</div></div>
-                            <div class="accordion-content" style="display: none;"></div>
-                        </div>
-                        <div class="execution-section mt-4 pt-4 border-t-2 border-[--grid-color]">
-                          <button data-action="generate" class="btn btn-primary w-full">Generate UGR Check Package</button>
-                      </div>
-                  </div>
-                  <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-              </div>
-          </template>
+                    </div>
+            </template>
 
             <template id="template-recipe-facade-irradiation">
                     <div class="floating-window ui-panel">
@@ -3908,16 +3790,16 @@
                                     <div class="param-item">
                                         <div class="param-item-row">
                                             <label for="facade-offset" class="label">Offset from Façade (m)</label>
-                                            <input type="number" class="param-input-num" id="facade-offset-num" step="0.05" min="0" max="5">
+                                            <input type="number" class="param-input-num" id="facade-offset-num" step="0.05" min="0" max="5" autocomplete="off">
                                         </div>
-                                        <input type="range" id="facade-offset" min="0" max="5" value="0.05" step="0.05">
+                                        <input type="range" id="facade-offset" min="0" max="5" value="0.05" step="0.05" autocomplete="off">
                                     </div>
                                     <div class="param-item">
                                         <div class="param-item-row">
                                             <label for="facade-grid-spacing" class="label">Grid Spacing (m)</label>
-                                            <input type="number" class="param-input-num" id="facade-grid-spacing-num" step="0.1" min="0.1" max="5">
+                                            <input type="number" class="param-input-num" id="facade-grid-spacing-num" step="0.1" min="0.1" max="5" autocomplete="off">
                                         </div>
-                                        <input type="range" id="facade-grid-spacing" min="0.1" max="5" value="0.5" step="0.1">
+                                        <input type="range" id="facade-grid-spacing" min="0.1" max="5" value="0.5" step="0.1" autocomplete="off">
                                     </div>
                                 </div>
                             </div>
@@ -3931,21 +3813,10 @@
                                     </div>
                                 </div>
                             </div>
-
-                            <div class="accordion-item mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                                <div class="accordion-header">Simulation Quality (Overrides)<div class="accordion-chevron">▶</div></div>
-                                <div class="accordion-content" style="display: none;"></div>
-                            </div>
-
-                            <div class="execution-section mt-4 pt-4 border-t-2 border-[--grid-color]">
-                            <button data-action="generate" class="btn btn-primary w-full">Generate Irradiation Analysis Package</button>
-                        </div>
                     </div>
-                    <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-                </div>
             </template>
 
-<template id="template-recipe-annual-radiation">
+        <template id="template-recipe-annual-radiation">
                 <div class="floating-window ui-panel">
                     <div class="window-header">
                         <span>Recipe: Annual Solar Radiation</span>
@@ -3972,35 +3843,12 @@
                                 <input type="file" id="weather-file" accept=".epw" class="w-full text-sm">
                             </div>
                         </div>
-
-                        <div class="accordion-item mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                            <div class="accordion-header">Advanced Parameters (Overrides)<div class="accordion-chevron">▶</div></div>
-                            <div class="accordion-content" style="display: none;">
-                                 </div>
-                        </div>
-
-                        <div class="execution-section mt-4 pt-4 border-t-2 border-[--grid-color]">
-                            <h4 class="text-base font-semibold mb-3">Execution</h4>
-                            <div class="space-y-3">
-                                <button data-action="generate" class="btn btn-primary w-full">Generate Annual Radiation Package</button>
-                                <button data-action="run" class="btn btn-secondary w-full" disabled>Run Simulation</button>
-                            </div>
-                            <div class="command-center hidden mt-4 pt-4 border-t border-dashed border-[--grid-color]">
-                                <div class="flex justify-between items-center mb-2">
-                                    <h5 class="font-semibold text-xs uppercase text-[--text-secondary]">Generated Script</h5>
-                                    <button class="btn btn-xs btn-secondary" title="Copy to clipboard">Copy</button>
-                                </div>
-                                <textarea readonly class="w-full h-48 font-mono text-xs p-2 rounded bg-[--grid-color] border border-gray-500/50 resize-y"></textarea>
-                            </div>
-                        </div>
-                    </div>
-                <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-            </div>
-        </template>
+                </div>
+            </template>
 
         </div>
 
-    <div id="bsdf-viewer-panel" class="floating-window ui-panel hidden" style="width: 500px; height: 650px;">
+        <div id="bsdf-viewer-panel" class="floating-window ui-panel hidden" style="width: 500px; height: 650px;">
         <div class="window-header">
             <span>BSDF Viewer</span>
             <div class="window-controls">
@@ -4035,7 +3883,6 @@
     </script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
     <script type="module" src="scripts/resultsManager.js"></script>
     <script type="module" src="scripts/annualDashboard.js"></script>

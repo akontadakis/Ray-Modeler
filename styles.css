@@ -2,6 +2,7 @@
 
 /* --- THEME VARIABLES --- */
 :root {
+  --ai-sidebar-width: 380px;
   /* Light Theme (Default) */
   --bg-main: #E9E9EF;
   --bg-selection: #000000;
@@ -30,10 +31,6 @@
   --select-arrow-icon: url('data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns="http://www.w3.org/2000/svg" width="292.4" height="292.4"%3E%3Cpath fill="%23343434" d="M287 69.4a17.6 17.6 0 0 0-13-5.4H18.4c-5 0-9.3 1.8-12.9 5.4A17.6 17.6 0 0 0 0 82.2c0 5 1.8 9.3 5.4 12.9l128 127.9c3.6 3.6 7.8 5.4 12.8 5.4s9.2-1.8 12.8-5.4L287 95c3.5-3.5 5.4-7.8 5.4-12.8 0-5-1.9-9.2-5.5-12.8z"%2F%3E%3C/svg%3E');
   --btn-secondary-bg: #DDDEE3;
   --btn-secondary-hover-bg: #D2D2D7;
-
-    /* Welcome Screen Positioning Options */
-  --welcome-header-margin-bottom: 1rem;
-  --welcome-description-margin-bottom: 2rem;
 
 }
 
@@ -375,7 +372,7 @@ canvas {
   min-height: 240px;
   max-width: 1080px;
   max-height: 95vh;
-  overflow: hidden;
+  /* ---  overflow: hidden; --- */
   display: flex;
   flex-direction: column;
   transition: width 0.3s ease, height 0.3s ease, top 0.3s ease, left 0.3s ease;
@@ -519,13 +516,13 @@ canvas {
 /* --- RIGHT SIDEBAR WRAPPER & SIDEBARS --- */
 #sidebar-wrapper {
   position: fixed;
-  top: 1rem;
-  right: 1rem;
-  bottom: 1rem;
+  top: 0;
+  right: 0;
+  bottom: 0;
   z-index: 50;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  pointer-events: none;
 }
 
 #right-sidebar,
@@ -536,48 +533,112 @@ canvas {
   flex: 1 1 0;
   min-height: 0;
   transition: transform 0.4s ease-in-out;
+  width: var(--ai-sidebar-width);
+  min-width: 320px;
+  max-width: 80vw;
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
+  border-left: 1px solid var(--grid-color);
+}
+
+#right-sidebar .resize-handle-edge.left {
+    left: 0;
+    top: 0;
+    bottom: 0;
 }
 
 #right-sidebar.closed,
 #analysis-sidebar.closed {
-  transform: translateX(calc(100% + 1rem));
+  transform: translateX(100%);
+}
+
+/* --- Push/Resize effect for AI Sidebar --- */
+#render-container, #view-controls {
+    /* Transition properties match the sidebar's slide animation */
+    transition: width 0.4s ease-in-out, left 0.4s ease-in-out;
+}
+
+body.ai-sidebar-open #render-container {
+    width: calc(100% - var(--ai-sidebar-width));
+}
+
+body.ai-sidebar-open #view-controls {
+    left: calc((100% - var(--ai-sidebar-width)) / 2);
+}
+
+/* --- FIX: Sidebar Resizing --- */
+#right-sidebar .resize-handle-edge.left {
+    left: 0;
+    top: 0;
+    bottom: 0;
+}
+
+body.is-resizing-sidebar #render-container,
+body.is-resizing-sidebar #view-controls,
+body.is-resizing-sidebar #ai-assistant-toggle-container {
+    transition: none;
+}
+
+/* --- AI Assistant Toggle Button Styling --- */
+#ai-assistant-toggle-container {
+    position: absolute;
+    top: 50%;
+    right: 0rem;
+    transform: translateY(-50%);
+    z-index: 1;
+    transition: right 0.4s ease-in-out;
+    pointer-events: auto; /* Ensure the container is clickable */
+}
+
+body.ai-sidebar-open #ai-assistant-toggle-container {
+    right: var(--ai-sidebar-width); /* Width of the sidebar */
+}
+
+#ai-assistant-toggle-container #ai-assistant-button {
+    border-radius: 12px 0 0 12px;
+    border-right: none;
+    width: 48px;
+    height: 72px;
+}
+
+/* Adjust tooltip to appear on the left */
+#ai-assistant-toggle-container .tooltip {
+    left: auto;
+    right: calc(100% + 10px);
+}
+
+#ai-assistant-toggle-container .tooltip::after {
+    right: auto;
+    left: 100%;
+    margin-left: -1px; /* Prevents a small gap */
+    border-color: transparent transparent transparent var(--text-primary);
+}
+
+#ai-chat-input {
+      resize: vertical;
+      line-height: 1;
+      padding: 1rem 1rem; /* Use less padding to fit better */
+}
+
+/* --- FIX: Sidebar Resizing --- */
+#right-sidebar .resize-handle-edge.left {
+    left: 0;
+    top: 0;
+    bottom: 0;
+}
+
+body.is-resizing-sidebar #render-container,
+body.is-resizing-sidebar #view-controls,
+body.is-resizing-sidebar #ai-assistant-toggle-container {
+    transition: none;
 }
 
 .sidebar-content {
   padding: 1.25rem;
-  overflow-y: auto;
   flex-grow: 1;
+  min-height: 0;
 }
-
-.sidebar-toggle-btn {
-  position: absolute;
-  top: 1rem;
-  left: -40px;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 10;
-}
-
-#analysis-sidebar .sidebar-toggle-btn {
-  top: 1rem;
-}
-
-.sidebar-toggle-btn svg {
-  width: 18px;
-  height: 18px;
-  transition: transform 0.3s ease;
-  color: var(--text-primary);
-}
-
-#right-sidebar.closed .sidebar-toggle-btn svg,
-#analysis-sidebar.closed .sidebar-toggle-btn svg {
-  transform: rotate(180deg);
-}
-
 
 /* --- ACCORDION --- */
 .accordion-item {
@@ -624,7 +685,6 @@ canvas {
   max-height: 1000px;
   padding-bottom: 1rem;
 }
-
 
 /* --- CUSTOM SCROLLBARS --- */
 .sidebar-content::-webkit-scrollbar,
@@ -1080,13 +1140,10 @@ html[data-theme="light"] .leaflet-tile-pane {
 }
 
 
-/* --- INTERACTION & POINTER-EVENTS LAYERING --- */
 /* Prevent the sidebar wrapper from blocking the canvas */
-#sidebar-wrapper { pointer-events: none; }
 
 /* Keep panels and the small toggle buttons clickable */
-#sidebar-wrapper .ui-panel,
-#sidebar-wrapper .sidebar-toggle-btn { pointer-events: auto; }
+#sidebar-wrapper .ui-panel { pointer-events: auto; }
 
 /* Let clicks pass through empty UI areas */
 #window-container { pointer-events: none; }
@@ -1095,7 +1152,6 @@ html[data-theme="light"] .leaflet-tile-pane {
 .floating-window,
 .ui-panel,
 .action-button-container,
-.sidebar-toggle-btn,
 #left-controls-container,
 #view-controls,
 #theme-switcher-container,
@@ -1103,13 +1159,7 @@ html[data-theme="light"] .leaflet-tile-pane {
 
 /* Don’t let closed sidebars block the canvas */
 #right-sidebar.closed,
-#analysis-sidebar.closed { pointer-events: none; }
 
-#right-sidebar.closed .sidebar-toggle-btn,
-#analysis-sidebar.closed .sidebar-toggle-btn { pointer-events: auto; }
-
-
-/* --- INFORMATION WIDGET --- */
 #info-widget-container {
     pointer-events: none; /* Pass clicks through the container */
 }
@@ -1188,7 +1238,6 @@ html[data-theme="light"] .leaflet-tile-pane {
     -moz-appearance: none;
     height: 0;
 }
-
 
 /* Style the slider thumb */
 #time-range-slider-container input[type="range"]::-webkit-slider-thumb {
@@ -1379,28 +1428,35 @@ html[data-theme="light"] .leaflet-tile-pane {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: -4rem; /* Space between logo/title and options */
-}
-
-.welcome-header {
-    margin-bottom: var(--welcome-header-margin-bottom);
 }
 
 .welcome-description {
-    margin-bottom: var(--welcome-description-margin-bottom);
+    margin-bottom: 2rem;
 }
 
 .welcome-header {
     display: flex;
+    flex-direction: row;
     align-items: center;
     justify-content: center;
-    gap: 1.5rem;
+    gap: 2rem;
 }
 
 .welcome-title {
     font-size: 4rem;
     font-weight: 700;
     letter-spacing: -0.05em;
+    margin-bottom: -0.5rem;
+}
+
+.welcome-subheader {
+    font-size: 1.25rem; /* 20px */
+    font-weight: 600; /* Semibold */
+    color: var(--text-secondary);
+    letter-spacing: 0.02em;
+    margin-top: 0.5rem;
+    margin-bottom: 2.5rem;
+    animation: pulse 2.5s cubic-bezier(0.5, 0, 0.6, 1) infinite;
 }
 
 .welcome-options {
@@ -1542,9 +1598,9 @@ html[data-theme="cafe58"] #welcome-logo-cafe58 {
 }
 
 .ai-mode-selector {
-    display: flex;
-    gap: 0.5rem; /* 8px */
-    align-items: center;
+  display: flex;
+  gap: 0.5rem; /* 8px */
+  align-items: center;
 }
 
 .chat-message {
@@ -1658,4 +1714,98 @@ html[data-theme="cafe58"] #welcome-logo-cafe58 {
 .asset-item[data-asset-type="bush"] .asset-icon svg {
   width: 28px;
   height: 28px;
+}
+
+/* --- AI Chat Tabs --- */
+.ai-chat-tabs {
+display: flex;
+padding: 0.25rem 0.5rem 0;
+gap: 0.25rem;
+background-color: var(--btn-secondary-bg);
+border-bottom: 1px solid var(--grid-color);
+overflow-x: auto;
+flex-shrink: 0;
+}
+
+.ai-chat-tab {
+display: flex;
+align-items: center;
+gap: 0.5rem;
+padding: 0.4rem 0.75rem;
+border-radius: 0.375rem 0.375rem 0 0;
+border: 1px solid transparent;
+border-bottom: none;
+cursor: pointer;
+font-size: 0.8rem;
+font-weight: 500;
+white-space: nowrap;
+transition: all 0.2s ease;
+background-color: transparent;
+color: var(--text-secondary);
+}
+
+.ai-chat-tab:hover {
+background-color: var(--panel-bg);
+color: var(--text-primary);
+}
+
+.ai-chat-tab.active {
+background-color: var(--bg-main);
+color: var(--text-primary);
+border-color: var(--grid-color);
+}
+
+.ai-tab-close-btn {
+width: 1rem;
+height: 1rem;
+display: flex;
+align-items: center;
+justify-content: center;
+border-radius: 50%;
+background-color: transparent;
+border: none;
+font-size: 1rem;
+line-height: 1;
+cursor: pointer;
+color: var(--text-secondary);
+margin-left: 0.25rem;
+transition: all 0.2s ease;
+}
+
+.ai-chat-tab:hover .ai-tab-close-btn {
+color: var(--text-primary);
+}
+
+.ai-tab-close-btn:hover {
+background-color: var(--grid-color);
+}
+
+/* --- Resizable Chat Input --- */
+#ai-chat-input-container {
+    min-height: 60px;
+    max-height: 400px;
+    display: flex;
+    flex-direction: column;
+    padding-top: 1rem; /* Adjusted padding */
+}
+
+#chat-resize-handle {
+    display: none;
+    width: 100%;
+    height: 8px;
+    position: absolute;
+    top: -4px;
+    left: 0;
+    cursor: ns-resize;
+    z-index: 10;
+}
+
+#ai-chat-form {
+    flex-grow: 1;
+}
+
+#ai-chat-input {
+    resize: none;
+    line-height: 1.5;
+    padding: 0.5rem 1rem; /* Use less padding to fit better */
 }

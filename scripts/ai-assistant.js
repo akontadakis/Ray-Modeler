@@ -11,8 +11,11 @@ import * as THREE from 'three';
 
 // Module-level cache for DOM elements
 let dom;
-// Stores the conversation history for context
-const chatHistory = [];
+
+// State management for tabbed conversations
+let conversations = {};
+let activeConversationId = null;
+let conversationCounter = 0; // Simple incrementing ID for new conversations
 
 // Define the tools the AI can use to interact with the application
 const availableTools = [
@@ -30,6 +33,33 @@ const availableTools = [
                         "z": { "type": "NUMBER", "description": "The Z-coordinate for the asset's center (along the room's length)." }
                     },
                     "required": ["assetType", "x", "y", "z"]
+                }
+            },
+            {
+                "name": "compareMetrics",
+                "description": "Compares a specific performance metric between the two loaded datasets (A and B).",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "metric": {
+                            "type": "STRING",
+                            "description": "The metric to compare. Must be one of 'sDA' (Spatial Daylight Autonomy), 'ASE' (Annual Sunlight Exposure), 'UDI' (Useful Daylight Illuminance), 'averageIlluminance', or 'uniformity'."
+                        }
+                    },
+                    "required": ["metric"]
+                }
+            },
+            {
+                "name": "filterAndHighlightPoints",
+                "description": "Finds all sensor points in a specified dataset that meet a numerical condition (e.g., illuminance below 300 lux) and highlights them in the 3D view.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "dataset": { "type": "STRING", "description": "The dataset to query. Must be 'a' or 'b'." },
+                        "condition": { "type": "STRING", "description": "The comparison operator. Must be one of '<', '>', '<=', '>='." },
+                        "value": { "type": "NUMBER", "description": "The numerical value to compare against (e.g., an illuminance value in lux)." }
+                    },
+                    "required": ["dataset", "condition", "value"]
                 }
             },
             {
@@ -59,20 +89,14 @@ const availableTools = [
                 }
             },
             {
-                "name": "validateProjectState",
-                "description": "Analyzes the current project configuration for common errors, warnings, and readiness for a specific type of simulation.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "analysisType": { "type": "STRING", "description": "The type of analysis to validate for. Must be one of 'general', 'illuminance', 'rendering', 'dgp', 'annual', 'illuminance', 'df', 'imageless-glare'." }
-                    },
-                    "required": ["analysisType"]
-                }
+                "name": "runDesignInspector",
+                "description": "Performs a comprehensive AI-driven analysis of the entire project configuration, checking for conflicting settings, potential issues, and adherence to best practices. Returns a summary of findings for the AI to present to the user.",
+                "parameters": { "type": "OBJECT", "properties": {} }
             },
             {
-                "name": "runDesignInspector",
-                "description": "Performs a comprehensive analysis of the entire project configuration, checking for common errors, potential issues, and adherence to best practices. Returns a structured list of findings.",
-                "parameters": { "type": "OBJECT", "properties": {} }
+              "name": "runResultsCritique",
+              "description": "Performs an AI-driven analysis of the currently loaded simulation results. It identifies problems (e.g., high glare, low daylight autonomy), explains their likely causes based on the project configuration, and suggests specific, actionable design changes to the user.",
+              "parameters": { "type": "OBJECT", "properties": {} }
             },
             {
                 "name": "setDimension",
@@ -176,13 +200,32 @@ const availableTools = [
                         "range": { "type": "ARRAY", "description": "A two-element array with the [min, max] values for the variable in meters." },
                         "steps": { "type": "NUMBER", "description": "The number of simulations to run within the range (e.g., 5)." },
                         "constraints": { "type": "STRING", "description": "The constraint for valid solutions, e.g., 'ASE < 10' or 'sDA >= 60'." }
-                    },
-                    "required": ["goal", "variable", "targetElement", "range", "steps", "constraints"]
-                }
-            },
-            {
-                "name": "configureSimulationRecipe",
-                "description": "Sets parameters within an already OPEN simulation recipe panel.",
+                },
+                "required": ["goal", "variable", "targetElement", "range", "steps", "constraints"]
+            }
+        },
+        {
+            "name": "startWalkthrough",
+            "description": "Initiates a step-by-step interactive tutorial to guide the user through a specific simulation workflow, such as Daylight Factor (df), Daylight Glare Probability (dgp), or Spatial Daylight Autonomy (sda).",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "topic": {
+                        "type": "STRING",
+                        "description": "The simulation topic for the walkthrough. Must be one of 'dgp', 'df', or 'sda'."
+                    }
+                },
+                "required": ["topic"]
+            }
+        },
+        {
+            "name": "endWalkthrough",
+            "description": "Ends the current interactive walkthrough or tutorial mode.",
+            "parameters": { "type": "OBJECT", "properties": {} }
+        },
+        {
+            "name": "configureSimulationRecipe",
+            "description": "Sets parameters within an already OPEN simulation recipe panel.",
                 "parameters": {
                     "type": "OBJECT",
                     "properties": {
@@ -305,7 +348,7 @@ const availableTools = [
                     "property": { "type": "STRING", "description": "The property to change. Must be one of 'reflectance', 'specularity', 'roughness', or 'transmittance' (for glazing only)." },
                     "value": { "type": "NUMBER", "description": "The new value for the property, typically between 0.0 and 1.0." }
                 },
-"required": ["surface", "property", "value"]
+                "required": ["surface", "property", "value"]
             }
         },
         {
@@ -515,15 +558,15 @@ const modelsByProvider = {
 };
 
 /**
- * Initializes the AI Assistant, setting up all necessary event listeners.
- */
+Initializes the AI Assistant, setting up all necessary event listeners.
+*/
 function initAiAssistant() {
     dom = getDom(); // Cache the dom object from ui.js
 
     // Exit if the main button doesn't exist in the HTML
     if (!dom['ai-assistant-button']) {
-        console.warn('AI Assistant button not found, feature disabled.');
-        return;
+    console.warn('AI Assistant button not found, feature disabled.');
+    return;
     }
 
     dom['ai-chat-form']?.addEventListener('submit', handleSendMessage);
@@ -531,64 +574,249 @@ function initAiAssistant() {
     dom['ai-settings-close-btn']?.addEventListener('click', closeSettingsModal);
     dom['ai-settings-form']?.addEventListener('submit', saveSettings);
 
-    // Event listener for the new "Generate Scene" button.
-    dom['ai-mode-generate']?.addEventListener('click', () => {
-        // Switch to chat mode if not already active
-        switchToChatMode();
-        // Activate this button and deactivate others
-        dom['ai-mode-generate'].classList.add('active');
-        dom['ai-mode-chat'].classList.remove('active');
-        dom['ai-mode-inspector'].classList.remove('active');
+    dom['ai-mode-select']?.addEventListener('change', (e) => {
+        const selectedMode = e.target.value;
+        if (!selectedMode) return; // Do nothing if the disabled placeholder is selected
 
-        dom['ai-chat-input'].placeholder = 'e.g., Create a 10m by 8m office...';
-        dom['ai-chat-input'].focus();
-        showAlert('Generative Mode Activated', 'Describe the scene you want to create in the chat box below.');
+        // Immediately reset the dropdown's visual state to the placeholder.
+        e.target.selectedIndex = 0; 
+        
+        // Now create the conversation with the mode we captured.
+        createNewConversation(selectedMode);
     });
 
     dom['ai-provider-select']?.addEventListener('change', (e) => {
-        const provider = e.target.value;
-        updateModelOptions(provider);
-        toggleProviderInfo(provider);
-        updateApiKeyInput(provider); // Update the API key field when provider changes
-        });
+    const provider = e.target.value;
+    updateModelOptions(provider);
+    toggleProviderInfo(provider);
+    updateApiKeyInput(provider);
+    });
 
-    // Listeners for Inspector Mode
-    dom['ai-mode-chat']?.addEventListener('click', switchToChatMode);
-    dom['ai-mode-inspector']?.addEventListener('click', switchToInspectorMode);
+    // Add auto-resizing functionality to the chat input
+    dom['ai-chat-input']?.addEventListener('input', () => {
+        const input = dom['ai-chat-input'];
+        input.style.height = 'auto';
+        input.style.height = `${input.scrollHeight}px`;
+    });
+
     dom['run-inspector-btn']?.addEventListener('click', handleRunInspector);
     dom['ai-inspector-results']?.addEventListener('click', handleInspectorActionClick);
 
+    dom['run-critique-btn']?.addEventListener('click', handleRunCritique);
+    dom['ai-critique-results']?.addEventListener('click', handleCritiqueActionClick);
+
     loadSettings();
-    loadKnowledgeBase(); // Load custom knowledge documents
-    addMessage('ai', 'Hello! How can I help you with your simulation?');
+    loadKnowledgeBase();
+
+    // Start with a default chat conversation
+    createNewConversation('chat');
+}
+
+// --- START: Tabbed Conversation Management ---
+
+/**
+* Creates a new conversation, adds it to the state, and makes it active.
+* @param {string} mode - The mode for the new conversation ('chat', 'generate', etc.).
+*/
+function createNewConversation(mode) {
+    // First, check if a conversation for this mode already exists.
+    const existingConversation = Object.values(conversations).find(conv => conv.mode === mode);
+    if (existingConversation) {
+        // If it exists, just switch to it and do nothing else.
+        switchConversation(existingConversation.id);
+        return;
+    }
+
+    // If no tab exists for this mode, check if we're at the total tab limit.
+    if (Object.keys(conversations).length >= 6) {
+        showAlert("You can have a maximum of 6 active conversations.", "Tab Limit Reached");
+        return;
+    }
+
+    // Proceed with creating a new conversation
+    conversationCounter++;
+    const newId = `conv-${conversationCounter}`;
+    const modeTitle = mode.charAt(0).toUpperCase() + mode.slice(1);
+
+    conversations[newId] = {
+        id: newId,
+        mode: mode,
+        title: modeTitle, // Title is now just the mode name
+        history: [],
+        isActive: false // Will be set to true by switchConversation
+    };
+
+    // Add mode-specific welcome message
+    const welcomeMessages = {
+        chat: "Hello! How can I assist you with your Radiance project today?",
+        generate: "Generative Mode activated. Please describe the scene you want to create.",
+        explorer: "Data Explorer mode activated. You can now ask me to compare your loaded datasets (A and B) or highlight specific points in the 3D view. For example, 'compare sDA' or 'in dataset A, highlight points below 300 lux'.",
+        tutor: "Welcome to Tutor Mode! What would you like to learn? You can ask me to guide you through a specific workflow, like a 'Daylight Factor study'."
+    };
+
+    if (welcomeMessages[mode]) {
+        conversations[newId].history.push({ role: 'model', parts: [{ text: welcomeMessages[mode] }] });
+    }
+
+    switchConversation(newId);
+}
+
+
+/**
+Switches the active conversation and re-renders the UI.
+* @param {string} conversationId - The ID of the conversation to activate.
+*/
+function switchConversation(conversationId) {
+    if (!conversations[conversationId]) return;
+
+    activeConversationId = conversationId;
+
+    // Update active status for all conversations
+    for (const id in conversations) {
+    conversations[id].isActive = (id === conversationId);
+    }
+
+    renderTabs();
+    renderActiveConversation();
 }
 
 /**
- * Switches the AI panel to Chat mode.
- */
-function switchToChatMode() {
-    dom['ai-mode-chat'].classList.add('active');
-    dom['ai-mode-inspector'].classList.remove('active');
+* Closes a conversation, removes its tab, and switches to another conversation.
+* @param {Event} event - The click event from the close button.
+* @param {string} conversationId - The ID of the conversation to close.
+*/
+function closeConversation(event, conversationId) {
+    event.stopPropagation(); // Prevent the tab click from firing
 
-    dom['ai-chat-messages'].classList.remove('hidden');
-    dom['ai-chat-form'].classList.remove('hidden');
+    delete conversations[conversationId];
 
-    dom['ai-inspector-results'].classList.add('hidden');
-    dom['run-inspector-btn'].classList.add('hidden');
+    // If we closed the active tab, we need to activate a new one
+    if (activeConversationId === conversationId) {
+    const remainingIds = Object.keys(conversations);
+    if (remainingIds.length > 0) {
+    
+    // Switch to the last remaining conversation
+    switchConversation(remainingIds[remainingIds.length - 1]);
+    } else {
+    
+    // If no tabs are left, create a new default chat
+    createNewConversation('chat');
+    }
+    } else {
+    
+    // If we closed an inactive tab, just re-render the tabs
+    renderTabs();
+    }
 }
 
 /**
- * Switches the AI panel to Inspector mode.
- */
-function switchToInspectorMode() {
-    dom['ai-mode-inspector'].classList.add('active');
-    dom['ai-mode-chat'].classList.remove('active');
+* Renders the tab UI based on the current conversations state.
+*/
+function renderTabs() {
+    const tabsContainer = dom['ai-chat-tabs'];
+    
+    if (!tabsContainer) return;
+    tabsContainer.innerHTML = '';
 
-    dom['ai-inspector-results'].classList.remove('hidden');
-    dom['run-inspector-btn'].classList.remove('hidden');
+    Object.values(conversations).forEach(conv => {
+    const tab = document.createElement('button');
+    tab.className = 'ai-chat-tab';
+    tab.textContent = conv.title;
+    if (conv.isActive) {
+    tab.classList.add('active');
+    }
+    
+    tab.onclick = () => switchConversation(conv.id);
 
-    dom['ai-chat-messages'].classList.add('hidden');
-    dom['ai-chat-form'].classList.add('hidden');
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'ai-tab-close-btn';
+    closeBtn.innerHTML = '&times;';
+    closeBtn.ariaLabel = `Close ${conv.title}`;
+    closeBtn.onclick = (e) => closeConversation(e, conv.id);
+
+    tab.appendChild(closeBtn);
+    tabsContainer.appendChild(tab);
+    });
+}
+
+/**
+* Renders the content (messages, inspector UI) for the currently active conversation.
+*/
+function renderActiveConversation() {
+    const conv = conversations[activeConversationId];
+    if (!conv) {
+
+    // Handle case where there are no conversations. Check for element existence.
+    if (dom['ai-chat-messages']) {
+        dom['ai-chat-messages'].innerHTML = '';
+    }
+    updateModeDescription('chat');
+    return;
+    };
+
+    const isInspector = conv.mode === 'inspector';
+    const isCritique = conv.mode === 'critique';
+
+    // Toggle main content visibility using optional chaining to prevent errors
+    dom['ai-chat-messages']?.classList.toggle('hidden', isInspector || isCritique);
+    dom['ai-chat-form']?.classList.toggle('hidden', isInspector || isCritique);
+    dom['ai-inspector-results']?.classList.toggle('hidden', !isInspector);
+    dom['run-inspector-btn']?.classList.toggle('hidden', !isInspector);
+    dom['ai-critique-results']?.classList.toggle('hidden', !isCritique);
+    dom['run-critique-btn']?.classList.toggle('hidden', !isCritique);
+
+    updateModeDescription(conv.mode);
+
+    if (!isInspector && !isCritique) {
+
+        // Render chat history
+        const messagesContainer = dom['ai-chat-messages'];
+        if (messagesContainer) {
+            messagesContainer.innerHTML = '';
+            conv.history.forEach(msg => {
+                const sender = msg.role === 'model' ? 'ai' : 'user';
+                addMessageToDOM(sender, msg.parts[0].text, messagesContainer);
+            });
+        }
+
+        if (dom['ai-chat-input']) {
+            dom['ai-chat-input'].placeholder = getPlaceholderText(conv.mode);
+            dom['ai-chat-input'].focus();
+        }
+    }
+}
+
+/**
+* Gets the appropriate placeholder text for the chat input based on the mode.
+* @param {string} mode
+* @returns {string}
+*/
+function getPlaceholderText(mode) {
+    switch (mode) {
+        case 'generate': return 'e.g., A 10m x 8m office with 2 south windows...';
+        case 'tutor': return "e.g., 'Teach me about glare analysis'";
+        default: return 'Ask about Radiance or this app...';
+    }
+}
+
+/**
+* Updates the description box based on the selected AI mode.
+* @param {string} mode - The selected mode ('chat', 'generate', 'inspector', 'tutor').
+*/
+function updateModeDescription(mode) {
+    const descriptions = {
+    chat: '<strong>Chat Assistant:</strong> Ask questions about Radiance, get help with this application, or request changes to your scene.',
+    generate: '<strong>Generative Design:</strong> Describe a scene you want to create, and the AI will build it for you. E.g., "create a 10m by 8m office with two windows on the south wall."',
+    inspector: '<strong>Design Inspector:</strong> Analyzes your current project for common errors, potential issues, and adherence to best practices. Click "Run Inspector" to start.',
+    critique: '<strong>Results Critique:</strong> Analyzes loaded simulation results, identifies potential issues (e.g., high glare, low daylight), and suggests actionable design improvements.',
+    explorer: '<strong>Data Explorer:</strong> Use natural language to query and compare your loaded result sets. Examples: "Compare uniformity", "Show me points in dataset B that are over 2000 lux".',
+    tutor: '<strong>Interactive Tutor:</strong> Get step-by-step guidance through common simulation workflows. E.g., ask "guide me through a Daylight Factor study".'
+    };
+
+    const descriptionText = dom['ai-mode-description-text'];
+    if (descriptionText) {
+    descriptionText.innerHTML = descriptions[mode] || '';
+    }
 }
 
 /**
@@ -601,25 +829,45 @@ function updateApiKeyInput(provider) {
         const storageKey = `ai_api_key_${provider}`;
         keyInput.value = localStorage.getItem(storageKey) || '';
     }
-}
-
-/**
- * Event handler for the 'Run Inspector' button.
- */
-async function handleRunInspector() {
+}async function handleRunInspector() {
     const resultsContainer = dom['ai-inspector-results'];
     if (!resultsContainer) return;
 
-    resultsContainer.innerHTML = '<div class="text-center p-4">🔍 Analyzing project...</div>';
+    resultsContainer.innerHTML = '<div class="text-center p-4">🔍 Consulting AI expert for project analysis...</div>';
     setLoadingState(true);
 
     try {
-        const findings = await _runInspectorChecks();
+        const findings = await performAIInspection();
         displayInspectorResults(findings);
     } catch (error) {
-        console.error("Design Inspector failed:", error);
-        resultsContainer.innerHTML = `<div class="p-4 text-red-500">An error occurred during inspection: ${error.message}</div>`;
-        showAlert(`Inspector failed: ${error.message}`, 'Error');
+        console.error("AI Design Inspector failed:", error);
+        resultsContainer.innerHTML = `<div class="p-4 text-red-500">An error occurred during AI inspection: ${error.message}</div>`;
+        showAlert(`AI Inspector failed: ${error.message}`, 'Error');
+    } finally {
+        setLoadingState(false);
+    }
+}
+
+async function handleRunCritique() {
+    const resultsContainer = dom['ai-critique-results'];
+    if (!resultsContainer) return;
+
+    // Check if results are loaded
+    if (!resultsManager.getActiveData() || resultsManager.getActiveData().length === 0) {
+        showAlert("Please load a simulation results file before running the critique.", "No Results Loaded");
+        return;
+    }
+
+    resultsContainer.innerHTML = '<div class="text-center p-4">🔍 AI is analyzing your simulation results...</div>';
+    setLoadingState(true);
+
+    try {
+        const findings = await _performAICritique();
+        displayCritiqueResults(findings);
+    } catch (error) {
+        console.error("AI Results Critique failed:", error);
+        resultsContainer.innerHTML = `<div class="p-4 text-red-500">An error occurred during AI critique: ${error.message}</div>`;
+        showAlert(`AI Critique failed: ${error.message}`, 'Error');
     } finally {
         setLoadingState(false);
     }
@@ -677,50 +925,110 @@ function displayInspectorResults(findings) {
 }
 
 /**
+* Renders the findings from the critique into the UI.
+* @param {object} critique - An object with an array of findings.
+*/
+function displayCritiqueResults(critique) {
+  const container = dom['ai-critique-results'];
+  container.innerHTML = ''; // Clear previous results
+
+  if (critique.findings.length === 0) {
+      container.innerHTML = `
+          <div class="inspector-finding type-success">
+              <div class="finding-icon">✅</div>
+              <div class="finding-content">
+                  <p class="finding-message"><strong>Analysis Complete!</strong> The AI found no immediate issues or suggestions based on the current results.</p>
+              </div>
+          </div>`;
+      return;
+  }
+
+  const createFindingElement = (finding) => {
+      const el = document.createElement('div');
+      // Reuse the inspector's styling by mapping critique types
+      const typeClass = finding.type === 'positive' ? 'success' : 'critique';
+      el.className = `inspector-finding type-${typeClass}`;
+
+      const icons = {
+          critique: '🧐',
+          suggestion: '💡',
+          positive: '✅'
+      };
+
+      let actionButton = '';
+      if (finding.action) {
+          const paramsJson = JSON.stringify(finding.params || {});
+          actionButton = `<button class="btn btn-xs btn-secondary finding-action-btn" data-action="${finding.action}" data-params='${paramsJson}'>${finding.actionLabel || 'Apply Fix'}</button>`;
+      }
+
+      el.innerHTML = `
+          <div class="finding-icon">${icons[finding.type] || '🧐'}</div>
+          <div class="finding-content">
+              <p class="finding-message">${finding.message}</p>
+              ${actionButton}
+          </div>
+      `;
+      return el;
+  };
+
+  critique.findings.forEach(f => container.appendChild(createFindingElement(f)));
+}
+
+/**
+* Handles clicks on action buttons within the critique results.
+* @param {MouseEvent} event 
+*/
+async function handleCritiqueActionClick(event) {
+  const button = event.target.closest('.finding-action-btn');
+  if (!button) return;
+
+  const action = button.dataset.action;
+  const params = JSON.parse(button.dataset.params);
+
+  console.log(`Critique action clicked: ${action}`, params);
+
+  try {
+      const result = await _executeToolCall({ functionCall: { name: action, args: params } });
+      if (result.success) {
+          showAlert(result.message, 'Action Complete');
+      } else {
+          throw new Error(result.message);
+      }
+      
+  } catch (error) {
+      console.error(`Failed to execute critique action '${action}':`, error);
+      showAlert(`Action failed: ${error.message}`, 'Error');
+  }
+}
+
+/**
  * Handles clicks on action buttons within the inspector results.
  * @param {MouseEvent} event 
  */
 async function handleInspectorActionClick(event) {
-    const button = event.target.closest('.finding-action-btn');
-    if (!button) return;
+  const button = event.target.closest('.finding-action-btn');
+  if (!button) return;
 
-    const action = button.dataset.action;
-    const params = JSON.parse(button.dataset.params);
+  const action = button.dataset.action;
+  const params = JSON.parse(button.dataset.params);
 
-    console.log(`Inspector action clicked: ${action}`, params);
+  console.log(`Inspector action clicked: ${action}`, params);
 
-    try {
-        switch (action) {
-            case 'addOverhang':
-                const wallDir = params.wall.charAt(0).toLowerCase();
-                dom[`shading-${wallDir}-toggle`].checked = true;
-                dom[`shading-${wallDir}-toggle`].dispatchEvent(new Event('change', { bubbles: true }));
-                dom[`shading-type-${wallDir}`].value = 'overhang';
-                dom[`shading-type-${wallDir}`].dispatchEvent(new Event('change', { bubbles: true }));
-                dom[`overhang-depth-${wallDir}`].value = params.depth || 0.8;
-                dom[`overhang-depth-${wallDir}`].dispatchEvent(new Event('input', { bubbles: true }));
-                showAlert(`Added a ${params.depth || 0.8}m overhang to the ${params.wall} wall.`, 'Action Complete');
-                break;
-            case 'openPanel':
-                const panelMap = {
-                    dimensions: { panelId: 'panel-dimensions', btnId: 'toggle-panel-dimensions-btn' },
-                    materials: { panelId: 'panel-materials', btnId: 'toggle-panel-materials-btn' },
-                    sensors: { panelId: 'panel-sensor', btnId: 'toggle-panel-sensor-btn' },
-                    project: { panelId: 'panel-project', btnId: 'toggle-panel-project-btn' },
-                    viewpoint: { panelId: 'panel-viewpoint', btnId: 'toggle-panel-viewpoint-btn' },
-                };
-                const mapping = panelMap[params.panel];
-                if (mapping) {
-                    togglePanelVisibility(mapping.panelId, mapping.btnId);
-                }
-                break;
-        }
-        await handleRunInspector(); // Re-run to confirm the fix
+  try {
+      // REFACTORED: Use the central tool execution function
+      const result = await _executeToolCall({ functionCall: { name: action, args: params } });
+      if (result.success) {
+          showAlert(result.message, 'Action Complete');
+      } else {
+          throw new Error(result.message);
+      }
 
-    } catch (error) {
-        console.error(`Failed to execute inspector action '${action}':`, error);
-        showAlert(`Action failed: ${error.message}`, 'Error');
-    }
+      await handleRunInspector(); // Re-run to confirm the fix
+
+  } catch (error) {
+      console.error(`Failed to execute inspector action '${action}':`, error);
+      showAlert(`Action failed: ${error.message}`, 'Error');
+  }
 }
 
 /**
@@ -754,35 +1062,54 @@ function toggleProviderInfo(provider) {
 }
 
 /**
- * Adds a message to the chat window and the conversation history.
+ * Adds a message to the active conversation history and the DOM.
  * @param {'user' | 'ai'} sender - Who sent the message.
  * @param {string} text - The content of the message.
  */
 function addMessage(sender, text) {
+    const conv = conversations[activeConversationId];
+    if (!conv) return;
+
     const messagesContainer = dom['ai-chat-messages'];
     if (!messagesContainer) return;
+    
+    // Add to history object
+    const role = sender === 'ai' ? 'model' : 'user';
+    conv.history.push({ role: role, parts: [{ text: text }] });
+    
+    // Keep history from getting too long
+    if (conv.history.length > 30) {
+        conv.history.splice(0, conv.history.length - 30);
+    }
 
+    // Add to the DOM
+    const messageWrapper = addMessageToDOM(sender, text, messagesContainer);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    return messageWrapper;
+}
+
+/**
+ * Creates and appends a message element to the DOM. (Helper for rendering)
+ * @param {string} sender - 'user' or 'ai'.
+ * @param {string} text - The message content.
+ * @param {HTMLElement} container - The container to append to.
+ * @returns {HTMLElement} The created message wrapper element.
+ */
+function addMessageToDOM(sender, text, container) {
     const messageWrapper = document.createElement('div');
     messageWrapper.className = `chat-message ${sender}-message`;
 
     const messageBubble = document.createElement('div');
     messageBubble.className = 'message-bubble';
 
+    // Convert markdown code blocks to pre tags
     text = text.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
     messageBubble.innerHTML = text;
-
-    const role = sender === 'ai' ? 'model' : 'user';
-    chatHistory.push({ role: role, parts: [{ text: text }] });
-
-    if(chatHistory.length > 20) {
-        chatHistory.splice(0, chatHistory.length - 20);
-    }
-
+    
     messageWrapper.appendChild(messageBubble);
-    messagesContainer.appendChild(messageWrapper);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-
-    return messageWrapper; // Return the created element
+    container.appendChild(messageWrapper);
+    return messageWrapper;
 }
 
 /**
@@ -793,7 +1120,14 @@ function addMessage(sender, text) {
  * @private
  */
 async function _createContextualSystemPrompt(userQuery) {
+    const activeConversation = conversations[activeConversationId];
+    if (!activeConversation) throw new Error("No active conversation found.");
+
     let systemPrompt = "You are Helios, an expert AI assistant with deep knowledge of the Radiance Lighting Simulation Engine embedded within the Ray Modeler web application. Your purpose is to guide users through daylighting analysis, lighting simulation, and building performance modeling. You can explain Radiance concepts, troubleshoot errors, and interpret results. Your tone is that of a seasoned mentor: clear, precise, and encouraging.";
+
+    if (activeConversation.mode === 'tutor') {
+        systemPrompt += `\n\nCRITICAL INSTRUCTION: You are currently in a tutorial mode. Your goal is to guide the user step-by-step through a workflow. At each step, you must: 1. Explain what you are doing and why. 2. Use one, and only one, tool to perform the action. 3. After the tool call, ask the user for confirmation or what to do next. Do not perform multiple tool calls at once. When the workflow is complete or if the user wants to stop, you must call the 'endWalkthrough' tool.`;
+    }
 
     const contextChunks = searchKnowledgeBase(userQuery);
     if (contextChunks.length > 0) {
@@ -900,6 +1234,63 @@ async function _executeToolCall(toolCall) {
 
     try {
     switch (name) {
+        case 'compareMetrics': {
+            if (!resultsManager.datasets.a?.stats || !resultsManager.datasets.b?.stats) {
+                throw new Error("Both dataset A and dataset B must be loaded with results to perform a comparison.");
+            }
+            
+            let resultA, resultB;
+            const metric = args.metric;
+        
+            if (metric === 'sDA' || metric === 'ASE' || metric === 'UDI') {
+                if (!resultsManager.hasAnnualData('a') || !resultsManager.hasAnnualData('b')) {
+                    throw new Error(`Annual data must be loaded for both datasets to compare ${metric}.`);
+                }
+                const metricsA = resultsManager.calculateAnnualMetrics('a', {});
+                const metricsB = resultsManager.calculateAnnualMetrics('b', {});
+                resultA = metric === 'UDI' ? metricsA.UDI.autonomous : metricsA[metric];
+                resultB = metric === 'UDI' ? metricsB.UDI.autonomous : metricsB[metric];
+            } else if (metric === 'averageIlluminance') {
+                resultA = resultsManager.datasets.a.stats.avg;
+                resultB = resultsManager.datasets.b.stats.avg;
+            } else if (metric === 'uniformity') {
+                const statsA = resultsManager.datasets.a.stats;
+                const statsB = resultsManager.datasets.b.stats;
+                resultA = statsA.avg > 0 ? statsA.min / statsA.avg : 0;
+                resultB = statsB.avg > 0 ? statsB.min / statsB.avg : 0;
+            } else {
+                throw new Error(`Unsupported metric for comparison: ${metric}`);
+            }
+        
+            const winner = resultA > resultB ? 'a' : (resultB > resultA ? 'b' : 'tie');
+            const comparison = {
+                metric: metric,
+                datasetA_value: resultA,
+                datasetB_value: resultB,
+                winner: winner,
+                summary: `For ${metric}, Dataset A scored ${resultA.toFixed(2)} and Dataset B scored ${resultB.toFixed(2)}. Dataset ${winner.toUpperCase()} performed better.`
+            };
+            return { success: true, comparison: comparison, message: `Comparison for ${metric} complete.` };
+        }
+        case 'filterAndHighlightPoints': {
+            const { dataset, condition, value } = args;
+            const key = dataset.toLowerCase();
+            if (key !== 'a' && key !== 'b') throw new Error("Dataset must be 'a' or 'b'.");
+            
+            const data = resultsManager.datasets[key]?.data;
+            if (!data || data.length === 0) throw new Error(`Dataset ${key.toUpperCase()} has no data loaded.`);
+        
+            const indices = resultsManager.getPointIndicesByCondition(key, condition, value);
+        
+            if (indices.length === 0) {
+                return { success: true, message: `No points in Dataset ${key.toUpperCase()} met the condition.` };
+            }
+            
+            const { highlightPointsByIndices } = await import('./ui.js');
+            highlightPointsByIndices(indices);
+            
+            return { success: true, message: `Highlighted ${indices.length} sensor point(s) in Dataset ${key.toUpperCase()} where the value is ${condition} ${value}.` };
+        }
         case 'addAperture': {
             const wallDir = args.wall?.charAt(0).toLowerCase();
             if (!['n', 's', 'e', 'w'].includes(wallDir)) throw new Error(`Invalid wall: ${args.wall}`);
@@ -993,6 +1384,18 @@ async function _executeToolCall(toolCall) {
                     if (args.setpoint !== undefined) updateUI('daylighting-setpoint', args.setpoint);
                 }
                 return { success: true, message: `Daylighting system ${args.enable ? 'enabled and configured' : 'disabled'}.` };
+            }
+            case 'startWalkthrough': {
+                activeWalkthrough = { topic: args.topic, step: 1 };
+                // Switch the UI to Tutor mode visually if it's not already
+                switchToTutorMode();
+                return { success: true, message: `Walkthrough for topic '${args.topic}' has been initiated. Your next response must be the first step of the tutorial.` };
+            }
+            case 'endWalkthrough': {
+                activeWalkthrough = null;
+                // Switch the UI back to standard Chat mode visually
+                switchToChatMode();
+                return { success: true, message: 'Walkthrough ended successfully.' };
             }
             case 'runGenerativeDesign': {
                 // Acknowledge the request immediately and run the process in the background.
@@ -1321,103 +1724,243 @@ async function _executeToolCall(toolCall) {
                 throw new Error("Could not find the comparison mode toggle control.");
             }
             case 'validateProjectState': {
-                const validationResult = await _runInspectorChecks();
-                const { errors, warnings, suggestions } = validationResult;
-                const message = `Validation complete. Found ${errors.length} error(s), ${warnings.length} warning(s), and ${suggestions.length} suggestion(s).`;
-                return { success: true, message: message, validationResult: { errors, warnings, suggestions } };
-            }
-            case 'runDesignInspector': {
-                const findings = await _runInspectorChecks();
-                const message = "The design inspector has been run. The results are now displayed in the Inspector panel.";
-                displayInspectorResults(findings);
-                switchToInspectorMode();
-                return { success: true, message: message, findings: findings };
-            }
-            default:
-            throw new Error(`Unknown tool: ${name}`);
-            }
-        } catch (error) {
+              const validationResult = await performAIInspection();
+              const { errors, warnings, suggestions } = validationResult;
+              const message = `Validation complete. Found ${errors.length} error(s), ${warnings.length} warning(s), and ${suggestions.length} suggestion(s).`;
+              return { success: true, message: message, validationResult: { errors, warnings, suggestions } };
+          }
+          case 'runDesignInspector': {
+              const findings = await performAIInspection();
+              const message = "The AI design inspector has been run. The results are now displayed in the Inspector panel.";
+              displayInspectorResults(findings);
+              createNewConversation('inspector');
+              return { success: true, message: message, findings: findings };
+          }
+          case 'runResultsCritique': {
+              const critique = await _performAICritique();
+              const message = "The AI results critique has been run. The findings are now displayed in the Critique panel.";
+              displayCritiqueResults(critique);
+              createNewConversation('critique');
+              return { success: true, message: message, critique: critique };
+          }
+          default:
+          throw new Error(`Unknown tool: ${name}`);
+        
+        }
+        
+    } catch (error) {
         console.error(`Error executing tool '${name}':`, error);
         return { success: false, message: `Error: ${error.message}` };
     }
 }
 
 /**
- * Performs validation checks on the current project state.
+ * Performs a comprehensive AI-driven analysis of the project configuration.
  * @returns {Promise<object>} An object containing lists of errors, warnings, and suggestions.
  * @private
  */
-async function _runInspectorChecks() {
-    const errors = [];
-    const warnings = [];
-    const suggestions = [];
+async function performAIInspection() {
+    try {
+        const provider = localStorage.getItem('ai_provider') || 'openrouter';
+        const apiKey = localStorage.getItem(`ai_api_key_${provider}`);
+        let model = localStorage.getItem('ai_model');
+        const customModel = localStorage.getItem('ai_custom_model');
 
-    const projectData = await project.gatherAllProjectData();
-    const { W, L, H } = projectData.geometry.room;
-
-    // GEOMETRY CHECKS
-    if (H < 2.2) warnings.push({ message: `Room height is ${H}m, which is quite low for a typical space. This might affect light distribution.` });
-    if (W < 2 || L < 2) warnings.push({ message: `Room dimensions (${W}m x ${L}m) are very small.` });
-
-    // SHADING CHECKS (Context-aware for location)
-    if (projectData.projectInfo.latitude > 23.5) { // Northern Hemisphere
-        const southWallShading = projectData.geometry.shading['S'];
-        const southWallWindows = projectData.geometry.apertures['S'];
-        if (southWallWindows && southWallWindows.winCount > 0 && (!southWallShading || southWallShading.type === 'none')) {
-            warnings.push({ 
-                message: "The south-facing wall has windows but no shading. This creates a high risk of summer overheating and glare.",
-                action: 'addOverhang',
-                actionLabel: 'Add 0.8m Overhang',
-                params: { wall: 'south', depth: 0.8 }
-            });
+        if (customModel && customModel.trim()) {
+            model = customModel.trim();
         }
-    }
 
-    // MATERIALS CHECKS
-    ['wall', 'floor', 'ceiling'].forEach(surface => {
-        const refl = projectData.materials[surface].reflectance;
-        if (refl > 0.9) warnings.push({ message: `The ${surface} reflectance (${refl}) is very high, which can be unrealistic and may increase simulation time.` });
-        if (refl < 0.1 && surface !== 'floor') warnings.push({ message: `The ${surface} reflectance (${refl}) is very low, which will result in a dark space.` });
-    });
-
-    // SIMULATION SETUP CHECKS
-    if (!projectData.projectInfo.epwFileName) {
-        warnings.push({ 
-            message: "No EPW weather file is loaded. Annual and location-specific simulations will not be accurate.",
-            action: 'openPanel',
-            actionLabel: 'Go to Project Panel',
-            params: { panel: 'project' }
-        });
-    }
-
-    const globalParams = projectData.simulationParameters?.global;
-    if (globalParams && globalParams.ab < 2) {
-        suggestions.push({ message: `Ambient Bounces (-ab) is set to ${globalParams.ab}. For more realistic indirect lighting, a value of 3-5 is recommended.` });
-    }
-
-    // RECIPE-SPECIFIC CHECKS
-    const openRecipePanels = document.querySelectorAll('.floating-window[data-template-id^="template-recipe-"]:not(.hidden)');
-    openRecipePanels.forEach(panel => {
-        const recipeType = panel.dataset.templateId;
-        if (recipeType === 'template-recipe-dgp' && projectData.viewpoint['view-type'] !== 'h') {
-            errors.push({ 
-                message: "The DGP recipe is open, but the Viewpoint Type is not set to 'Fisheye'. This will cause the simulation to fail.",
-                action: 'openPanel',
-                actionLabel: 'Go to Viewpoint',
-                params: { panel: 'viewpoint' }
-            });
+        if (!apiKey || !provider || !model) {
+            throw new Error('AI settings are incomplete. Please configure them first.');
         }
-        if ((recipeType === 'template-recipe-illuminance' || recipeType === 'template-recipe-df') && !getSensorGridParams().illuminance.enabled) {
-            errors.push({ 
-                message: `The ${recipeType.split('-')[2]} recipe requires an illuminance grid, but none is enabled.`,
-                action: 'openPanel',
-                actionLabel: 'Go to Sensors',
-                params: { panel: 'sensors' }
-            });
-        }
-    });
 
-    return { errors, warnings, suggestions };
+        const projectData = await project.gatherAllProjectData();
+        // Sanitize project data for the prompt to avoid sending large file contents
+        const dataForPrompt = JSON.parse(JSON.stringify(projectData));
+        dataForPrompt.epwFileContent = dataForPrompt.epwFileContent ? `[Loaded: ${dataForPrompt.projectInfo.epwFileName}]` : null;
+        if (dataForPrompt.simulationFiles) {
+            Object.values(dataForPrompt.simulationFiles).forEach(file => { if (file && file.content) file.content = `[Content Loaded for ${file.name}]`; });
+        }
+        const appStateJSON = JSON.stringify(dataForPrompt, null, 2);
+
+        const systemPrompt = `You are a building performance simulation expert for the Radiance Lighting Simulation Engine.
+        Your task is to analyze a project's configuration provided in JSON format and identify potential issues.
+        Analyze the following project state. Identify potential issues, common mistakes, or combinations of parameters that could lead to inaccurate results, long simulation times, or runtime errors.
+        For each issue, explain the problem and its consequences in simple terms.
+        If a simple, direct fix is possible using one of the available tools, suggest it.
+
+        CRITICAL: Respond ONLY with a single, valid JSON object. Do not include any text, notes, or markdown before or after the JSON.
+        The JSON object must have three keys: "errors", "warnings", and "suggestions". Each key should be an array of objects.
+        Each object in the arrays must have a "message" key (string).
+        Optionally, an object can have "action" (string, must be a valid tool name like 'addOverhang' or 'openPanel'), "actionLabel" (string, e.g., 'Add 0.8m Overhang'), and "params" (an object of parameters for the action).
+
+        Example for a warning:
+        { "message": "The south-facing wall has windows but no shading, creating a high risk of glare.", "action": "addOverhang", "actionLabel": "Add 0.8m Overhang", "params": { "wall": "south", "depth": 0.8 } }
+
+        Example for an error:
+        { "message": "DGP recipe is open, but the Viewpoint is not Fisheye. This will fail.", "action": "openPanel", "actionLabel": "Go to Viewpoint", "params": { "panel": "viewpoint" } }
+
+        Now, analyze the user's project.`;
+
+        const userMessage = `Project JSON to analyze: \n\n${appStateJSON}`;
+
+        let apiUrl, headers, payload;
+        const messages = [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMessage }];
+
+        if (provider === 'openrouter' || provider === 'openai') {
+            apiUrl = provider === 'openrouter' ? 'https://openrouter.ai/api/v1/chat/completions' : 'https://api.openai.com/v1/chat/completions';
+            headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
+            if (provider === 'openrouter') {
+                headers['HTTP-Referer'] = 'http://localhost';
+                headers['X-Title'] = 'Ray Modeler';
+            }
+            // Use JSON mode if supported by the model/provider
+            payload = { model: model, messages: messages, response_format: { type: "json_object" } };
+        } else {
+            // Simplified path for other providers; they might not support JSON mode as reliably.
+            // This could be expanded in the future.
+            throw new Error(`AI Inspection currently requires an OpenAI or OpenRouter provider that supports JSON mode.`);
+        }
+
+        const response = await fetch(apiUrl, { method: 'POST', headers: headers, body: JSON.stringify(payload) });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error?.message || `API Error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const responseText = data.choices?.[0]?.message?.content;
+
+        if (!responseText) {
+            throw new Error("Received an empty response from the AI model.");
+        }
+
+        const findings = JSON.parse(responseText);
+
+        return {
+            errors: Array.isArray(findings.errors) ? findings.errors : [],
+            warnings: Array.isArray(findings.warnings) ? findings.warnings : [],
+            suggestions: Array.isArray(findings.suggestions) ? findings.suggestions : []
+        };
+
+    } catch (error) {
+        console.error("AI Design Inspector failed:", error);
+        return {
+            errors: [{ message: `An error occurred during AI inspection: ${error.message}` }],
+            warnings: [],
+            suggestions: []
+        };
+    }
+}
+
+/**
+
+Performs an AI-driven analysis of the simulation results.
+
+@returns {Promise<object>} An object containing lists of findings and suggestions.
+
+@private
+*/
+async function _performAICritique() {
+    try {
+        const provider = localStorage.getItem('ai_provider') || 'openrouter';
+        const apiKey = localStorage.getItem(`ai_api_key_${provider}`);
+        let model = localStorage.getItem('ai_model');
+        const customModel = localStorage.getItem('ai_custom_model');
+
+        if (customModel && customModel.trim()) {
+            model = customModel.trim();
+        }
+
+        if (!apiKey || !provider || !model) {
+            throw new Error('AI settings are incomplete. Please configure them first.');
+        }
+
+ const projectData = await project.gatherAllProjectData();
+ // Sanitize project data for the prompt
+ const dataForPrompt = JSON.parse(JSON.stringify(projectData));
+ dataForPrompt.epwFileContent = dataForPrompt.epwFileContent ? `[Loaded: ${dataForPrompt.projectInfo.epwFileName}]` : null;
+ if (dataForPrompt.simulationFiles) {
+     Object.values(dataForPrompt.simulationFiles).forEach(file => { if (file && file.content) file.content = `[Content Loaded for ${file.name}]`; });
+ }
+
+ // Gather results data
+ const resultsData = {
+     datasetA: resultsManager.datasets.a ? { fileName: resultsManager.datasets.a.fileName, stats: resultsManager.datasets.a.stats, glareResult: !!resultsManager.datasets.a.glareResult, isAnnual: resultsManager.hasAnnualData('a') } : null,
+     datasetB: resultsManager.datasets.b ? { fileName: resultsManager.datasets.b.fileName, stats: resultsManager.datasets.b.stats, glareResult: !!resultsManager.datasets.b.glareResult, isAnnual: resultsManager.hasAnnualData('b') } : null
+ };
+
+ const appState = {
+     projectConfiguration: dataForPrompt,
+     loadedResultsSummary: resultsData
+ };
+
+ const appStateJSON = JSON.stringify(appState, null, 2);
+
+ const systemPrompt = `You are a building performance simulation expert for the Radiance Lighting Simulation Engine.
+ Your task is to analyze a project's configuration and its simulation results, provided in JSON format, and provide a design critique.
+ 1. Identify key findings from the results (e.g., high DGP, low average illuminance, poor uniformity).
+ 2. Correlate these findings with the project configuration (e.g., "high DGP is likely due to the unshaded south-facing window at this time of day").
+ 3. Propose specific, actionable solutions using the available tools.
+ 4. Explain your reasoning clearly and concisely for each suggestion.
+
+ CRITICAL: Respond ONLY with a single, valid JSON object. Do not include any text, notes, or markdown before or after the JSON.
+ The JSON object must have one key: "findings". This key should be an array of objects.
+ Each object in the array must have a "message" key (string, explaining the issue and suggestion) and a "type" key (string: 'critique', 'suggestion', or 'positive').
+ Optionally, an object can have "action" (string, a valid tool name), "actionLabel" (string, e.g., 'Add 0.8m Overhang'), and "params" (an object of parameters for the action).
+
+ Example for a finding:
+ {
+   "type": "critique",
+   "message": "The DGP value of 0.47 is 'Intolerable'. This is caused by direct sun through the large west-facing window in the afternoon. I suggest adding vertical louvers to block the low-angle sun.",
+   "action": "configureShading",
+   "actionLabel": "Add Vertical Louvers",
+   "params": { "wall": "west", "enable": true, "deviceType": "louver", "slatOrientation": "vertical", "slatAngle": 45 }
+ }
+
+ Now, analyze the user's project and results.`;
+
+ const userMessage = `Project and Results JSON to analyze: \n\n${appStateJSON}`;
+
+ let apiUrl, headers, payload;
+ const messages = [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMessage }];
+
+ if (provider === 'openrouter' || provider === 'openai') {
+     apiUrl = provider === 'openrouter' ? 'https://openrouter.ai/api/v1/chat/completions' : 'https://api.openai.com/v1/chat/completions';
+     headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
+     if (provider === 'openrouter') {
+         headers['HTTP-Referer'] = 'http://localhost';
+         headers['X-Title'] = 'Ray Modeler';
+     }
+     payload = { model: model, messages: messages, response_format: { type: "json_object" } };
+ } else {
+     throw new Error(`AI Critique currently requires an OpenAI or OpenRouter provider that supports JSON mode.`);
+ }
+
+ const response = await fetch(apiUrl, { method: 'POST', headers: headers, body: JSON.stringify(payload) });
+ if (!response.ok) {
+     const errorData = await response.json();
+     throw new Error(errorData.error?.message || `API Error: ${response.status}`);
+ }
+
+ const data = await response.json();
+ const responseText = data.choices?.[0]?.message?.content;
+
+ if (!responseText) {
+     throw new Error("Received an empty response from the AI model.");
+ }
+
+ const critique = JSON.parse(responseText);
+
+ return {
+     findings: Array.isArray(critique.findings) ? critique.findings : []
+ };
+} catch (error) {
+console.error("AI Results Critique failed:", error);
+return {
+findings: [{ type: 'critique', message: `An error occurred during AI critique: ${error.message}` }]
+};
+}
 }
 
 /**
@@ -1431,9 +1974,14 @@ async function _runInspectorChecks() {
 async function callGenerativeAI(apiKey, provider, model, systemPrompt) {
     let apiUrl, headers, payload;
 
-    // A simple way to handle history: send the system prompt and the most recent user message.
-    const lastUserMessage = chatHistory.filter(m => m.role === 'user').pop();
-    let messages = lastUserMessage ? [{ role: 'user', content: lastUserMessage.parts[0].text }] : [];
+    const activeConversation = conversations[activeConversationId];
+    if (!activeConversation) throw new Error("No active conversation found.");
+
+    // Prepare message history in OpenAI format for providers that use it.
+    let messages = activeConversation.history.map(msg => ({
+        role: msg.role === 'model' ? 'assistant' : 'user', // Convert 'model' to 'assistant'
+        content: msg.parts[0].text
+    }));
     messages.unshift({ role: 'system', content: systemPrompt });
 
     const openAITools = convertGeminiToolsToOpenAI(availableTools);
@@ -1519,9 +2067,6 @@ async function callGenerativeAI(apiKey, provider, model, systemPrompt) {
     } else if (provider === 'anthropic') {
         text = data.content?.[0]?.text || '';
     }
-
-    // Add assistant's raw response to our internal history for display
-    chatHistory.push({ role: 'model', parts: [{ text: text || '' }] });
 
     if (toolCalls && toolCalls.length > 0 && (provider === 'openrouter' || provider === 'openai')) {
         // Execute tools

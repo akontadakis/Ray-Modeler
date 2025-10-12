@@ -247,14 +247,36 @@ function createLarkSpectralScript(projectData) {
     const ab = p['ab'], ad = p['ad'], as = p['as'], ar = p['ar'], aa = p['aa'], lw = p['lw'];
     const run9ch = p['lark-run-9ch-toggle'];
 
-    // --- Spectral Binning (in JavaScript) ---
+    /// --- Spectral Binning (in JavaScript) ---
     const wallSrdContent = simulationFiles['wall-srd-file']?.content;
-    const binnedWallRefl9ch = _parseAndBinSpectralData(wallSrdContent, 'lark-9') || Array(9).fill(0);
+    const floorSrdContent = simulationFiles['floor-srd-file']?.content;
+    const ceilingSrdContent = simulationFiles['ceiling-srd-file']?.content;
+
+    const binnedWallRefl9ch = _parseAndBinSpectralData(wallSrdContent, 'lark-9') || Array(9).fill(p['wall-refl'] || 0.5);
+    const binnedFloorRefl9ch = _parseAndBinSpectralData(floorSrdContent, 'lark-9') || Array(9).fill(p['floor-refl'] || 0.2);
+    const binnedCeilingRefl9ch = _parseAndBinSpectralData(ceilingSrdContent, 'lark-9') || Array(9).fill(p['ceiling-refl'] || 0.8);
+
+    const generateMaterialSet = (suffix, wallBins, floorBins, ceilingBins) => `
+void plastic wall_mat
+0
+0
+5 ${wallBins.map(v => v.toFixed(4)).join(' ')} 0 0
+
+void plastic floor_mat
+0
+0
+5 ${floorBins.map(v => v.toFixed(4)).join(' ')} 0 0
+
+void plastic ceiling_mat
+0
+0
+5 ${ceilingBins.map(v => v.toFixed(4)).join(' ')} 0 0
+    `;
     
     const materialDefs9ch = {
-        c1_3: `void plastic wall_material\n0\n0\n5 ${binnedWallRefl9ch[0].toFixed(4)} ${binnedWallRefl9ch[1].toFixed(4)} ${binnedWallRefl9ch[2].toFixed(4)} 0 0`,
-        c4_6: `void plastic wall_material\n0\n0\n5 ${binnedWallRefl9ch[3].toFixed(4)} ${binnedWallRefl9ch[4].toFixed(4)} ${binnedWallRefl9ch[5].toFixed(4)} 0 0`,
-        c7_9: `void plastic wall_material\n0\n0\n5 ${binnedWallRefl9ch[6].toFixed(4)} ${binnedWallRefl9ch[7].toFixed(4)} ${binnedWallRefl9ch[8].toFixed(4)} 0 0`,
+        'c1-3': generateMaterialSet('c1-3', binnedWallRefl9ch.slice(0, 3), binnedFloorRefl9ch.slice(0, 3), binnedCeilingRefl9ch.slice(0, 3)),
+        'c4-6': generateMaterialSet('c4-6', binnedWallRefl9ch.slice(3, 6), binnedFloorRefl9ch.slice(3, 6), binnedCeilingRefl9ch.slice(3, 6)),
+        'c7-9': generateMaterialSet('c7-9', binnedWallRefl9ch.slice(6, 9), binnedFloorRefl9ch.slice(6, 9), binnedCeilingRefl9ch.slice(6, 9)),
     };
 
     const pythonScriptContent = `
@@ -1514,8 +1536,10 @@ ILL_3PH_DIRECT="\${RESULTS_DIR}/direct_3ph.ill"
 dctimestep "\${VIEW_MTX}" "\${BSDF_FILE}" "\${DAYLIGHT_MTX}" "\${SUN_SKY_MTX}" > "\${ILL_3PH_DIRECT}"
 if [ \$? -ne 0 ]; then echo "Error generating direct 3-phase result."; exit 1; fi
 
+# Use the Tensor Tree BSDF for the accurate direct calculation (Phase 5)
+TENSOR_BSDF_FILE="../05_bsdf/${p['bsdf-tensor']?.name || 'tensor.xml'}"
 ILL_5PH_DIRECT="\${RESULTS_DIR}/direct_5ph.ill"
-dctimestep "\${CDS_MTX}" "\${SUN_SKY_MTX}" > "\${ILL_5PH_DIRECT}"
+dctimestep "\${VIEW_MTX}" "\${TENSOR_BSDF_FILE}" "\${DAYLIGHT_MTX}" "\${SUN_SKY_MTX}" > "\${ILL_5PH_DIRECT}"
 if [ \$? -ne 0 ]; then echo "Error generating direct 5-phase result."; exit 1; fi
 
 # Final calculation: Total - Inaccurate_Direct + Accurate_Direct

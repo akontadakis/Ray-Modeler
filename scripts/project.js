@@ -49,31 +49,32 @@ class Project {
             simParams.global = panelData;
         }
 
-        // 2. Gather parameters for each individual recipe panel
-        const recipePanels = document.querySelectorAll('.floating-window[data-template-id^="template-recipe-"]');
-        recipePanels.forEach(panel => {
+        // 2. Gather parameters from ALL open recipe panels
+        document.querySelectorAll('.floating-window[data-template-id^="template-recipe-"]').forEach(panel => {
             const templateId = panel.dataset.templateId;
-            const panelIdSuffix = panel.id.replace(`${templateId}-panel-`, '');
+            const panelIdSuffix = panel.id.split('-').pop();
+
             const recipeData = {
                 templateId: templateId,
                 values: {}
             };
 
             panel.querySelectorAll('input, select').forEach(input => {
+                // Reconstruct the original base ID by removing the unique suffix
                 const key = input.id.replace(`-${panelIdSuffix}`, '');
+                if (!key) return;
 
                 if (input.type === 'file') {
-                // The key for simulationFiles is the base key (without suffix)
-                if (this.simulationFiles[key]) {
-                    recipeData.values[key] = { name: this.simulationFiles[key].name };
-                } else {
-                    recipeData.values[key] = null;
+                    // For files, we save a reference; the actual content is saved elsewhere
+                    if (this.simulationFiles[key]) {
+                        recipeData.values[key] = { name: this.simulationFiles[key].name };
+                    } else {
+                        recipeData.values[key] = null;
                     }
                 } else {
                     recipeData.values[key] = (input.type === 'checkbox' || input.type === 'radio') ? input.checked : input.value;
                 }
             });
-
             simParams.recipes.push(recipeData);
         });
 
@@ -156,128 +157,124 @@ class Project {
                     const massingData = [];
                     contextObject.children.forEach(obj => {
                         if (obj.userData.isMassingBlock) {
-                            massingData.push({
-                                position: obj.position.toArray(),
+                            // Combine userData (for geometry) with live transform data
+                            const dataToSave = {
+                                ...obj.userData,
+                                position: obj.position.toArray(), // Overwrite userData.position with the live one
                                 quaternion: obj.quaternion.toArray(),
-                                scale: obj.scale.toArray(),
-                            });
+                                scale: obj.scale.toArray()
+                            };
+                            massingData.push(dataToSave);
                         }
                     });
-                   return massingData;
-            })(),
-            contextMassing: (async () => {
-                const { contextObject } = await import('./geometry.js');
-                const massingData = [];
-                contextObject.children.forEach(obj => {
-                    if (obj.userData.isMassingBlock) {
-                        // Combine userData (for geometry) with live transform data
-                        const dataToSave = {
-                            ...obj.userData,
-                            position: obj.position.toArray(), // Overwrite userData.position with the live one
-                            quaternion: obj.quaternion.toArray(),
-                            scale: obj.scale.toArray()
+                    return massingData;
+                })(),
+            },
+            materials: (() => {
+                const getMaterialData = (type) => {
+                        const mode = dom[`${type}-mode-srd`]?.classList.contains('active') ? 'srd' : 'refl';
+                        const data = {
+                            type: getValue(`${type}-mat-type`),
+                            mode: mode,
+                            reflectance: getValue(`${type}-refl`, parseFloat),
+                            specularity: getValue(`${type}-spec`, parseFloat),
+                            roughness: getValue(`${type}-rough`, parseFloat),
+                            color: getValue(`${type}-color`),
+                            srdFile: null
                         };
-                        massingData.push(dataToSave);
-                    }
-                });
-                return massingData;
-            })(),
-        },
-        materials: (() => {
-            const getMaterialData = (type) => {
-                    const mode = dom[`${type}-mode-srd`]?.classList.contains('active') ? 'srd' : 'refl';
-                    const data = {
-                        type: getValue(`${type}-mat-type`),
-                        mode: mode,
-                        reflectance: getValue(`${type}-refl`, parseFloat),
-                        specularity: getValue(`${type}-spec`, parseFloat),
-                        roughness: getValue(`${type}-rough`, parseFloat),
-                        color: getValue(`${type}-color`),
-                        srdFile: null
+                        if (mode === 'srd' && this.simulationFiles[`${type}-srd-file`]) {
+                            data.srdFile = {
+                                inputId: `${type}-srd-file`,
+                                name: this.simulationFiles[`${type}-srd-file`].name
+                            };
+                        }
+                        return data;
                     };
-                    if (mode === 'srd' && this.simulationFiles[`${type}-srd-file`]) {
-                        data.srdFile = {
-                            inputId: `${type}-srd-file`,
-                            name: this.simulationFiles[`${type}-srd-file`].name
-                        };
-                    }
-                    return data;
-                };
 
-                return {
-                    wall: getMaterialData('wall'),
-                    floor: getMaterialData('floor'),
-                    ceiling: getMaterialData('ceiling'),
-                    frame: { type: getValue('frame-mat-type'), reflectance: getValue('frame-refl', parseFloat), specularity: getValue('frame-spec', parseFloat), roughness: getValue('frame-rough', parseFloat), color: getValue('frame-color') },
-                    shading: { type: getValue('shading-mat-type'), reflectance: getValue('shading-refl', parseFloat), specularity: getValue('shading-spec', parseFloat), roughness: getValue('shading-rough', parseFloat), color: getValue('shading-color') },
-                    furniture: { type: getValue('furniture-mat-type'), reflectance: getValue('furniture-refl', parseFloat), specularity: getValue('furniture-spec', parseFloat), roughness: getValue('furniture-rough', parseFloat) },
-                    glazing: {
-                        transmittance: getValue('glazing-trans', parseFloat),
-                        bsdfEnabled: getChecked('bsdf-toggle'),
-                        bsdfFile: getChecked('bsdf-toggle') && this.simulationFiles['bsdf-file'] ? { inputId: 'bsdf-file', name: this.simulationFiles['bsdf-file'].name } : null
-                    },
-                };
-            })(),
-            lighting: lightingManager.getCurrentState(),
-            sensorGrids: ui.getSensorGridParams(),
-            viewpoint: {
-                'view-type': getValue('view-type'), 'gizmo-toggle': getChecked('gizmo-toggle'),
-                'view-pos-x': getValue('view-pos-x', parseFloat), 'view-pos-y': getValue('view-pos-y', parseFloat), 'view-pos-z': getValue('view-pos-z', parseFloat),
-                'view-dir-x': getValue('view-dir-x', parseFloat), 'view-dir-y': getValue('view-dir-y', parseFloat), 'view-dir-z': getValue('view-dir-z', parseFloat),
-                'view-fov': getValue('view-fov', parseFloat), 'view-dist': getValue('view-dist', parseFloat)
-            },
-            viewOptions: {
-            projection: dom['proj-btn-persp']?.classList.contains('active') ? 'perspective' : 'orthographic',
-                transparent: getChecked('transparent-toggle'),
-                ground: getChecked('ground-plane-toggle'),
-                worldAxes: getChecked('world-axes-toggle'),
-                worldAxesSize: getValue('world-axes-size', parseFloat),
-                hSection: { enabled: getChecked('h-section-toggle'), dist: getValue('h-section-dist', parseFloat) },
-                vSection: { enabled: getChecked('v-section-toggle'), dist: getValue('v-section-dist', parseFloat) }
-            },
-            savedViews: getSavedViews().map(view => ({
-                name: view.name,
-                thumbnail: view.thumbnail, 
-                cameraState: {
-                    position: view.cameraState.position.toArray(),
-                    quaternion: view.cameraState.quaternion.toArray(),
-                    zoom: view.cameraState.zoom,
-                    target: view.cameraState.target.toArray(),
-                    viewType: view.cameraState.viewType,
-                    fov: view.cameraState.fov
-                }
-            })),
-            topography: {
-                enabled: getChecked('context-mode-topo'),
-                heightmapFile: this.simulationFiles['topo-heightmap-file'] ? {
-                    inputId: 'topo-heightmap-file',
-                    name: this.simulationFiles['topo-heightmap-file'].name
-                } : null,
-                planeSize: getValue('topo-plane-size', parseFloat),
-                verticalScale: getValue('topo-vertical-scale', parseFloat)
-            },
-            visualization: {
-            },
-            occupancy: {
-                enabled: getChecked('occupancy-toggle'),
-                fileName: getValue('occupancy-schedule-filename'),
-                timeStart: getValue('occupancy-time-range-start', parseFloat),
-                timeEnd: getValue('occupancy-time-range-end', parseFloat),
-                days: (() => {
-                    const days = {};
-                    const dayMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-                    document.querySelectorAll('.occupancy-day').forEach((el, i) => {
-                        days[dayMap[i]] = el.checked;
-                    });
-                    return days;
-                })()
-            },
-            epwFileContent: this.epwFileContent,
-            simulationFiles: this.simulationFiles,
-            simulationParameters: this.gatherSimulationParameters()
+                    return {
+                        wall: getMaterialData('wall'),
+                        floor: getMaterialData('floor'),
+                        ceiling: getMaterialData('ceiling'),
+                        frame: { type: getValue('frame-mat-type'), reflectance: getValue('frame-refl', parseFloat), specularity: getValue('frame-spec', parseFloat), roughness: getValue('frame-rough', parseFloat), color: getValue('frame-color') },
+                        shading: { type: getValue('shading-mat-type'), reflectance: getValue('shading-refl', parseFloat), specularity: getValue('shading-spec', parseFloat), roughness: getValue('shading-rough', parseFloat), color: getValue('shading-color') },
+                        furniture: { type: getValue('furniture-mat-type'), reflectance: getValue('furniture-refl', parseFloat), specularity: getValue('furniture-spec', parseFloat), roughness: getValue('furniture-rough', parseFloat) },
+                        glazing: {
+                            transmittance: getValue('glazing-trans', parseFloat),
+                            bsdfEnabled: getChecked('bsdf-toggle'),
+                            bsdfFile: getChecked('bsdf-toggle') && this.simulationFiles['bsdf-file'] ? { inputId: 'bsdf-file', name: this.simulationFiles['bsdf-file'].name } : null
+                        },
+                    };
+                })(),
+                lighting: lightingManager.getCurrentState(),
+                sensorGrids: ui.getSensorGridParams(),
+                viewpoint: {
+                    'view-type': getValue('view-type'), 'gizmo-toggle': getChecked('gizmo-toggle'),
+                    'view-pos-x': getValue('view-pos-x', parseFloat), 'view-pos-y': getValue('view-pos-y', parseFloat), 'view-pos-z': getValue('view-pos-z', parseFloat),
+                    'view-dir-x': getValue('view-dir-x', parseFloat), 'view-dir-y': getValue('view-dir-y', parseFloat), 'view-dir-z': getValue('view-dir-z', parseFloat),
+                    'view-fov': getValue('view-fov', parseFloat), 'view-dist': getValue('view-dist', parseFloat)
+                },
+                viewOptions: {
+                projection: dom['proj-btn-persp']?.classList.contains('active') ? 'perspective' : 'orthographic',
+                    transparent: getChecked('transparent-toggle'),
+                    ground: getChecked('ground-plane-toggle'),
+                    worldAxes: getChecked('world-axes-toggle'),
+                    worldAxesSize: getValue('world-axes-size', parseFloat),
+                    hSection: { enabled: getChecked('h-section-toggle'), dist: getValue('h-section-dist', parseFloat) },
+                    vSection: { enabled: getChecked('v-section-toggle'), dist: getValue('v-section-dist', parseFloat) }
+                },
+                savedViews: getSavedViews().map(view => ({
+                    name: view.name,
+                    thumbnail: view.thumbnail, 
+                    cameraState: {
+                        position: view.cameraState.position.toArray(),
+                        quaternion: view.cameraState.quaternion.toArray(),
+                        zoom: view.cameraState.zoom,
+                        target: view.cameraState.target.toArray(),
+                        viewType: view.cameraState.viewType,
+                        fov: view.cameraState.fov
+                    }
+                })),
+                topography: {
+                    enabled: getChecked('context-mode-topo'),
+                    heightmapFile: this.simulationFiles['topo-heightmap-file'] ? {
+                        inputId: 'topo-heightmap-file',
+                        name: this.simulationFiles['topo-heightmap-file'].name
+                    } : null,
+                    planeSize: getValue('topo-plane-size', parseFloat),
+                    verticalScale: getValue('topo-vertical-scale', parseFloat)
+                },
+                visualization: {
+                    compareMode: getChecked('compare-mode-toggle'),
+                    activeView: document.querySelector('#view-mode-selector .btn.active')?.id.replace('view-mode-', '').replace('-btn', '') || 'a',
+                    scaleMin: getValue('results-scale-min', parseFloat),
+                    scaleMax: getValue('results-scale-max', parseFloat),
+                    palette: getValue('results-palette'),
+                    activeMetric: getValue('metric-selector'),
+                },
+                occupancy: {
+                    enabled: getChecked('occupancy-toggle'),
+                    fileName: getValue('occupancy-schedule-filename'),
+                    timeStart: getValue('occupancy-time-range-start', parseFloat),
+                    timeEnd: getValue('occupancy-time-range-end', parseFloat),
+                    days: (() => {
+                        const days = {};
+                        const dayMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+                        document.querySelectorAll('.occupancy-day').forEach((el, i) => {
+                            days[dayMap[i]] = el.checked;
+                        });
+                        return days;
+                    })()
+                },
+                epwFileContent: this.epwFileContent,
+                simulationFiles: this.simulationFiles,
+                simulationParameters: this.gatherSimulationParameters()
         };
         
+        // Await the promises from the async IIFEs to get the actual data
         projectData.geometry.furniture = await projectData.geometry.furniture;
+        projectData.geometry.vegetation = await projectData.geometry.vegetation;
+        projectData.geometry.contextMassing = await projectData.geometry.contextMassing;
+
         return projectData;
     }
 
@@ -333,21 +330,26 @@ class Project {
     
         const globalParams = projectData.simulationParameters.global || {};
         const recipeOverrides = {};
-        const panelTemplateId = panelElement.dataset.templateId;
-        const panelIdSuffix = panelElement.id.replace(`${panelTemplateId}-panel-`, '');
-    
-        panelElement.querySelectorAll('input, select').forEach(input => {
-            const key = input.id.replace(`-${panelIdSuffix}`, '');
-            if (input.type === 'file') {
-                if (this.simulationFiles[key]) {
-                    recipeOverrides[key] = { name: this.simulationFiles[key].name, content: this.simulationFiles[key].content };
+        const recipeContainer = panelElement.querySelector('#recipe-parameters-container');
+        const activeRecipePanel = recipeContainer ? recipeContainer.firstElementChild : null;
+        
+        if (activeRecipePanel) {
+            const panelIdSuffix = activeRecipePanel.id.split('-').pop();
+            activeRecipePanel.querySelectorAll('input, select').forEach(input => {
+                const key = input.id.replace(`-${panelIdSuffix}`, '');
+                if (!key) return;
+                
+                if (input.type === 'file') {
+                    if (this.simulationFiles[key]) {
+                        recipeOverrides[key] = { name: this.simulationFiles[key].name, content: this.simulationFiles[key].content };
+                    } else {
+                        recipeOverrides[key] = null;
+                    }
                 } else {
-                    recipeOverrides[key] = null;
+                    recipeOverrides[key] = (input.type === 'checkbox' || input.type === 'radio') ? input.checked : input.value;
                 }
-            } else {
-                recipeOverrides[key] = (input.type === 'checkbox' || input.type === 'radio') ? input.checked : input.value;
-            }
-        });
+            });
+        }
     
         projectData.mergedSimParams = { ...globalParams, ...recipeOverrides };
 
@@ -1049,9 +1051,9 @@ class Project {
         if (settings.viewOptions) {
             const vo = settings.viewOptions;
             if (vo.projection === 'orthographic') {
-                dom['proj-btn-ortho']?.click();
+                dom['view-btn-ortho']?.click();
             } else {
-                dom['proj-btn-persp']?.click();
+                dom['view-btn-persp']?.click();
             }
             setChecked('transparent-toggle', vo.transparent);
             setChecked('ground-plane-toggle', vo.ground);
@@ -1130,15 +1132,29 @@ class Project {
             }
         }
 
-    // --- Visualization Colors ---
-    if (settings.visualization) {
-        Object.keys(settings.visualization).forEach(key => setValue(key, settings.visualization[key]));
-    }
+    // --- Visualization Colors & Analysis Panel State ---
+        if (settings.visualization) {
+            const viz = settings.visualization;
+            // Set simple values first
+            setChecked('compare-mode-toggle', viz.compareMode);
+            setValue('results-scale-min', viz.scaleMin);
+            setValue('results-scale-max', viz.scaleMax);
+            setValue('results-palette', viz.palette);
+            setValue('metric-selector', viz.activeMetric);
 
-    // --- Simulation Panels ---
-    if (settings.simulationParameters) {
-        recreateSimulationPanels(settings.simulationParameters, this.simulationFiles, ui);
-    }
+            // Trigger UI updates that depend on these values
+            if (dom['compare-mode-toggle']) {
+                dom['compare-mode-toggle'].dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            if (dom['metric-selector']) {
+                dom['metric-selector'].dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+
+        // --- Simulation Panels ---
+        if (settings.simulationParameters) {
+            recreateSimulationPanels(settings.simulationParameters, this.simulationFiles, ui);
+        }
 
     // --- Saved Views ---
     if (settings.savedViews) {

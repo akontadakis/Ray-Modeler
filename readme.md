@@ -3,9 +3,9 @@
 > **Editor's Note:** This is a passion project that I've been developing for the past year, primarily as a learning exercise. It is not intended for commercial use but rather as a tool to help others explore, learn, and understand Radiance simulations and how they can improve building design.
 > Please consider this a **beta version**. The intent is to improve it over time, but many features have not been extensively tested. If you run into a bug, your feedback would be greatly appreciated!
 
-Ray Modeler is a web-based graphical user interface for the Radiance Lighting Simulation Suite. It streamlines the entire daylighting and electric lighting analysis workflow, from parametric 3D modeling to simulation script generation and advanced results visualization.
+Ray Modeler is a web-based graphical user interface for the Radiance Lighting Simulation Suite, with an integrated AI Assistant to automate workflows and provide expert guidance. It streamlines the entire daylighting and electric lighting analysis workflow, from parametric 3D modeling to simulation script generation and advanced results visualization.
 
-Designed for lighting designers, architects, and building science researchers, Ray Modeler provides an intuitive, interactive environment to model, simulate, and analyze lighting performance in single-zone spaces without needing to write Radiance code manually.
+Ray Modeler provides an intuitive, interactive environment to model, simulate, and analyze lighting performance in single-zone spaces without needing to write Radiance code manually.
 
 ![Ray Modeler Welcome Screen](./Pictures/welcome_screen.png)
 
@@ -13,11 +13,21 @@ Designed for lighting designers, architects, and building science researchers, R
 
 - [Ray Modeler △](#ray-modeler-)
   - [Table of Contents](#table-of-contents)
-  - [✨ Core Capabilities](#-core-capabilities)
   - [🚀 Getting Started](#-getting-started)
+  - [✨ Core Capabilities](#-core-capabilities)
   - [🤖 AI Assistant](#-ai-assistant)
+    - [AI-Powered Actions (Tool Use)](#ai-powered-actions-tool-use)
+    - [Design Inspector](#design-inspector)
+    - [Results Critique](#results-critique)
+    - [Interactive Tutor](#interactive-tutor)
+      - [Proactive Suggestions](#proactive-suggestions)
+    - [Generative Design](#generative-design)
     - [API Key Configuration](#api-key-configuration)
     - [Getting Your API Key](#getting-your-api-key)
+      - [Google Gemini API Key 🔑](#google-gemini-api-key-)
+      - [OpenRouter API Key 🔑](#openrouter-api-key-)
+      - [OpenAI API Key 🔑](#openai-api-key-)
+      - [Anthropic API Key 🔑](#anthropic-api-key-)
   - [UI Walkthrough 💻](#ui-walkthrough-)
   - [📖 In-Depth Feature Guide](#-in-depth-feature-guide)
     - [📋 Scene Definition Panels](#-scene-definition-panels)
@@ -33,6 +43,29 @@ Designed for lighting designers, architects, and building science researchers, R
     - [Cross-Platform Building](#cross-platform-building)
   - [🛠️ Technology Stack](#️-technology-stack)
   - [License 📄](#license-)
+
+## 🚀 Getting Started
+
+To use Ray Modeler, you will need a modern web browser and a local installation of the Radiance Lighting Simulation Suite.
+The desktop version provides the most seamless experience.
+
+1. **Install Radiance**:
+   Download and install [Radiance](https://www.radiance-online.org/) from the official website or the [NREL](https://github.com/NREL/Radiance) GitHub repository. Ensure the Radiance `bin` directory is in your system's PATH.
+
+2. **Download Ray Modeler**:
+   Download the latest release for your operating system (macOS or Windows) from the project's Releases page.
+
+3. **Run the Application**:
+   - *Windows*: Run the Ray Modeler Setup X.X.X.exe installer.
+   - *macOS*: Open the Ray Modeler-X.X.X.dmg and drag the application to your Applications folder.
+
+Security Warnings on First Launch:
+
+Because the application is not yet code-signed, your operating system will likely show a security warning. When a user on a Mac downloads and tries to open the unsigned app, they will be stopped by Gatekeeper, which will show a message like "Ray Modeler cannot be opened because the developer cannot be verified."
+
+- **On Windows (SmartScreen)**: Click "**More info**", then click "**Run anyway**".
+
+- **On macOS (Gatekeeper)**: **Right-click** (or Control-click) the app icon, select "**Open**" from the menu. A new dialog box will appear that is similar to the first one, but this time it will include an "**Open**" button. Clicking this will run the app. You only need to do this once. After the first successful launch, the app can be opened normally by double-clicking it.
 
 ## ✨ Core Capabilities
 
@@ -104,115 +137,131 @@ Ray Modeler is packed with features that automate and enhance the Radiance workf
 
 - **Vegetation & Tree Modeling**: Add simple procedural trees and bushes from the Scene Elements library to your site. The vegetation canopy uses a Radiance `trans` material to accurately simulate its light-filtering effects, improving the realism of site-specific analyses.
 
-## 🚀 Getting Started
-
-To use Ray Modeler, you will need a modern web browser and a local installation of the Radiance Lighting Simulation Suite.
-The desktop version provides the most seamless experience.
-
-1. **Install Radiance**:
-   Download and install [Radiance](https://www.radiance-online.org/) from the official website or the [NREL](https://github.com/NREL/Radiance) GitHub repository. Ensure the Radiance `bin` directory is in your system's PATH.
-
-2. **Download Ray Modeler**:
-   Download the latest release for your operating system (macOS or Windows) from the project's Releases page.
-
-3. **Run the Application**:
-   - *Windows*: Run the Ray Modeler Setup X.X.X.exe installer.
-   - *macOS*: Open the Ray Modeler-X.X.X.dmg and drag the application to your Applications folder.
-
-Security Warnings on First Launch:
-
-Because the application is not yet code-signed, your operating system will likely show a security warning. When a user on a Mac downloads and tries to open the unsigned app, they will be stopped by Gatekeeper, which will show a message like "Ray Modeler cannot be opened because the developer cannot be verified."
-
-- **On Windows (SmartScreen)**: Click "**More info**", then click "**Run anyway**".
-
-- **On macOS (Gatekeeper)**: **Right-click** (or Control-click) the app icon, select "**Open**" from the menu. A new dialog box will appear that is similar to the first one, but this time it will include an "**Open**" button. Clicking this will run the app. You only need to do this once. After the first successful launch, the app can be opened normally by double-clicking it.
-
 ## 🤖 AI Assistant
 
 The AI Assistant panel provides a chat interface to help you with your workflow. It understands the application's current state and can perform actions on your behalf using natural language commands.
 
-- **AI-Powered Actions (Tool Use)**: Beyond answering questions, the assistant can directly manipulate the UI and query project data. This allows for a powerful natural language workflow. Its capabilities include:
+---
 
-  - **Project Validation**: Ask it to `"validate my project for an annual glare simulation"` and it will check for common setup errors, such as a missing weather file or an incorrect viewpoint type, and report back any issues.
+### AI-Powered Actions (Tool Use)
 
-  - **Advanced Scene Manipulation**:
-    - **Shading**: `"Add a 0.5 meter deep overhang to the south wall."`
-    - **Sensor Grids**: `"Enable a sensor grid on the floor with 0.75m spacing."`
-    - **Daylighting**: `"Enable continuous daylighting controls with a setpoint of 500 lux."`
-  
-  - **Simulation & Recipe Control**:
-    - **Global Parameters**: `"Set the global ambient bounces to 5."`
-    - **Recipe Configuration**: `"In the open illuminance recipe, change the time to 9:00 AM."`
+Beyond answering questions, the assistant can directly manipulate the UI and query project data. This allows for a powerful natural language workflow. Its capabilities include:
 
-  - **Results Analysis & Data Query**:
-    - **Data Query**: `"What is the average illuminance for the current results?"` or `"How many points are above 500 lux?"`
-    - **Time Scrubbing**: `"Show me the results for the winter solstice at noon."`
-    - **Dashboard Control**: `"Open the glare rose diagram."`
-  
-  - **File Management**:
-    - **Load Results**: `"Load a results file into dataset A."`
-    - **Clear Results**: `"Clear all loaded results data."`
+- **Project Validation**: Ask it to `"validate my project for an annual glare simulation"` and it will check for common setup errors, such as a missing weather file or an incorrect viewpoint type, and report back any issues.
+- **Advanced Scene Manipulation**:
+  - **Shading**: `"Add a 0.5 meter deep overhang to the south wall."`
+  - **Sensor Grids**: `"Enable a sensor grid on the floor with 0.75m spacing."`
+  - **Daylighting**: `"Enable continuous daylighting controls with a setpoint of 500 lux."`
+- **Simulation & Recipe Control**:
+  - **Global Parameters**: `"Set the global ambient bounces to 5."`
+  - **Recipe Configuration**: `"In the open illuminance recipe, change the time to 9:00 AM."`
+- **Conversational Data Exploration & Comparison**:
+  - **Data Query**: `"What is the average illuminance for the current results?"` or `"How many points are above 500 lux?"`
+  - **Time Scrubbing**: `"Show me the results for the winter solstice at noon."`
+  - **Dashboard Control**: `"Open the glare rose diagram."`
+  - **Comparative Analysis**: `"Which of my two designs has better daylight uniformity?"` or `"Compare the sDA for both designs."`
+- **File Management**:
+  - **Load Results**: `"Load a results file into dataset A."`
+  - **Clear Results**: `"Clear all loaded results data."`
 
-- **Proactive Suggestions**: The AI Assistant monitors user actions and provides contextual, non-intrusive suggestions to guide the workflow and prevent common errors. These suggestions appear as dismissible chips in the UI. For example:
+### Design Inspector
 
-  - After loading an **EPW weather file**, it will suggest opening an annual simulation recipe.
+The AI analyzes the entire project state to identify conflicting or suboptimal combinations of settings, explains the potential consequences, and offers a one-click fix.
 
-  - If a material's **reflectance is set to an unusually high or low value**, it will warn that this may be physically unrealistic.
+> **AI Analysis:** "I've reviewed your project. Your wall reflectance is quite low (0.2), and you're only using 2 ambient bounces. This combination will likely result in an unrealistically dark rendering with noticeable splotches. I recommend increasing ambient bounces to 4 and wall reflectance to 0.5."
+>
+> **[Apply Fixes]**
 
-  - If the user enables a **View Grid**, it will suggest opening the Imageless Annual Glare recipe.
+### Results Critique
 
-  - If the **DGP recipe is open but the viewpoint is not set to fisheye**, it will offer to correct the setting.
+After a simulation completes, the AI can analyze the results, identify problems, and suggest specific, actionable design changes.
 
-- **Generative Design**: Leverage the AI to perform automated, multi-step design optimization. Instead of manually testing variations, you can define a goal, constraints, and a design variable, and the assistant will orchestrate the entire workflow. For example:
+> **AI Analysis:** "The Daylight Glare Probability (DGP) is 0.47, which is considered 'Intolerable'. This is caused by low-angle sun from the west-facing window. To fix this, I suggest adding vertical louvers."
+>
+> **[Add Vertical Louvers]**
 
-  > "Find an overhang depth for the south wall between 0.5m and 2.0m that maximizes sDA while keeping ASE below 10%."
+### Interactive Tutor
 
-  The assistant will then:
-  1. Iterate through the design space (e.g., testing multiple overhang depths).
-  2. Programmatically run an sDA/ASE simulation for each step.
-  3. Post live progress updates to the chat window.
-  4. Analyze the results of all simulations.
-  5. Report back with the optimal design that best meets your goal while satisfying your constraints.
+The AI can act as a tutor to guide new users through complex simulation workflows step-by-step, teaching them the process as they go.
+
+> **User**: "How do I run a glare simulation?"
+>
+> **AI**: "Of course! To calculate DGP, we need a 180° fisheye view. Your current viewpoint is set to Perspective. Would you like me to change it for you?"
+>
+> **User**: "Yes"
+>
+> **AI**: *(Changes viewpoint)* "Great. Next, I'll open the DGP recipe panel for you." *(Opens recipe)* "Now you just need to click 'Generate Package' and run the simulation."
+
+#### Proactive Suggestions
+
+The AI Assistant monitors user actions and provides contextual, non-intrusive suggestions to guide the workflow and prevent common errors. These suggestions appear as dismissible chips in the UI. For example:
+
+- After loading an **EPW weather file**, it will suggest opening an annual simulation recipe.
+- If a material's **reflectance is set to an unusually high or low value**, it will warn that this may be physically unrealistic.
+- If the user enables a **View Grid**, it will suggest opening the Imageless Annual Glare recipe.
+- If the **DGP recipe is open but the viewpoint is not set to fisheye**, it will offer to correct the setting.
+
+### Generative Design
+
+Leverage the AI to perform automated, multi-step design tasks.
+
+- **Scene Creation from Natural Language**: Instead of manually adjusting sliders, describe the space you want to build in plain English.
+
+    > "Create a long office, 12 meters deep by 5 meters wide, with a 3-meter high ceiling. Put a large, continuous window across the entire south wall with a sill height of 0.8 meters. Add a 1-meter deep overhang above it and place two desks in the middle of the room."
+- **Design Optimization**: Define a goal, constraints, and a design variable, and the assistant will orchestrate the entire workflow to find the best solution. For example:
+
+    > "Find an overhang depth for the south wall between 0.5m and 2.0m that maximizes sDA while keeping ASE below 10%."
+
+---
 
 ### API Key Configuration
 
-The integrated AI Assistant requires an API key to function. It can be configured to use Google Gemini or any model available through OpenRouter.
+The integrated AI Assistant requires an API key to function. It supports multiple providers for greater flexibility.
 
-- **AI Configuration**: A settings modal allows you to select your preferred AI provider, choose from a list of models (e.g., Gemini 2.5 Pro, GPT-5, Claude 3.7 Sonnet), and **enter your own API key for access**.
+- **Expanded Provider Support**: Select between **OpenRouter**, **OpenAI**, **Google Gemini**, and **Anthropic**.
+- **Provider-Specific Keys**: The application saves a separate API key for each provider, so you can switch between models without re-entering credentials.
+- **AI Configuration**: A settings modal (⚙️ icon) allows you to select your preferred provider, choose from a list of popular models (e.g., Gemini 1.5 Pro, GPT-4o, Claude 3.5 Sonnet), and enter your API key.
+
+---
 
 ### Getting Your API Key
 
-Google Gemini API Key 🔑:
+#### Google Gemini API Key 🔑
 
 You can get a free API key for the Gemini family of models from [Google AI Studio](https://aistudio.google.com/prompts/new_chat).
 
 1. Go to the Google AI Studio website.
-
 2. Sign in with your Google account.
-
 3. Click the "`Get API key`" button, usually located in the top-left or top-right corner of the page.
-
 4. A dialog will appear. Click "`Create API key`".
-
 5. Your new API key will be generated and displayed.
-
 6. Copy this key and paste it into the API Key field in the Ray Modeler AI settings.
-
 *Note*: The Gemini API has a free tier with usage limits. Be sure to review Google's current pricing and terms of service.
 
-OpenRouter API Key 🔑:
+#### OpenRouter API Key 🔑
 
 OpenRouter provides access to a wide variety of models from different providers through a single API.
 
 1. Go to the [OpenRouter.ai](https://openrouter.ai/) website and log in.
-
 2. Click on your account icon in the top-right corner and select "`Keys`" from the dropdown menu.
-
 3. Click the "`+ Create Key`" button. Give your key a name (e.g., "RayModeler") and click "`Create`".Your new API key will be generated.
-
 4. Copy this key and paste it into the API Key field in the Ray Modeler AI settings.
-
 *Note*: OpenRouter is a paid service. You will need to add credits to your account to use most models. To use some of the free models, you may need to adjust your privacy settings to allow your data to be used for model improvement.
+
+#### OpenAI API Key 🔑
+
+1. Go to the [OpenAI API keys](https://platform.openai.com/api-keys) page and log in.
+2. Click the "`+ Create new secret key`" button.
+3. Give your key a name (e.g., "RayModeler") and click "`Create secret key`".
+4. Copy the generated key immediately and paste it into the API Key field in the Ray Modeler AI settings. You will not be able to view it again.
+
+#### Anthropic API Key 🔑
+
+1. Go to the [Anthropic Console](https://console.anthropic.com/) and log in.
+2. Navigate to the "API Keys" section in your account settings.
+3. Click the "`Create Key`" button.
+4. Give the key a name and click "`Create Key`".
+5. Copy the key and paste it into the API Key field in the Ray Modeler AI settings.
 
 **Important**: Treat your API keys like passwords. Do not share them publicly or commit them to version control.
 
@@ -224,15 +273,17 @@ The interface is designed around a logical workflow, guiding the user from setup
 ![Ray Modeler Main UI](./Pictures/main_ui_quad.png)
 ![Ray Modeler Panels](./Pictures/panels_ui.png)
 
-- **3D Viewport (Center)**: The main interactive area where the 3D scene is displayed. You can navigate the scene using standard orbit controls (mouse drag, scroll).
-  
-- **Left Toolbar**: Contains buttons to access panels for defining all aspects of the physical scene, from project location to material properties.
-  
-- **Top View Controls**: A quick-access toolbar to switch between standard orthographic (Top, Front, etc.) and perspective camera views.
-  
-- **Bottom Toolbar (Bottom-Left)**: Provides quick access to save/load project files, view application information, and open the AI Assistant.
-  
-- **Right Sidebar (Simulation & Analysis)**: This dual-purpose sidebar allows you to set up simulation recipes and later load the results for visualization and analysis.
+- **3D Viewport (Center)**: This is the main interactive area where your 3D scene is displayed. You can navigate using standard orbit controls (mouse drag, scroll). The viewport can also be split into a **Quad View** layout, showing synchronized Perspective, Top, Front, and Side cameras for comprehensive spatial awareness.
+
+- **Left Toolbar**: This is the primary command center for building your scene. It contains buttons to open floating panels for defining all aspects of the physical model, from **Project Setup** and **Dimensions** to **Simulation** and **Analysis** modules.
+
+- **Top View Controls**: A quick-access toolbar to instantly switch between standard orthographic (Top, Front, etc.) and perspective camera views. It also includes the button to toggle the **Quad View** layout.
+
+- **Bottom Toolbar (Bottom-Left)**: Provides quick access to global actions like saving/loading project files, viewing application information and keyboard shortcuts, and launching the AI Assistant.
+
+- **Floating Panels**: All scene definition, simulation, and analysis tools open as independent floating windows. These panels can be dragged, resized, collapsed, and arranged anywhere on the screen, allowing you to create a workspace tailored to your needs.
+
+- **AI Assistant Sidebar (Right)**: A dedicated, resizable sidebar that houses the conversational AI Assistant. This keeps the AI's powerful capabilities accessible without cluttering your modeling and analysis workflow.
 
 ## 📖 In-Depth Feature Guide
 
@@ -301,8 +352,6 @@ The panels on the left toolbar are used to define the scene.
     - **Simple Massing Tools**: Create and place simple 3D shapes (boxes, cylinders) to represent surrounding buildings.
     - **Topography Import**: Generate a ground plane with topography from a grayscale heightmap image.
     - **OpenStreetMaps Integration**: Automatically fetch building footprints and height data for a given location to generate a basic urban context.
-
-![Ray Modeler Main UI](./Pictures/panels_ui_ray.png)
 
 ### 📜 Simulation Modules (Recipes)
 

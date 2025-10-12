@@ -5,6 +5,7 @@ import { project } from './project.js'; // Import project to access its state
 
 // --- MODULE-LEVEL VARIABLES ---
 let panelCounter = 0;
+let globalParametersCache = {}; // Cache for global parameters that persists across accordion state changes
 
 const availableModules = [
     { id: 'template-global-sim-params', name: 'Global Simulation Parameters' },
@@ -32,26 +33,71 @@ const FOLDER_STRUCTURE = [
 
 // --- CORE PUBLIC FUNCTIONS ---
 export function setupSimulationSidebar() {
-    const moduleList = document.getElementById('simulation-module-list');
-    if (!moduleList) return;
+    const simPanel = document.getElementById('panel-simulation-modules');
+    const recipeSelector = document.getElementById('recipe-selector');
+    if (!simPanel || !recipeSelector) return;
 
-    moduleList.innerHTML = '';
+    // Initialize the logic for the entire panel, including global parameters.
+    initializePanelLogic(simPanel);
+
     availableModules.forEach(module => {
-        const li = document.createElement('li');
-        li.className = 'module-item';
-        li.innerHTML = `
-            <span class="module-item-title">${module.name}</span>
-            <button class="add-module-btn" data-template="${module.id}" title="Add ${module.name} Panel">+</button>
-        `;
-        moduleList.appendChild(li);
+       // Skip adding "Global" to the recipe dropdown
+        if (module.id === 'template-global-sim-params') return;
+
+        const option = document.createElement('option');
+        option.value = module.id;
+        option.textContent = module.name;
+        recipeSelector.appendChild(option);
     });
     
-    moduleList.addEventListener('click', (e) => {
-        const button = e.target.closest('.add-module-btn');
-        if (button?.dataset.template) {
-            _togglePanelVisibility(button.dataset.template, button);
+    recipeSelector.addEventListener('change', (e) => {
+    const templateId = e.target.value;
+    const container = document.getElementById('recipe-parameters-container');
+    const generateBtn = document.querySelector('#panel-simulation-modules [data-action="generate"]');
+    const runBtn = document.querySelector('#panel-simulation-modules [data-action="run"]');
+    const commandCenter = document.querySelector('#panel-simulation-modules .command-center');
+
+    if (!container || !generateBtn) return;
+
+    // Clear previous recipe and hide execution details
+    container.innerHTML = '';
+    runBtn.disabled = true;
+    commandCenter.classList.add('hidden');
+
+
+    if (templateId) {
+        const template = document.getElementById(templateId);
+        if (template) {
+        const fullClone = template.content.cloneNode(true);
+        // Find the content inside the cloned template
+        const contentClone = fullClone.querySelector('.window-content');
+
+        if (contentClone) {
+            // Move the content from the template into the container
+            container.append(...contentClone.children);
+
+            // Set dataset for later reference
+            container.dataset.activeRecipeTemplate = templateId;
+
+            // Initialize logic for the newly added elements within the container
+            initializePanelLogic(container);
+            setupFileListenersForPanel(container);
         }
-    });
+
+        // Update the generate button text and enable it
+        const recipeName = availableModules.find(m => m.id === templateId)?.name || 'Package';
+        generateBtn.textContent = `Generate ${recipeName.replace('Recipe: ', '')} Package`;
+        generateBtn.disabled = false;
+
+        }
+    } else {
+        // If "-- Select --" is chosen, show placeholder text and disable button
+        container.innerHTML = `<p class="text-sm text-center text-[--text-secondary] p-4">Select a recipe from the dropdown above to configure a simulation.</p>`;
+        generateBtn.textContent = 'Generate Package';
+        generateBtn.disabled = true;
+        delete container.dataset.activeRecipeTemplate;
+    }
+});
 }
 
 /**
@@ -65,7 +111,7 @@ export function recreateSimulationPanels(simSettings, loadedFiles, ui) {
     const moduleList = document.getElementById('simulation-module-list');
 
     // Clear all existing dynamically generated simulation panels
-    panelContainer.querySelectorAll('.floating-window[data-template-id]').forEach(panel => {
+    panelContainer.querySelectorAll('.floating-window[data-template-id^="template-recipe-"]').forEach(panel => {
         const templateId = panel.dataset.templateId;
         const button = moduleList.querySelector(`[data-template="${templateId}"]`);
         if (panel.parentElement) {
@@ -131,7 +177,7 @@ export async function openRecipePanelByType(templateId) {
         // Panel exists but is hidden, toggle it.
         _togglePanelVisibility(templateId, button);
     }
-    
+
     // Bring to front
     if(panel) {
         panel.style.zIndex = getNewZIndex();
@@ -216,19 +262,9 @@ function _createSimulationPanel(templateId, button) {
     panelCounter++;
     const clone = template.content.firstElementChild.cloneNode(true);
     clone.id = `${templateId}-panel-${panelCounter}`;
-    clone.dataset.templateId = templateId; 
+    clone.dataset.templateId = templateId;
 
-    // Inject advanced parameters section if it exists
-    if (clone.querySelector('.accordion-content')) {
-        const advancedSection = clone.querySelector('.accordion-content');
-        const globalParamsTemplate = document.getElementById('template-global-sim-params');
-        if (globalParamsTemplate && advancedSection) {
-            const globalParamsContent = globalParamsTemplate.content.querySelector('.window-content').cloneNode(true);
-            advancedSection.appendChild(globalParamsContent);
-        }
-    }
-
-    _uniquifyIds(clone, panelCounter);
+    uniquifyIds(clone, panelCounter);
 
     const openWindows = document.querySelectorAll('#window-container .floating-window:not(.hidden)').length;
     clone.style.top = `${80 + (openWindows % 10) * 40}px`;
@@ -250,7 +286,7 @@ function _createSimulationPanel(templateId, button) {
     }
 
     initializePanelControls(clone);
-    _initializePanelLogic(clone);
+    initializePanelLogic(clone);
     setupFileListenersForPanel(clone);
 
     if (button) {
@@ -303,8 +339,8 @@ function _populatePanel(panel, panelData) {
     }
 }
 
-// Helper functions (_uniquifyIds, _makeWindowInteractive, etc.) go here...
-function _uniquifyIds(element, suffix) {
+// Helper functions (uniquifyIds, makeWindowInteractive, etc.) go here...
+export function uniquifyIds(element, suffix) {
     element.querySelectorAll('[id]').forEach(el => {
         const oldId = el.id;
         const newId = `${oldId}-${suffix}`;
@@ -382,14 +418,14 @@ function _showBrowserRunInstructions(scriptFile) {
     }
 }
 
-function _initializePanelLogic(panel) {
-    // Apply global defaults first, so override UI can compare against them
-    if (panel.dataset.templateId.startsWith('template-recipe-')) {
-        _applyGlobalDefaults(panel);
+export function initializePanelLogic(panel) {
+    // Initializes quality presets if the panel is a recipe, which now target global params
+    if (panel.dataset.templateId && panel.dataset.templateId.startsWith('template-recipe-')) {
         _initQualityPresets(panel);
-        _setupParameterOverrides(panel);
+    } else if (panel.id.includes('recipe-parameters-container')) {
+         _initQualityPresets(panel);
     }
-    
+
     // Initializes interactive sliders and number inputs
     panel.querySelectorAll('.param-item').forEach(item => {
         const slider = item.querySelector('input[type="range"]');
@@ -410,19 +446,6 @@ function _initializePanelLogic(panel) {
             if (!button || !group.contains(button)) return;
             group.querySelectorAll('.btn').forEach(btn => btn.classList.remove('active'));
             button.classList.add('active');
-        });
-    });
-
-    // Initializes accordion behavior for collapsing sections
-    panel.querySelectorAll('.accordion-header').forEach(header => {
-        header.addEventListener('click', () => {
-            const content = header.nextElementSibling;
-            if (content) {
-                const isOpen = content.style.display === 'block';
-                content.style.display = isOpen ? 'none' : 'block';
-                header.parentElement.classList.toggle('open', !isOpen);
-                 if (!isOpen) ensureWindowInView(panel);
-            }
         });
     });
 
@@ -511,121 +534,41 @@ const QUALITY_PRESETS = {
 };
 
 /**
- * Retrieves the current values from the Global Simulation Parameters panel.
- * @returns {object} An object of key-value pairs of the global parameters.
- */
-function _getGlobalParameters() {
-    const globalParams = {};
-    const globalPanel = document.querySelector('[data-template-id="template-global-sim-params"]');
-    if (!globalPanel) return globalParams;
-
-    // Use a data attribute for a more robust selection of parameters.
-    // This avoids parsing IDs and the hasOwnProperty check.
-    globalPanel.querySelectorAll('[data-param-name]').forEach(el => {
-        const key = el.dataset.paramName;
-        // The check for existence prevents number inputs from overwriting range inputs if both have the same name
-        if (!globalParams.hasOwnProperty(key)) {
-             globalParams[key] = el.type === 'checkbox' ? el.checked : el.value;
-        }
-    });
-    return globalParams;
-}
-
-/**
- * Applies the global default parameters to a newly created recipe panel's advanced section.
- * @param {HTMLElement} panel The recipe panel element.
- */
-function _applyGlobalDefaults(panel) {
-    const advancedSection = panel.querySelector('.accordion-content');
-    if (!advancedSection) return;
-
-    const globalDefaults = _getGlobalParameters();
-
-    for (const key in globalDefaults) {
-        // Find the input within the advanced section of this specific panel
-        const input = advancedSection.querySelector(`[id^="${key}-"]`);
-        if (input) {
-            input.value = globalDefaults[key];
-            input.dataset.globalDefault = globalDefaults[key]; // Store default for override UI
-            input.dispatchEvent(new Event('input', { bubbles: true })); // Update sliders, etc.
-        }
-    }
-}
-
-/**
- * Initializes the UI for parameter overrides in a recipe panel.
- * @param {HTMLElement} panel The recipe panel element.
- */
-function _setupParameterOverrides(panel) {
-    const advancedSection = panel.querySelector('.accordion-content');
-    if (!advancedSection) return;
-
-    const advancedInputs = advancedSection.querySelectorAll('input[type="range"], input[type="number"], select');
-
-    advancedInputs.forEach(input => {
-        if (input.dataset.globalDefault === undefined) return;
-
-        let iconContainer = input.closest('.param-item-row') || input.parentElement;
-        if (!iconContainer) return;
-        
-        const resetIcon = document.createElement('span');
-        resetIcon.className = 'reset-icon hidden';
-        resetIcon.title = 'Reset to global default';
-        resetIcon.innerHTML = '&#8634;'; // Undo arrow
-        
-        // Style and position the icon
-        resetIcon.style.cursor = 'pointer';
-        resetIcon.style.position = 'absolute';
-        resetIcon.style.right = '0px';
-        resetIcon.style.top = '50%';
-        resetIcon.style.transform = 'translateY(-50%)';
-        resetIcon.style.fontSize = '16px';
-        resetIcon.style.color = 'var(--text-secondary)';
-        iconContainer.style.position = 'relative'; 
-        iconContainer.appendChild(resetIcon);
-
-        const checkOverride = () => {
-            const isOverridden = input.value !== input.dataset.globalDefault;
-            resetIcon.classList.toggle('hidden', !isOverridden);
-        };
-
-        input.addEventListener('input', checkOverride);
-        input.addEventListener('change', checkOverride);
-
-        resetIcon.addEventListener('click', () => {
-            input.value = input.dataset.globalDefault;
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-            checkOverride();
-        });
-
-        checkOverride();
-    });
-}
-
-/**
  * Initializes the quality preset dropdown in a recipe panel.
  * @param {HTMLElement} panel The recipe panel element.
  */
 function _initQualityPresets(panel) {
-    const presetSelect = panel.querySelector('#quality-preset-' + panel.id.split('-').pop());
-    if (!presetSelect) return;
+// The preset selector could be in a floating panel or the main sidebar
+const presetSelect = panel.querySelector('[id^="quality-preset"]');
+if (!presetSelect) return;
 
-    presetSelect.addEventListener('change', (e) => {
-        const selectedPreset = e.target.value;
-        if (selectedPreset === 'custom' || !QUALITY_PRESETS[selectedPreset]) return;
+presetSelect.addEventListener('change', (e) => {
+    const selectedPreset = e.target.value;
+    if (selectedPreset === 'custom' || !QUALITY_PRESETS[selectedPreset]) {
+        // If user selects custom, do nothing. They can edit the global params manually.
+        return;
+    }
 
-        const presetValues = QUALITY_PRESETS[selectedPreset];
-        const advancedSection = panel.querySelector('.accordion-content');
-        if (!advancedSection) return;
+    const presetValues = QUALITY_PRESETS[selectedPreset];
+    // The target inputs are ALWAYS the global parameters in the main simulation panel
+    const globalParamsPanel = document.getElementById('panel-simulation-modules');
+    if (!globalParamsPanel) return;
 
-        for (const key in presetValues) {
-            const input = advancedSection.querySelector(`[id^="${key}-"]`);
-            if (input) {
-                input.value = presetValues[key];
-                input.dispatchEvent(new Event('input', { bubbles: true }));
-                input.dispatchEvent(new Event('change', { bubbles: true }));
-            }
+    for (const key in presetValues) {
+        // The IDs in the global panel are like 'ab' & 'ab-num', 'ad' & 'ad-num'.
+        const slider = globalParamsPanel.querySelector(`#${key}`);
+        const numberInput = globalParamsPanel.querySelector(`#${key}-num`);
+        
+        if (slider && numberInput) {
+            const newValue = presetValues[key];
+            slider.value = newValue;
+            numberInput.value = newValue;
+            // Dispatch events to ensure UI consistency (e.g., updating text labels)
+            // and notify other parts of the app of the change.
+            numberInput.dispatchEvent(new Event('input', { bubbles: true })); // For updating the slider
+            slider.dispatchEvent(new Event('input', { bubbles: true })); // For updating the label
         }
-    });
+    }
+    showAlert(`Global simulation parameters set to '${selectedPreset}' preset.`, 'Preset Applied');
+});
 }

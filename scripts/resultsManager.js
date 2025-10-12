@@ -1071,6 +1071,38 @@ class ResultsManager {
         const dataset = this.datasets[key];
         return !!(dataset && dataset.lightingMetrics);
     }
+
+    /**
+     * Gets the indices of all sensor points in a dataset that meet a specific condition.
+     * @param {'a' | 'b'} key - The dataset to query.
+     * @param {'<' | '>' | '<=' | '>='} condition - The comparison operator.
+     * @param {number} value - The value to compare against.
+     * @returns {number[]} An array of indices that meet the condition.
+     */
+    getPointIndicesByCondition(key, condition, value) {
+        const dataset = this.datasets[key];
+        if (!dataset || !dataset.data || dataset.data.length === 0) {
+            return [];
+        }
+
+        const indices = [];
+        const data = dataset.data;
+
+        for (let i = 0; i < data.length; i++) {
+            const pointValue = data[i];
+            let conditionMet = false;
+            switch (condition) {
+                case '<':  conditionMet = pointValue < value; break;
+                case '>':  conditionMet = pointValue > value; break;
+                case '<=': conditionMet = pointValue <= value; break;
+                case '>=': conditionMet = pointValue >= value; break;
+            }
+            if (conditionMet) {
+                indices.push(i);
+            }
+        }
+        return indices;
+    }
 }
 
 export const resultsManager = new ResultsManager();
