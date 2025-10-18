@@ -3,7 +3,7 @@
   "version": "1.9.0",
   "description": "A web-based graphical user interface (GUI) for the Radiance Lighting Simulation Suite.",
   "main": "electron.js",
-"scripts": {
+  "scripts": {
     "start": "electron .",
     "build": "electron-builder",
     "build:win": "electron-builder --win",
@@ -21,7 +21,7 @@
     "electron": "^38.0.0",
     "electron-builder": "^24.9.1"
   },
-"build": {
+  "build": {
     "appId": "com.example.raymodeler",
     "productName": "Ray Modeler",
     "files": [
@@ -43,21 +43,25 @@
       "icon": "assets/icon.icns"
     },
     "win": {
-        "icon": "assets/icon.ico",
-        "target": [
-          {
-            "target": "nsis",
-            "arch": [
-              "x64",
-              "arm64"
-            ]
-          }
-        ],
-        "artifactName": "${productName} Setup ${version}-${arch}.${ext}"
-      },
-      "nsis": {
-        "oneClick": false,
-        "allowToChangeInstallationDirectory": true
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "artifactName": "${productName} Setup ${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     }
+  },
+  "dependencies": {
+    "d3-delaunay": "^6.0.4",
+    "lsystem": "^1.2.1"
   }
 }

@@ -277,6 +277,11 @@ function createGroundPlane() {
     clearGroup(groundObject);
     const dom = getDom();
     const { W, L } = readParams();
+
+    // Read grid size and divisions from the UI
+    const gridSize = dom['ground-grid-size'] ? parseFloat(dom['ground-grid-size'].value) : 50;
+    const gridDivisions = dom['ground-grid-divisions'] ? parseInt(dom['ground-grid-divisions'].value, 10) : 50;
+
     const isTopoMode = dom['context-mode-topo']?.classList.contains('active');
     const topoFile = project.simulationFiles['topo-heightmap-file'];
 
@@ -336,10 +341,11 @@ function createGroundPlane() {
         };
         img.src = imageUrl;
     } else {
-        // --- Create Default Flat Grid ---
-        const size = Math.max(W, L) * 6;
-        const gridHelper = new THREE.GridHelper(size, 60, shared.lineColor, shared.gridMinorColor);
-        gridHelper.position.set(0, -0.001, 0);
+    // --- Create Default Flat Grid ---
+    // Use the values from the UI sliders
+    const size = gridSize;
+    const gridHelper = new THREE.GridHelper(size, gridDivisions, shared.lineColor, shared.gridMinorColor);
+    gridHelper.position.set(0, -0.001, 0);
 
         const mat = new THREE.MeshBasicMaterial({
             color: 0xdddddd,
@@ -802,6 +808,8 @@ export function createShadingDevices() {
                 deviceGroup = createLouvers(ww, wh, shadeParams.louver, shadeColor);
             } else if (shadeParams.type === 'roller' && shadeParams.roller) {
                 deviceGroup = createRoller(ww, wh, shadeParams.roller, shadeColor);
+            } else if (shadeParams.type === 'generative') {
+                deviceGroup = createGenerativeDevice(orientation, shadeParams);
         }
 
         if (deviceGroup) {
@@ -2012,4 +2020,79 @@ export async function addImportedAsset(objContent, mtlContent, assetType) {
     }
 
     return objectGroup;
+}
+
+/**
+ * Creates a generative shading device by calling the appropriate generator function.
+ * @param {string} wallId - The canonical ID of the wall ('N', 'S', 'E', 'W').
+ * @param {object} params - The shading parameters object, including type and pattern-specific parameters.
+ * @returns {THREE.Group|null} A group containing the generated shading geometry, or null if creation fails.
+ */
+function createGenerativeDevice(wallId, params) {
+    // Ensure getWindowParamsForWall is available and returns expected values
+    const windowParams = getWindowParamsForWall(wallId);
+    if (!windowParams) {
+        console.error(`Could not get window parameters for wall ${wallId}`);
+        return null;
+    }
+    const { ww, wh, sh } = windowParams;
+
+    if (!params || !params.patternType || !params.parameters) {
+        console.error("Invalid or missing parameters for createGenerativeDevice");
+        return null;
+    }
+
+    // Prepare parameters for the specific generator function
+    const generatorParams = {
+        windowWidth: ww,
+        windowHeight: wh,
+        sillHeight: sh, // Pass sill height if needed by generators
+        ...params.parameters // Spread the specific parameters (depth, spacingX, etc.)
+    };
+
+    let deviceGroup = null;
+
+    // Dispatch based on patternType
+    switch (params.patternType) {
+        case 'vertical_fins':
+            deviceGroup = generativeShading.createVerticalFins(generatorParams);
+            break;
+        case 'horizontal_fins':
+            deviceGroup = generativeShading.createHorizontalFins(generatorParams);
+            break;
+        case 'grid':
+            deviceGroup = generativeShading.createGridPattern(generatorParams);
+            break;
+        case 'perforated_screen':
+            deviceGroup = generativeShading.createPerforatedScreen(generatorParams);
+            break;
+        case 'voronoi':
+            deviceGroup = generativeShading.createVoronoiPattern(generatorParams);
+            break;
+        case 'l_system':
+            deviceGroup = generativeShading.createLSystemPattern(generatorParams);
+            break;
+        case 'topology_optimized':
+            deviceGroup = generativeShading.createTopologyOptimized(generatorParams);
+            break;
+        case 'solar_responsive':
+            deviceGroup = generativeShading.createSolarResponsive(generatorParams);
+            break;
+        case 'view_optimized':
+            deviceGroup = generativeShading.createViewOptimized(generatorParams);
+            break;
+        case 'penrose_tiling':
+            deviceGroup = generativeShading.createPenroseTiling(generatorParams);
+            break;
+        default:
+            console.warn(`Unknown generative pattern type: ${params.patternType}`);
+            return null;
+    }
+
+    if (deviceGroup) {
+        deviceGroup.userData.shadingType = 'generative'; // Add type for reference if needed
+        deviceGroup.userData.patternType = params.patternType;
+    }
+
+    return deviceGroup;
 }

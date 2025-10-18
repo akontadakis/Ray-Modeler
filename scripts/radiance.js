@@ -3,6 +3,7 @@
 import { getDom, getAllWindowParams, getAllShadingParams, getSensorGridParams } from './ui.js';
 import { project } from './project.js';
 import * as THREE from 'three';
+import { shadingObject } from './geometry.js';
 
 // Klems Full Basis outgoing angles (center points) for plotting
 const KLEMS_ANGLES = [
@@ -312,6 +313,68 @@ export function generateViewpointFileContent(viewpointData, roomData) {
     return `${radViewType} -vp ${rad_vp} -vd ${rad_vd} -vu 0 0 1 -vh ${hfov} -vv ${vfov}`;
 }
 
+/**
+ * Finds a generative shading device group in the scene by its name.
+ * @param {string} orientation - The wall orientation ('N', 'S', 'E', 'W').
+ * @param {number} windowIndex - The index of the window on that wall.
+ * @returns {THREE.Group|null} The found group or null.
+ */
+function getGenerativeDeviceFromScene(orientation, windowIndex) {
+    const expectedName = `generative_${orientation}_${windowIndex}`;
+    return shadingObject.getObjectByName(expectedName) || null;
+}
+
+/**
+ * Generates Radiance primitives for simple generative patterns.
+ * @param {string} patternType - The type of pattern ('vertical_fins', 'horizontal_fins', 'grid').
+ * @param {object} parameters - The pattern's parameters.
+ * @param {object} winParams - The window's parameters.
+ * @param {string} orientation - The wall orientation.
+ * @param {number} windowIndex - The index of the window.
+ * @param {function} transformFunc - The function to transform vertices.
+ * @returns {string} The Radiance geometry string.
+ */
+function generateSimpleGenerativePattern(patternType, parameters, winParams, orientation, windowIndex, transformFunc) {
+    let radString = '';
+    const { depth, spacingX, spacingY, elementWidth } = parameters;
+    const { ww, wh, sh } = winParams;
+    const winId = `${orientation}_${windowIndex + 1}`;
+
+    const inwardNormal = { 'N': [0, 1, 0], 'S': [0, -1, 0], 'W': [1, 0, 0], 'E': [-1, 0, 0] }[orientation];
+    
+    // This is a simplified positioning logic. It assumes the generative pattern is centered on the window.
+    // A more robust implementation would get the exact window position from the `allWindows` loop.
+    const createFin = (u0, u1, v0, v1, finIndex, finType) => {
+        const baseVerts = quadVerts(orientation, u0, u1, v0, v1);
+        const depthVec = inwardNormal.map(n => n * -depth);
+        const p1_hinge = [baseVerts[0][0], baseVerts[0][1], baseVerts[0][2]];
+        const p2_hinge = [baseVerts[1][0], baseVerts[1][1], baseVerts[1][2]];
+        const p3_outer = [p2_hinge[0] + depthVec[0], p2_hinge[1] + depthVec[1], p2_hinge[2] + depthVec[2]];
+        const p4_outer = [p1_hinge[0] + depthVec[0], p1_hinge[1] + depthVec[1], p1_hinge[2] + depthVec[2]];
+        const topVerts = [p1_hinge, p2_hinge, p3_outer, p4_outer];
+        radString += generateRadBox(topVerts, elementWidth, 'shading_mat', `gen_${finType}_${winId}_${finIndex}`, transformFunc);
+    };
+
+    if (patternType === 'vertical_fins' || patternType === 'grid') {
+        const numFins = Math.floor(ww / spacingX);
+        for (let i = 0; i <= numFins; i++) {
+            const u0 = i * spacingX - (elementWidth / 2);
+            createFin(u0, u0 + elementWidth, sh, sh + wh, i, 'vfin');
+        }
+    }
+
+    if (patternType === 'horizontal_fins' || patternType === 'grid') {
+        const numFins = Math.floor(wh / spacingY);
+        for (let i = 0; i <= numFins; i++) {
+            const v0 = sh + i * spacingY - (elementWidth / 2);
+            createFin(0, ww, v0, v0 + elementWidth, i, 'hfin');
+        }
+    }
+
+    return radString;
+}
+
+
 export async function generateRadFileContent(options = {}) {
   const { channelSet, clippingPlanes } = options; // e.g., 'c1-3', 'c4-6', 'c7-9' for spectral runs
   const dom = getDom();
@@ -430,9 +493,9 @@ export async function generateRadFileContent(options = {}) {
       };
   }
 
-  const W = parseFloat(dom.width.value), L = parseFloat(dom.length.value), H = parseFloat(dom.height.value);
-  const allWindows = getAllWindowParams();
-  const allShading = getAllShadingParams();
+    const W = parseFloat(dom.width.value), L = parseFloat(dom.length.value), H = parseFloat(dom.height.value);
+    const allWindows = getAllWindowParams();
+    const allShading = getAllShadingParams();
 
   const alphaRad = THREE.MathUtils.degToRad(parseFloat(dom['room-orientation'].value));
   const cosA = Math.cos(alphaRad);
@@ -756,6 +819,36 @@ const { importedShadingObjects, furnitureObject, contextObject, vegetationObject
         shadingGeometry += `${matName} polygon roller_${winId}_right\n0\n0\n12\n${[p[1], q[1], q[2], p[2]].map(v => transformAndFormat(v)).join('\n')}\n\n`;
         shadingGeometry += `${matName} polygon roller_${winId}_top\n0\n0\n12\n${[p[2], q[2], q[3], p[3]].map(v => transformAndFormat(v)).join('\n')}\n\n`;
         shadingGeometry += `${matName} polygon roller_${winId}_left\n0\n0\n12\n${[p[3], q[3], q[0], p[0]].map(v => transformAndFormat(v)).join('\n')}\n\n`;
+      } else if (shadeParams.type === 'generative' && shadeParams.parameters) {
+          const patternType = shadeParams.patternType;
+
+          // Strategy 1: Simple patterns - generate Radiance primitives directly for efficiency
+          if (['vertical_fins', 'horizontal_fins', 'grid'].includes(patternType)) {
+              shadingGeometry += generateSimpleGenerativePattern(
+                  patternType,
+                  shadeParams.parameters,
+                  winParams,
+                  orientation,
+                  i, // window index
+                  transformAndFormat
+              );
+          }
+          // Strategy 2: Complex patterns - convert the THREE.js mesh to Radiance polygons
+          else {
+              const deviceGroup = getGenerativeDeviceFromScene(orientation, i);
+              if (deviceGroup) {
+                  deviceGroup.traverse(mesh => {
+                      if (mesh.isMesh) {
+                          shadingGeometry += _generateRadFromMesh(
+                              mesh,
+                              'shading_mat', // Use the standard shading material
+                              `generative_${patternType}_${winId}`,
+                              transformAndFormat
+                          );
+                      }
+                  });
+              }
+          }
       }
     }
   }

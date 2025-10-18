@@ -262,32 +262,17 @@ export function onWindowResize() {
         }
     } else {
         // Update only the main cameras
-        const aspect = container.clientWidth / container.clientHeight;
-        perspectiveCamera.aspect = aspect;
-        perspectiveCamera.updateProjectionMatrix();
-
-        const frustumSize = 15;
-        orthoCamera.left = frustumSize * aspect / -2;
-        orthoCamera.right = frustumSize * aspect / 2;
-        orthoCamera.top = frustumSize / 2;
-        orthoCamera.bottom = frustumSize / -2;
-        orthoCamera.updateProjectionMatrix();
+        updateCameraAspect(perspectiveCamera, container);
+        updateCameraAspect(orthoCamera, container);
     }
 
     // Update FPV and viewpoint cameras as they are tied to the main view
     const mainElement = viewports.main ? viewports.main.element : container;
-    const mainAspect = mainElement.clientWidth / mainElement.clientHeight;
     if (viewpointCamera) {
-        viewpointCamera.aspect = mainAspect;
-        viewpointCamera.updateProjectionMatrix();
+        updateCameraAspect(viewpointCamera, mainElement);
     }
     if (fpvOrthoCamera) {
-        const frustumSize = 15;
-        fpvOrthoCamera.left = frustumSize * mainAspect / -2;
-        fpvOrthoCamera.right = frustumSize * mainAspect / 2;
-        fpvOrthoCamera.top = frustumSize / 2;
-        fpvOrthoCamera.bottom = frustumSize / -2;
-        fpvOrthoCamera.updateProjectionMatrix();
+        updateCameraAspect(fpvOrthoCamera, mainElement);
     }
 
     renderer.setSize(container.clientWidth, container.clientHeight);
@@ -302,6 +287,7 @@ export function onWindowResize() {
         labelRenderer.setSize(container.clientWidth, container.clientHeight);
     }
 
+    const mainAspect = mainElement.clientWidth / mainElement.clientHeight;
     fisheyePass.uniforms['aspect'].value = mainAspect;
 }
 

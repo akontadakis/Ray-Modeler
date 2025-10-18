@@ -282,7 +282,7 @@
                 </div>
 
                 <div class="action-button-container">
-                    <button id="toggle-analysis-btn" class="btn" aria-label="Analysis Modules">
+                    <button id="toggle-analysis-btn" class="btn" aria-label="Analysis">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 495.421 495.421" xml:space="preserve" fill="currentColor" stroke="none"><path d="M490.531 188.099a7.27 7.27 0 0 0-8.089 2.393l-85.909 110.192a15.1 15.1 0 0 1-14.407 5.619l-93.674-15.672c-4.783-.8-9.668.742-13.123 4.159l-85.609 84.633a15.1 15.1 0 0 1-9.148 4.291l-111.28 10.993a15.14 15.14 0 0 0-9.523 4.679L2.414 460.344a8.85 8.85 0 0 0-1.685 9.589 8.87 8.87 0 0 0 8.138 5.339h468.591c9.924 0 17.963-8.036 17.963-17.957V194.956a7.25 7.25 0 0 0-4.89-6.857M29.334 275.472c4.504 0 8.978-1.782 12.312-5.314l24.096-25.411c3.535 1.03 7.229 1.758 11.093 1.758 18.997 0 34.859-13.296 39.018-31.04l38.148-3.762c6.584 13.213 20.086 22.397 35.833 22.397 22.116 0 40.138-18.007 40.138-40.141 0-4.952-1.02-9.648-2.669-14.03l34.049-33.384c5.579 2.947 11.833 4.771 18.567 4.771 14.987 0 27.945-8.368 34.828-20.584l22.137 3.707c5.129 16.25 20.185 28.15 38.108 28.15 22.136 0 40.143-18.007 40.143-40.143 0-6.286-1.585-12.162-4.159-17.462l44.862-57.555c5.743-7.361 4.423-17.983-2.941-23.718-7.328-5.719-17.956-4.417-23.715 2.938l-44.848 56.869c-3.004-.725-6.108-1.212-9.343-1.212-14.192 0-26.605 7.443-33.733 18.584l-23.937-4.002c-5.794-15.077-20.316-25.855-37.403-25.855-22.131 0-40.138 18.007-40.138 40.141 0 2.691.295 5.316.79 7.858l-37.733 37.136c-4.089-1.42-8.434-2.352-13.003-2.352-16.392 0-30.469 9.895-36.708 24l-44.438 4.39c-7.328-9.648-18.817-15.984-31.854-15.984-22.116 0-40.142 18.007-40.142 40.141 0 5.729 1.254 11.157 3.434 16.084l-23.091 24.535c-6.404 6.802-6.073 17.497.71 23.895a16.85 16.85 0 0 0 11.589 4.595m345.658-167.813c8.153 0 14.792 6.634 14.792 14.787 0 8.156-6.639 14.79-14.792 14.79s-14.788-6.634-14.788-14.79c0-8.153 6.635-14.787 14.788-14.787m-95.073-11.272c8.153 0 14.793 6.634 14.793 14.787s-6.64 14.79-14.793 14.79c-8.154 0-14.787-6.637-14.787-14.79s6.633-14.787 14.787-14.787m-90.084 82.782c8.154 0 14.787 6.637 14.787 14.79s-6.633 14.79-14.787 14.79-14.792-6.637-14.792-14.79 6.639-14.79 14.792-14.79m-113 12.405c8.153 0 14.788 6.634 14.788 14.788s-6.634 14.789-14.788 14.789-14.787-6.636-14.787-14.789c0-8.154 6.633-14.788 14.787-14.788"/></svg>
                     </button>
                     <span class="tooltip" role="tooltip">Analysis</span>
@@ -462,6 +462,22 @@
                     <input type="checkbox" id="ground-plane-toggle" checked>
                     <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal !mb-0">Show Ground Plane</span>
                 </label>
+                <div id="ground-grid-controls" class="hidden mt-4 pl-4 space-y-3">
+                    <div>
+                        <label class="label text-xs" for="ground-grid-size">Grid Size (m)</label>
+                        <div class="flex items-center space-x-3 mt-1">
+                            <input type="range" id="ground-grid-size" min="10" max="200" value="50" step="1">
+                            <span id="ground-grid-size-val" class="data-value font-mono w-12 text-left">50m</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="label text-xs" for="ground-grid-divisions">Grid Divisions</label>
+                        <div class="flex items-center space-x-3 mt-1">
+                            <input type="range" id="ground-grid-divisions" min="2" max="400" value="50" step="1">
+                            <span id="ground-grid-divisions-val" class="data-value font-mono w-12 text-left">50</span>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="space-y-3 pt-4 border-t border-[--grid-color]">
                 <label for="world-axes-toggle" class="flex items-center cursor-pointer">
@@ -584,7 +600,7 @@
                     <h4 class="font-semibold text-sm uppercase text-gray-700">North Wall Shading</h4>
                     <label class="flex items-center cursor-pointer" for="shading-n-toggle"><input type="checkbox" id="shading-n-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Shading on this Wall</span></label>
                     <div id="shading-controls-n" class="hidden space-y-5">
-                        <div><label class="label" for="shading-type-n">Device Type</label><select id="shading-type-n" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option><option value="imported_obj">Imported OBJ</option></select></div>
+                        <div><label class="label" for="shading-type-n">Device Type</label><select id="shading-type-n" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option><option value="generative">Generative (AI)</option><option value="imported_obj">Imported OBJ</option></select></div>
                         <div id="shading-controls-overhang-n" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
                             <div><label class="label" for="overhang-dist-above-n">Distance Above Top (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-dist-above-n" min="0" max="1.0" value="0" step="0.05"><span id="overhang-dist-above-n-val" class="data-value font-mono w-12 text-left">0.00m</span></div></div>
 
@@ -660,9 +676,103 @@
                             </div>
                             <p class="info-box !text-xs !py-2 !px-3">Click the imported object in the 3D view to use the transform gizmo for interactive placement.</p>
                         </div>
+                        <div id="shading-controls-generative-n" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
+                            <p class="info-box !text-xs !py-2 !px-3">
+                                AI-generated pattern. Adjust common parameters below. New patterns can only be created by the AI assistant.
+                            </p>
+                            <div>
+                                <label class="label text-xs flex justify-between" for="shading-generative-depth-n"><span>Depth</span><span id="shading-generative-depth-n-val" class="data-value font-mono">0.5m</span></label>
+                                <input type="range" id="shading-generative-depth-n" min="0.1" max="2.0" step="0.05" value="0.5">
+                            </div>
+                            <div>
+                                <label class="label text-xs flex justify-between" for="shading-generative-spacing-x-n"><span>Spacing X</span><span id="shading-generative-spacing-x-n-val" class="data-value font-mono">0.3m</span></label>
+                                <input type="range" id="shading-generative-spacing-x-n" min="0.1" max="2.0" step="0.05" value="0.3">
+                            </div>
+                            <div>
+                                <label class="label text-xs flex justify-between" for="shading-generative-spacing-y-n"><span>Spacing Y</span><span id="shading-generative-spacing-y-n-val" class="data-value font-mono">0.3m</span></label>
+                                <input type="range" id="shading-generative-spacing-y-n" min="0.1" max="2.0" step="0.05" value="0.3">
+                            </div>
+
+
+
+
+
+
+                            <div>
+                            <label class="label text-xs flex justify-between" for="shading-generative-element-width-n"><span>Element Width</span><span id="shading-generative-element-width-n-val" class="data-value font-mono">0.05m</span></label>
+                            <input type="range" id="shading-generative-element-width-n" min="0.01" max="0.5" step="0.01" value="0.05">
+                        </div>
+                        <input type="hidden" id="shading-pattern-type-n">
+
+                        <!-- Solar Responsive Parameters -->
+                        <div id="solar-params-n" class="hidden space-y-3 pt-4 border-t border-dashed border-[--grid-color]">
+                            <h4 class="font-semibold text-sm">Solar Responsive Shading</h4>
+                            
+                            <!-- Analysis Quality -->
+                            <div>
+                                <label class="text-sm">Analysis Quality</label>
+                                <select id="solar-quality-n" class="input w-full">
+                                    <option value="quick">Quick (Monthly, Coarse Grid)</option>
+                                    <option value="standard" selected>Standard (Hourly, Medium Grid)</option>
+                                    <option value="high-fidelity">High-Fidelity (Sub-hourly, Fine Grid)</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Radiation Threshold -->
+                            <div class="flex items-center justify-between">
+                                <label class="text-sm">Radiation Threshold</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="range" id="solar-threshold-n" 
+                                           min="200" max="1000" step="50" value="500" class="slider flex-1">
+                                    <span id="solar-threshold-val-n" class="text-sm w-24 text-right">500 kWh/m²</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Weather File -->
+                            <div>
+                                <label class="text-sm">Weather File</label>
+                                <input type="file" id="solar-epw-file-n" accept=".epw" class="input w-full text-sm">
+                            </div>
+                            
+                            <!-- Run Analysis Button -->
+                            <button id="solar-analyze-btn-n" class="btn btn-primary w-full">
+                                Run Solar Analysis
+                            </button>
+                            
+                            <!-- Progress indicator -->
+                            <div id="solar-progress-n" class="hidden">
+                                <div class="progress-bar">
+                                    <div id="solar-progress-fill-n" class="progress-fill"></div>
+                                </div>
+                                <p class="text-xs text-center mt-1" id="solar-progress-text-n">Analyzing...</p>
+                            </div>
+                            
+                            <!-- Results Summary (shown after analysis) -->
+                            <div id="solar-results-n" class="hidden p-3 bg-gray-800 rounded">
+                                <h5 class="font-semibold text-xs mb-2">Analysis Results</h5>
+                                <p class="text-xs">High-radiation hours: <span id="solar-high-hours-n">-</span></p>
+                                <p class="text-xs">Peak altitude: <span id="solar-peak-alt-n">-</span>°</p>
+                                <p class="text-xs">Fins generated: <span id="solar-fin-count-n">-</span></p>
+                            </div>
+                            
+                            <!-- Manual Adjustment -->
+                            <button id="solar-edit-btn-n" class="btn btn-secondary w-full hidden">
+                                Manually Adjust Pattern
+                            </button>
+                        </div>
                     </div>
-                    <div class="pt-4 mt-4 border-t border-dashed border-[--grid-color]">
-                    <label for="sun-ray-tracing-toggle-n" class="flex items-center cursor-pointer">
+
+                </div>
+                <div class="pt-4 mt-4 border-t border-dashed border-[--grid-color]">
+
+
+
+
+
+
+
+
+
                         <input type="checkbox" id="sun-ray-tracing-toggle-n">
                         <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Sun Ray Tracing</span>
                     </label>
@@ -689,7 +799,7 @@
                     <h4 class="font-semibold text-sm uppercase text-gray-700">South Wall Shading</h4>
                     <label class="flex items-center cursor-pointer" for="shading-s-toggle"><input type="checkbox" id="shading-s-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Shading on this Wall</span></label>
                     <div id="shading-controls-s" class="hidden space-y-5">
-                        <div><label class="label" for="shading-type-s">Device Type</label><select id="shading-type-s" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option><option value="imported_obj">Imported OBJ</option></select></div>
+                        <div><label class="label" for="shading-type-s">Device Type</label><select id="shading-type-s" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option><option value="generative">Generative (AI)</option><option value="imported_obj">Imported OBJ</option></select></div>
                         <div id="shading-controls-overhang-s" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
                             <div><label class="label" for="overhang-dist-above-s">Distance Above Top (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-dist-above-s" min="0" max="1.0" value="0" step="0.05"><span id="overhang-dist-above-s-val" class="data-value font-mono w-12 text-left">0.00m</span></div></div>
                             <div><label class="label" for="overhang-tilt-s">Tilt Angle (°)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-tilt-s" min="-90" max="90" value="0" step="1"><span id="overhang-tilt-s-val" class="data-value font-mono w-12 text-left">0°</span></div></div>
@@ -763,9 +873,88 @@
                             </div>
                             <p class="info-box !text-xs !py-2 !px-3">Click the imported object in the 3D view to use the transform gizmo for interactive placement.</p>
                         </div>
+                        <div id="shading-controls-generative-s" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
+                            <p class="info-box !text-xs !py-2 !px-3">
+                                AI-generated pattern. Adjust common parameters below. New patterns can only be created by the AI assistant.
+                            </p>
+                            <div>
+                                <label class="label text-xs flex justify-between" for="shading-generative-depth-s"><span>Depth</span><span id="shading-generative-depth-s-val" class="data-value font-mono">0.5m</span></label>
+                                <input type="range" id="shading-generative-depth-s" min="0.1" max="2.0" step="0.05" value="0.5">
+                            </div>
+                            <div>
+                                <label class="label text-xs flex justify-between" for="shading-generative-spacing-x-s"><span>Spacing X</span><span id="shading-generative-spacing-x-s-val" class="data-value font-mono">0.3m</span></label>
+                                <input type="range" id="shading-generative-spacing-x-s" min="0.1" max="2.0" step="0.05" value="0.3">
+                            </div>
+                            <div>
+                                <label class="label text-xs flex justify-between" for="shading-generative-spacing-y-s"><span>Spacing Y</span><span id="shading-generative-spacing-y-s-val" class="data-value font-mono">0.3m</span></label>
+                                <input type="range" id="shading-generative-spacing-y-s" min="0.1" max="2.0" step="0.05" value="0.3">
+                            </div>
+                                                        <div>
+                            <label class="label text-xs flex justify-between" for="shading-generative-element-width-s"><span>Element Width</span><span id="shading-generative-element-width-s-val" class="data-value font-mono">0.05m</span></label>
+                            <input type="range" id="shading-generative-element-width-s" min="0.01" max="0.5" step="0.01" value="0.05">
+                        </div>
+                        <input type="hidden" id="shading-pattern-type-s">
+
+                        <!-- Solar Responsive Parameters -->
+                        <div id="solar-params-s" class="hidden space-y-3 pt-4 border-t border-dashed border-[--grid-color]">
+                            <h4 class="font-semibold text-sm">Solar Responsive Shading</h4>
+                            
+                            <!-- Analysis Quality -->
+                            <div>
+                                <label class="text-sm">Analysis Quality</label>
+                                <select id="solar-quality-s" class="input w-full">
+                                    <option value="quick">Quick (Monthly, Coarse Grid)</option>
+                                    <option value="standard" selected>Standard (Hourly, Medium Grid)</option>
+                                    <option value="high-fidelity">High-Fidelity (Sub-hourly, Fine Grid)</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Radiation Threshold -->
+                            <div class="flex items-center justify-between">
+                                <label class="text-sm">Radiation Threshold</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="range" id="solar-threshold-s" 
+                                           min="200" max="1000" step="50" value="500" class="slider flex-1">
+                                    <span id="solar-threshold-val-s" class="text-sm w-24 text-right">500 kWh/m²</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Weather File -->
+                            <div>
+                                <label class="text-sm">Weather File</label>
+                                <input type="file" id="solar-epw-file-s" accept=".epw" class="input w-full text-sm">
+                            </div>
+                            
+                            <!-- Run Analysis Button -->
+                            <button id="solar-analyze-btn-s" class="btn btn-primary w-full">
+                                Run Solar Analysis
+                            </button>
+                            
+                            <!-- Progress indicator -->
+                            <div id="solar-progress-s" class="hidden">
+                                <div class="progress-bar">
+                                    <div id="solar-progress-fill-s" class="progress-fill"></div>
+                                </div>
+                                <p class="text-xs text-center mt-1" id="solar-progress-text-s">Analyzing...</p>
+                            </div>
+                            
+                            <!-- Results Summary (shown after analysis) -->
+                            <div id="solar-results-s" class="hidden p-3 bg-gray-800 rounded">
+                                <h5 class="font-semibold text-xs mb-2">Analysis Results</h5>
+                                <p class="text-xs">High-radiation hours: <span id="solar-high-hours-s">-</span></p>
+                                <p class="text-xs">Peak altitude: <span id="solar-peak-alt-s">-</span>°</p>
+                                <p class="text-xs">Fins generated: <span id="solar-fin-count-s">-</span></p>
+                            </div>
+                            
+                            <!-- Manual Adjustment -->
+                            <button id="solar-edit-btn-s" class="btn btn-secondary w-full hidden">
+                                Manually Adjust Pattern
+                            </button>
+                        </div>
                     </div>
-                    <div class="pt-4 mt-4 border-t border-dashed border-[--grid-color]">
-                    <label for="sun-ray-tracing-toggle-s" class="flex items-center cursor-pointer">
+                    
+                </div>
+                <div class="pt-4 mt-4 border-t border-dashed border-[--grid-color]">
                         <input type="checkbox" id="sun-ray-tracing-toggle-s">
                         <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Sun Ray Tracing</span>
                     </label>
@@ -792,13 +981,9 @@
                 <h4 class="font-semibold text-sm uppercase text-gray-700">East Wall Shading</h4>
                     <label class="flex items-center cursor-pointer" for="shading-e-toggle"><input type="checkbox" id="shading-e-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Shading on this Wall</span></label>
                     <div id="shading-controls-e" class="hidden space-y-5">
-                        <div><label class="label" for="shading-type-e">Device Type</label><select id="shading-type-e" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option><option value="imported_obj">Imported OBJ</option></select></div>
+                        <div><label class="label" for="shading-type-e">Device Type</label><select id="shading-type-e" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option><option value="generative">Generative (AI)</option><option value="imported_obj">Imported OBJ</option></select></div>
                         <div id="shading-controls-overhang-e" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
                             <div><label class="label" for="overhang-dist-above-e">Distance Above Top (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-dist-above-e" min="0" max="1.0" value="0" step="0.05"><span id="overhang-dist-above-e-val" class="data-value font-mono w-12 text-left">0.00m</span></div></div>
-                            <div><label class="label" for="overhang-tilt-e">Tilt Angle (°)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-tilt-e" min="-90" max="90" value="0" step="1"><span id="overhang-tilt-e-val" class="data-value font-mono w-12 text-left">0°</span></div></div>
-                            <div><label class="label" for="overhang-depth-e">Depth (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-depth-e" min="0" max="2.0" value="0.5" step="0.1"><span id="overhang-depth-e-val" class="data-value font-mono w-12 text-left">0.5m</span></div></div>
-                            <div><label class="label" for="overhang-thick-e">Thickness (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-thick-e" min="0.005" max="0.5" value="0.05" step="0.005"><span id="overhang-thick-e-val" class="data-value font-mono w-12 text-left">0.050m</span></div></div>
-                            <div><label class="label" for="overhang-extension-e">Extension From Window (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-extension-e" min="0" max="1.0" value="0.0" step="0.05"><span id="overhang-extension-e-val" class="data-value font-mono w-12 text-left">0.00m</span></div></div>
                         </div>
                         <div id="shading-controls-lightshelf-e" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
                             <div><label class="label">Placement</label><div class="btn-group mt-1"><button id="lightshelf-placement-ext-e" class="btn active">Exterior</button><button id="lightshelf-placement-int-e" class="btn">Interior</button><button id="lightshelf-placement-both-e" class="btn">Both</button></div></div>
@@ -866,9 +1051,88 @@
                             </div>
                             <p class="info-box !text-xs !py-2 !px-3">Click the imported object in the 3D view to use the transform gizmo for interactive placement.</p>
                         </div>
+                        <div id="shading-controls-generative-e" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
+                            <p class="info-box !text-xs !py-2 !px-3">
+                                AI-generated pattern. Adjust common parameters below. New patterns can only be created by the AI assistant.
+                            </p>
+                            <div>
+                                <label class="label text-xs flex justify-between" for="shading-generative-depth-e"><span>Depth</span><span id="shading-generative-depth-e-val" class="data-value font-mono">0.5m</span></label>
+                                <input type="range" id="shading-generative-depth-e" min="0.1" max="2.0" step="0.05" value="0.5">
+                            </div>
+                            <div>
+                                <label class="label text-xs flex justify-between" for="shading-generative-spacing-x-e"><span>Spacing X</span><span id="shading-generative-spacing-x-e-val" class="data-value font-mono">0.3m</span></label>
+                                <input type="range" id="shading-generative-spacing-x-e" min="0.1" max="2.0" step="0.05" value="0.3">
+                            </div>
+                            <div>
+                                <label class="label text-xs flex justify-between" for="shading-generative-spacing-y-e"><span>Spacing Y</span><span id="shading-generative-spacing-y-e-val" class="data-value font-mono">0.3m</span></label>
+                                <input type="range" id="shading-generative-spacing-y-e" min="0.1" max="2.0" step="0.05" value="0.3">
+                            </div>
+                            <div>
+                            <label class="label text-e-xs flex justify-between" for="shading-generative-element-width-e"><span>Element Width</span><span id="shading-generative-element-width-e-val" class="data-value font-mono">0.05m</span></label>
+                            <input type="range" id="shading-generative-element-width-e" min="0.01" max="0.5" step="0.01" value="0.05">
+                        </div>
+                        <input type="hidden" id="shading-pattern-type-e">
+
+                        <!-- Solar Responsive Parameters -->
+                        <div id="solar-params-e" class="hidden space-y-3 pt-4 border-t border-dashed border-[--grid-color]">
+                            <h4 class="font-semibold text-sm">Solar Responsive Shading</h4>
+                            
+                            <!-- Analysis Quality -->
+                            <div>
+                                <label class="text-sm">Analysis Quality</label>
+                                <select id="solar-quality-e" class="input w-full">
+                                    <option value="quick">Quick (Monthly, Coarse Grid)</option>
+                                    <option value="standard" selected>Standard (Hourly, Medium Grid)</option>
+                                    <option value="high-fidelity">High-Fidelity (Sub-hourly, Fine Grid)</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Radiation Threshold -->
+                            <div class="flex items-center justify-between">
+                                <label class="text-sm">Radiation Threshold</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="range" id="solar-threshold-e" 
+                                           min="200" max="1000" step="50" value="500" class="slider flex-1">
+                                    <span id="solar-threshold-val-e" class="text-sm w-24 text-right">500 kWh/m²</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Weather File -->
+                            <div>
+                                <label class="text-sm">Weather File</label>
+                                <input type="file" id="solar-epw-file-e" accept=".epw" class="input w-full text-sm">
+                            </div>
+                            
+                            <!-- Run Analysis Button -->
+                            <button id="solar-analyze-btn-e" class="btn btn-primary w-full">
+                                Run Solar Analysis
+                            </button>
+                            
+                            <!-- Progress indicator -->
+                            <div id="solar-progress-e" class="hidden">
+                                <div class="progress-bar">
+                                    <div id="solar-progress-fill-e" class="progress-fill"></div>
+                                </div>
+                                <p class="text-xs text-center mt-1" id="solar-progress-text-e">Analyzing...</p>
+                            </div>
+                            
+                            <!-- Results Summary (shown after analysis) -->
+                            <div id="solar-results-e" class="hidden p-3 bg-gray-800 rounded">
+                                <h5 class="font-semibold text-xs mb-2">Analysis Results</h5>
+                                <p class="text-xs">High-radiation hours: <span id="solar-high-hours-e">-</span></p>
+                                <p class="text-xs">Peak altitude: <span id="solar-peak-alt-e">-</span>°</p>
+                                <p class="text-xs">Fins generated: <span id="solar-fin-count-e">-</span></p>
+                            </div>
+                            
+                            <!-- Manual Adjustment -->
+                            <button id="solar-edit-btn-e" class="btn btn-secondary w-full hidden">
+                                Manually Adjust Pattern
+                            </button>
+                        </div>
                     </div>
-                    <div class="pt-4 mt-4 border-t border-dashed border-[--grid-color]">
-                    <label for="sun-ray-tracing-toggle-e" class="flex items-center cursor-pointer">
+                    
+                </div>
+                <div class="pt-4 mt-4 border-t border-dashed border-[--grid-color]">
                         <input type="checkbox" id="sun-ray-tracing-toggle-e">
                         <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Sun Ray Tracing</span>
                     </label>
@@ -895,13 +1159,9 @@
                 <h4 class="font-semibold text-sm uppercase text-gray-700">West Wall Shading</h4>
                     <label class="flex items-center cursor-pointer" for="shading-w-toggle"><input type="checkbox" id="shading-w-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Shading on this Wall</span></label>
                     <div id="shading-controls-w" class="hidden space-y-5">
-                        <div><label class="label" for="shading-type-w">Device Type</label><select id="shading-type-w" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option><option value="imported_obj">Imported OBJ</option></select></div>
+                        <div><label class="label" for="shading-type-w">Device Type</label><select id="shading-type-w" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option><option value="generative">Generative (AI)</option><option value="imported_obj">Imported OBJ</option></select></div>
                         <div id="shading-controls-overhang-w" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
                             <div><label class="label" for="overhang-dist-above-w">Distance Above Top (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-dist-above-w" min="0" max="1.0" value="0" step="0.05"><span id="overhang-dist-above-w-val" class="data-value font-mono w-12 text-left">0.00m</span></div></div>
-                            <div><label class="label" for="overhang-tilt-w">Tilt Angle (°)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-tilt-w" min="-90" max="90" value="0" step="1"><span id="overhang-tilt-w-val" class="data-value font-mono w-12 text-left">0°</span></div></div>
-                            <div><label class="label" for="overhang-depth-w">Depth (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-depth-w" min="0" max="2.0" value="0.5" step="0.1"><span id="overhang-depth-w-val" class="data-value font-mono w-12 text-left">0.5m</span></div></div>
-                            <div><label class="label" for="overhang-thick-w">Thickness (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-thick-w" min="0.005" max="0.5" value="0.05" step="0.005"><span id="overhang-thick-w-val" class="data-value font-mono w-12 text-left">0.050m</span></div></div>
-                            <div><label class="label" for="overhang-extension-w">Extension From Window (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-extension-w" min="0" max="1.0" value="0.0" step="0.05"><span id="overhang-extension-w-val" class="data-value font-mono w-12 text-left">0.00m</span></div></div>
                         </div>
                         <div id="shading-controls-lightshelf-w" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
                             <div><label class="label">Placement</label><div class="btn-group mt-1"><button id="lightshelf-placement-ext-w" class="btn active">Exterior</button><button id="lightshelf-placement-int-w" class="btn">Interior</button><button id="lightshelf-placement-both-w" class="btn">Both</button></div></div>
@@ -969,15 +1229,96 @@
                             </div>
                             <p class="info-box !text-xs !py-2 !px-3">Click the imported object in the 3D view to use the transform gizmo for interactive placement.</p>
                         </div>
+                        <div id="shading-controls-generative-w" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
+                            <p class="info-box !text-xs !py-2 !px-3">
+                                AI-generated pattern. Adjust common parameters below. New patterns can only be created by the AI assistant.
+                            </p>
+                            <div>
+                                <label class="label text-xs flex justify-between" for="shading-generative-depth-w"><span>Depth</span><span id="shading-generative-depth-w-val" class="data-value font-mono">0.5m</span></label>
+                                <input type="range" id="shading-generative-depth-w" min="0.1" max="2.0" step="0.05" value="0.5">
+                            </div>
+                            <div>
+                                <label class="label text-xs flex justify-between" for="shading-generative-spacing-x-w"><span>Spacing X</span><span id="shading-generative-spacing-x-w-val" class="data-value font-mono">0.3m</span></label>
+                                <input type="range" id="shading-generative-spacing-x-w" min="0.1" max="2.0" step="0.05" value="0.3">
+                            </div>
+                            <div>
+                                <label class="label text-xs flex justify-between" for="shading-generative-spacing-y-w"><span>Spacing Y</span><span id="shading-generative-spacing-y-w-val" class="data-value font-mono">0.3m</span></label>
+                                <input type="range" id="shading-generative-spacing-y-w" min="0.1" max="2.0" step="0.05" value="0.3">
+                            </div>
+                            <div>
+                            <label class="label text-xs flex justify-between" for="shading-generative-element-width-w"><span>Element Width</span><span id="shading-generative-element-width-w-val" class="data-value font-mono">0.05m</span></label>
+                            <input type="range" id="shading-generative-element-width-w" min="0.01" max="0.5" step="0.01" value="0.05">
+                        </div>
+                        <input type="hidden" id="shading-pattern-type-w">
+
+                        <!-- Solar Responsive Parameters -->
+                        <div id="solar-params-w" class="hidden space-y-3 pt-4 border-t border-dashed border-[--grid-color]">
+                            <h4 class="font-semibold text-sm">Solar Responsive Shading</h4>
+                            
+                            <!-- Analysis Quality -->
+                            <div>
+                                <label class="text-sm">Analysis Quality</label>
+                                <select id="solar-quality-w" class="input w-full">
+                                    <option value="quick">Quick (Monthly, Coarse Grid)</option>
+                                    <option value="standard" selected>Standard (Hourly, Medium Grid)</option>
+                                    <option value="high-fidelity">High-Fidelity (Sub-hourly, Fine Grid)</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Radiation Threshold -->
+                            <div class="flex items-center justify-between">
+                                <label class="text-sm">Radiation Threshold</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="range" id="solar-threshold-w" 
+                                           min="200" max="1000" step="50" value="500" class="slider flex-1">
+                                    <span id="solar-threshold-val-w" class="text-sm w-24 text-right">500 kWh/m²</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Weather File -->
+                            <div>
+                                <label class="text-sm">Weather File</label>
+                                <input type="file" id="solar-epw-file-w" accept=".epw" class="input w-full text-sm">
+                            </div>
+                            
+                            <!-- Run Analysis Button -->
+                            <button id="solar-analyze-btn-w" class="btn btn-primary w-full">
+                                Run Solar Analysis
+                            </button>
+                            
+                            <!-- Progress indicator -->
+                            <div id="solar-progress-w" class="hidden">
+                                <div class="progress-bar">
+                                    <div id="solar-progress-fill-w" class="progress-fill"></div>
+                                </div>
+                                <p class="text-xs text-center mt-1" id="solar-progress-text-w">Analyzing...</p>
+                            </div>
+                            
+                            <!-- Results Summary (shown after analysis) -->
+                            <div id="solar-results-w" class="hidden p-3 bg-gray-800 rounded">
+                                <h5 class="font-semibold text-xs mb-2">Analysis Results</h5>
+                                <p class="text-xs">High-radiation hours: <span id="solar-high-hours-w">-</span></p>
+                                <p class="text-xs">Peak altitude: <span id="solar-peak-alt-w">-</span>°</p>
+                                <p class="text-xs">Fins generated: <span id="solar-fin-count-w">-</span></p>
+                            </div>
+                            
+                            <!-- Manual Adjustment -->
+                            <button id="solar-edit-btn-w" class="btn btn-secondary w-full hidden">
+                                Manually Adjust Pattern
+                            </button>
+                        </div>
                     </div>
-                    <div class="pt-4 mt-4 border-t border-dashed border-[--grid-color]">
-                        <label for="sun-ray-tracing-toggle-w" class="flex items-center cursor-pointer">
+                    
+                </div>
+                <div class="pt-4 mt-4 border-t border-dashed border-[--grid-color]">
                             <input type="checkbox" id="sun-ray-tracing-toggle-w">
                             <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Sun Ray Tracing</span>
                         </label>
                     </div>
                 </div>
             </div>
+
+            
 
             <div class="pt-4 border-t border-[--grid-color]">
                 <label for="frame-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="frame-toggle" checked><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Add Frame To All Windows</span></label>
@@ -2118,104 +2459,275 @@
                   </div>
               </div>
               <div class="window-content">
-                    <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.311a15.045 15.045 0 01-7.5 0C4.508 17.311 2.25 15.122 2.25 12c0-3.122 2.258-5.311 4.75-5.965M12 18a2.25 2.25 0 01-2.25-2.25V6.75A2.25 2.25 0 0112 4.5h.75a2.25 2.25 0 012.25 2.25v5.25a2.25 2.25 0 01-2.25 2.25h-.75z" /></svg>About Ray Modeler</h2>
-                    <p>This application is a web-based graphical user interface for the <a href="https://www.radiance-online.org/" target="_blank" class="text-[--text-secondary] underline">Radiance Lighting Simulation Suite</a>. It simplifies the process of creating, simulating, and analyzing daylighting and electric lighting in simple, single-zone spaces by providing a visual, parametric modeling environment and automating the script generation process.</p>
+                <p class="mb-4">
+                    Ray Modeler is a web-based graphical user interface for the Radiance Lighting Simulation Suite, with an integrated AI Assistant to automate workflows and provide expert guidance. It streamlines the entire daylighting and electric lighting analysis workflow, from parametric 3D modeling to simulation script generation and advanced results visualization.
+                </p>
+                <p class="mb-4">
+                    Ray Modeler provides an intuitive, interactive environment to model, simulate, and analyze lighting performance in single-zone spaces without needing to write Radiance code manually.
+                </p>
+                <img src="./Pictures/welcome_screen.png" alt="Ray Modeler Welcome Screen" class="w-full rounded-md my-4 border border-[--grid-color]">
 
-                    <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Core Capabilities</h3>
-                    <ul>
-                        <li><strong>Parametric Scene Modeling:</strong> Visually define room dimensions, orientation, window-to-wall ratios, and complex shading devices like overhangs, light shelves, louvers, and roller shades.</li>
-                        <li><strong>Radiance Material Editor:</strong> Configure standard Radiance materials (<code>plastic</code>, <code>metal</code>, <code>glass</code>) by adjusting properties like reflectance, specularity, and roughness.</li>
-                        <li><strong>Advanced Glazing:</strong> Model glazing using simple transmittance values or by incorporating complex fenestration data via BSDF <code>.xml</code> files.</li>
-                        <li><strong>Electric Lighting Design:</strong> Place and configure multiple Radiance light source types (<code>light</code>, <code>spotlight</code>, <code>glow</code>, <code>illum</code>) or import real-world luminaire data using IES photometric files in individual or grid-based layouts.</li>
-                        <li><strong>Solar Analysis:</strong> Visualize annual sun paths and analemmas, intelligently centered on the primary window or room center. The 3D diagram is integrated with a 2D stereographic compass for top-down views.</li>
-                        <li><strong>Automated Radiance Workflow:</strong> Generates a complete, organized project folder structure (e.g., <code>01_geometry</code>, <code>04_skies</code>, <code>07_scripts</code>) and populates it with geometry files, material definitions, and executable run scripts.</li>
-                        <li><strong>First-Person View (FPV) Mode:</strong> Enter the Radiance viewpoint camera directly to preview the exact perspective or fisheye view that will be rendered for analysis.</li>
-                        <li><strong>Advanced Annual Analysis:</strong> Generate and view temporal heatmaps, glare rose diagrams, and combined daylight/glare scatter plots to deeply understand annual performance.</li>
-                        <li><strong>Interactive HDR Image Analysis:</strong> View renderings with exposure controls, toggle false-color luminance mode, and use a mouse-over probe to get exact cd/m² values.</li>
-                    </ul>
-
-                    <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" /></svg>Workflow Overview</h2>
-                    <p>The application is designed around a clear, linear workflow from scene definition to results analysis. The UI panels are arranged to guide you through this process.</p>
-                    <div class="workflow-container">
-                        <div class="workflow-step" id="wf-step-1">
-                            <div class="workflow-title">Step 1: Scene Setup</div>
-                            <div class="workflow-subtitle">Left Toolbar Panels</div>
-                            <div class="workflow-items">
-                                <span>Project & Location</span>
-                                <span>Dimensions & Orientation</span>
-                                <span>Apertures & Shading</span>
-                                <span>Materials & Lighting</span>
-                                <span>Sensor Grids</span>
-                            </div>
-                        </div>
-                        <div class="workflow-arrow">&rarr;</div>
-                        <div class="workflow-step" id="wf-step-2">
-                            <div class="workflow-title">Step 2: Simulation Setup</div>
-                            <div class="workflow-subtitle">Right Simulation Sidebar</div>
-                            <div class="workflow-items">
-                                <span>Select a Recipe</span>
-                                <span>Configure Parameters</span>
-                                <span>Generate Package</span>
-                            </div>
-                        </div>
-                        <div class="workflow-arrow">&rarr;</div>
-                        <div class="workflow-step" id="wf-step-3">
-                            <div class="workflow-title">Step 3: Run Simulation</div>
-                            <div class="workflow-subtitle">(External)</div>
-                        </div>
-                        <div class="workflow-arrow">&rarr;</div>
-                        <div class="workflow-step" id="wf-step-4">
-                            <div class="workflow-title">Step 4: Analyze Results</div>
-                            <div class="workflow-subtitle">Right Analysis Sidebar</div>
-                            <div class="workflow-items">
-                                <span>Load Results File</span>
-                                <span>Visualize Data in 3D</span>
-                                <span>View Dashboards</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>Panel Reference</h2>
-                    <h3><code>Project Setup</code></h3>
-                    <p>This is the starting point. Define project metadata, set the building's geographic location using an interactive map, or by uploading an <code>.epw</code> weather file which auto-populates location data. This panel also contains controls for the 3D Sun Path visualization and a tool for generating annual occupancy schedules.</p>
-                    <h3><code>Dimensions</code></h3>
-                    <p>Set the foundational geometry: <strong>width (X-axis)</strong>, <strong>length (Z-axis)</strong>, and <strong>height (Y-axis)</strong>. The <strong>Orientation</strong> slider rotates the entire room, affecting its solar exposure.</p>
-                    <h3><code>Apertures & Shading</code></h3>
-                    <p>Control openings on each wall. Work parametrically using <strong>Window-to-Wall Ratio (WWR)</strong> or switch to <strong>Manual</strong> mode for precise control. Each wall can have its own complex shading system, including <code>Overhangs</code>, <code>Light Shelves</code>, <code>Louvers</code>, and <code>Roller Shades</code>.</p>
-                    <h3><code>Artificial Lighting</code></h3>
-                    <p>Add electric lighting. Choose from Radiance primitives like <code>light</code>, <code>spotlight</code>, and <code>glow</code>, or upload an <code>.ies</code> file for a specific luminaire. Lights can be placed individually or arranged in a grid.</p>
-                    <h3><code>Material Properties</code></h3>
-                    <p>Define surface characteristics. For each element, select a Radiance material and adjust its <strong>reflectance</strong>, <strong>specularity</strong>, and <strong>roughness</strong>. The app correctly converts the intuitive 'Transmittance' value for glazing into the physically-based 'Transmissivity' required by the Radiance <code>glass</code> material. Advanced optics can be modeled via BSDF <code>.xml</code> files.</p>
-                    <h3><code>Sensor Grid</code></h3>
-                    <p>Create measurement points for simulations. The <strong>Illuminance Grid</strong> generates a <code>.pts</code> file for `rtrace` and is visualized as spheres. The <strong>View Grid</strong> generates a <code>.ray</code> file for imageless glare analysis (`rcontrib`) and is visualized as arrows indicating view directions.</p>
-                    <h3><code>Viewpoint</code></h3>
-                    <p>This panel controls the specific camera view used by Radiance for generating renderings (<code>rpict</code>) or glare images (<code>evalglare</code>). It defines the camera's position (<code>-vp</code>), direction (<code>-vd</code>), and view type. You can manipulate this camera with a 3D gizmo or enter a <strong>First-Person View (FPV)</strong> to see exactly what Radiance will render.</p>
-                    <h3><code>View Options</code></h3>
-                    <p>Adjust the live 3D preview. You can make surfaces transparent to see inside the model or enable <strong>section cuts</strong> (horizontal or vertical clipping planes) to inspect the interior.</p>
-
-                    <h2><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>Simulation Modules (Recipes)</h2>
-                    <p>Each recipe automates a specific Radiance workflow by generating scripts that call core commands like <code>oconv</code>, <code>rpict</code>, and <code>rtrace</code>. For annual simulations, a Python script (<code>post_process_annual.py</code>) is also generated to calculate metrics from the binary results.</p>
-                    <ul>
-                        <li><strong>Global Simulation Parameters:</strong> A panel to set default Radiance parameters (e.g., <code>-ab</code>, <code>-ad</code>) that are inherited by all other recipes.</li>
-                        <li><strong>Illuminance Map:</strong> A point-in-time calculation that produces illuminance (lux) values for each point in your sensor grid.</li>
-                        <li><strong>Photorealistic Rendering:</strong> Creates a high-dynamic-range (HDR) image from the specified Viewpoint.</li>
-                        <li><strong>Daylight Glare Probability (DGP):</strong> Renders a 180° fisheye image and analyzes it for glare, producing a DGP value and a report on glare sources.</li>
-                        <li><strong>Daylight Factor (DF):</strong> Calculates the ratio of internal to external illuminance under a standard CIE overcast sky.</li>
-                        <li><strong>Annual Daylight (3/5-Phase):</strong> Generates scripts to run <code>rcontrib</code> to create the necessary matrices (View, Daylight, etc.) and then uses <code>dctimestep</code> to perform the final annual calculation.</li>
-                        <li><strong>Imageless Annual Glare:</strong> This advanced recipe uses <code>rcontrib</code> to generate Daylight Coefficients and then runs <code>dcglare</code> to efficiently calculate an 8760-hour DGP profile.</li>
-                    </ul>
-
-                    <h2><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>Analysis Modules</h2>
-                    <p>This sidebar uses a background Web Worker to parse various Radiance result files (binary <code>.ill</code>, text-based <code>.dgp</code>, <code>.ga</code> reports, and <code>.hdr</code> images) without freezing the interface. The application will automatically detect the file type and enable the relevant visualization tools.</p>
-                    <ul>
-                        <li><strong>3D Visualization:</strong> Illuminance data is mapped as a false-color grid onto the 3D model, with a customizable color scale and support for comparing two datasets.</li>
-                        <li><strong>Annual Metrics Dashboard:</strong> For annual <code>.ill</code> files, this dashboard visualizes key climate-based metrics. It includes gauge charts for <strong>Spatial Daylight Autonomy (sDA)</strong> and <strong>Annual Sunlight Exposure (ASE)</strong>, and a stacked bar chart detailing the percentages of <strong>Useful Daylight Illuminance (UDI)</strong>.</li>
-                        <li><strong>Temporal Map:</strong> When clicking on a sensor point after loading annual results, a 24x365 heatmap is generated, showing the hour-by-hour illuminance profile for that specific point throughout the year.</li>
-                        <li><strong>Glare Rose Diagram:</strong> For annual <code>.dgp</code> files, this generates a polar chart showing the number of occupied hours that exceed a DGP threshold, organized by the sun's position in the sky.</li>
-                        <li><strong>Combined Daylight vs. Glare Plot:</strong> When both annual illuminance and glare files are loaded, this scatter plot is available. Each point represents a sensor, plotting its percentage of useful daylight hours against its percentage of glare hours.</li>
-                        <li><strong>HDR Viewer:</strong> Loads and displays rendered <code>.hdr</code> images. Features include exposure controls, a false-color mode based on luminance, and a mouse-over probe to get exact cd/m² values. It can also overlay detected glare sources from a report.</li>
+                <h2><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v.01h-.001a6 6 0 01-5.84-7.38L6.75 8.25a.75.75 0 01.75-.75h7.5a.75.75 0 01.75.75l2.84 6.12zM12 12l.001.001M12 12l-.001.001M12 12l.001-.001M12 12l-.001-.001M12 6a.75.75 0 01.75-.75h.008a.75.75 0 01.75.75v.008a.75.75 0 01-.75.75h-.008A.75.75 0 0112 6zM12 3.75a.75.75 0 01.75-.75h.008a.75.75 0 01.75.75v.008a.75.75 0 01-.75.75h-.008a.75.75 0 01-.75-.75V3.75zM12 15a.75.75 0 01.75-.75h.008a.75.75 0 01.75.75v.008a.75.75 0 01-.75.75h-.008A.75.75 0 0112 15z" /></svg>Getting Started</h2>
+                <p>To use Ray Modeler, you will need a modern web browser and a local installation of the Radiance Lighting Simulation Suite. The desktop version provides the most seamless experience.</p>
+                <ol class="list-decimal list-inside space-y-2 my-4">
+                    <li><strong>Install Radiance</strong>:
+                        Download and install <a href="https://www.radiance-online.org/" target="_blank" class="text-[--text-secondary] underline">Radiance</a> from the official website or the <a href="https://github.com/NREL/Radiance" target="_blank" class="text-[--text-secondary] underline">NREL GitHub repository</a>. Ensure the Radiance <code>bin</code> directory is in your system's PATH.
+                    </li>
+                    <li><strong>Download Ray Modeler</strong>:
+                        Download the latest release for your operating system (macOS or Windows) from the project's Releases page.
+                    </li>
+                    <li><strong>Run the Application</strong>:
+                        <ul class="list-disc list-inside ml-4">
+                            <li><em>Windows</em>: Run the <code>Ray Modeler Setup X.X.X.exe</code> installer.</li>
+                            <li><em>macOS</em>: Open the <code>Ray Modeler-X.X.X.dmg</code> and drag the application to your Applications folder.</li>
+                        </ul>
+                    </li>
+                </ol>
+                <h4 class="font-semibold text-sm uppercase text-[--text-secondary] mt-4">Security Warnings on First Launch</h4>
+                <p>Because the application is not yet code-signed, your operating system will likely show a security warning. When a user on a Mac downloads and tries to open the unsigned app, they will be stopped by Gatekeeper, which will show a message like "Ray Modeler cannot be opened because the developer cannot be verified."</p>
+                <ul class="list-disc list-inside ml-4 mt-2">
+                    <li><strong>On Windows (SmartScreen)</strong>: Click "<strong>More info</strong>", then click "<strong>Run anyway</strong>".</li>
+                    <li><strong>On macOS (Gatekeeper)</strong>: <strong>Right-click</strong> (or Control-click) the app icon, select "<strong>Open</strong>" from the menu. A new dialog box will appear that is similar to the first one, but this time it will include an "<strong>Open</strong>" button. Clicking this will run the app. You only need to do this once. After the first successful launch, the app can be opened normally by double-clicking it.</li>
                 </ul>
-                </div> <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+
+                <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Core Capabilities</h2>
+                <p>Ray Modeler is packed with features that automate and enhance the Radiance workflow:</p>
+                <ul class="list-disc list-inside space-y-1 my-4">
+                    <li><strong>Parametric Scene Modeling</strong>: Visually define room dimensions, orientation, window-to-wall ratios (WWR), and complex shading devices like overhangs, light shelves, louvers, and roller shades.</li>
+                    <li><strong>Geometry Importer</strong>: Import complex models from <code>.obj</code> files, with an interactive UI to tag surfaces (walls, floors, glazing) for accurate simulation setup.</li>
+                    <li><strong>Context & Site Modeling</strong>: Improve simulation accuracy by adding surrounding context, either through simple massing tools, topography from heightmaps, or by automatically fetching building data from OpenStreetMaps.</li>
+                    <li><strong>Interior Furniture Library</strong>: Place simple furniture and partition objects from a pre-built library via drag-and-drop to create more realistic interior scenes.</li>
+                    <li><strong>Radiance Material Editor</strong>: Configure standard Radiance materials (<code>plastic</code>, <code>metal</code>, <code>glass</code>) by adjusting properties like reflectance, specularity, and roughness. It also supports spectral data (<code>.dat</code>) files for advanced material definitions.</li>
+                    <li><strong>Advanced Glazing Systems</strong>: Model glazing using simple transmittance values or incorporate complex fenestration data via Bidirectional Scattering Distribution Function (BSDF) <code>.xml</code> files. The application correctly converts intuitive transmittance to physically-based transmissivity for simulations.</li>
+                    <li><strong>Interactive BSDF Viewer</strong>: Demystify complex glazing by providing immediate visual feedback. When a BSDF <code>.xml</code> file is loaded, the application can parse the Klems matrix and render an interactive 2D polar plot showing the angular distribution of transmitted light for any incident angle.</li>
+                    <li><strong>Electric Lighting Design</strong>: Place and configure multiple Radiance light source types (light, spotlight, glow, illum) or import real-world luminaire data using IES photometric files in individual or grid-based layouts.</li>
+                    <li><strong>Advanced IES Photometry Viewer</strong>: In addition to a 2D polar plot, visualize luminaire distributions with an interactive 3D photometric web and view key metadata like lumens and wattage directly from the <code>.ies</code> file.</li>
+                    <li><strong>Daylighting Controls</strong>: Simulate energy savings by implementing photosensor-controlled lighting systems with continuous, stepped, or off modes.</li>
+                    <li><strong>Daylighting Control Zone Visualization</strong>: Instantly visualize which luminaires are controlled by which photosensors with color-coded 3D gizmos, providing immediate feedback on the daylighting strategy.</li>
+                    <li><strong>Automated Radiance Workflow</strong>: Generates a complete, organized project folder structure (e.g., 01_geometry, 04_skies, 07_scripts) and populates it with geometry files, material definitions, sensor points, and executable run scripts for both Windows (<code>.bat</code>) and macOS/Linux (<code>.sh</code>).</li>
+                    <li><strong>First-Person View (FPV) Mode</strong>: Enter the Radiance viewpoint camera directly to preview the exact perspective, fisheye, or parallel view that will be rendered for analysis.</li>
+                    <li><strong>Saved Camera Views ("Snapshots")</strong>: Save and load specific camera positions and angles, complete with thumbnails, to quickly return to key perspectives during analysis.</li>
+                    <li><strong>Advanced Annual Analysis</strong>: Generate and view temporal heatmaps, glare rose diagrams, and combined daylight/glare scatter plots to deeply understand annual performance.</li>
+                    <li><strong>Recipe-Based Simulation Engine</strong>: Automate complex Radiance workflows with pre-configured "recipes." The application generates all necessary geometry files, material definitions, and executable run scripts (<code>.sh</code>, <code>.bat</code>) in a standardized project folder.</li>
+                    <li><strong>Advanced Annual Methods</strong>: Support for industry-standard annual simulation methods, including 3-Phase and 5-Phase Daylight Analysis.</li>
+                    <li><strong>Spectral Lighting Analysis</strong>: A full implementation of the Lark methodology to run multi-channel simulations and calculate non-visual lighting metrics like melanopic and neuropic illuminance.</li>
+                    <li><strong>Automated Compliance Workflows</strong>: Specialized recipes for checking compliance with major industry standards, including <code>IES LM-83 (sDA/ASE)</code>, <code>EN 17037 (Daylight in Buildings)</code>, and <code>EN 12464-1 (Light and lighting of work places)</code>.</li>
+                    <li><strong>Interactive HDR Image Analysis</strong>: View High-Dynamic Range (HDR) renderings with exposure controls, toggle false-color luminance mode, and use a mouse-over probe to get exact cd/m² values. Detected glare sources can be overlaid directly onto the image for verification.</li>
+                    <li><strong>Live Sun Ray Tracing</strong>: Visualize direct sun penetration in real-time. Trace a grid of rays from the sun's current position (calculated from the EPW file for any date/time) through glazing surfaces and see how they bounce around the interior, helping to quickly identify potential glare spots or assess daylight distribution.</li>
+                    <li><strong>File System Integration</strong>: Using the File System Access API (or Electron's APIs), Ray Modeler can directly read from and save to a local project folder, enabling a seamless desktop-like experience.</li>
+                    <li><strong>AI Assistant</strong>: An integrated, context-aware AI chat powered by generative AI (Google Gemini or models via OpenRouter) that can answer questions and directly manipulate the scene, run simulations, and control the UI using natural language commands.</li>
+                    <li><strong>Automated Report Generation</strong>: Generate comprehensive HTML reports with a single click. The report includes project details, a 3D scene snapshot, key performance metrics (sDA, ASE, DGP), and all generated dashboard charts (UDI, Glare Rose), ready for printing or saving as a PDF.</li>
+                    <li><strong>Interactive Data Table</strong>: Inspect raw simulation data in a sortable, filterable table. Click on any row to instantly highlight the corresponding sensor point in the 3D model, linking numerical data directly to its spatial context.</li>
+                    <li><strong>Daylight Autonomy Heatmaps</strong>: Visualize annual performance not just as point-in-time illuminance, but also as Daylight Autonomy (DA), showing the percentage of occupied hours that each sensor point meets a specific illuminance threshold.</li>
+                    <li><strong>Climate Data Analysis</strong>: Generate an interactive dashboard from the loaded EPW file, including a wind rose, solar radiation charts, and temperature profiles to better understand the site context.</li>
+                    <li><strong>Advanced Circadian Health Dashboard</strong>: Analyze results from spectral simulations to calculate and visualize key circadian lighting metrics like Circadian Stimulus (CS), Equivalent Melanopic Lux (EML), and check for compliance with WELL building standards.</li>
+                    <li><strong>Advanced IES Photometry Viewer</strong>: In addition to a 2D polar plot, visualize luminaire distributions with an interactive 3D photometric web and view key metadata like lumens and wattage directly from the <code>.ies</code> file.</li>
+                    <li><strong>Interactive 3D Room Resizing</strong>: A "Resize Mode" that allows you to directly manipulate the room's dimensions in the 3D viewport by dragging its exterior faces, providing immediate tactile feedback.</li>
+                    <li><strong>Keyboard Shortcuts</strong>: Accelerate your workflow with keyboard shortcuts for common actions, such as <code>T</code> for Top View, <code>P</code> for Perspective, and <code>Ctrl+S</code> to save the project. A help modal (<code>?</code>) displays all available shortcuts.</li>
+                    <li><strong>Multi-View Layout (Quad View)</strong>: Split the main viewport into four synchronized cameras (Perspective, Top, Front, Side) for comprehensive spatial awareness and precise object placement, a standard in professional 3D software.</li>
+                    <li><strong>Vegetation & Tree Modeling</strong>: Add simple procedural trees and bushes from the Scene Elements library to your site. The vegetation canopy uses a Radiance <code>trans</code> material to accurately simulate its light-filtering effects, improving the realism of site-specific analyses.</li>
+                </ul>
+
+                <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.311a15.045 15.045 0 01-7.5 0C4.508 17.311 2.25 15.122 2.25 12c0-3.122 2.258-5.311 4.75-5.965M12 18a2.25 2.25 0 01-2.25-2.25V6.75A2.25 2.25 0 0112 4.5h.75a2.25 2.25 0 012.25 2.25v5.25a2.25 2.25 0 01-2.25 2.25h-.75z" /></svg>AI Assistant</h2>
+                <p>The AI Assistant panel provides a chat interface to help you with your workflow. It understands the application's current state and can perform actions on your behalf using natural language commands.</p>
+
+                <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>AI-Powered Actions (Tool Use)</h3>
+                <p>Beyond answering questions, the assistant can directly manipulate the UI and query project data. This allows for a powerful natural language workflow. Its capabilities include:</p>
+                <ul class="list-disc list-inside space-y-1 my-4">
+                    <li><strong>Project Validation</strong>: Ask it to <code>"validate my project for an annual glare simulation"</code> and it will check for common setup errors, such as a missing weather file or an incorrect viewpoint type, and report back any issues.</li>
+                    <li><strong>Advanced Scene Manipulation</strong>:
+                        <ul class="list-disc list-inside ml-4">
+                            <li><strong>Shading</strong>: <code>"Add a 0.5 meter deep overhang to the south wall."</code></li>
+                            <li><strong>Sensor Grids</strong>: <code>"Enable a sensor grid on the floor with 0.75m spacing."</code></li>
+                            <li><strong>Daylighting</strong>: <code>"Enable continuous daylighting controls with a setpoint of 500 lux."</code></li>
+                        </ul>
+                    </li>
+                    <li><strong>Simulation & Recipe Control</strong>:
+                        <ul class="list-disc list-inside ml-4">
+                            <li><strong>Global Parameters</strong>: <code>"Set the global ambient bounces to 5."</code></li>
+                            <li><strong>Recipe Configuration</strong>: <code>"In the open illuminance recipe, change the time to 9:00 AM."</code></li>
+                        </ul>
+                    </li>
+                    <li><strong>Conversational Data Exploration & Comparison</strong>:
+                        <ul class="list-disc list-inside ml-4">
+                            <li><strong>Data Query</strong>: <code>"What is the average illuminance for the current results?"</code> or <code>"How many points are above 500 lux?"</code></li>
+                            <li><strong>Time Scrubbing</strong>: <code>"Show me the results for the winter solstice at noon."</code></li>
+                            <li><strong>Dashboard Control</strong>: <code>"Open the glare rose diagram."</code></li>
+                            <li><strong>Comparative Analysis</strong>: <code>"Which of my two designs has better daylight uniformity?"</code> or <code>"Compare the sDA for both designs."</code></li>
+                        </ul>
+                    </li>
+                    <li><strong>File Management</strong>:
+                        <ul class="list-disc list-inside ml-4">
+                            <li><strong>Load Results</strong>: <code>"Load a results file into dataset A."</code></li>
+                            <li><strong>Clear Results</strong>: <code>"Clear all loaded results data."</code></li>
+                        </ul>
+                    </li>
+                </ul>
+
+                <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Design Inspector</h3>
+                <p>The AI analyzes the entire project state to identify conflicting or suboptimal combinations of settings, explains the potential consequences, and offers a one-click fix.</p>
+                <div class="info-box my-4">
+                    <strong>AI Analysis:</strong> "I've reviewed your project. Your wall reflectance is quite low (0.2), and you're only using 2 ambient bounces. This combination will likely result in an unrealistically dark rendering with noticeable splotches. I recommend increasing ambient bounces to 4 and wall reflectance to 0.5."
+                    <br>
+                    <button class="btn btn-xs btn-secondary mt-2">[Apply Fixes]</button>
+                </div>
+
+                <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Results Critique</h3>
+                <p>After a simulation completes, the AI can analyze the results, identify problems, and suggest specific, actionable design changes.</p>
+                <div class="info-box my-4">
+                    <strong>AI Analysis:</strong> "The Daylight Glare Probability (DGP) is 0.47, which is considered 'Intolerable'. This is caused by low-angle sun from the west-facing window. To fix this, I suggest adding vertical louvers."
+                    <br>
+                    <button class="btn btn-xs btn-secondary mt-2">[Add Vertical Louvers]</button>
+                </div>
+
+                <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Interactive Tutor</h3>
+                <p>The AI can act as a tutor to guide new users through complex simulation workflows step-by-step, teaching them the process as they go.</p>
+                <div class="info-box my-4">
+                    <p><strong>User</strong>: "How do I run a glare simulation?"</p>
+                    <p><strong>AI</strong>: "Of course! To calculate DGP, we need a 180° fisheye view. Your current viewpoint is set to Perspective. Would you like me to change it for you?"</p>
+                    <p><strong>User</strong>: "Yes"</p>
+                    <p><strong>AI</strong>: <em>(Changes viewpoint)</em> "Great. Next, I'll open the DGP recipe panel for you." <em>(Opens recipe)</em> "Now you just need to click 'Generate Package' and run the simulation."</p>
+                </div>
+                <h4 class="font-semibold text-sm uppercase text-[--text-secondary] mt-4">Proactive Suggestions</h4>
+                <p>The AI Assistant monitors user actions and provides contextual, non-intrusive suggestions to guide the workflow and prevent common errors. These suggestions appear as dismissible chips in the UI. For example:</p>
+                <ul class="list-disc list-inside space-y-1 my-4">
+                    <li>After loading an <strong>EPW weather file</strong>, it will suggest opening an annual simulation recipe.</li>
+                    <li>If a material's <strong>reflectance is set to an unusually high or low value</strong>, it will warn that this may be physically unrealistic.</li>
+                    <li>If the user enables a <strong>View Grid</strong>, it will suggest opening the Imageless Annual Glare recipe.</li>
+                    <li>If the <strong>DGP recipe is open but the viewpoint is not set to fisheye</strong>, it will offer to correct the setting.</li>
+                </ul>
+
+                <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Generative Design</h3>
+                <p>Leverage the AI to perform automated, multi-step design tasks.</p>
+                <ul class="list-disc list-inside space-y-1 my-4">
+                    <li><strong>Scene Creation from Natural Language</strong>: Instead of manually adjusting sliders, describe the space you want to build in plain English.
+                        <div class="info-box !text-sm my-2">
+                            "Create a long office, 12 meters deep by 5 meters wide, with a 3-meter high ceiling. Put a large, continuous window across the entire south wall with a sill height of 0.8 meters. Add a 1-meter deep overhang above it and place two desks in the middle of the room."
+                        </div>
+                    </li>
+                    <li><strong>Design Optimization</strong>: Define a goal, constraints, and a design variable, and the assistant will orchestrate the entire workflow to find the best solution. For example:
+                        <div class="info-box !text-sm my-2">
+                            "Find an overhang depth for the south wall between 0.5m and 2.0m that maximizes sDA while keeping ASE below 10%."
+                        </div>
+                    </li>
+                </ul>
+
+                <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>API Key Configuration</h3>
+                <p>The integrated AI Assistant requires an API key to function. It supports multiple providers for greater flexibility.</p>
+                <ul class="list-disc list-inside space-y-1 my-4">
+                    <li><strong>Expanded Provider Support</strong>: Select between <strong>OpenRouter</strong>, <strong>OpenAI</strong>, <strong>Google Gemini</strong>, and <strong>Anthropic</strong>.</li>
+                    <li><strong>Provider-Specific Keys</strong>: The application saves a separate API key for each provider, so you can switch between models without re-entering credentials.</li>
+                    <li><strong>AI Configuration</strong>: A settings modal (⚙️ icon) allows you to select your preferred provider, choose from a list of popular models (e.g., Gemini 1.5 Pro, GPT-4o, Claude 3.5 Sonnet), and enter your API key.</li>
+                </ul>
+
+                <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Getting Your API Key</h3>
+                <h4 class="font-semibold text-sm uppercase text-[--text-secondary] mt-4">Google Gemini API Key 🔑</h4>
+                <p>You can get a free API key for the Gemini family of models from <a href="https://aistudio.google.com/prompts/new_chat" target="_blank" class="text-[--text-secondary] underline">Google AI Studio</a>.</p>
+                <ol class="list-decimal list-inside space-y-1 my-2 ml-4">
+                    <li>Go to the Google AI Studio website.</li>
+                    <li>Sign in with your Google account.</li>
+                    <li>Click the "<code>Get API key</code>" button, usually located in the top-left or top-right corner of the page.</li>
+                    <li>A dialog will appear. Click "<code>Create API key</code>".</li>
+                    <li>Your new API key will be generated and displayed.</li>
+                    <li>Copy this key and paste it into the API Key field in the Ray Modeler AI settings.</li>
+                </ol>
+                <p class="text-xs text-[--text-secondary]"><em>Note: The Gemini API has a free tier with usage limits. Be sure to review Google's current pricing and terms of service.</em></p>
+
+                <h4 class="font-semibold text-sm uppercase text-[--text-secondary] mt-4">OpenRouter API Key 🔑</h4>
+                <p>OpenRouter provides access to a wide variety of models from different providers through a single API.</p>
+                <ol class="list-decimal list-inside space-y-1 my-2 ml-4">
+                    <li>Go to the <a href="https://openrouter.ai/" target="_blank" class="text-[--text-secondary] underline">OpenRouter.ai</a> website and log in.</li>
+                    <li>Click on your account icon in the top-right corner and select "<code>Keys</code>" from the dropdown menu.</li>
+                    <li>Click the "<code>+ Create Key</code>" button. Give your key a name (e.g., "RayModeler") and click "<code>Create</code>".Your new API key will be generated.</li>
+                    <li>Copy this key and paste it into the API Key field in the Ray Modeler AI settings.</li>
+                </ol>
+                <p class="text-xs text-[--text-secondary]"><em>Note: OpenRouter is a paid service. You will need to add credits to your account to use most models. To use some of the free models, you may need to adjust your privacy settings to allow your data to be used for model improvement.</em></p>
+
+                <h4 class="font-semibold text-sm uppercase text-[--text-secondary] mt-4">OpenAI API Key 🔑</h4>
+                <ol class="list-decimal list-inside space-y-1 my-2 ml-4">
+                    <li>Go to the <a href="https://platform.openai.com/api-keys" target="_blank" class="text-[--text-secondary] underline">OpenAI API keys</a> page and log in.</li>
+                    <li>Click the "<code>+ Create new secret key</code>" button.</li>
+                    <li>Give your key a name (e.g., "RayModeler") and click "<code>Create secret key</code>".</li>
+                    <li>Copy the generated key immediately and paste it into the API Key field in the Ray Modeler AI settings. You will not be able to view it again.</li>
+                </ol>
+
+                <h4 class="font-semibold text-sm uppercase text-[--text-secondary] mt-4">Anthropic API Key 🔑</h4>
+                <ol class="list-decimal list-inside space-y-1 my-2 ml-4">
+                    <li>Go to the <a href="https://console.anthropic.com/" target="_blank" class="text-[--text-secondary] underline">Anthropic Console</a> and log in.</li>
+                    <li>Navigate to the "API Keys" section in your account settings.</li>
+                    <li>Click the "<code>Create Key</code>" button.</li>
+                    <li>Give the key a name and click "<code>Create Key</code>".</li>
+                    <li>Copy the key and paste it into the API Key field in the Ray Modeler AI settings.</li>
+                </ol>
+                <p class="info-box my-4"><strong>Important</strong>: Treat your API keys like passwords. Do not share them publicly or commit them to version control.</p>
+
+                <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 6.75C6.75 5.64543 7.64543 4.75 8.75 4.75H15.25C16.3546 4.75 17.25 5.64543 17.25 6.75V19.25L12 14.75L6.75 19.25V6.75Z" /></svg>UI Walkthrough 💻</h2>
+                <p>The interface is designed around a logical workflow, guiding the user from setup to analysis.</p>
+                <img src="./Pictures/main_ui.png" alt="Ray Modeler Main UI" class="w-full rounded-md my-4 border border-[--grid-color]">
+                <img src="./Pictures/main_ui_quad.png" alt="Ray Modeler Main UI in Quad View" class="w-full rounded-md my-4 border border-[--grid-color]">
+                <img src="./Pictures/panels_ui.png" alt="Ray Modeler Panels" class="w-full rounded-md my-4 border border-[--grid-color]">
+                <ul class="list-disc list-inside space-y-1 my-4">
+                    <li><strong>3D Viewport (Center)</strong>: This is the main interactive area where your 3D scene is displayed. You can navigate using standard orbit controls (mouse drag, scroll). The viewport can also be split into a <strong>Quad View</strong> layout, showing synchronized Perspective, Top, Front, and Side cameras for comprehensive spatial awareness.</li>
+                    <li><strong>Left Toolbar</strong>: This is the primary command center for building your scene. It contains buttons to open floating panels for defining all aspects of the physical model, from <strong>Project Setup</strong> and <strong>Dimensions</strong> to <strong>Simulation</strong> and <strong>Analysis</strong> modules.</li>
+                    <li><strong>Top View Controls</strong>: A quick-access toolbar to instantly switch between standard orthographic (Top, Front, etc.) and perspective camera views. It also includes the button to toggle the <strong>Quad View</strong> layout.</li>
+                    <li><strong>Bottom Toolbar (Bottom-Left)</strong>: Provides quick access to global actions like saving/loading project files, viewing application information and keyboard shortcuts, and launching the AI Assistant.</li>
+                    <li><strong>Floating Panels</strong>: All scene definition, simulation, and analysis tools open as independent floating windows. These panels can be dragged, resized, collapsed, and arranged anywhere on the screen, allowing you to create a workspace tailored to your needs.</li>
+                    <li><strong>AI Assistant Sidebar (Right)</strong>: A dedicated, resizable sidebar that houses the conversational AI Assistant. This keeps the AI's powerful capabilities accessible without cluttering your modeling and analysis workflow.</li>
+                </ul>
+
+                <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>In-Depth Feature Guide</h2>
+
+                <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Scene Definition Panels</h3>
+                <p>The panels on the left toolbar are used to define the scene.</p>
+                <ul class="list-disc list-inside space-y-1 my-4">
+                    <li><strong>Project Setup</strong>: This is the starting point. Define project metadata, set the building's geographic location using an interactive map, or by uploading an <code>.epw</code> weather file which auto-populates location data. This panel also contains controls for the 3D Sun Path visualization and a tool for generating annual occupancy schedules.</li>
+                    <li><strong>Dimensions</strong>: Set the foundational geometry: <strong>width (X-axis)</strong>, <strong>length (Z-axis)</strong>, and <strong>height (Y-axis)</strong>. The <strong>Orientation</strong> slider rotates the entire room, affecting its solar exposure.</li>
+                    <li><strong>Apertures & Shading</strong>: Control openings on each wall. Work parametrically using <strong>Window-to-Wall Ratio (WWR)</strong> or switch to <strong>Manual</strong> mode for precise control. Each wall can have its own complex shading system, including <code>Overhangs</code>, <code>Light Shelves</code>, <code>Louvers</code>, and <code>Roller Shades</code>.</li>
+                    <li><strong>Artificial Lighting</strong>: Add electric lighting. Choose from Radiance primitives like <code>light</code>, <code>spotlight</code>, and <code>glow</code>, or upload an <code>.ies</code> file for a specific luminaire. Lights can be placed individually or arranged in a grid.</li>
+                    <li><strong>Material Properties</strong>: Define surface characteristics. For each element, select a Radiance material and adjust its <strong>reflectance</strong>, <strong>specularity</strong>, and <strong>roughness</strong>. The app correctly converts the intuitive 'Transmittance' value for glazing into the physically-based 'Transmissivity' required by the Radiance <code>glass</code> material. Advanced optics can be modeled via BSDF <code>.xml</code> files.</li>
+                    <li><strong>Sensor Grid</strong>: Create measurement points for simulations. The <strong>Illuminance Grid</strong> generates a <code>.pts</code> file for `rtrace` and is visualized as spheres. The <strong>View Grid</strong> generates a <code>.ray</code> file for imageless glare analysis (`rcontrib`) and is visualized as arrows indicating view directions.</li>
+                    <li><strong>Viewpoint</strong>: This panel controls the specific camera view used by Radiance for generating renderings (<code>rpict</code>) or glare images (<code>evalglare</code>). It defines the camera's position (<code>-vp</code>), direction (<code>-vd</code>), and view type. You can manipulate this camera with a 3D gizmo or enter a <strong>First-Person View (FPV)</strong> to see exactly what Radiance will render.</li>
+                    <li><strong>Scene Elements</strong>: Add and manage non-architectural objects in the scene. Includes an <strong>Interior Furniture Library</strong> (drag-and-drop), <strong>Context & Site Modeling</strong> tools (Simple Massing, Topography Import, OpenStreetMaps Integration).</li>
+                </ul>
+
+                <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Simulation Modules (Recipes)</h3>
+                <p>Each recipe automates a specific Radiance workflow by generating scripts that call core commands. Global simulation parameters (<code>-ab</code>, <code>-ad</code>) can be set once and overridden per recipe.</p>
+                <ul class="list-disc list-inside space-y-1 my-4">
+                    <li><strong>Global Simulation Parameters</strong>: Sets default Radiance parameters inherited by all recipes.</li>
+                    <li><strong>Illuminance Map</strong>: A point-in-time calculation for sensor grid illuminance.</li>
+                    <li><strong>Photorealistic Rendering</strong>: Creates an HDR image from the Viewpoint.</li>
+                    <li><strong>Daylight Glare Probability (DGP)</strong>: Renders a 180° fisheye image and analyzes it for glare.</li>
+                    <li><strong>Daylight Factor (DF)</strong>: Calculates internal/external illuminance ratio under a CIE overcast sky.</li>
+                    <li><strong>Annual Daylight (3-Phase & 5-Phase)</strong>: Generates scripts for advanced matrix-based annual simulations.</li>
+                    <li><strong>Imageless Annual Glare</strong>: Uses <code>rcontrib</code> and <code>dcglare</code> for an 8760-hour DGP profile.</li>
+                    <li><strong>Spectral Analysis (Lark)</strong>: Implements the Lark methodology for multi-channel spectral simulations.</li>
+                    <li><strong>Compliance Recipes</strong>: Specialized recipes for <code>IES LM-83 (sDA/ASE)</code>, <code>EN 17037</code>, and <code>EN 12464-1</code>.</li>
+                    <li><strong>Lighting Energy Analysis</strong>: Runs an annual simulation with daylighting controls to estimate energy use.</li>
+                    <li><strong>Façade Irradiation Analysis</strong>: Calculates total annual solar irradiation on an exterior façade.</li>
+                    <li><strong>Annual Solar Radiation Maps</strong>: Calculates cumulative solar radiation on interior surfaces.</li>
+                </ul>
+
+                <h2><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>Analysis 📊</h2>
+                <p>The Analysis Sidebar uses a background Web Worker to parse various Radiance result files without freezing the interface. The application automatically detects the file type and enables the relevant visualization tools.</p>
+                <ul class="list-disc list-inside space-y-1 my-4">
+                    <li><strong>3D Visualization</strong>: Illuminance data is mapped as a false-color grid onto the 3D model, with a customizable color scale and support for comparing two datasets.</li>
+                    <li><strong>Annual Metrics Dashboard</strong>: For annual <code>.ill</code> files, this dashboard visualizes key metrics like sDA, ASE, and UDI.</li>
+                    <li><strong>Climate Analysis Dashboard</strong>: When an EPW file is loaded, this dashboard provides interactive visualizations of the climate data.</li>
+                    <li><strong>Temporal Map</strong>: After loading annual results, clicking on any sensor point generates a 24x365 heatmap for that specific point.</li>
+                    <li><strong>Glare Rose Diagram</strong>: For annual <code>.dgp</code> files, this generates a polar chart showing glare frequency by sun position.</li>
+                    <li><strong>Combined Daylight vs. Glare Plot</strong>: A scatter plot showing the trade-off between useful daylight and glare hours for each sensor.</li>
+                    <li><strong>HDR Viewer</strong>: Loads <code>.hdr</code> images with exposure controls, false-color mode, and a luminance probe.</li>
+                    <li><strong>Advanced Circadian Health Dashboard</strong>: Visualizes metrics like CS, EML, and checks for WELL compliance.</li>
+                    <li><strong>Automated Report Generation</strong>: Compiles all project information, metrics, and charts into a single HTML report.</li>
+                </ul>
+                <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Desktop Integration (Electron)</h3>
+                <p>Ray Modeler operates as an Electron-based desktop application, enabling direct interaction with your file system.</p>
+                <ul class="list-disc list-inside space-y-1 my-4">
+                    <li><strong>Standardized Project Folder</strong>: When you save a project, the application creates a complete, organized folder structure on your local machine.</li>
+                    <li><strong>Simulation Console</strong>: A built-in console window appears when you run a simulation, showing the live output from the Radiance processes and reporting the final exit code (success or failure).</li>
+                </ul>
+            </div> 
+            <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
             </div> <div id="simulation-console-panel" class="floating-window ui-panel hidden" style="width: 700px; height: 450px;">
               <div class="window-header">
               <span>Simulation Console</span>
@@ -2284,75 +2796,77 @@
                   <div class="window-icon-close"></div>
               </div>
           </div>
-          <div class="window-content">
-          <div class="accordion-item open">
-            <div class="accordion-header">
-              <span>Global Simulation Parameters</span>
-              <div class="accordion-chevron">▶</div>
-          </div>
-          <div class="accordion-content" style="display: block;">
-              <div class="param-section">
-                  <h4>Ambient Calculation Settings</h4>
-                    <div class="param-grid-sim">
+         <div class="window-content">
+      <div class="space-y-3">
+          <label for="globals-toggle" class="flex items-center cursor-pointer w-full">
+              <input type="checkbox" id="globals-toggle">
+              <span class="ml-3 font-semibold text-sm uppercase">Global Simulation Parameters</span>
+          </label>
+          <div id="globals-controls" class="hidden space-y-5 pt-4 border-t border-[--grid-color]">
+              <p class="info-box !text-xs !py-2 !px-3 !mt-0">These are the default Radiance parameters inherited by all recipes. They can be overridden in specific recipes by setting the quality to "Custom".</p>
+              <div class="param-section !pt-0 !mt-0 !border-none">
+                    <h4>Ambient Calculation Settings</h4>
+                      <div class="param-grid-sim">
+                                  <div class="param-item">
+                                      <div class="param-item-row"><label for="ab" class="label">Ambient Bounces (-ab) <span class="info-icon">i<span class="info-popover">Max number of diffuse inter-reflections. 0 disables indirect calculation. 2-4 is standard, 5-8 for high accuracy or complex scenes.</span></span></label><input type="number" class="param-input-num" id="ab-num" data-param-name="ab-num" step="1" min="0" max="16" autocomplete="off"></div>
+                                      <input type="range" id="ab" data-param-name="ab" min="0" max="16" value="4" step="1">
+                                  </div>
+                                      <div class="param-item">
+                                      <div class="param-item-row"><label for="ad" class="label">Ambient Divisions (-ad) <span class="info-icon">i<span class="info-popover">Number of samples for indirect illuminance. Primary control for "splotchy" artifacts.</span></span></label><input type="number" class="param-input-num" id="ad-num" data-param-name="ad-num" step="64" min="0" max="8192" autocomplete="off"></div>
+                                      <input type="range" id="ad" data-param-name="ad" min="0" max="8192" value="1024" step="64">
+                                  </div>
                                 <div class="param-item">
-                                    <div class="param-item-row"><label for="ab" class="label">Ambient Bounces (-ab) <span class="info-icon">i<span class="info-popover">Max number of diffuse inter-reflections. 0 disables indirect calculation. 2-4 is standard, 5-8 for high accuracy or complex scenes.</span></span></label><input type="number" class="param-input-num" id="ab-num" data-param-name="ab-num" step="1" min="0" max="16" autocomplete="off"></div>
-                                    <input type="range" id="ab" data-param-name="ab" min="0" max="16" value="4" step="1">
-                                </div>
-                                    <div class="param-item">
-                                    <div class="param-item-row"><label for="ad" class="label">Ambient Divisions (-ad) <span class="info-icon">i<span class="info-popover">Number of samples for indirect illuminance. Primary control for "splotchy" artifacts.</span></span></label><input type="number" class="param-input-num" id="ad-num" data-param-name="ad-num" step="64" min="0" max="8192" autocomplete="off"></div>
-                                    <input type="range" id="ad" data-param-name="ad" min="0" max="8192" value="1024" step="64">
-                                </div>
-                              <div class="param-item">
-                              <div class="param-item-row"><label for="as" class="label">Ambient Super-samples (-as) <span class="info-icon">i<span class="info-popover">Additional samples to refine areas with high variance. Use to clean up noise after setting -ad.</span></span></label><input type="number" class="param-input-num" id="as-num" data-param-name="as-num" step="64" min="0" max="8192" autocomplete="off"></div>
-                              <input type="range" id="as" data-param-name="as" min="0" max="8192" value="256" step="64">
-                          </div>
-                              <div class="param-item">
-                              <div class="param-item-row"><label for="aa" class="label">Ambient Accuracy (-aa) <span class="info-icon">i<span class="info-popover">Error tolerance for irradiance cache interpolation. Lower values are more accurate but slower. Does not fix splotches.</span></span></label><input type="number" class="param-input-num" id="aa-num" data-param-name="aa-num" step="0.01" min="0" max="1" autocomplete="off"></div>
-                              <input type="range" id="aa" data-param-name="aa" min="0" max="1" value="0.15" step="0.01">
-                          </div>
-                              <div class="param-item">
-                              <div class="param-item-row"><label for="ar" class="label">Ambient Resolution (-ar) <span class="info-icon">i<span class="info-popover">Sets the density of the irradiance cache relative to scene size. Works with -aa.</span></span></label><input type="number" class="param-input-num" id="ar-num" data-param-name="ar-num" step="32" min="0" max="4096" autocomplete="off"></div>
-                              <input type="range" id="ar" data-param-name="ar" min="0" max="4096" value="128" step="32">
-                          </div>
-                              <div class="param-item">
-                              <div class="param-item-row"><label for="lw" class="label">Limit Weight (-lw) <span class="info-icon">i<span class="info-popover">Minimum contribution for a ray to be traced. Crucial for simulations with high -ab values.</span></span></label><input type="number" class="param-input-num" id="lw-num" data-param-name="lw-num" step="0.0001" min="0" max="0.01" autocomplete="off"></div>
-                              <input type="range" id="lw" data-param-name="lw" min="0" max="0.01" value="0.002" step="0.0001">
-                          </div>
-                          </div>
+                                <div class="param-item-row"><label for="as" class="label">Ambient Super-samples (-as) <span class="info-icon">i<span class="info-popover">Additional samples to refine areas with high variance. Use to clean up noise after setting -ad.</span></span></label><input type="number" class="param-input-num" id="as-num" data-param-name="as-num" step="64" min="0" max="8192" autocomplete="off"></div>
+                                <input type="range" id="as" data-param-name="as" min="0" max="8192" value="256" step="64">
+                            </div>
+                                <div class="param-item">
+                                <div class="param-item-row"><label for="aa" class="label">Ambient Accuracy (-aa) <span class="info-icon">i<span class="info-popover">Error tolerance for irradiance cache interpolation. Lower values are more accurate but slower. Does not fix splotches.</span></span></label><input type="number" class="param-input-num" id="aa-num" data-param-name="aa-num" step="0.01" min="0" max="1" autocomplete="off"></div>
+                                <input type="range" id="aa" data-param-name="aa" min="0" max="1" value="0.15" step="0.01">
+                            </div>
+                                <div class="param-item">
+                                <div class="param-item-row"><label for="ar" class="label">Ambient Resolution (-ar) <span class="info-icon">i<span class="info-popover">Sets the density of the irradiance cache relative to scene size. Works with -aa.</span></span></label><input type="number" class="param-input-num" id="ar-num" data-param-name="ar-num" step="32" min="0" max="4096" autocomplete="off"></div>
+                                <input type="range" id="ar" data-param-name="ar" min="0" max="4096" value="128" step="32">
+                            </div>
+                                <div class="param-item">
+                                <div class="param-item-row"><label for="lw" class="label">Limit Weight (-lw) <span class="info-icon">i<span class="info-popover">Minimum contribution for a ray to be traced. Crucial for simulations with high -ab values.</span></span></label><input type="number" class="param-input-num" id="lw-num" data-param-name="lw-num" step="0.0001" min="0" max="0.01" autocomplete="off"></div>
+                                <input type="range" id="lw" data-param-name="lw" min="0" max="0.01" value="0.002" step="0.0001">
+                            </div>
+                            </div>
+                        </div>
+                        <div class="param-section">
+                            <h4>Direct & Specular Calculation Settings</h4>
+                            <div class="param-grid-sim">
+                                <div class="param-item">
+                                <div class="param-item-row"><label for="dc" class="label">Direct Certainty (-dc) <span class="info-icon">i<span class="info-popover">A value of 1 guarantees shadow accuracy. 0.5 is a good balance.</span></span></label><input type="number" class="param-input-num" id="dc-num" data-param-name="dc-num" step="0.05" min="0" max="1" autocomplete="off"></div>
+                                <input type="range" id="dc" data-param-name="dc" min="0" max="1" value="0.5" step="0.05">
+                            </div>
+                                <div class="param-item">
+                                <div class="param-item-row"><label for="dt" class="label">Direct Thresholding (-dt) <span class="info-icon">i<span class="info-popover">Optimization to ignore insignificant light sources. For max accuracy, set to 0.</span></span></label><input type="number" class="param-input-num" id="dt-num" data-param-name="dt-num" step="0.05" min="0" max="1" autocomplete="off"></div>
+                                <input type="range" id="dt" data-param-name="dt" min="0" max="1" value="0.05" step="0.05">
+                            </div>
+                                <div class="param-item">
+                                <div class="param-item-row"><label for="dr" class="label">Direct Relays (-dr) <span class="info-icon">i<span class="info-popover">Number of relays for secondary sources (e.g., reflections in mirrors).</span></span></label><input type="number" class="param-input-num" id="dr-num" data-param-name="dr-num" step="1" min="0" max="6" autocomplete="off"></div>
+                                <input type="range" id="dr" data-param-name="dr" min="0" max="6" value="1" step="1">
+                            </div>
+                                <div class="param-item">
+                                <div class="param-item-row"><label for="dp" class="label">Direct Pre-test Density (-dp) <span class="info-icon">i<span class="info-popover">Number of samples/steradian for pre-testing secondary sources.</span></span></label><input type="number" class="param-input-num" id="dp-num" data-param-name="dp-num" step="32" min="32" max="512"></div>
+                                <input type="range" id="dp" data-param-name="dp" min="32" max="512" value="64" step="32">
+                            </div>
+                                <div class="param-item">
+                                <div class="param-item-row"><label for="ss" class="label">Specular Sampling (-ss) <span class="info-icon">i<span class="info-popover">Sampling for rough specular materials. >1 sends multiple rays to reduce noise.</span></span></label><input type="number" class="param-input-num" id="ss-num" data-param-name="ss-num" step="0.1" min="0" max="2" autocomplete="off"></div>
+                                <input type="range" id="ss" data-param-name="ss" min="0" max="2" value="0.7" step="0.1">
+                            </div>
+                                <div class="param-item">
+                                <div class="param-item-row"><label for="lr" class="label">Limit Reflection (-lr) <span class="info-icon">i<span class="info-popover">Maximum number of specular reflections. 0 uses Russian Roulette for ray termination.</span></span></label><input type="number" class="param-input-num" id="lr-num" data-param-name="lr-num" step="1" min="0" max="16" autocomplete="off"></div>
+                                <input type="range" id="lr" data-param-name="lr" min="0" max="16" value="8" step="1">
+                            </div>
+                            </div>
                       </div>
-                      <div class="param-section">
-                          <h4>Direct & Specular Calculation Settings</h4>
-                          <div class="param-grid-sim">
-                              <div class="param-item">
-                              <div class="param-item-row"><label for="dc" class="label">Direct Certainty (-dc) <span class="info-icon">i<span class="info-popover">A value of 1 guarantees shadow accuracy. 0.5 is a good balance.</span></span></label><input type="number" class="param-input-num" id="dc-num" data-param-name="dc-num" step="0.05" min="0" max="1" autocomplete="off"></div>
-                              <input type="range" id="dc" data-param-name="dc" min="0" max="1" value="0.5" step="0.05">
-                          </div>
-                              <div class="param-item">
-                              <div class="param-item-row"><label for="dt" class="label">Direct Thresholding (-dt) <span class="info-icon">i<span class="info-popover">Optimization to ignore insignificant light sources. For max accuracy, set to 0.</span></span></label><input type="number" class="param-input-num" id="dt-num" data-param-name="dt-num" step="0.05" min="0" max="1" autocomplete="off"></div>
-                              <input type="range" id="dt" data-param-name="dt" min="0" max="1" value="0.05" step="0.05">
-                          </div>
-                              <div class="param-item">
-                              <div class="param-item-row"><label for="dr" class="label">Direct Relays (-dr) <span class="info-icon">i<span class="info-popover">Number of relays for secondary sources (e.g., reflections in mirrors).</span></span></label><input type="number" class="param-input-num" id="dr-num" data-param-name="dr-num" step="1" min="0" max="6" autocomplete="off"></div>
-                              <input type="range" id="dr" data-param-name="dr" min="0" max="6" value="1" step="1">
-                          </div>
-                              <div class="param-item">
-                              <div class="param-item-row"><label for="dp" class="label">Direct Pre-test Density (-dp) <span class="info-icon">i<span class="info-popover">Number of samples/steradian for pre-testing secondary sources.</span></span></label><input type="number" class="param-input-num" id="dp-num" data-param-name="dp-num" step="32" min="32" max="512"></div>
-                              <input type="range" id="dp" data-param-name="dp" min="32" max="512" value="64" step="32">
-                          </div>
-                              <div class="param-item">
-                              <div class="param-item-row"><label for="ss" class="label">Specular Sampling (-ss) <span class="info-icon">i<span class="info-popover">Sampling for rough specular materials. >1 sends multiple rays to reduce noise.</span></span></label><input type="number" class="param-input-num" id="ss-num" data-param-name="ss-num" step="0.1" min="0" max="2" autocomplete="off"></div>
-                              <input type="range" id="ss" data-param-name="ss" min="0" max="2" value="0.7" step="0.1">
-                          </div>
-                              <div class="param-item">
-                              <div class="param-item-row"><label for="lr" class="label">Limit Reflection (-lr) <span class="info-icon">i<span class="info-popover">Maximum number of specular reflections. 0 uses Russian Roulette for ray termination.</span></span></label><input type="number" class="param-input-num" id="lr-num" data-param-name="lr-num" step="1" min="0" max="16" autocomplete="off"></div>
-                              <input type="range" id="lr" data-param-name="lr" min="0" max="16" value="8" step="1">
-                          </div>
-                          </div>
-                      </div>
-            </div>
-          </div>
-            <div id="simulation-recipes-container" class="space-y-4 pt-4 mt-4 border-t-2 border-[--grid-color]">
-                <div class="param-section">
+              </div>
+      </div>
+      <div id="simulation-recipes-container" class="space-y-4 pt-4 mt-4 border-t-2 border-[--grid-color]">
+          <h3 class="font-semibold text-sm uppercase">Simulation Recipes</h3>
+            <div class="param-section">
                 <label for="recipe-selector" class="label">Select Recipe</label>
                   <select id="recipe-selector" class="w-full mt-1" autocomplete="off">
                           <option value="" selected>-- Select a simulation recipe --</option>
@@ -2382,21 +2896,17 @@
 
       <div id="panel-analysis-modules" class="floating-window ui-panel hidden">
           <div class="window-header">
-
-
-
-                <span>Analysis Modules</span>
+                <span>Analysis</span>
                 <div class="window-controls">
-                    <div class="window-icon-max"></div>
-                    <div class="collapse-icon"></div>
-                    <div class="window-icon-close"></div>
-                </div>
-            </div>
-                <div class="window-content">
-                    <p class="text-sm text-gray-500 mb-6">Load a simulation results file to visualize data on the 3D model.</p>
-                    <div id="results-module-content" class="space-y-5 pt-4 border-t border-dashed border-[--grid-color]">
-                    <div class="param-section">
-                        <label for="results-file-input-a" class="btn btn-secondary w-full cursor-pointer text-center">
+            <div class="window-icon-max"></div>
+            <div class="collapse-icon"></div>
+            <div class="window-icon-close"></div>
+        </div>
+    </div>
+    <div class="window-content">
+        <p class="text-sm text-gray-500 mb-6">Load a simulation results file to visualize data on the 3D model.</p>
+        <div class="param-section">
+            <label for="results-file-input-a" class="btn btn-secondary w-full cursor-pointer text-center">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="mr-2 inline-block"><path stroke-linecap="round" stroke-linejoin="round" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                             <span>Load Results File (A)</span>
                         </label>
@@ -2536,10 +3046,33 @@
                         <button id="results-dashboard-btn" class="btn btn-primary w-full mt-4">Results Dashboard</button>
                         <button id="data-table-btn" class="btn btn-secondary w-full mt-2 hidden">Show Data Table</button>
                         <button id="generate-report-btn" class="btn btn-secondary w-full mt-2 hidden">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="mr-2 inline-block"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                            <span>Generate Report</span>
-                        </button>
-                    </div>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="mr-2 inline-block"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    <span>Generate Report</span>
+                </button>
+            </div>
+            </div>
+                <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+            </div>
+        </div>
+
+        <div id="panel-recipe-guides" class="floating-window ui-panel hidden" style="width: 600px; height: 70vh;">
+            <div class="window-header">
+            <span>Recipe Guides</span>
+                <div class="window-controls">
+                    <div class="window-icon-max"></div>
+                    <div class="collapse-icon"></div>
+                    <div class="window-icon-close"></div>
+                </div>
+            </div>
+            <div class="window-content space-y-4">
+                <div>
+                    <label for="guide-selector" class="label">Select a Recipe Guide</label>
+                    <select id="guide-selector" class="w-full mt-1">
+                        <option value="" disabled selected>-- Choose a guide to display --</option>
+                    </select>
+                </div>
+                <div id="guide-content" class="prose max-w-none h-full overflow-y-auto border border-[--grid-color] p-4 rounded-md bg-[--grid-color]">
+                    <p class="text-[--text-secondary]">Please select a recipe from the dropdown above to see its guide.</p>
                 </div>
             </div>
             <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
@@ -2892,7 +3425,19 @@
             </button>
             <span class="tooltip" role="tooltip">App Information</span>
             </div>
-            <div class="action-button-container">
+        <div class="action-button-container">
+          <button id="recipe-guides-btn" class="bottom-action-button" aria-label="Show Recipe Guides">
+              <svg xmlns="http://www.w3.org/2000/svg" height="28px" width="28px" viewBox="0 0 32 32">
+                  <path d="M8 4h22v28H8z" style="fill:var(--btn-secondary-bg)"></path>
+                  <path d="M8 4v28l16-4V0z" style="fill:var(--grid-color)"></path>
+                  <path d="M2 0h22v28H2z" style="fill:var(--bg-main)"></path>
+                  <path d="M26 19h2v2h-2zm3 0h1v2h-1zm-5 0h1v2h-1z" style="fill:var(--text-primary)"></path>
+                  <path d="M4 7h2v2H4zm3 0h2v2H7zm6 0h2v2h-2zm3 0h2v2h-2zm0 3h2v2h-2zm0 3h2v2h-2zm0 3h2v2h-2zm3 0h2v2h-2zm3 0h2v2h-2zM2 7h1v2H2zm8 0h2v2h-2z" style="fill:var(--text-secondary)"></path>
+              </svg>
+          </button>
+          <span class="tooltip" role="tooltip">Recipe Guides</span>
+      </div>
+          <div class="action-button-container">
                 <button id="shortcut-help-btn" class="bottom-action-button" aria-label="Show Keyboard Shortcuts">
                     <svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 0 24 24" width="28px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm-1-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg>
                 </button>
@@ -2900,7 +3445,39 @@
             </div>
         </div>
 
-        <div id="templates" style="display: none;">
+        <div id="templates" class="hidden">
+    <template id="template-view-target-item">
+    <div class="view-target-item border border-[--grid-color] rounded p-2 space-y-2">
+        <div class="flex items-center justify-between">
+            <input type="text" placeholder="Description (e.g., Garden view)" 
+                   class="view-target-desc input text-xs flex-1 mr-2">
+            <button class="view-target-remove btn btn-xs btn-danger" aria-label="Remove view target">×</button>
+        </div>
+        
+        <div class="grid grid-cols-3 gap-2">
+            <div>
+                <label class="text-xs text-[--text-secondary]">Dir X</label>
+                <input type="number" step="0.1" value="0" class="view-target-dir-x input text-xs w-full">
+            </div>
+            <div>
+                <label class="text-xs text-[--text-secondary]">Dir Y</label>
+                <input type="number" step="0.1" value="0" class="view-target-dir-y input text-xs w-full">
+            </div>
+            <div>
+                <label class="text-xs text-[--text-secondary]">Dir Z</label>
+                <input type="number" step="0.1" value="1" class="view-target-dir-z input text-xs w-full">
+            </div>
+        </div>
+        
+        <div>
+            <label class="label text-xs flex justify-between">
+                <span>Angular Width</span>
+                <span class="view-target-angle-val data-value font-mono">30°</span>
+            </label>
+            <input type="range" min="5" max="90" value="30" step="5" class="view-target-angle w-full">
+        </div>
+    </div>
+</template>
             <template id="template-material-tagger">
                 <div class="floating-window ui-panel">
                     <div class="window-header">
@@ -3875,9 +4452,11 @@
     <script type="importmap">
     {
         "imports": {
-        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-        "three/examples/jsm/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+            "three/examples/jsm/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+            "d3-delaunay": "https://unpkg.com/d3-delaunay?module",
+            "lsystem": "https://esm.sh/lsystem"
         }
     }
     </script>
@@ -3891,5 +4470,6 @@
     <script type="module" src="scripts/sunTracer.js"></script>
     <script type="module" src="scripts/main.js"></script>
     <script type="module" src="scripts/ai-assistant.js"></script>
+
 </body>
 </html>

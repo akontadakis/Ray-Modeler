@@ -380,8 +380,36 @@ canvas {
 
 .resize-handle-edge, .resize-handle-corner {
     position: absolute;
-    background: transparent; /* Make handles invisible */
-    z-index: 11; /* Ensure handles are on top for cursor detection */
+    background: transparent; /* Handles are invisible by default */
+    z-index: 11;
+    transition: background-color 0.2s ease;
+}
+
+/* Show a subtle background on hover for better usability */
+.resize-handle-edge:hover, .resize-handle-corner:hover {
+    background: rgba(128, 128, 128, 0.2);
+}
+
+/* Add a visual icon to the bottom-right corner handle */
+.resize-handle-corner.bottom-right::after {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 12px;
+    height: 12px;
+    background-image: var(--resize-handle-icon);
+    background-repeat: no-repeat;
+    background-position: center;
+    opacity: 0.8;
+}
+
+/* Temporarily disable transitions and text selection while resizing */
+body.is-resizing {
+    user-select: none;
+}
+body.is-resizing .floating-window {
+    transition: none !important;
 }
 
 .resize-handle-edge.top { top: -4px; left: 8px; right: 8px; height: 8px; cursor: ns-resize; }
@@ -554,7 +582,7 @@ canvas {
 }
 
 /* --- Push/Resize effect for AI Sidebar --- */
-#render-container, #view-controls {
+#render-container {
     /* Transition properties match the sidebar's slide animation */
     transition: width 0.4s ease-in-out, left 0.4s ease-in-out;
 }
@@ -1808,4 +1836,98 @@ background-color: var(--grid-color);
     resize: none;
     line-height: 1.5;
     padding: 0.5rem 1rem; /* Use less padding to fit better */
+}
+
+/* --- RECIPE GUIDES PROSE STYLING --- */
+.prose {
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+
+.prose h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid var(--grid-color);
+    padding-bottom: 0.5rem;
+    color: var(--line-color);
+}
+
+.prose h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-top: 1.25rem;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.prose h4 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-top: 1rem;
+    margin-bottom: 0.25rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+
+.prose p, .prose ul, .prose ol {
+    margin-bottom: 1rem;
+}
+
+.prose ul, .prose ol {
+    padding-left: 1.5rem;
+}
+
+.prose ul { list-style-type: disc; }
+.prose ol { list-style-type: decimal; }
+
+.prose li {
+    margin-bottom: 0.5rem;
+}
+
+.prose a {
+    color: var(--highlight-color);
+    text-decoration: underline;
+}
+
+.prose code {
+    background-color: var(--btn-secondary-bg);
+    color: var(--text-primary);
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.25rem;
+    font-size: 0.85em;
+    font-family: 'Courier New', Courier, monospace;
+    border: 1px solid var(--grid-color);
+}
+
+.prose table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5rem 0;
+    font-size: 0.8rem;
+}
+
+.prose th, .prose td {
+    border: 1px solid var(--grid-color);
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+}
+
+.prose th {
+    background-color: var(--btn-secondary-bg);
+    font-weight: 600;
+}
+
+.prose tr:nth-child(even) {
+    background-color: rgba(0,0,0,0.02);
+}
+
+.prose .mermaid {
+    margin-bottom: 2rem;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    background-color: var(--btn-secondary-bg);
+    display: flex;
+    justify-content: center;
 }

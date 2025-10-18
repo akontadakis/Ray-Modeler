@@ -354,7 +354,7 @@ class Project {
         projectData.mergedSimParams = { ...globalParams, ...recipeOverrides };
 
         // Generate all necessary input files in memory first.
-        const { materials, geometry } = await generateRadFileContent();
+        const { materials, geometry } = await generateRadFileContent(projectData);
         const viewpointContent = generateViewpointFileContent(projectData.viewpoint, projectData.geometry.room);
         const fisheyeVpData = { ...projectData.viewpoint, 'view-type': 'h' };
         const fisheyeContent = generateViewpointFileContent(fisheyeVpData, projectData.geometry.room);
@@ -451,13 +451,12 @@ class Project {
     
         try {
             const projectData = await this.gatherAllProjectData();
-            const projectName = this.projectName || 'project';
-    
+        const projectName = this.projectName || 'project';
+
             // 2. Generate all file contents in memory first.
-            const { materials, geometry } = await generateRadFileContent();
+            const { materials, geometry } = await generateRadFileContent(projectData);
             const viewpointContent = generateViewpointFileContent(projectData.viewpoint, projectData.geometry.room);
             const fisheyeVpData = { ...projectData.viewpoint, 'view-type': 'h' };
-            const fisheyeContent = generateViewpointFileContent(fisheyeVpData, projectData.geometry.room);
             const allPtsContent = await this._generateSensorPointsContent('all');
             const taskPtsContent = await this._generateSensorPointsContent('task');
             const surroundingPtsContent = await this._generateSensorPointsContent('surrounding');
@@ -585,7 +584,7 @@ class Project {
         const [hour, minute] = time.split(':');
         const decimalTime = parseInt(hour, 10) + parseInt(minute, 10) / 60;
 
-        const { materials, geometry } = await generateRadFileContent();
+        const { materials, geometry } = await generateRadFileContent(projectData);
         const viewpointContent = generateViewpointFileContent(projectData.viewpoint, projectData.geometry.room);
 
         const payload = {
@@ -934,22 +933,31 @@ class Project {
                     setValue(`win-height-${dir}`, apertureData.wh);
                     setValue(`sill-height-${dir}`, apertureData.sh);
                 }
-                // Always set window depth position if aperture data exists
-                setValue(`win-depth-pos-${dir}`, apertureData.winDepthPos);
-                setValue(`win-depth-pos-${dir}-manual`, apertureData.winDepthPos);
+                
+            // Always set window depth position if aperture data exists
+            setValue(`win-depth-pos-${dir}`, apertureData.winDepthPos);
+            setValue(`win-depth-pos-${dir}-manual`, apertureData.winDepthPos);
             }
             const shadingData = settings.geometry.shading[key];
             setChecked(`shading-${dir}-toggle`, !!shadingData);
             if (shadingData) {
                 setValue(`shading-type-${dir}`, shadingData.type);
-                ui.handleShadingTypeChange(dir, false);
-                if (shadingData.overhang) Object.keys(shadingData.overhang).forEach(p => setValue(`overhang-${p}-${dir}`, shadingData.overhang[p]));
-                if (shadingData.lightshelf) Object.keys(shadingData.lightshelf).forEach(p => setValue(`lightshelf-${p}-${dir}`, shadingData.lightshelf[p]));
-                if (shadingData.louver) Object.keys(shadingData.louver).forEach(p => setValue(`louver-${p}-${dir}`, shadingData.louver[p]));
+                ui.handleShadingTypeChange(dir, false); // This reveals the correct controls panel
+
+                if (shadingData.type === 'generative') {
+                    // As per the plan, call new UI functions to restore generative shading state
+                    ui.storeGenerativeParams(dir, shadingData.patternType, shadingData.parameters);
+                    ui.setGenerativeSliderValues(dir, shadingData.parameters);
+                } else {
+                    // Handle existing, non-generative shading types
+                    if (shadingData.overhang) Object.keys(shadingData.overhang).forEach(p => setValue(`overhang-${p}-${dir}`, shadingData.overhang[p]));
+                    if (shadingData.lightshelf) Object.keys(shadingData.lightshelf).forEach(p => setValue(`lightshelf-${p}-${dir}`, shadingData.lightshelf[p]));
+                    if (shadingData.louver) Object.keys(shadingData.louver).forEach(p => setValue(`louver-${p}-${dir}`, shadingData.louver[p]));
+                }
             }
         });
 
-       // --- Frames & Materials ---
+        // --- Frames & Materials ---
         setChecked('frame-toggle', settings.geometry.frames.enabled);
         setValue('frame-thick', settings.geometry.frames.thickness);
         setValue('frame-depth', settings.geometry.frames.depth);

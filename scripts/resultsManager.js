@@ -64,6 +64,47 @@ class ResultsManager {
     }
 
     /**
+     * Processes the parsed data from the web worker and updates the dataset.
+     * @param {object} result - The parsed data from the worker.
+     * @param {string} fileName - The name of the original file.
+     * @param {'a' | 'b'} key - The dataset key.
+     * @private
+     */
+    _processWorkerResult(result, fileName, key) {
+        if (!this.datasets[key]) {
+            this.clearDataset(key);
+        }
+        this.datasets[key].fileName = fileName;
+
+        const lowerFileName = fileName.toLowerCase();
+
+        if (result.circadianMetrics) {
+            this.datasets[key].circadianMetrics = result.circadianMetrics;
+        } else if (result.perPointCircadianData) {
+            this.datasets[key].spectralResults = result.perPointCircadianData;
+            this.datasets[key].data = result.perPointCircadianData.Photopic_lux;
+            this.activeMetricType = 'Photopic_lux';
+        } else if (lowerFileName.includes('_direct.ill')) {
+            this.datasets[key].annualDirectData = result.annualData || [];
+            this.datasets[key].data = result.data || [];
+            this.datasets[key].spectralResults['illuminance'] = result.data || [];
+            this.activeMetricType = 'illuminance';
+        } else if (result.lightingEnergyMetrics) {
+            this.datasets[key].lightingEnergyMetrics = result.lightingEnergyMetrics;
+        } else {
+            const illuminanceData = result.data || [];
+            this.datasets[key].data = illuminanceData;
+            this.datasets[key].spectralResults['illuminance'] = illuminanceData;
+            this.activeMetricType = 'illuminance';
+            this.datasets[key].annualData = result.annualData || [];
+            this.datasets[key].glareResult = result.glareResult || null;
+            this.datasets[key].annualGlareResults = result.annualGlareResults || {};
+        }
+
+        this.datasets[key].lightingMetrics = result.lightingMetrics || null;
+    }
+
+    /**
      * Loads a file, sends it to a Web Worker for parsing, and processes the returned data.
      * @param {File} file - The file to process.
      * @param {'a' | 'b'} key - The dataset key to associate the results with.
@@ -71,12 +112,8 @@ class ResultsManager {
      */
     async loadAndProcessFile(file, key) {
         return new Promise((resolve, reject) => {
-            if (!file) {
-                return reject(new Error("No file provided."));
-            }
-            if (!(key in this.datasets)) {
-                return reject(new Error(`Invalid dataset key provided: ${key}`));
-            }
+            if (!file) return reject(new Error("No file provided."));
+            if (!(key in this.datasets)) return reject(new Error(`Invalid dataset key: ${key}`));
 
             const reader = new FileReader();
             const lowerFileName = file.name.toLowerCase();
@@ -86,25 +123,22 @@ class ResultsManager {
             reader.onload = (e) => {
                 const content = e.target.result;
 
-                // --- NEW: Handle EPW file parsing directly ---
                 if (isEpwFile) {
                     try {
                         this.climateData = this._parseEpwContent(content);
                         showAlert(`Climate file "${file.name}" parsed successfully.`, 'Climate Data Loaded');
-                        // Resolve with a special type to let the UI know
                         resolve({ key: key, type: 'climate' });
                     } catch (error) {
                         showAlert(`Error parsing EPW file: ${error.message}`, 'EPW Error');
                         reject(error);
                     }
-                    return; // Stop further processing for EPW files
+                    return;
                 }
+
                 const worker = new Worker('./scripts/parsingWorker.js');
 
                 worker.onmessage = (event) => {
-                    // Terminate the worker to free up resources
                     worker.terminate();
-
                     if (event.data.error) {
                         const error = new Error(event.data.error);
                         showAlert(`Error processing results file: ${error.message}`, 'File Error');
@@ -112,69 +146,19 @@ class ResultsManager {
                         return;
                     }
 
-                    const parsedData = event.data.result;
+                    this._processWorkerResult(event.data.result, file.name, key);
 
-                    // Initialize the dataset object if it's null
-                    if (!this.datasets[key]) {
-                        this.datasets[key] = {
-                            fileName: file.name,
-                            data: [],
-                            annualData: [],
-                            glareResult: null,
-                            annualGlareResults: {},
-                            spectralResults: {}, // NEW: To store different metric types
-                            lightingMetrics: null,
-                            stats: null
-                        };
-                    }
-                    
-                    // --- NEW: Logic to handle different types of result files ---
-                    const lowerFileName = file.name.toLowerCase();
-                    let isSpectral = false;
-
-                    if (parsedData.circadianMetrics) {
-                    // This was a circadian_summary.json file
-                    this.datasets[key].circadianMetrics = parsedData.circadianMetrics;
-                    } else if (parsedData.perPointCircadianData) {
-                        // This was a circadian_per_point.csv file
-                        this.datasets[key].spectralResults = parsedData.perPointCircadianData;
-                        // Set the default viewable data to photopic lux
-                        this.datasets[key].data = parsedData.perPointCircadianData.Photopic_lux;
-                        this.activeMetricType = 'Photopic_lux';
-                    } else if (lowerFileName.includes('_direct.ill')) { // NEW: Detect direct-only .ill files
-                        this.datasets[key].annualDirectData = parsedData.annualData || [];
-                        // Also populate the main data array with the average direct illuminance for visualization
-                        this.datasets[key].data = parsedData.data || [];
-                        this.datasets[key].spectralResults['illuminance'] = parsedData.data || [];
-                        this.activeMetricType = 'illuminance';
-                    } else if (parsedData.lightingEnergyMetrics) {
-                        this.datasets[key].lightingEnergyMetrics = parsedData.lightingEnergyMetrics;
-                    } else {
-                        // Standard (non-spectral) data handling
-                        const illuminanceData = parsedData.data || [];
-                        this.datasets[key].data = illuminanceData;
-                        this.datasets[key].spectralResults['illuminance'] = illuminanceData;
-                        this.activeMetricType = 'illuminance';
-
-                        this.datasets[key].annualData = parsedData.annualData || [];
-                        this.datasets[key].glareResult = parsedData.glareResult || null;
-                        this.datasets[key].annualGlareResults = parsedData.annualGlareResults || {};
-                    }
-                    
-                    this.datasets[key].lightingMetrics = parsedData.lightingMetrics || null;
+                    // Common finalization steps
                     this.datasets[key].stats = this._calculateStats(this.datasets[key].data);
-                    
                     if (this.datasets.a && this.datasets.b) {
                         this.calculateDifference();
                     }
+                    const activeStats = this.getActiveStats();
+                    if (activeStats) {
+                        this.updateColorScale(activeStats.min, activeStats.max, this.colorScale.palette);
+                    }
 
-                    this.colorScale.min = this.datasets[key].stats.min;
-                    this.colorScale.max = this.datasets[key].stats.max;
-
-                    resolve({
-                        key: key,
-                        stats: this.datasets[key].stats,
-                    });
+                    resolve({ key: key, stats: this.datasets[key].stats });
                 };
 
                 worker.onerror = (error) => {
@@ -185,11 +169,7 @@ class ResultsManager {
                 };
 
                 const transferList = (content instanceof ArrayBuffer) ? [content] : [];
-                worker.postMessage({
-                    content: content,
-                    fileName: file.name
-                }, transferList);
-
+                worker.postMessage({ content: content, fileName: file.name }, transferList);
             };
 
             reader.onerror = () => {

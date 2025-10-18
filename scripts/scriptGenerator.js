@@ -3,15 +3,13 @@
 import { _parseAndBinSpectralData } from './radiance.js';
 
 /**
- * Generates Radiance definitions for artificial light sources using xform for placement.
- * @param {object|null} lightingData - The lighting state object from lightingManager.
- * @param {object} roomData - The room geometry data { W, L, H, rotationY }.
- * @returns {string} A string containing Radiance light source definitions.
- */
-function generateLightSourceDefinitions(lightingData, roomData) {
-    if (!lightingData || !lightingData.type) {
-        return '# No artificial lighting enabled in the scene.';
-    }
+* Generates Radiance definitions for artificial light sources using xform for placement.
+* @param {object|null} lightingData - The lighting state object from lightingManager.
+* @param {object} roomData - The room geometry data { W, L, H, rotationY }.
+* @param {object} simulationFiles - The project's collection of simulation file data.
+* @returns {string} A string containing Radiance light source definitions. 
+*/ 
+    function generateLightSourceDefinitions(lightingData, roomData, simulationFiles) { if (!lightingData || !lightingData.type) { return '# No artificial lighting enabled in the scene.'; }
 
     // Apply the Maintenance Factor (MF) to the luminaire output
     const mf = lightingData.maintenance_factor || 1.0;
@@ -68,12 +66,17 @@ function generateLightSourceDefinitions(lightingData, roomData) {
         case 'glow': matArgs = `4 ${scaledRgb(lightingData.rgb)} ${lightingData.max_radius}`; break;
         case 'illum': matArgs = `2 ${lightingData.alternate_material || 'void'} ${scaledRgb(lightingData.rgb)}`; break;
         case 'ies':
-                const totalMultiplier = (lightingData.ies_multiplier || 1.0) * mf;
-                // Get the basename of the file (e.g., "my_light" from "my_light.ies")
-                iesBasename = lightingData.ies_file.replace(/\\.ies$/i, '');
-                // Corrected path to point to the general files directory instead of bsdf
-                lightRad += `!ies2rad -m ${totalMultiplier.toPrecision(4)} ../11_files/${lightingData.ies_file_data.name}\n`;
-                break;
+            const totalMultiplier = (lightingData.ies_multiplier || 1.0) * mf;
+            const iesFileInputId = 'ies-file-input'; // The static ID from the lighting panel
+            const iesFileData = simulationFiles[iesFileInputId];
+
+            if (iesFileData && iesFileData.name) {
+                iesBasename = iesFileData.name.replace(/\\.ies$/i, '');
+                lightRad += `!ies2rad -m ${totalMultiplier.toPrecision(4)} ../11_files/${iesFileData.name}\n`;
+            } else {
+                return '# ERROR: IES file selected but file data not found in project. Please re-select the file.\n';
+            }
+            break;
         }
 
     if (lightingData.type !== 'ies') {
@@ -550,7 +553,7 @@ function createPointIlluminanceScript(projectData) {
     const aa = p['aa'] || 0.2;
     const rtraceMode = p['rtrace-mode-I'] ? '-I' : '-i';
     const rtraceSwitches = `${p['rtrace-h'] ? '-h' : ''} ${p['rtrace-w'] ? '-w' : ''} ${p['rtrace-u'] ? '-u' : ''}`.trim();
-    const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room);
+    const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room, projectData.simulationFiles);
 
     const shContent = `#!/bin/bash
 # RUN_Illuminance.sh
@@ -719,7 +722,7 @@ function createRenderImageScript(projectData) {
     const ps = p['rpict-ps'] || 8;
     const pt = p['rpict-pt'] || 0.05;
     const pj = p['rpict-pj'] || 0.9;
-    const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room);
+    const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room, projectData.simulationFiles);
 
     const shContent = `#!/bin/bash
 # RUN_Rendering.sh
@@ -885,7 +888,7 @@ function createDgpAnalysisScript(projectData) {
     const xRes = p['dgp-x-res'] || 1500; // Use parameter, fallback to 1500
     const yRes = p['dgp-y-res'] || 1500; // Use parameter, fallback to 1500
     const evalglareSwitches = `${p['evalglare-c'] ? `-c ${projectName}_glare_check.hdr` : ''} ${p['evalglare-d'] ? '-d' : ''} ${p['evalglare-t'] ? '-t' : ''}`.trim();
-    const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room);
+    const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room, projectData.simulationFiles);
 
     const shContent = `#!/bin/bash
 # RUN_DGP_Analysis.sh
@@ -1064,9 +1067,10 @@ function createDaylightFactorScript(projectData) {
     const aa = p['aa'] || 0.2;
     const skyType = p['df-sky-type'] || '-c';
     const groundRefl = p['df-ground-refl'] || 0.2;
+    
     // For a standard 10,000 lux exterior illuminance, B should be 55.866 W/m^2 for a CIE overcast sky
     const horizIrrad = p['df-irrad'] || 55.866;
-    const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room);
+    const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room, projectData.simulationFiles);
 
     const shContent = `#!/bin/bash
 # RUN_Daylight_Factor.sh
@@ -1213,7 +1217,7 @@ function create3phMatrixGenerationScript(projectData) {
     const ar = p['ar'] || 1024;
     const aa = p['aa'] || 0.1;
     const lw = p['lw'] || 1e-4;
-    const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room);
+    const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room, projectData.simulationFiles);
 
     const shContent = `#!/bin/bash
 # RUN_3ph_Matrix_Generation.sh
@@ -1451,10 +1455,10 @@ function create5phMatrixGenerationScript(projectData) {
     const ar = p['ar'] || 1024;
     const aa = p['aa'] || 0.1;
     const lw = p['lw'] || 1e-4;
-    const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room);
+    const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room, projectData.simulationFiles);
 
     const shContent = `#!/bin/bash
-# RUN_5ph_Matrix_Generation.sh 
+# RUN_5ph_Matrix_Generation.sh
 # A script to run a full 5-Phase Method annual simulation.
 # This script generates all required matrices and then performs the final calculation.
 # Generated by Ray Modeler.
@@ -1789,10 +1793,10 @@ function createImagelessGlareScript(projectData) {
     const ab = sp['ab'] || 8;
     const ad = sp['ad'] || 4096;
     const as = sp['as'] || 1024;
-    const ar = sp['ar'] || 512;
-    const aa = sp['aa'] || 0.1;
-    const lw = sp['lw'] || 0.001;
-    const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room);
+    const ar = p['ar'] || 512;
+    const aa = p['aa'] || 0.1;
+    const lw = p['lw'] || 0.001;
+    const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room, projectData.simulationFiles);
 
     const scheduleFlag = scheduleFile ? `-sff ../10_schedules/${scheduleFile}` : '';
 
@@ -2575,8 +2579,8 @@ function createEnIlluminanceScript(projectData) {
     const aa = p['aa'] || 0.1;
     const lw = p['lw'] || 0.001;
 
-    const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room);
-    
+    const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room, projectData.simulationFiles);
+
     const shContent = `#!/bin/bash
 # RUN_EN12464_Illuminance.sh
 # Verifies maintained illuminance (Em) and uniformity (U0) as per EN 12464-1.
@@ -2676,8 +2680,8 @@ function createEnUgrScript(projectData) {
     const aa = p['aa'] || 0.1;
     const lw = p['lw'] || 0.001;
     const ugrLimit = p['ugr-limit'] || 19;
-    
-    const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room);
+
+    const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room, projectData.simulationFiles);
 
     const shContent = `#!/bin/bash
 # RUN_EN12464_UGR.sh
@@ -3165,7 +3169,7 @@ function createFacadeIrradiationScript(projectData) {
         const ar = p['ar'] || 512;
         const aa = p['aa'] || 0.15;
         const lw = p['lw'] || 0.005;
-        const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room);
+        const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room, projectData.simulationFiles);
 
         const shContent = `#!/bin/bash
     # RUN_Annual_Radiation.sh

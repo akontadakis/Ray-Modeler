@@ -144,14 +144,194 @@ const availableTools = [
                         "enable": { "type": "BOOLEAN", "description": "Set to true to enable shading on this wall, or false to disable it." },
                         "deviceType": { "type": "STRING", "description": "The type of device to configure. E.g., 'overhang', 'louver', 'lightshelf'. Required if enabling or configuring." },
                         "depth": { "type": "NUMBER", "description": "The depth of the device in meters (e.g., for an overhang)." },
-                        "tilt": { "type": "NUMBER", "description": "The tilt angle in degrees (e.g., for an overhang)." }
+                    "tilt": { "type": "NUMBER", "description": "The tilt angle in degrees (e.g., for an overhang)." }
+                },
+                "required": ["wall"]
+            }
+        },
+        {
+            "name": "createShadingPattern",
+            "description": "Creates a generative shading pattern on a specified wall. Only the AI can create new patterns; users can then adjust common parameters.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "targetWall": {
+                        "type": "STRING",
+                        "enum": ["N", "S", "E", "W"],
+                        "description": "The wall to apply the pattern to"
                     },
-                    "required": ["wall"]
-                }
+                    "patternType": {
+                        "type": "STRING",
+                        "enum": ["vertical_fins", "horizontal_fins", "grid", "perforated_screen", "voronoi", "l_system", "solar_responsive", "view_optimized", "penrose_tiling"],
+                        "description": "The type of generative pattern"
+                    },
+                    "parameters": {
+                        "type": "OBJECT",
+                        "description": "Pattern parameters including depth, spacingX, spacingY, elementWidth, and algorithm-specific parameters",
+                        "properties": {
+                            "depth": { "type": "NUMBER", "description": "Depth of shading elements in meters" },
+                            "spacingX": { "type": "NUMBER", "description": "Horizontal spacing in meters" },
+                            "spacingY": { "type": "NUMBER", "description": "Vertical spacing in meters" },
+                            "elementWidth": { "type": "NUMBER", "description": "Width of individual elements" },
+                            "voronoi_cell_count": { "type": "NUMBER" },
+                            "l_system_iterations": { "type": "NUMBER" }
+                        }
+                    }
+                },
+                "required": ["targetWall", "patternType", "parameters"]
+            }
+        },
+        {
+            "name": "optimizeShadingDesign",
+            "description": "Runs an optimization loop to find the best generative shading pattern parameters based on simulation results. This is a long-running process that evaluates multiple design variations.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "targetWall": {
+                        "type": "STRING",
+                        "enum": ["N", "S", "E", "W"],
+                        "description": "The wall to optimize shading for"
+                    },
+                    "patternType": {
+                        "type": "STRING",
+                        "enum": ["vertical_fins", "horizontal_fins", "grid", "perforated_screen", "voronoi"],
+                        "description": "The type of generative pattern to optimize"
+                    },
+                    "optimizationGoal": {
+                        "type": "STRING",
+                        "enum": ["maximize_sDA", "minimize_ASE", "minimize_DGP_average"],
+                        "description": "The objective to optimize for"
+                    },
+                    "constraints": {
+                        "type": "OBJECT",
+                        "description": "Min/max ranges for each parameter, e.g., {depth: [0.1, 2.0], spacingX: [0.2, 1.5], spacingY: [0.2, 1.5], elementWidth: [0.05, 0.5]}"
+                    },
+                    "targetConstraint": {
+                        "type": "STRING",
+                        "description": "Optional constraint for valid solutions, e.g., 'ASE < 10' or 'sDA >= 60'. Leave empty for unconstrained optimization."
+                    },
+                    "algorithm": {
+                        "type": "STRING",
+                        "enum": ["genetic"],
+                        "description": "The optimization algorithm to use (currently only genetic is supported)"
+                    },
+                    "generations": {
+                        "type": "NUMBER",
+                        "description": "Number of generations for genetic algorithm (default: 10, recommended: 5-15)"
+                    },
+                    "populationSize": {
+                        "type": "NUMBER",
+                        "description": "Population size for genetic algorithm (default: 20, recommended: 15-30)"
+                    },
+                    "quality": {
+                        "type": "STRING",
+                        "enum": ["draft", "medium", "high"],
+                        "description": "Simulation quality preset. Draft is fastest for testing, high is most accurate (default: medium)"
+                    }
+                },
+                "required": ["targetWall", "patternType", "optimizationGoal", "constraints"]
+            }
+        },
+        {
+            "name": "generateSolarResponsiveShading",
+            "description": "Creates a solar-responsive shading pattern that blocks high-radiation sun angles while preserving desirable daylight. Requires annual solar analysis using an EPW weather file. The pattern will be optimized based on the site's specific solar conditions.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "targetWall": {
+                        "type": "STRING",
+                        "enum": ["N", "S", "E", "W"],
+                        "description": "The wall to apply the pattern to"
+                    },
+                    "quality": {
+                        "type": "STRING",
+                        "enum": ["quick", "standard", "high-fidelity"],
+                        "description": "Analysis quality/resolution: quick (monthly averages, coarse grid), standard (hourly, medium grid), or high-fidelity (sub-hourly, fine grid)"
+                    },
+                    "threshold": {
+                        "type": "NUMBER",
+                        "description": "Solar radiation threshold in kWh/m²/year. Sun angles exceeding this will be blocked. Typical range: 200-1000"
+                    },
+                    "depth": {
+                        "type": "NUMBER",
+                        "description": "Depth of the shading fins in meters. Typical range: 0.2-0.5"
+                    }
+                },
+                "required": ["targetWall", "quality", "threshold"]
+            }
+        },
+
+
+{
+    name: "generateViewOptimizedShading",
+    description: "Creates view-optimized shading that preserves sight lines to desirable views while blocking undesirable views or glare sources.",
+    parameters: {
+        type: "OBJECT",
+        properties: {
+            targetWall: {
+                type: "STRING",
+                enum: ["N", "S", "E", "W"],
+                description: "The wall to apply the pattern to"
             },
-            {
-                "name": "setSensorGrid",
-                "description": "Configures parameters for the illuminance sensor grid on a specific surface.",
+            viewpoint: {
+                type: "OBJECT",
+                properties: {
+                    x: { type: "NUMBER" },
+                    y: { type: "NUMBER" },
+                    z: { type: "NUMBER" }
+                },
+                description: "Observer position coordinates"
+            },
+            desirableViews: {
+                type: "ARRAY",
+                items: {
+                    type: "OBJECT",
+                    properties: {
+                        description: { type: "STRING" },
+                        direction: {
+                            type: "OBJECT",
+                            properties: {
+                                x: { type: "NUMBER" },
+                                y: { type: "NUMBER" },
+                                z: { type: "NUMBER" }
+                            }
+                        },
+                        angularWidth: { type: "NUMBER" }
+                    }
+                },
+                description: "Array of view targets to preserve"
+            },
+            blockViews: {
+                type: "ARRAY",
+                items: {
+                    type: "OBJECT",
+                    properties: {
+                        description: { type: "STRING" },
+                        direction: {
+                            type: "OBJECT",
+                            properties: {
+                                x: { type: "NUMBER" },
+                                y: { type: "NUMBER" },
+                                z: { type: "NUMBER" }
+                            }
+                        }
+                    }
+                },
+                description: "Array of views to block"
+            },
+            samplingDensity: {
+                type: "NUMBER",
+                minimum: 25,
+                maximum: 400,
+                description: "Analysis detail in rays per square meter"
+            }
+        },
+        required: ["targetWall", "viewpoint"]
+    }
+},
+        {
+            "name": "setSensorGrid",
+            "description": "Configures parameters for the illuminance sensor grid on a specific surface.",
                 "parameters": {
                     "type": "OBJECT",
                     "properties": {
@@ -491,6 +671,7 @@ const modelsByProvider = {
         // OpenAI
         { id: 'openai/gpt-5', name: 'OpenAI GPT-5' },
         { id: 'openai/gpt-5-mini', name: 'OpenAI GPT-5 Mini' },
+        { id: 'openai/gpt-5-nano', name: 'OpenAI GPT-5 Nano' },
         { id: 'openai/gpt-4.1', name: 'OpenAI GPT-4.1' },
         { id: 'openai/gpt-4o', name: 'OpenAI GPT-4o' },
         { id: 'openai/gpt-4o-mini', name: 'OpenAI GPT-4o Mini' },
@@ -499,10 +680,12 @@ const modelsByProvider = {
         { id: 'openai/gpt-oss-20b:free', name: 'OpenAI GPT-OSS 20B (Free)' },
 
         // Anthropic
-        { id: 'anthropic/claude-3.5-sonnet', name: 'Anthropic Claude 3.5 Sonnet' },
-        { id: 'anthropic/claude-3-opus', name: 'Anthropic Claude 3 Opus' },
-        { id: 'anthropic/claude-3-sonnet', name: 'Anthropic Claude 3 Sonnet' },
-        { id: 'anthropic/claude-3-haiku', name: 'Anthropic Claude 3 Haiku' },
+        { id: 'anthropic/claude-sonnet-4.5', name: 'Anthropic Claude 4.5 Sonnet' },
+        { id: 'anthropic/claude-sonnet-4', name: 'Anthropic Claude 4 Sonnet' },
+        { id: 'anthropic/claude-3.7-sonnet', name: 'Anthropic Claude 3.7 Sonnet' },
+        { id: 'anthropic/claude-3.7-sonnet:thinking', name: 'Anthropic Claude 3.7 Sonnet Thinking' },
+        { id: 'anthropic/claude-haiku-4.5', name: 'Anthropic Claude 4.5 Haiku' },
+        { id: 'anthropic/claude-3.5-haiku', name: 'Anthropic Claude 3.5 Haiku' },
 
         // xAI
         { id: 'x-ai/grok-code-fast-1', name: 'xAI Grok Code Fast 1' },
@@ -535,25 +718,26 @@ const modelsByProvider = {
         { id: 'google/gemma-3n-e2b-it:free', name: 'Google Gemma 3N E2B IT (Free)' },
         { id: 'tngtech/deepseek-r1t2-chimera:free', name: 'DeepSeek R1T2 Chimera (Free)' },
         { id: 'qwen/qwen3-4b:free', name: 'Qwen 3 4B (Free)' },
-        { id: 'meta-llama/llama-4-maverick:free', name: 'Meta Llama 4 Maverick (Free)' }
+        { id: 'meta-llama/llama-4-maverick:free', name: 'Meta Llama 4 Maverick (Free)' },
+        { id: 'moonshotai/kimi-k2:free', name: 'MoonshotAI Kimi K2 0711 (Free)' },
     ],
     openai: [
         { id: 'gpt-4o', name: 'GPT-4o' },
         { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
-        { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
-        { id: 'gpt-4', name: 'GPT-4' },
-        { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
+        { id: 'gpt-5', name: 'GPT-5' },
+        { id: 'gpt-5-mini', name: 'GPT-5 Mini' },
+        { id: 'gpt-5-nano', name: 'GPT-5 Nano' }
     ],
     gemini: [
-        { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
-        { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
-        { id: 'gemini-1.0-pro', name: 'Gemini 1.0 Pro' }
+        { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
+        { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
     ],
     anthropic: [
-        { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet' },
-        { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
-        { id: 'claude-3-sonnet-20240229', name: 'Claude 3 Sonnet' },
-        { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' }
+        { id: 'claude-sonnet-4-5-20250929', name: 'Claude 4.5 Sonnet' },
+        { id: 'claude-sonnet-4-20250514', name: 'Claude 4 Sonnet' },
+        { id: 'claude-3-7-sonnet-20250219', name: 'Claude 3.7 Sonnet' },
+        { id: 'claude-haiku-4-5-20251001', name: 'Claude 4.5 Haiku' },
+        { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku' }
     ]
 };
 
@@ -1123,7 +1307,73 @@ async function _createContextualSystemPrompt(userQuery) {
     const activeConversation = conversations[activeConversationId];
     if (!activeConversation) throw new Error("No active conversation found.");
 
-    let systemPrompt = "You are Helios, an expert AI assistant with deep knowledge of the Radiance Lighting Simulation Engine embedded within the Ray Modeler web application. Your purpose is to guide users through daylighting analysis, lighting simulation, and building performance modeling. You can explain Radiance concepts, troubleshoot errors, and interpret results. Your tone is that of a seasoned mentor: clear, precise, and encouraging.";
+    let systemPrompt = `You are Helios, an expert AI assistant with deep knowledge of the Radiance Lighting Simulation Engine embedded within the Ray Modeler web application. Your purpose is to guide users through daylighting analysis, lighting simulation, and building performance modeling. You can explain Radiance concepts, troubleshoot errors, and interpret results. Your tone is that of a seasoned mentor: clear, precise, and encouraging.
+
+GENERATIVE SHADING PATTERN CATALOG:
+When recommending shading patterns, consider these available options:
+
+1. **vertical_fins** - Vertical blade system
+   - Best for: East/West facades, low-angle sun control
+   - Key params: depth (0.3-1.5m), spacingX (0.2-0.6m), elementWidth (0.03-0.15m)
+   - Effect: Blocks low-angle sun while maintaining views
+   - Performance: Excellent for morning/evening glare control
+
+2. **horizontal_fins** - Horizontal louver system
+   - Best for: South facades (Northern hemisphere), high-angle sun
+   - Key params: depth (0.3-1.5m), spacingY (0.2-0.5m), elementWidth (0.03-0.15m), tilt (0-45°)
+   - Effect: Blocks overhead sun, tilt adjusts seasonal performance
+   - Performance: Optimal for summer sun control
+
+3. **grid** - Egg-crate pattern (combined vertical + horizontal)
+   - Best for: All orientations, balanced control
+   - Key params: depth (0.3-1.0m), spacingX (0.3-0.6m), spacingY (0.3-0.6m), elementWidth (0.03-0.1m)
+   - Effect: Omnidirectional shading with geometric aesthetic
+   - Performance: Good all-around performance, higher material use
+
+4. **voronoi** - Organic cell-based pattern
+   - Best for: Aesthetic facades, diffuse shading, biophilic design
+   - Key params: depth (0.2-0.8m), elementWidth (0.03-0.1m), voronoi_cell_count (20-100), seed (any integer)
+   - Effect: Natural, non-repeating organic appearance
+   - Performance: Moderate shading, excellent for visual interest
+   - Note: Higher cell counts create finer patterns but more geometry
+
+5. **l_system** - Branching fractal pattern
+   - Best for: Artistic installations, biomimetic design, unique aesthetics
+   - Key params: depth (0.2-0.8m), elementWidth (0.02-0.08m), l_system_iterations (3-6), branch_angle (15-45°)
+   - Effect: Tree-like branching structures, fractal complexity
+   - Performance: Variable shading density, highly distinctive
+   - Note: Iterations 3-4 recommended (5+ creates very dense patterns)
+
+6. **perforated_screen** - Regular perforation pattern
+   - Best for: Privacy screens, filtered light, consistent coverage
+   - Key params: depth (0.1-0.3m), elementWidth (0.03-0.08m), perforation_size (0.05-0.3m), perforation_spacing (0.1-0.5m), perforation_shape ('rectangular' or 'circular')
+   - Effect: Creates a screen with regularly spaced holes, balancing privacy with light transmission
+   - Performance: Moderate shading, excellent for privacy while maintaining daylight
+   - Note: Circular perforations use 8-segment approximation for efficient geometry
+
+7. **penrose_tiling** - Non-repeating geometric tiling
+   - Best for: Mathematical aesthetics, artistic facades, unique non-periodic patterns
+   - Key params: depth (0.05-0.2m), elementWidth (0.01-0.03m for gaps), tile_size (0.1-0.5m), subdivision_depth (2-5), seed (any integer)
+   - Effect: Creates beautiful aperiodic patterns based on golden ratio subdivision
+   - Performance: Variable shading density, highly distinctive appearance
+   - Note: Uses P2 Penrose tiling with kite and dart tiles. Subdivision depth 3-4 recommended (higher creates very dense patterns)
+
+
+
+9. **solar_responsive** - Solar radiation-based density (FUTURE)
+   - Best for: Climate-responsive facades
+   - Status: Requires sun path data integration
+
+10. **view_optimized** - View-preserving pattern (FUTURE)
+    - Best for: Balancing views with shading
+    - Status: Requires view analysis integration
+
+PATTERN SELECTION GUIDELINES:
+- For glare control: vertical_fins (E/W), horizontal_fins (S/N)
+- For aesthetics: voronoi, l_system
+- For balanced performance: grid
+- For optimization: Use the optimizeShadingDesign tool with appropriate pattern
+- Always consider: orientation, climate, user priorities (performance vs. aesthetics)`;
 
     if (activeConversation.mode === 'tutor') {
         systemPrompt += `\n\nCRITICAL INSTRUCTION: You are currently in a tutorial mode. Your goal is to guide the user step-by-step through a workflow. At each step, you must: 1. Explain what you are doing and why. 2. Use one, and only one, tool to perform the action. 3. After the tool call, ask the user for confirmation or what to do next. Do not perform multiple tool calls at once. When the workflow is complete or if the user wants to stop, you must call the 'endWalkthrough' tool.`;
@@ -1215,37 +1465,140 @@ async function handleSendMessage(event) {
  * @returns {Promise<object>} A result object for the tool call.
  * @private
  */
-async function _executeToolCall(toolCall) {
-    const { name, args } = toolCall.functionCall;
-    console.log(`👾 Executing tool: ${name}`, args);
+const _updateUI = (elementId, value, property = 'value', parentElement = null) => {
+    const context = parentElement || document;
+    const element = context.querySelector(`#${elementId}`);
+    if (element) {
+        element[property] = value;
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+    }
+    console.warn(`Tool execution failed: Element with ID '${elementId}' not found.`);
+    return false;
+};
 
-    const updateUI = (elementId, value, property = 'value', parentElement = null) => {
-        const context = parentElement || document;
-        const element = context.querySelector(`#${elementId}`);
-        if (element) {
-            element[property] = value;
-            element.dispatchEvent(new Event('input', { bubbles: true }));
-            element.dispatchEvent(new Event('change', { bubbles: true }));
-            return true;
+async function _handleSceneTool(name, args) {
+    switch (name) {
+        case 'addAperture': {
+            const wallDir = args.wall?.charAt(0).toLowerCase();
+            if (!['n', 's', 'e', 'w'].includes(wallDir)) throw new Error(`Invalid wall: ${args.wall}`);
+            _updateUI(`aperture-${wallDir}-toggle`, true, 'checked');
+            const manualModeBtn = document.getElementById(`mode-manual-btn-${wallDir}`);
+            if (manualModeBtn) manualModeBtn.click();
+            _updateUI(`win-count-${wallDir}`, args.count);
+            _updateUI(`win-width-${wallDir}`, args.width);
+            _updateUI(`win-height-${wallDir}`, args.height);
+            _updateUI(`sill-height-${wallDir}`, args.sillHeight);
+            return { success: true, message: `Added ${args.count} window(s) to the ${args.wall} wall.` };
         }
-        console.warn(`Tool execution failed: Element with ID '${elementId}' not found.`);
-        return false;
-    };
+        case 'placeAsset': {
+            const position = new THREE.Vector3(args.x, args.y, args.z);
+            const vegetationTypes = ['tree-deciduous', 'tree-coniferous', 'bush'];
+            let newAsset;
+            if (vegetationTypes.includes(args.assetType)) {
+                newAsset = addVegetation(args.assetType, position, false);
+            } else {
+                newAsset = addFurniture(args.assetType, position, false);
+            }
+            if (newAsset) return { success: true, message: `Placed a ${args.assetType} at (${args.x}, ${args.y}, ${args.z}).` };
+            throw new Error(`Could not create an asset of type '${args.assetType}'.`);
+        }
+        case 'setDimension': {
+            if (!['width', 'length', 'height'].includes(args.dimension)) throw new Error(`Invalid dimension: ${args.dimension}`);
+            _updateUI(args.dimension, args.value);
+            return { success: true, message: `Set ${args.dimension} to ${args.value}m.` };
+        }
+        case 'configureShading': {
+            const wallDir = args.wall?.charAt(0).toLowerCase();
+            if (!['n', 's', 'e', 'w'].includes(wallDir)) throw new Error(`Invalid wall: ${args.wall}`);
+            if (args.enable !== undefined) _updateUI(`shading-${wallDir}-toggle`, args.enable, 'checked');
+            if (args.deviceType) _updateUI(`shading-type-${wallDir}`, args.deviceType);
+            if (args.depth !== undefined) _updateUI(`overhang-depth-${wallDir}`, args.depth);
+            if (args.tilt !== undefined) _updateUI(`overhang-tilt-${wallDir}`, args.tilt);
+            return { success: true, message: `Configured shading for ${args.wall} wall.` };
+        }
+        case 'setSensorGrid': {
+            const surfaceMap = { 'floor': 'floor', 'ceiling': 'ceiling', 'walls': 'wall' };
+            const surfaceKey = surfaceMap[args.surface];
+            if (!surfaceKey) throw new Error(`Invalid surface: ${args.surface}`);
+            if (surfaceKey === 'wall') {
+                ['north', 'south', 'east', 'west'].forEach(dir => _updateUI(`grid-${dir}-toggle`, args.enable, 'checked'));
+            } else if (args.enable !== undefined) {
+                _updateUI(`grid-${surfaceKey}-toggle`, args.enable, 'checked');
+            }
+            if (args.spacing !== undefined) _updateUI(`${surfaceKey}-grid-spacing`, args.spacing);
+            if (args.offset !== undefined) _updateUI(`${surfaceKey}-grid-offset`, args.offset);
+            return { success: true, message: `Configured sensor grid for ${args.surface}.` };
+        }
+        case 'setMaterialProperty': {
+            const propMap = { reflectance: 'refl', specularity: 'spec', roughness: 'rough', transmittance: 'trans' };
+            const validSurfaces = ['wall', 'floor', 'ceiling', 'frame', 'shading', 'glazing'];
+            if (!validSurfaces.includes(args.surface)) throw new Error(`Invalid surface: '${args.surface}'.`);
+            if (!Object.keys(propMap).includes(args.property)) throw new Error(`Invalid property: '${args.property}'.`);
+            if (args.property === 'transmittance' && args.surface !== 'glazing') throw new Error("The 'transmittance' property can only be set for the 'glazing' surface.");
+            if (args.property !== 'transmittance' && args.surface === 'glazing') throw new Error("The 'glazing' surface only accepts the 'transmittance' property.");
+            const elementId = `${args.surface}-${propMap[args.property]}`;
+            const clampedValue = Math.max(0, Math.min(1, args.value));
+            if (_updateUI(elementId, clampedValue)) {
+                return { success: true, message: `Set ${args.surface} ${args.property} to ${clampedValue.toFixed(2)}.` };
+            }
+            throw new Error(`Could not find the UI control for ${args.surface} ${args.property} (ID: ${elementId}).`);
+        }
+        case 'traceSunRays': {
+            const traceSection = dom['sun-ray-trace-section'];
+            if (!traceSection) throw new Error("The Sun Ray Tracing panel doesn't appear to be available.");
+            if (traceSection.classList.contains('hidden')) {
+                const activeToggle = document.querySelector('input[id^="sun-ray-tracing-toggle-"]:checked');
+                if (!activeToggle) dom['sun-ray-tracing-toggle-s']?.click();
+            }
+            _updateUI('sun-ray-date', args.date);
+            _updateUI('sun-ray-time', args.time);
+            _updateUI('sun-ray-count', args.rayCount);
+            _updateUI('sun-ray-bounces', args.maxBounces);
+            setTimeout(() => dom['trace-sun-rays-btn']?.click(), 100);
+            return { success: true, message: `Initiating sun ray trace for ${args.date} at ${args.time}.` };
+        }
+        case 'toggleSunRayVisibility': {
+            const toggle = dom['sun-rays-visibility-toggle'];
+            if (!toggle) throw new Error("Sun ray visibility toggle not found.");
+            toggle.checked = args.visible;
+            toggle.dispatchEvent(new Event('change', { bubbles: true }));
+            return { success: true, message: `Sun ray traces are now ${args.visible ? 'visible' : 'hidden'}.` };
+        }
+        default:
+            throw new Error(`Unknown scene tool: ${name}`);
+    }
+}
 
-    try {
+async function _handleViewTool(name, args) {
+    switch (name) {
+        case 'changeView': {
+            const { setCameraView } = await import('./ui.js');
+            const viewMap = { 'perspective': 'persp', 'top': 'top', 'front': 'front', 'back': 'back', 'left': 'left', 'right': 'right' };
+            if (!viewMap[args.view]) throw new Error(`Invalid view: ${args.view}`);
+            setCameraView(viewMap[args.view]);
+            return { success: true, message: `Changed view to ${args.view}.` };
+        }
+        case 'setViewpointPosition': {
+            _updateUI('view-pos-x', args.x);
+            _updateUI('view-pos-y', args.y);
+            _updateUI('view-pos-z', args.z);
+            return { success: true, message: `Viewpoint moved to [${args.x}, ${args.y}, ${args.z}].` };
+        }
+        default:
+            throw new Error(`Unknown view tool: ${name}`);
+    }
+}
+
+async function _handleResultsTool(name, args) {
     switch (name) {
         case 'compareMetrics': {
-            if (!resultsManager.datasets.a?.stats || !resultsManager.datasets.b?.stats) {
-                throw new Error("Both dataset A and dataset B must be loaded with results to perform a comparison.");
-            }
-            
+            if (!resultsManager.datasets.a?.stats || !resultsManager.datasets.b?.stats) throw new Error("Both dataset A and dataset B must be loaded to compare.");
             let resultA, resultB;
             const metric = args.metric;
-        
-            if (metric === 'sDA' || metric === 'ASE' || metric === 'UDI') {
-                if (!resultsManager.hasAnnualData('a') || !resultsManager.hasAnnualData('b')) {
-                    throw new Error(`Annual data must be loaded for both datasets to compare ${metric}.`);
-                }
+            if (['sDA', 'ASE', 'UDI'].includes(metric)) {
+                if (!resultsManager.hasAnnualData('a') || !resultsManager.hasAnnualData('b')) throw new Error(`Annual data must be loaded for both datasets to compare ${metric}.`);
                 const metricsA = resultsManager.calculateAnnualMetrics('a', {});
                 const metricsB = resultsManager.calculateAnnualMetrics('b', {});
                 resultA = metric === 'UDI' ? metricsA.UDI.autonomous : metricsA[metric];
@@ -1261,496 +1614,343 @@ async function _executeToolCall(toolCall) {
             } else {
                 throw new Error(`Unsupported metric for comparison: ${metric}`);
             }
-        
             const winner = resultA > resultB ? 'a' : (resultB > resultA ? 'b' : 'tie');
-            const comparison = {
-                metric: metric,
-                datasetA_value: resultA,
-                datasetB_value: resultB,
-                winner: winner,
-                summary: `For ${metric}, Dataset A scored ${resultA.toFixed(2)} and Dataset B scored ${resultB.toFixed(2)}. Dataset ${winner.toUpperCase()} performed better.`
-            };
-            return { success: true, comparison: comparison, message: `Comparison for ${metric} complete.` };
+            const comparison = { metric, datasetA_value: resultA, datasetB_value: resultB, winner, summary: `For ${metric}, Dataset A scored ${resultA.toFixed(2)} and Dataset B scored ${resultB.toFixed(2)}. Dataset ${winner.toUpperCase()} performed better.` };
+            return { success: true, comparison, message: `Comparison for ${metric} complete.` };
         }
         case 'filterAndHighlightPoints': {
             const { dataset, condition, value } = args;
             const key = dataset.toLowerCase();
-            if (key !== 'a' && key !== 'b') throw new Error("Dataset must be 'a' or 'b'.");
-            
-            const data = resultsManager.datasets[key]?.data;
-            if (!data || data.length === 0) throw new Error(`Dataset ${key.toUpperCase()} has no data loaded.`);
-        
+            if (!['a', 'b'].includes(key)) throw new Error("Dataset must be 'a' or 'b'.");
+            if (!resultsManager.datasets[key]?.data?.length) throw new Error(`Dataset ${key.toUpperCase()} has no data loaded.`);
             const indices = resultsManager.getPointIndicesByCondition(key, condition, value);
-        
-            if (indices.length === 0) {
-                return { success: true, message: `No points in Dataset ${key.toUpperCase()} met the condition.` };
-            }
-            
+            if (indices.length === 0) return { success: true, message: `No points in Dataset ${key.toUpperCase()} met the condition.` };
             const { highlightPointsByIndices } = await import('./ui.js');
             highlightPointsByIndices(indices);
-            
             return { success: true, message: `Highlighted ${indices.length} sensor point(s) in Dataset ${key.toUpperCase()} where the value is ${condition} ${value}.` };
         }
-        case 'addAperture': {
-            const wallDir = args.wall?.charAt(0).toLowerCase();
-            if (!['n', 's', 'e', 'w'].includes(wallDir)) throw new Error(`Invalid wall: ${args.wall}`);
-
-            // 1. Enable the aperture toggle for the wall
-            updateUI(`aperture-${wallDir}-toggle`, true, 'checked');
-
-            // 2. Switch to manual mode to accept direct dimensions
-            const manualModeBtn = document.getElementById(`mode-manual-btn-${wallDir}`);
-            if (manualModeBtn) manualModeBtn.click();
-
-            // 3. Set the dimension values from the arguments
-            updateUI(`win-count-${wallDir}`, args.count);
-            updateUI(`win-width-${wallDir}`, args.width);
-            updateUI(`win-height-${wallDir}`, args.height);
-            updateUI(`sill-height-${wallDir}`, args.sillHeight);
-
-            return { success: true, message: `Added ${args.count} window(s) to the ${args.wall} wall.` };
+        case 'highlightResultPoint': {
+            if (!resultsManager.getActiveData()?.length) throw new Error("No results data is loaded to highlight.");
+            if (args.type === 'clear') {
+                clearSensorHighlights();
+                return { success: true, message: `Cleared all highlights from the sensor grid.` };
+            }
+            if (['min', 'max'].includes(args.type)) {
+                highlightSensorPoint(args.type);
+                return { success: true, message: `Highlighted the sensor point(s) with the ${args.type} value.` };
+            }
+            throw new Error(`Invalid highlight type: ${args.type}. Must be 'min', 'max', or 'clear'.`);
         }
-        case 'placeAsset': {
-            const position = new THREE.Vector3(args.x, args.y, args.z);
-            const vegetationTypes = ['tree-deciduous', 'tree-coniferous', 'bush'];
-            let newAsset;
-
-            if (vegetationTypes.includes(args.assetType)) {
-                newAsset = addVegetation(args.assetType, position, false); // isWorldPosition = false
-            } else {
-                newAsset = addFurniture(args.assetType, position, false); // isWorldPosition = false
-            }
-
-            if (newAsset) {
-                return { success: true, message: `Placed a ${args.assetType} at (${args.x}, ${args.y}, ${args.z}).` };
-            } else {
-                throw new Error(`Could not create an asset of type '${args.assetType}'.`);
+        case 'displayResultsForTime': {
+            if (!resultsManager.hasAnnualData('a') && !resultsManager.hasAnnualData('b')) throw new Error("No annual simulation results are loaded.");
+            const timeScrubber = dom['time-scrubber'];
+            if (!timeScrubber) throw new Error("The annual time-series explorer panel does not appear to be open.");
+            const hour = Math.max(0, Math.min(8759, args.hour));
+            timeScrubber.value = hour;
+            timeScrubber.dispatchEvent(new Event('input', { bubbles: true }));
+            return { success: true, message: `3D view updated to show illuminance at hour ${hour}.` };
+        }
+        case 'queryResultsData': {
+            const data = resultsManager.getActiveData();
+            const stats = resultsManager.getActiveStats();
+            if (!data?.length || !stats) throw new Error("No results data is loaded to query.");
+            switch (args.queryType) {
+                case 'average': return { success: true, result: stats.avg, query: 'average' };
+                case 'min': return { success: true, result: stats.min, query: 'minimum' };
+                case 'max': return { success: true, result: stats.max, query: 'maximum' };
+                case 'countBelow':
+                    if (args.threshold === undefined) throw new Error("A 'threshold' is required for 'countBelow' query.");
+                    return { success: true, result: data.filter(v => v < args.threshold).length, query: `count of points below ${args.threshold} lux` };
+                case 'countAbove':
+                    if (args.threshold === undefined) throw new Error("A 'threshold' is required for 'countAbove' query.");
+                    return { success: true, result: data.filter(v => v > args.threshold).length, query: `count of points above ${args.threshold} lux` };
+                default: throw new Error(`Invalid queryType: ${args.queryType}`);
             }
         }
-        case 'setDimension': {
-            if (!['width', 'length', 'height'].includes(args.dimension)) throw new Error(`Invalid dimension: ${args.dimension}`);
-            updateUI(args.dimension, args.value);
-                return { success: true, message: `Set ${args.dimension} to ${args.value}m.` };
-            }
-            case 'changeView': {
-                const { setCameraView } = await import('./ui.js');
-                const viewMap = { 'perspective': 'persp', 'top': 'top', 'front': 'front', 'back': 'back', 'left': 'left', 'right': 'right' };
-                if (!viewMap[args.view]) throw new Error(`Invalid view: ${args.view}`);
-                setCameraView(viewMap[args.view]);
-                return { success: true, message: `Changed view to ${args.view}.` };
-            }
-            case 'setViewpointPosition': {
-                updateUI('view-pos-x', args.x);
-                updateUI('view-pos-y', args.y);
-                updateUI('view-pos-z', args.z);
-                return { success: true, message: `Viewpoint moved to [${args.x}, ${args.y}, ${args.z}].` };
-            }
-            case 'configureShading': {
-                const wallDir = args.wall?.charAt(0).toLowerCase();
-                if (!['n', 's', 'e', 'w'].includes(wallDir)) throw new Error(`Invalid wall: ${args.wall}`);
-                if (args.enable !== undefined) updateUI(`shading-${wallDir}-toggle`, args.enable, 'checked');
-                if (args.deviceType) updateUI(`shading-type-${wallDir}`, args.deviceType);
-                if (args.depth !== undefined) updateUI(`overhang-depth-${wallDir}`, args.depth);
-                if (args.tilt !== undefined) updateUI(`overhang-tilt-${wallDir}`, args.tilt);
-                return { success: true, message: `Configured shading for ${args.wall} wall.` };
-            }
-            case 'setSensorGrid': {
-                const surfaceMap = { 'floor': 'floor', 'ceiling': 'ceiling', 'walls': 'wall' };
-                const surfaceKey = surfaceMap[args.surface];
-                if (!surfaceKey) throw new Error(`Invalid surface: ${args.surface}`);
-                if (surfaceKey === 'wall') {
-                    ['north', 'south', 'east', 'west'].forEach(dir => updateUI(`grid-${dir}-toggle`, args.enable, 'checked'));
-                } else if (args.enable !== undefined) {
-                    updateUI(`grid-${surfaceKey}-toggle`, args.enable, 'checked');
-                }
-                if (args.spacing !== undefined) updateUI(`${surfaceKey}-grid-spacing`, args.spacing);
-                if (args.offset !== undefined) updateUI(`${surfaceKey}-grid-offset`, args.offset);
-                return { success: true, message: `Configured sensor grid for ${args.surface}.` };
-            }
-            case 'setGlobalRadianceParameter': {
-                const globalPanel = document.querySelector('[data-template-id="template-global-sim-params"]');
-                if (!globalPanel) throw new Error("Global Simulation Parameters panel is not open.");
-                const paramId = args.parameter; 
-                if (updateUI(paramId, args.value, 'value', globalPanel)) {
-                    return { success: true, message: `Set global parameter -${args.parameter} to ${args.value}.` };
-                } else {
-                     throw new Error(`Could not find UI control for global parameter '${args.parameter}'.`);
-                }
-            }
-            case 'configureDaylightingSystem': {
-                updateUI('daylighting-enabled-toggle', args.enable, 'checked');
-                if (args.enable) {
-                    if (args.controlType) updateUI('daylighting-control-type', args.controlType);
-                    if (args.setpoint !== undefined) updateUI('daylighting-setpoint', args.setpoint);
-                }
-                return { success: true, message: `Daylighting system ${args.enable ? 'enabled and configured' : 'disabled'}.` };
-            }
-            case 'startWalkthrough': {
-                activeWalkthrough = { topic: args.topic, step: 1 };
-                // Switch the UI to Tutor mode visually if it's not already
-                switchToTutorMode();
-                return { success: true, message: `Walkthrough for topic '${args.topic}' has been initiated. Your next response must be the first step of the tutorial.` };
-            }
-            case 'endWalkthrough': {
-                activeWalkthrough = null;
-                // Switch the UI back to standard Chat mode visually
-                switchToChatMode();
-                return { success: true, message: 'Walkthrough ended successfully.' };
-            }
-            case 'runGenerativeDesign': {
-                // Acknowledge the request immediately and run the process in the background.
-                addMessage('ai', `Starting generative design study for ${args.variable} on the ${args.targetElement}. This will run ${args.steps} simulations and may take a significant amount of time. I will post the results here when complete.`);
-                setLoadingState(true); // Keep UI locked until initial setup is done
-
-                // Run the actual optimization without blocking the AI's immediate response.
-                _performGenerativeDesign(args)
-                    .then(result => {
-                        addMessage('ai', result.message);
-                    })
-                    .catch(error => {
-                        console.error("Generative Design failed:", error);
-                        addMessage('ai', `🔴 **Generative Design Failed:**\n${error.message}`);
-                    })
-                    .finally(() => {
-                        setLoadingState(false);
-                    });
-
-                // Return an immediate response to the model so it knows the tool was called.
-                return { success: true, message: "Generative design process initiated. The results will be reported in a new message upon completion." };
-            }
-            case 'configureSimulationRecipe': {
-                const templateId = recipeMap[args.recipeType];
-                if (!templateId) throw new Error(`Unknown recipe type: ${args.recipeType}`);
-
-                const panel = document.querySelector(`.floating-window[data-template-id="${templateId}"]`);
-                if (!panel || panel.classList.contains('hidden')) {
-                    throw new Error(`The '${args.recipeType}' recipe panel is not open. Please open it first.`);
-                }
-                const panelSuffix = panel.id.split('-').pop();
-                let paramsSet = 0;
-                for (const key in args.parameters) {
-                    const elId = `${key}-${panelSuffix}`;
-                    if (updateUI(elId, args.parameters[key], 'value', panel)) {
-                        paramsSet++;
-                    }
-                }
-                return { success: true, message: `Successfully set ${paramsSet} parameters in the ${args.recipeType} recipe.` };
-            }
-            case 'openSimulationRecipe': {
-                const templateId = recipeMap[args.recipeType];
-                if (!templateId) throw new Error(`Unknown recipe type: ${args.recipeType}`);
-
-                if (args.recipeType === 'dgp' && dom['view-type']?.value !== 'h' && dom['view-type']?.value !== 'a') {
-                    triggerProactiveSuggestion('dgp_recipe_bad_viewpoint');
-                }
-
-                const panel = openRecipePanelByType(templateId);
-                if (panel) {
-                    return { success: true, message: `Opened the ${args.recipeType} recipe panel.` };
-                } else {
-                    throw new Error(`Could not open the ${args.recipeType} recipe panel.`);
-                }
-            }
-            case 'showAnalysisDashboard': {
-                if (args.dashboardType === 'glareRose') {
-                      openGlareRoseDiagram();
-                    return { success: true, message: `Opening the Glare Rose diagram.` };
-                } else if (args.dashboardType === 'combinedAnalysis') {
-                    await openCombinedAnalysisPanel();
-                    return { success: true, message: `Opening the Combined Daylight & Glare analysis.` };
-                }
-                throw new Error(`Unknown dashboard type: ${args.dashboardType}`);
-            }
-            case 'toggleUIPanel': {
-                const panelMap = {
-                    project: { panelId: 'panel-project', btnId: 'toggle-panel-project-btn' },
-                    dimensions: { panelId: 'panel-dimensions', btnId: 'toggle-panel-dimensions-btn' },
-                    apertures: { panelId: 'panel-aperture', btnId: 'toggle-panel-aperture-btn' },
-                    lighting: { panelId: 'panel-lighting', btnId: 'toggle-panel-lighting-btn' },
-                    materials: { panelId: 'panel-materials', btnId: 'toggle-panel-materials-btn' },
-                    sensors: { panelId: 'panel-sensor', btnId: 'toggle-panel-sensor-btn' },
-                    viewpoint: { panelId: 'panel-viewpoint', btnId: 'toggle-panel-viewpoint-btn' },
-                    viewOptions: { panelId: 'panel-view-options', btnId: 'toggle-panel-view-options-btn' },
-                    info: { panelId: 'panel-info', btnId: 'info-button' },
-                    aiAssistant: { panelId: 'panel-ai-assistant', btnId: 'ai-assistant-button' }
-                };
-                const mapping = panelMap[args.panelName];
-                if (!mapping) throw new Error(`Invalid panel name: ${args.panelName}`);
-
-                const panel = document.getElementById(mapping.panelId);
-                if (!panel) throw new Error(`Panel element '${mapping.panelId}' not found.`);
-
-                const isHidden = panel.classList.contains('hidden');
-                if (args.state === 'open' && isHidden) {
-                    togglePanelVisibility(mapping.panelId, mapping.btnId);
-                    return { success: true, message: `Opened the ${args.panelName} panel.` };
-                } else if (args.state === 'close' && !isHidden) {
-                    togglePanelVisibility(mapping.panelId, mapping.btnId);
-                    return { success: true, message: `Closed the ${args.panelName} panel.` };
-                }
-                return { success: true, message: `The ${args.panelName} panel was already ${args.state}.` };
-            }
-           case 'runSimulation': {
-                const templateId = recipeMap[args.recipeType];
-                if (!templateId) throw new Error(`Unknown recipe type: ${args.recipeType}`);
-
-                const panel = document.querySelector(`.floating-window[data-template-id="${templateId}"]`);
-                if (!panel || panel.classList.contains('hidden')) {
-                    throw new Error(`The '${args.recipeType}' recipe panel is not open. Please open it from the Simulation Modules sidebar first.`);
-                }
-
-                const runButton = panel.querySelector('[data-action="run"]');
-                if (!runButton) throw new Error(`Could not find a run button in the '${args.recipeType}' panel.`);
-
-                if (runButton.disabled) {
-                    return { success: false, message: `Cannot run simulation. Please generate the simulation package first.` };
-                }
-
-               runButton.click();
-                return { success: true, message: `Initiating the ${args.recipeType} simulation.` };
-            }
-            case 'highlightResultPoint': {
-                if (!resultsManager.getActiveData() || resultsManager.getActiveData().length === 0) {
-                    throw new Error("No results data is loaded to highlight.");
-                }
-                if (args.type === 'clear') {
-                    clearSensorHighlights();
-                    return { success: true, message: `Cleared all highlights from the sensor grid.` };
-                } else if (args.type === 'min' || args.type === 'max') {
-                    highlightSensorPoint(args.type);
-                    return { success: true, message: `Highlighted the sensor point(s) with the ${args.type} value.` };
-                } else {
-                    throw new Error(`Invalid highlight type: ${args.type}. Must be 'min', 'max', or 'clear'.`);
-                }
-            }
-            case 'displayResultsForTime': {
-                if (!resultsManager.hasAnnualData('a') && !resultsManager.hasAnnualData('b')) {
-                    throw new Error("No annual simulation results are loaded. Cannot display results for a specific time.");
-                }
-                const timeScrubber = dom['time-scrubber'];
-                if (!timeScrubber) {
-                    throw new Error("The annual time-series explorer panel does not appear to be open.");
-                }
-                const hour = Math.max(0, Math.min(8759, args.hour));
-                timeScrubber.value = hour;
-                timeScrubber.dispatchEvent(new Event('input', { bubbles: true }));
-                return { success: true, message: `3D view updated to show illuminance at hour ${hour}.` };
-            }
-            case 'queryResultsData': {
-                const data = resultsManager.getActiveData();
-                const stats = resultsManager.getActiveStats();
-                if (!data || data.length === 0 || !stats) {
-                    throw new Error("No results data is loaded to query.");
-                }
-
-                switch (args.queryType) {
-                    case 'average': return { success: true, result: stats.avg, query: 'average' };
-                    case 'min': return { success: true, result: stats.min, query: 'minimum' };
-                    case 'max': return { success: true, result: stats.max, query: 'maximum' };
-                    case 'countBelow': {
-                        if (args.threshold === undefined) throw new Error("A 'threshold' is required for 'countBelow' query.");
-                        const count = data.filter(v => v < args.threshold).length;
-                        return { success: true, result: count, query: `count of points below ${args.threshold} lux` };
-                    }
-                    case 'countAbove': {
-                        if (args.threshold === undefined) throw new Error("A 'threshold' is required for 'countAbove' query.");
-                        const count = data.filter(v => v > args.threshold).length;
-                        return { success: true, result: count, query: `count of points above ${args.threshold} lux` };
-                    }
-                    default: throw new Error(`Invalid queryType: ${args.queryType}`);
-                }
-            }
-            case 'getDatasetStatistics': {
-                const datasetKey = args.dataset.toLowerCase();
-                if (datasetKey !== 'a' && datasetKey !== 'b') {
-                    throw new Error("Invalid dataset specified. Must be 'a' or 'b'.");
-                }
-                const stats = resultsManager.datasets[datasetKey]?.stats;
-                if (!stats) {
-                    throw new Error(`Dataset ${datasetKey.toUpperCase()} is not loaded or has no statistics.`);
-                }
-                return { success: true, stats: stats };
-            }
-            case 'saveProject': {
-                project.downloadProjectFile();
-                return { success: true, message: "Project file download has been initiated." };
-            }
-            case 'loadResultsFile': {
-                const datasetKey = args.dataset.toLowerCase();
-                if (datasetKey !== 'a' && datasetKey !== 'b') {
-                    throw new Error("Invalid dataset specified. Must be 'a' or 'b'.");
-                }
-                const fileInput = dom[`results-file-input-${datasetKey}`];
-                if (!fileInput) {
-                    throw new Error(`Could not find the file input for dataset ${datasetKey}.`);
-                }
-                fileInput.click();
-                return { success: true, message: `Opening file dialog for the user to select a results file for dataset ${datasetKey.toUpperCase()}.` };
-            }
-            case 'clearResults': {
-                resultsManager.clearDataset('a');
-                resultsManager.clearDataset('b');
-              clearAllResultsDisplay();
-                return { success: true, message: "All results data and visualizations have been cleared." };
-            }
-            case 'setMaterialProperty': {
-                const propMap = { reflectance: 'refl', specularity: 'spec', roughness: 'rough', transmittance: 'trans' };
-                const validSurfaces = ['wall', 'floor', 'ceiling', 'frame', 'shading', 'glazing'];
-                const validProperties = Object.keys(propMap);
-
-                if (!validSurfaces.includes(args.surface)) throw new Error(`Invalid surface: '${args.surface}'.`);
-                if (!validProperties.includes(args.property)) throw new Error(`Invalid property: '${args.property}'.`);
-                if (args.property === 'transmittance' && args.surface !== 'glazing') throw new Error("The 'transmittance' property can only be set for the 'glazing' surface.");
-                if (args.property !== 'transmittance' && args.surface === 'glazing') throw new Error(`The 'glazing' surface only accepts the 'transmittance' property.`);
-
-                const propSuffix = propMap[args.property];
-                const elementId = `${args.surface}-${propSuffix}`;
-
-                const clampedValue = Math.max(0, Math.min(1, args.value));
-
-                if (updateUI(elementId, clampedValue)) {
-                    return { success: true, message: `Set ${args.surface} ${args.property} to ${clampedValue.toFixed(2)}.` };
-                } else {
-                    throw new Error(`Could not find the UI control for ${args.surface} ${args.property} (ID: ${elementId}).`);
-                }
-            }
-            case 'searchKnowledgeBase': {
-                const results = searchKnowledgeBase(args.query);
-                if (results.length > 0) {
-                    const formattedResults = results.map(r => `Topic: ${r.topic}\nContent: ${r.content}`).join('\n---\n');
-                    return { success: true, message: `Found ${results.length} relevant documents.`, results: formattedResults };
-                }
-                return { success: true, message: "No relevant documents found in the knowledge base." };
-            }
-            case 'traceSunRays': {
-                const traceSection = dom['sun-ray-trace-section'];
-                if (!traceSection) throw new Error("The Sun Ray Tracing panel doesn't appear to be available.");
-                if (traceSection.classList.contains('hidden')) {
-                    const activeToggle = document.querySelector('input[id^="sun-ray-tracing-toggle-"]:checked');
-                    if (!activeToggle) {
-                        dom['sun-ray-tracing-toggle-s']?.click();
-                    }
-                }
-
-                if (dom['sun-ray-date']?._flatpickr) {
-                    dom['sun-ray-date']._flatpickr.setDate(args.date, true);
-                } else {
-                    updateUI('sun-ray-date', args.date);
-                }
-                updateUI('sun-ray-time', args.time);
-                updateUI('sun-ray-count', args.rayCount);
-                updateUI('sun-ray-bounces', args.maxBounces);
-
-                dom['trace-sun-rays-btn']?.click();
-                return { success: true, message: `Initiating sun ray trace for ${args.date} at ${args.time}.` };
-            }
-            case 'toggleSunRayVisibility': {
-                if (updateUI('sun-rays-visibility-toggle', args.visible, 'checked')) {
-                    return { success: true, message: `Sun ray visibility set to ${args.visible}.` };
-                }
-                throw new Error("Could not find the sun ray visibility toggle control.");
-            }
-            case 'generateReport': {
-                dom['generate-report-btn']?.click();
-                return { success: true, message: "Report generation initiated." };
-            }
-            case 'toggleDataTable': {
-                const panel = dom['data-table-panel'];
-                if (!panel) throw new Error("Data table panel not found.");
-                const isHidden = panel.classList.contains('hidden');
-                if ((args.show && isHidden) || (!args.show && !isHidden)) {
-                    dom['data-table-btn']?.click();
-                }
-                return { success: true, message: `Data table visibility set to ${args.show}.` };
-            }
-            case 'filterDataTable': {
-                if (updateUI('data-table-filter-input', args.query)) {
-                    return { success: true, message: `Applied filter '${args.query}' to the data table.` };
-                }
-                throw new Error("Could not find the data table filter input.");
-            }
-            case 'toggleHdrViewer': {
-                const panel = dom['hdr-viewer-panel'];
-                if (!panel) throw new Error("HDR viewer panel not found.");
-                const isHidden = panel.classList.contains('hidden');
-                if ((args.show && isHidden) || (!args.show && !isHidden)) {
-                    if (args.show && !resultsManager.hdrResult) {
-                        throw new Error("Cannot open HDR viewer: No HDR file has been loaded.");
-                    }
-                    dom['view-hdr-btn']?.click();
-                }
-                return { success: true, message: `HDR viewer visibility set to ${args.show}.` };
-            }
-            case 'configureHdrViewer': {
-                if (dom['hdr-viewer-panel']?.classList.contains('hidden')) {
-                    throw new Error("HDR viewer must be open before it can be configured.");
-                }
-                let configuredCount = 0;
-                if (args.exposure !== undefined) {
-                    if (updateUI('hdr-exposure', args.exposure)) configuredCount++;
-                }
-                if (args.falseColor !== undefined) {
-                    if (updateUI('hdr-false-color-toggle', args.falseColor, 'checked')) configuredCount++;
-                }
-                return { success: true, message: `Configured ${configuredCount} setting(s) in the HDR viewer.` };
-            }
-            case 'setTheme': {
-                const themeOrder = ['light', 'dark', 'cyber', 'cafe58'];
-                const targetTheme = args.themeName;
-                if (!themeOrder.includes(targetTheme)) {
-                    throw new Error(`Invalid theme name: ${targetTheme}. Must be one of ${themeOrder.join(', ')}.`);
-                }
-                const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
-                if (currentTheme === targetTheme) {
-                    return { success: true, message: `Theme is already set to ${targetTheme}.` };
-                }
-
-                let clicksNeeded = (themeOrder.indexOf(targetTheme) - themeOrder.indexOf(currentTheme) + themeOrder.length) % themeOrder.length;
-
-                for (let i = 0; i < clicksNeeded; i++) {
-                    const visibleButton = document.querySelector('#theme-switcher-container .theme-btn:not([style*="display: none"])');
-                    visibleButton?.click();
-                }
-                return { success: true, message: `Theme changed to ${targetTheme}.` };
-            }
-            case 'loadProject': {
-                dom['load-project-button']?.click();
-                return { success: true, message: "Opening file dialog for user to select a project file." };
-            }
-            case 'toggleComparisonMode': {
-                if (updateUI('compare-mode-toggle', args.enable, 'checked')) {
-                    return { success: true, message: `Comparison mode ${args.enable ? 'enabled' : 'disabled'}.` };
-                }
-                throw new Error("Could not find the comparison mode toggle control.");
-            }
-            case 'validateProjectState': {
-              const validationResult = await performAIInspection();
-              const { errors, warnings, suggestions } = validationResult;
-              const message = `Validation complete. Found ${errors.length} error(s), ${warnings.length} warning(s), and ${suggestions.length} suggestion(s).`;
-              return { success: true, message: message, validationResult: { errors, warnings, suggestions } };
-          }
-          case 'runDesignInspector': {
-              const findings = await performAIInspection();
-              const message = "The AI design inspector has been run. The results are now displayed in the Inspector panel.";
-              displayInspectorResults(findings);
-              createNewConversation('inspector');
-              return { success: true, message: message, findings: findings };
-          }
-          case 'runResultsCritique': {
-              const critique = await _performAICritique();
-              const message = "The AI results critique has been run. The findings are now displayed in the Critique panel.";
-              displayCritiqueResults(critique);
-              createNewConversation('critique');
-              return { success: true, message: message, critique: critique };
-          }
-          default:
-          throw new Error(`Unknown tool: ${name}`);
-        
+        case 'getDatasetStatistics': {
+            const datasetKey = args.dataset.toLowerCase();
+            if (!['a', 'b'].includes(datasetKey)) throw new Error("Invalid dataset specified. Must be 'a' or 'b'.");
+            const stats = resultsManager.datasets[datasetKey]?.stats;
+            if (!stats) throw new Error(`Dataset ${datasetKey.toUpperCase()} is not loaded or has no statistics.`);
+            return { success: true, stats: stats };
         }
-        
+        case 'showAnalysisDashboard': {
+            if (args.dashboardType === 'glareRose') {
+                openGlareRoseDiagram();
+                return { success: true, message: `Opening the Glare Rose diagram.` };
+            } else if (args.dashboardType === 'combinedAnalysis') {
+                await openCombinedAnalysisPanel();
+                return { success: true, message: `Opening the Combined Daylight & Glare analysis.` };
+            }
+            throw new Error(`Unknown dashboard type: ${args.dashboardType}`);
+        }
+        case 'loadResultsFile': {
+            const datasetKey = args.dataset.toLowerCase();
+            if (!['a', 'b'].includes(datasetKey)) throw new Error("Invalid dataset specified. Must be 'a' or 'b'.");
+            const fileInput = dom[`results-file-input-${datasetKey}`];
+            if (!fileInput) throw new Error(`Could not find the file input for dataset ${datasetKey}.`);
+            fileInput.click();
+            return { success: true, message: `Opening file dialog for dataset ${datasetKey.toUpperCase()}.` };
+        }
+        case 'clearResults': {
+            resultsManager.clearDataset('a');
+            resultsManager.clearDataset('b');
+            clearAllResultsDisplay();
+            return { success: true, message: "All results data and visualizations have been cleared." };
+        }
+        default:
+            throw new Error(`Unknown results tool: ${name}`);
+    }
+}
+
+async function _handleGenerativeTool(name, args) {
+    switch (name) {
+        case 'createShadingPattern': {
+            const { targetWall, patternType, parameters } = args;
+            const wallDir = targetWall.toLowerCase();
+            const implementedPatterns = ['vertical_fins', 'horizontal_fins', 'grid', 'voronoi', 'l_system', 'perforated_screen', 'penrose_tiling'];
+            if (!implementedPatterns.includes(patternType)) throw new Error(`Unknown pattern type: '${patternType}'.`);
+            const { setShadingState, storeGenerativeParams, setGenerativeSliderValues, scheduleUpdate } = await import('./ui.js');
+            setShadingState(wallDir, { enabled: true, type: 'generative' });
+            storeGenerativeParams(wallDir, patternType, parameters);
+            setGenerativeSliderValues(wallDir, parameters);
+            scheduleUpdate('createShadingPattern');
+            return { success: true, message: `Successfully created ${patternType} pattern on the ${targetWall} wall.` };
+        }
+        case 'generateSolarResponsiveShading': {
+            const { targetWall, quality, threshold, depth } = args;
+            if (!project.epwFileContent) throw new Error("Solar responsive shading requires an EPW weather file.");
+            const wallDir = targetWall.toLowerCase();
+            const { setShadingState, storeGenerativeParams, setGenerativeSliderValues, scheduleUpdate } = await import('./ui.js');
+            setShadingState(wallDir, { enabled: true, type: 'generative' });
+            const parameters = { depth: depth || 0.3, quality, threshold, orientation: targetWall, epwFile: project.epwFileName || 'weather.epw' };
+            storeGenerativeParams(wallDir, 'solar_responsive', parameters);
+            setGenerativeSliderValues(wallDir, { depth: parameters.depth });
+            scheduleUpdate('generateSolarResponsiveShading');
+            return { success: true, message: `Initiated solar-responsive shading for ${targetWall} wall.` };
+        }
+        case 'generateViewOptimizedShading': {
+            const { targetWall, viewpoint, desirableViews, blockViews, samplingDensity } = args;
+            const wallDir = targetWall.toLowerCase();
+            const { setShadingState, storeGenerativeParams, scheduleUpdate } = await import('./ui.js');
+            setShadingState(wallDir, { enabled: true, type: 'generative' });
+            const parameters = { depth: 0.1, viewpoint, desirableViews: desirableViews || [], blockViews: blockViews || [], samplingDensity: samplingDensity || 100 };
+            storeGenerativeParams(wallDir, 'view_optimized', parameters);
+            scheduleUpdate('generateViewOptimizedShading');
+            const viewDesc = desirableViews?.length ? `preserving ${desirableViews.length} desirable view(s)` : 'with custom view targets';
+            return { success: true, message: `Initiated view-optimized shading for ${targetWall} wall, ${viewDesc}.` };
+        }
+        case 'optimizeShadingDesign':
+        case 'runGenerativeDesign': {
+            const message = name === 'optimizeShadingDesign'
+                ? `🔬 Starting optimization for ${args.patternType} on the ${args.targetWall} wall.\n\nGoal: ${args.optimizationGoal}`
+                : `Starting generative design study for ${args.variable} on the ${args.targetElement}.`;
+            addMessage('ai', message);
+            setLoadingState(true);
+            const promise = name === 'optimizeShadingDesign' ? _performGenerativeOptimization(args) : _performGenerativeDesign(args);
+            promise.then(result => addMessage('ai', result.message))
+                   .catch(error => addMessage('ai', `🔴 **Optimization Failed:**\n${error.message}`))
+                   .finally(() => setLoadingState(false));
+            return { success: true, message: "Generative process initiated. Results will be reported when complete." };
+        }
+        default:
+            throw new Error(`Unknown generative tool: ${name}`);
+    }
+}
+
+async function _handleSimulationTool(name, args) {
+    switch (name) {
+        case 'openSimulationRecipe': {
+            const templateId = recipeMap[args.recipeType];
+            if (!templateId) throw new Error(`Unknown recipe type: ${args.recipeType}`);
+            if (args.recipeType === 'dgp' && dom['view-type']?.value !== 'h' && dom['view-type']?.value !== 'a') {
+                triggerProactiveSuggestion('dgp_recipe_bad_viewpoint');
+            }
+            const panel = openRecipePanelByType(templateId);
+            if (panel) return { success: true, message: `Opened the ${args.recipeType} recipe panel.` };
+            throw new Error(`Could not open the ${args.recipeType} recipe panel.`);
+        }
+        case 'configureSimulationRecipe': {
+            const templateId = recipeMap[args.recipeType];
+            if (!templateId) throw new Error(`Unknown recipe type: ${args.recipeType}`);
+            const panel = document.querySelector(`.floating-window[data-template-id="${templateId}"]`);
+            if (!panel || panel.classList.contains('hidden')) throw new Error(`The '${args.recipeType}' recipe panel is not open.`);
+            const panelSuffix = panel.id.split('-').pop();
+            let paramsSet = 0;
+            for (const key in args.parameters) {
+                if (_updateUI(`${key}-${panelSuffix}`, args.parameters[key], 'value', panel)) paramsSet++;
+            }
+            return { success: true, message: `Successfully set ${paramsSet} parameters in the ${args.recipeType} recipe.` };
+        }
+        case 'runSimulation': {
+            const templateId = recipeMap[args.recipeType];
+            if (!templateId) throw new Error(`Unknown recipe type: ${args.recipeType}`);
+            const panel = document.querySelector(`.floating-window[data-template-id="${templateId}"]`);
+            if (!panel || panel.classList.contains('hidden')) throw new Error(`The '${args.recipeType}' recipe panel is not open.`);
+            const runButton = panel.querySelector('[data-action="run"]');
+            if (!runButton) throw new Error(`Could not find a run button in the '${args.recipeType}' panel.`);
+            if (runButton.disabled) return { success: false, message: `Cannot run simulation. Please generate the simulation package first.` };
+            runButton.click();
+            return { success: true, message: `Initiating the ${args.recipeType} simulation.` };
+        }
+        case 'setGlobalRadianceParameter': {
+            const globalPanel = document.querySelector('[data-template-id="template-global-sim-params"]');
+            if (!globalPanel) throw new Error("Global Simulation Parameters panel is not open.");
+            if (_updateUI(args.parameter, args.value, 'value', globalPanel)) {
+                return { success: true, message: `Set global parameter -${args.parameter} to ${args.value}.` };
+            }
+            throw new Error(`Could not find UI control for global parameter '${args.parameter}'.`);
+        }
+        case 'configureDaylightingSystem': {
+            _updateUI('daylighting-enabled-toggle', args.enable, 'checked');
+            if (args.enable) {
+                if (args.controlType) _updateUI('daylighting-control-type', args.controlType);
+                if (args.setpoint !== undefined) _updateUI('daylighting-setpoint', args.setpoint);
+            }
+            return { success: true, message: `Daylighting system ${args.enable ? 'enabled and configured' : 'disabled'}.` };
+        }
+        default:
+            throw new Error(`Unknown simulation tool: ${name}`);
+    }
+}
+
+async function _handleUITool(name, args) {
+    switch (name) {
+        case 'toggleUIPanel': {
+            const panelMap = { project: 'panel-project', dimensions: 'panel-dimensions', apertures: 'panel-aperture', lighting: 'panel-lighting', materials: 'panel-materials', sensors: 'panel-sensor', viewpoint: 'panel-viewpoint', viewOptions: 'panel-view-options', info: 'panel-info', aiAssistant: 'panel-ai-assistant' };
+            const panelId = panelMap[args.panelName];
+            if (!panelId) throw new Error(`Invalid panel name: ${args.panelName}`);
+            const panel = document.getElementById(panelId);
+            if (!panel) throw new Error(`Panel element '${panelId}' not found.`);
+            const isHidden = panel.classList.contains('hidden');
+            if ((args.state === 'open' && isHidden) || (args.state === 'close' && !isHidden)) {
+                togglePanelVisibility(panelId, `toggle-${panelId}-btn`);
+            }
+            return { success: true, message: `The ${args.panelName} panel is now ${args.state}.` };
+        }
+        case 'toggleDataTable': {
+            const btn = dom['data-table-btn'];
+            if (!btn) throw new Error("Data table button not found.");
+            const isVisible = !dom['data-table-panel'].classList.contains('hidden');
+            if (args.show !== isVisible) btn.click();
+            return { success: true, message: `Data table is now ${args.show ? 'shown' : 'hidden'}.` };
+        }
+        case 'filterDataTable': {
+            const input = dom['data-table-filter-input'];
+            if (!input) throw new Error("Data table filter input not found.");
+            input.value = args.query;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            return { success: true, message: `Applied filter '${args.query}' to the data table.` };
+        }
+        case 'toggleHdrViewer': {
+            const btn = dom['view-hdr-btn'];
+            if (!btn || btn.disabled) throw new Error("HDR viewer is not available. Load an HDR file first.");
+            const isVisible = !dom['hdr-viewer-panel'].classList.contains('hidden');
+            if (args.show !== isVisible) btn.click();
+            return { success: true, message: `HDR viewer is now ${args.show ? 'shown' : 'hidden'}.` };
+        }
+        case 'configureHdrViewer': {
+            const { setHdrExposure, toggleHdrFalseColor } = await import('./hdrViewer.js');
+            if (args.exposure !== undefined) setHdrExposure(args.exposure);
+            if (args.falseColor !== undefined) toggleHdrFalseColor(args.falseColor);
+            return { success: true, message: "HDR viewer settings updated." };
+        }
+        case 'setTheme': {
+            const themeBtn = dom[`theme-btn-${args.themeName}`];
+            if (!themeBtn) throw new Error(`Invalid theme name: ${args.themeName}`);
+            themeBtn.click();
+            return { success: true, message: `Theme changed to ${args.themeName}.` };
+        }
+        case 'toggleComparisonMode': {
+            const toggle = dom['compare-mode-toggle'];
+            if (!toggle) throw new Error("Comparison mode toggle not found.");
+            if (toggle.checked !== args.enable) toggle.click();
+            return { success: true, message: `Comparison mode is now ${args.enable ? 'enabled' : 'disabled'}.` };
+        }
+        default:
+            throw new Error(`Unknown UI tool: ${name}`);
+    }
+}
+
+async function _handleProjectTool(name, args) {
+    switch (name) {
+        case 'saveProject': {
+            project.downloadProjectFile();
+            return { success: true, message: "Project file download has been initiated." };
+        }
+        case 'loadProject': {
+            dom['load-project-button']?.click();
+            return { success: true, message: "Opening file dialog to load a project." };
+        }
+        case 'generateReport': {
+            const { reportGenerator } = await import('./reportGenerator.js');
+            reportGenerator.generate();
+            return { success: true, message: "Generating and downloading project report." };
+        }
+        case 'searchKnowledgeBase': {
+            const results = searchKnowledgeBase(args.query);
+            if (results.length > 0) {
+                const formattedResults = results.map(r => `Topic: ${r.topic}\nContent: ${r.content}`).join('\n---\n');
+                return { success: true, message: `Found ${results.length} relevant documents.`, results: formattedResults };
+            }
+            return { success: true, message: "No relevant documents found in the knowledge base." };
+        }
+        default:
+            throw new Error(`Unknown project tool: ${name}`);
+    }
+}
+
+async function _handleTutorTool(name, args) {
+    switch (name) {
+        case 'startWalkthrough': {
+            activeWalkthrough = { topic: args.topic, step: 1 };
+            switchToTutorMode();
+            return { success: true, message: `Walkthrough for topic '${args.topic}' has been initiated.` };
+        }
+        case 'endWalkthrough': {
+            activeWalkthrough = null;
+            switchToChatMode();
+            return { success: true, message: 'Walkthrough ended successfully.' };
+        }
+        default:
+            throw new Error(`Unknown tutor tool: ${name}`);
+    }
+}
+
+async function _executeToolCall(toolCall) {
+    const { name, args } = toolCall.functionCall;
+    console.log(`👾 Executing tool: ${name}`, args);
+
+    try {
+        const toolCategoryMap = {
+            'addAperture': _handleSceneTool, 'placeAsset': _handleSceneTool, 'setDimension': _handleSceneTool, 'configureShading': _handleSceneTool, 'setSensorGrid': _handleSceneTool, 'setMaterialProperty': _handleSceneTool, 'traceSunRays': _handleSceneTool, 'toggleSunRayVisibility': _handleSceneTool,
+            'changeView': _handleViewTool, 'setViewpointPosition': _handleViewTool,
+            'compareMetrics': _handleResultsTool, 'filterAndHighlightPoints': _handleResultsTool, 'queryResultsData': _handleResultsTool, 'getDatasetStatistics': _handleResultsTool, 'highlightResultPoint': _handleResultsTool, 'displayResultsForTime': _handleResultsTool, 'showAnalysisDashboard': _handleResultsTool, 'clearResults': _handleResultsTool, 'loadResultsFile': _handleResultsTool,
+            'createShadingPattern': _handleGenerativeTool, 'generateSolarResponsiveShading': _handleGenerativeTool, 'generateViewOptimizedShading': _handleGenerativeTool, 'optimizeShadingDesign': _handleGenerativeTool, 'runGenerativeDesign': _handleGenerativeTool,
+            'openSimulationRecipe': _handleSimulationTool, 'configureSimulationRecipe': _handleSimulationTool, 'runSimulation': _handleSimulationTool, 'setGlobalRadianceParameter': _handleSimulationTool, 'configureDaylightingSystem': _handleSimulationTool,
+            'toggleUIPanel': _handleUITool, 'toggleDataTable': _handleUITool, 'filterDataTable': _handleUITool, 'toggleHdrViewer': _handleUITool, 'configureHdrViewer': _handleUITool, 'setTheme': _handleUITool, 'toggleComparisonMode': _handleUITool,
+            'saveProject': _handleProjectTool, 'loadProject': _handleProjectTool, 'generateReport': _handleProjectTool, 'searchKnowledgeBase': _handleProjectTool,
+            'startWalkthrough': _handleTutorTool, 'endWalkthrough': _handleTutorTool,
+            'runDesignInspector': () => { /* Special case, handled outside */ }, 'runResultsCritique': () => { /* Special case, handled outside */ }
+        };
+
+        const handler = toolCategoryMap[name];
+        if (handler) {
+            return await handler(name, args);
+        }
+
+        // Fallback for tools not in the map or special cases
+        switch (name) {
+            case 'runDesignInspector':
+            case 'runResultsCritique':
+                // These are handled by their own top-level functions, not this executor
+                return { success: true, message: "Inspector/Critique initiated." };
+            default:
+                throw new Error(`The tool "${name}" is not yet implemented or is unknown.`);
+        }
     } catch (error) {
-        console.error(`Error executing tool '${name}':`, error);
-        return { success: false, message: `Error: ${error.message}` };
+        console.error(`Tool execution failed for '${name}':`, error);
+        return { success: false, message: error.message };
     }
 }
 
@@ -2338,8 +2538,8 @@ async function _performGenerativeDesign(args) {
         // 3. Load and query results from the output files.
         // NOTE: This assumes an Electron API function `readFile` is available.
         const projectName = project.projectName || 'scene';
-        const aseFile = await getFileFromElectron(`08_results/${projectName}_ASE_direct_only.ill`);
-        const sdaFile = await getFileFromElectron(`08_results/${projectName}_sDA_final.ill`);
+        const aseFile = await _getFileFromElectron(`08_results/${projectName}_ASE_direct_only.ill`);
+        const sdaFile = await _getFileFromElectron(`08_results/${projectName}_sDA_final.ill`);
         
         // Load into the results manager to calculate metrics.
         await resultsManager.loadAndProcessFile(aseFile, 'a');
@@ -2437,27 +2637,331 @@ function runScriptAndWait(scriptName) {
     });
 }
 
+
 /**
- * Reads a result file from the project directory using the Electron backend.
- * NOTE: This requires extending the Electron API to include a 'readFile' function.
- * @param {string} filePath - The relative path to the file within the project folder.
+ * Executes the full generative shading optimization workflow.
+ * @param {object} args - The arguments for the optimization from the AI tool call.
+ * @returns {Promise<object>} A promise that resolves with the final summary message.
+ * @private
+ */
+async function _performGenerativeOptimization(args) {
+    const { 
+        targetWall, 
+        patternType, 
+        optimizationGoal, 
+        constraints, 
+        targetConstraint,
+        generations = 10, 
+        populationSize = 20,
+        quality = 'medium'
+    } = args;
+
+    // Import the optimizer
+    const { GeneticOptimizer } = await import('./optimizationEngine.js');
+    
+    // Initialize the optimizer with the parameter constraints
+    const optimizer = new GeneticOptimizer({
+        populationSize: populationSize,
+        generations: generations,
+        mutationRate: 0.15,
+        constraints: constraints,
+        patternType: patternType
+    });
+
+    let progressMessage = `## Optimization Progress\n\n`;
+    let bestOverall = null;
+    let bestOverallFitness = -Infinity;
+    
+    // Add a status message that we can update
+    const conv = conversations[activeConversationId];
+    const messagesContainer = dom['ai-chat-messages'];
+    const statusMessageElement = addMessageToDOM('ai', progressMessage + `**Generation 0/${generations}**: Initializing...`, messagesContainer);
+
+    try {
+        // Run the optimization
+        const result = await optimizer.run(async (designParams, generationNum, individualNum) => {
+            // Update progress
+            if (individualNum === 0) {
+                progressMessage += `\n**Generation ${generationNum}/${generations}**: Evaluating ${populationSize} designs...\n`;
+                statusMessageElement.querySelector('.message-bubble').innerHTML = progressMessage;
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+
+            // Evaluate this design
+            const fitness = await _evaluateFitness(designParams, targetWall, patternType, optimizationGoal, targetConstraint, quality);
+            
+            // Track the best overall
+            if (fitness.score > bestOverallFitness) {
+                bestOverallFitness = fitness.score;
+                bestOverall = { params: designParams, fitness: fitness };
+                
+                // Report new best
+                progressMessage += `  ✨ New best: ${fitness.metricValue.toFixed(2)} (fitness: ${fitness.score.toFixed(2)})\n`;
+                statusMessageElement.querySelector('.message-bubble').innerHTML = progressMessage;
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+
+            return fitness.score;
+        });
+
+        // Apply the best design
+        progressMessage += `\n---\n\n✅ **Optimization Complete!**\n\n`;
+        statusMessageElement.querySelector('.message-bubble').innerHTML = progressMessage;
+
+        if (!bestOverall) {
+            throw new Error("No valid solutions found during optimization.");
+        }
+
+        // Apply the best design to the scene
+        await _executeToolCall({ 
+            functionCall: { 
+                name: 'createShadingPattern', 
+                args: {
+                    targetWall: targetWall,
+                    patternType: patternType,
+                    parameters: bestOverall.params
+                } 
+            } 
+        });
+
+        // Build summary message
+        let summary = `### 🏆 Best Design Found\n\n`;
+        summary += `**Pattern Type:** ${patternType}\n`;
+        summary += `**Target Wall:** ${targetWall}\n`;
+        summary += `**${optimizationGoal.replace('_', ' ')}:** ${bestOverall.fitness.metricValue.toFixed(2)}${bestOverall.fitness.unit}\n\n`;
+        
+        summary += `**Parameters:**\n`;
+        for (const [key, value] of Object.entries(bestOverall.params)) {
+            summary += `- ${key}: ${value.toFixed(3)}\n`;
+        }
+        
+        if (targetConstraint) {
+            summary += `\n**Constraint Met:** ${targetConstraint} ✓\n`;
+        }
+
+        summary += `\nThe optimized design has been applied to your scene. You can now adjust the parameters manually if needed.`;
+
+        return { message: summary };
+
+    } catch (error) {
+        throw error;
+    }
+}
+
+/**
+ * Evaluates the fitness of a design by running a simulation and calculating the metric.
+ * @param {object} designParams - The design parameters to evaluate.
+ * @param {string} targetWall - The wall direction (n, s, e, w).
+ * @param {string} patternType - The pattern type.
+ * @param {string} optimizationGoal - The goal to optimize for.
+ * @param {string} targetConstraint - Optional constraint string (e.g., "ASE < 10").
+ * @param {string} quality - Simulation quality preset.
+ * @returns {Promise<object>} An object with score, metricValue, and unit.
+ * @private
+ */
+async function _evaluateFitness(designParams, targetWall, patternType, optimizationGoal, targetConstraint, quality) {
+    const wallDir = targetWall.toLowerCase();
+    
+    // Step 1: Apply the design parameters to the scene
+    const { setShadingState, storeGenerativeParams, setGenerativeSliderValues, scheduleUpdate } = await import('./ui.js');
+    
+    setShadingState(wallDir, { enabled: true, type: 'generative' });
+    storeGenerativeParams(wallDir, patternType, designParams);
+    setGenerativeSliderValues(wallDir, designParams);
+    
+    // Wait for scene update to complete
+    await new Promise(resolve => {
+        scheduleUpdate('optimizationFitnessEval');
+        setTimeout(resolve, 500); // Give time for geometry to update
+    });
+
+    // Step 2: Generate and run the simulation script
+    const scriptContent = await _generateQuickSimScript(optimizationGoal, quality);
+    
+    if (!window.electronAPI?.runScriptHeadless || !project.dirPath) {
+        throw new Error("Optimization requires Electron app and a saved project directory.");
+    }
+
+    const result = await window.electronAPI.runScriptHeadless({
+        projectPath: project.dirPath,
+        scriptContent: scriptContent
+    });
+
+    if (!result.success) {
+        console.warn("Simulation failed, assigning worst fitness:", result.stderr);
+        return { score: -Infinity, metricValue: 0, unit: '' };
+    }
+
+    // Step 3: Parse the results and calculate fitness
+    const fitness = await _parseSimulationResult(optimizationGoal, targetConstraint);
+    
+    return fitness;
+}
+
+/**
+ * Generates a quick simulation script for fitness evaluation.
+ * @param {string} optimizationGoal - The goal being optimized.
+ * @param {string} quality - The quality preset (draft, medium, high).
+ * @returns {Promise<string>} The shell script content.
+ * @private
+ */
+async function _generateQuickSimScript(optimizationGoal, quality) {
+    // Determine which recipe to use based on the goal
+    const recipeType = optimizationGoal.includes('DGP') ? 'dgp' : 'sda-ase';
+    
+    // Open the appropriate recipe panel (if not already open)
+    const templateId = recipeMap[recipeType];
+    let panel = document.querySelector(`.floating-window[data-template-id="${templateId}"]`);
+    
+    if (!panel || panel.classList.contains('hidden')) {
+        panel = openRecipePanelByType(templateId);
+        if (!panel) {
+            throw new Error(`Could not open ${recipeType} recipe panel for optimization.`);
+        }
+        // Wait a moment for panel to initialize
+        await new Promise(resolve => setTimeout(resolve, 200));
+    }
+
+    // Set quality preset
+    const qualityMap = { draft: 'draft', medium: 'medium', high: 'high' };
+    const panelSuffix = panel.id.split('-').pop();
+    const qualitySelect = panel.querySelector(`#quality-preset-${panelSuffix}`);
+    if (qualitySelect) {
+        qualitySelect.value = qualityMap[quality] || 'medium';
+        qualitySelect.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    // Generate the simulation package
+    const scriptInfo = await programmaticallyGeneratePackage(panel);
+    
+    // Read the script file content
+    if (!window.electronAPI?.readFile) {
+        throw new Error("Reading script files requires Electron API.");
+    }
+    
+    const scriptFile = await window.electronAPI.readFile({
+        projectPath: project.dirPath,
+        filePath: `07_scripts/${scriptInfo.shFile}`
+    });
+
+    if (!scriptFile.success) {
+        throw new Error("Could not read generated script file.");
+    }
+
+    // Convert buffer to string
+    const decoder = new TextDecoder('utf-8');
+    const scriptContent = decoder.decode(scriptFile.content.data);
+    
+    return scriptContent;
+}
+
+/**
+ * Parses simulation results and calculates fitness score.
+ * @param {string} optimizationGoal - The goal being optimized.
+ * @param {string} targetConstraint - Optional constraint string.
+ * @returns {Promise<object>} An object with score, metricValue, and unit.
+ * @private
+ */
+async function _parseSimulationResult(optimizationGoal, targetConstraint) {
+    const projectName = project.projectName || 'scene';
+    
+    try {
+        let metricValue = 0;
+        let unit = '';
+
+        if (optimizationGoal === 'maximize_sDA') {
+            // Load sDA result file
+            const sdaFile = await _getFileFromElectron(`08_results/${projectName}_sDA_final.ill`);
+            await resultsManager.loadAndProcessFile(sdaFile, 'a');
+            const metrics = resultsManager.calculateAnnualMetrics('a', {});
+            metricValue = metrics.sDA;
+            unit = '%';
+            
+        } else if (optimizationGoal === 'minimize_ASE') {
+            // Load ASE result file
+            const aseFile = await _getFileFromElectron(`08_results/${projectName}_ASE_direct_only.ill`);
+            await resultsManager.loadAndProcessFile(aseFile, 'a');
+            const metrics = resultsManager.calculateAnnualMetrics('a', {});
+            metricValue = metrics.ASE;
+            unit = '%';
+            
+        } else if (optimizationGoal === 'minimize_DGP_average') {
+            // For DGP, we need to parse the output file
+            // This is a simplified approach - you may need to adjust based on your DGP output format
+            const dgpFile = await _getFileFromElectron(`08_results/${projectName}_DGP.txt`);
+            const text = await dgpFile.text();
+            // Extract average DGP (this regex may need adjustment)
+            const match = text.match(/Average DGP:\s*([\d.]+)/);
+            metricValue = match ? parseFloat(match[1]) : 0;
+            unit = '';
+        }
+
+        // Calculate fitness score
+        let fitness = 0;
+        if (optimizationGoal.startsWith('maximize')) {
+            fitness = metricValue; // Higher is better
+        } else if (optimizationGoal.startsWith('minimize')) {
+            fitness = -metricValue; // Lower is better (negated)
+        }
+
+        // Apply constraint penalty if provided
+        if (targetConstraint) {
+            const constraintMet = _checkConstraint(metricValue, targetConstraint);
+            if (!constraintMet) {
+                fitness = -Infinity; // Invalid solution
+            }
+        }
+
+        return { score: fitness, metricValue: metricValue, unit: unit };
+
+    } catch (error) {
+        console.error("Failed to parse simulation results:", error);
+        return { score: -Infinity, metricValue: 0, unit: '' };
+    }
+}
+
+/**
+ * Checks if a value meets a constraint.
+ * @param {number} value - The metric value to check.
+ * @param {string} constraint - Constraint string (e.g., "ASE < 10" or "sDA >= 60").
+ * @returns {boolean} True if constraint is met.
+ * @private
+ */
+function _checkConstraint(value, constraint) {
+    const regex = /([\w]+)\s*(<|<=|>|>=|==)\s*([\d.]+)/;
+    const match = constraint.match(regex);
+    if (!match) return true; // No valid constraint, pass by default
+    
+    const [, metric, operator, thresholdStr] = match;
+    const threshold = parseFloat(thresholdStr);
+    
+    switch (operator) {
+        case '<': return value < threshold;
+        case '<=': return value <= threshold;
+        case '>': return value > threshold;
+        case '>=': return value >= threshold;
+        case '==': return Math.abs(value - threshold) < 0.01;
+        default: return true;
+    }
+}
+
+/**
+ * Reads a result file from the project directory using Electron backend.
+ * @param {string} filePath - The relative path to the file.
  * @returns {Promise<File>} A promise that resolves with a File object.
  * @private
  */
-async function getFileFromElectron(filePath) {
+async function _getFileFromElectron(filePath) {
     if (!window.electronAPI?.readFile || !project.dirPath) {
-        throw new Error("File access requires the Electron app and a saved project directory. The `readFile` API must be exposed.");
+        throw new Error("File access requires Electron app and saved project.");
     }
-    try {
-        // Assume the backend returns an object with binary content and a filename.
-        const { content, name } = await window.electronAPI.readFile({
-            projectPath: project.dirPath,
-            filePath: filePath
-        });
-        const buffer = new Uint8Array(content.data).buffer;
-        const blob = new Blob([buffer]);
-        return new File([blob], name, { type: 'application/octet-stream' });
-    } catch (e) {
-        throw new Error(`Could not read result file '${filePath}'. Make sure the simulation ran correctly. Error: ${e.message}`);
-    }
+    
+    const { content, name } = await window.electronAPI.readFile({
+        projectPath: project.dirPath,
+        filePath: filePath
+    });
+    
+    const buffer = new Uint8Array(content.data).buffer;
+    const blob = new Blob([buffer]);
+    return new File([blob], name, { type: 'application/octet-stream' });
 }
