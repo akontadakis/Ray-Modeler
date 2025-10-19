@@ -1,6 +1,7 @@
 // scripts/simulation.js
 
-import { showAlert, makeDraggable, makeResizable, ensureWindowInView, getNewZIndex, setupFileListenersForPanel, initializePanelControls, getDom } from './ui.js';
+import { showAlert, makeDraggable, makeResizable, ensureWindowInView, getNewZIndex, setupFileListenersForPanel, initializePanelControls } from './ui.js';
+import { getDom } from './dom.js';
 import { project } from './project.js'; // Import project to access its state
 
 // --- MODULE-LEVEL VARIABLES ---

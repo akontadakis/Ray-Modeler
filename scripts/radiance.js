@@ -1,6 +1,7 @@
 // scripts/radiance.js
 
-import { getDom, getAllWindowParams, getAllShadingParams, getSensorGridParams } from './ui.js';
+import { getAllWindowParams, getAllShadingParams, getSensorGridParams } from './ui.js';
+import { getDom } from './dom.js';
 import { project } from './project.js';
 import * as THREE from 'three';
 import { shadingObject } from './geometry.js';

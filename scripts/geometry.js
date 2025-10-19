@@ -2,7 +2,8 @@
 
 import * as THREE from 'three';
 import { renderer, horizontalClipPlane, verticalClipPlane, sensorTransformControls, importedModelObject } from './scene.js';
-import { getDom, getAllWindowParams, getAllShadingParams, validateInputs, getWindowParamsForWall, getSensorGridParams, scheduleUpdate } from './ui.js';
+import { getAllWindowParams, getAllShadingParams, validateInputs, getWindowParamsForWall, getSensorGridParams, scheduleUpdate } from './ui.js';
+import { getDom } from './dom.js';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
@@ -366,187 +367,196 @@ function createGroundPlane() {
  * Creates the entire room geometry, including walls, floor, ceiling, windows, and frames.
  * Walls are now individual, selectable meshes.
  */
-function createRoomGeometry() {
+function createRoomGeometry() {    
     // If an imported model is active, do not generate parametric geometry.
     if (currentImportedModel) {
         clearGroup(roomObject);
         clearGroup(wallSelectionGroup);
         return;
     }
-    const dom = getDom();
     clearGroup(roomObject);
     clearGroup(wallSelectionGroup);
 
     const { W, L, H, wallThickness, floorThickness, ceilingThickness } = readParams();
-    const glazingTrans = parseFloat(dom['glazing-trans'].value);
-    const isTransparent = dom['transparent-toggle'].checked;
-    const surfaceOpacity = isTransparent ? parseFloat(dom['surface-opacity'].value) : 1.0;
-
-    const materialProperties = {
-        polygonOffset: true,
-        polygonOffsetFactor: 1,
-        polygonOffsetUnits: 1,
-        side: THREE.DoubleSide,
-        clippingPlanes: renderer.clippingPlanes,
-        clipIntersection: true,
-        transparent: isTransparent,
-        opacity: surfaceOpacity,
-    };
-
-    // Create materials using theme colors
-    const wallMaterial = new THREE.MeshBasicMaterial({ ...materialProperties, color: new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--wall-color').trim()) });
-    const floorMaterial = new THREE.MeshBasicMaterial({ ...materialProperties, color: new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--floor-color').trim()) });
-    const ceilingMaterial = new THREE.MeshBasicMaterial({ ...materialProperties, color: new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--ceiling-color').trim()) });
-    const windowMaterial = new THREE.MeshBasicMaterial({ color: 0xb3ecff, side: THREE.DoubleSide, transparent: true, opacity: glazingTrans, clippingPlanes: renderer.clippingPlanes, clipIntersection: true, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 1 });
-    const frameMaterial = new THREE.MeshBasicMaterial({ ...materialProperties, color: new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--frame-color').trim()) });
-
-    const allWindows = getAllWindowParams();
     const roomContainer = new THREE.Group();
     roomContainer.position.set(-W / 2, 0, -L / 2);
 
-    // Floor and Ceiling (added to roomObject, not selectable)
+    _createFloor(roomContainer, { W, L, floorThickness, wallThickness });
+    _createCeiling(roomContainer, { W, L, H, ceilingThickness, wallThickness });
+    _createWalls({ W, L, H, wallThickness });
+
+    roomObject.add(roomContainer);
+}
+
+/**
+ * Creates the floor geometry and adds it to the room container.
+ * @param {THREE.Group} roomContainer - The parent group for the floor.
+ * @param {object} dims - Dimensions object { W, L, floorThickness, wallThickness }.
+ * @private
+ */
+function _createFloor(roomContainer, { W, L, floorThickness, wallThickness }) {
+    const isTransparent = getDom()['transparent-toggle'].checked;
+    const surfaceOpacity = isTransparent ? parseFloat(getDom()['surface-opacity'].value) : 1.0;
+    const materialProperties = { side: THREE.DoubleSide, clippingPlanes: renderer.clippingPlanes, clipIntersection: true, transparent: isTransparent, opacity: surfaceOpacity };
+    const floorMaterial = new THREE.MeshBasicMaterial({ ...materialProperties, color: new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--floor-color').trim()) });
+
     const floorGeom = new THREE.BoxGeometry(W + 2 * wallThickness, L + 2 * wallThickness, floorThickness);
     const floorGroup = new THREE.Group();
     floorGroup.rotation.x = -Math.PI / 2;
     floorGroup.position.set(W / 2, -floorThickness / 2 - 0.001, L / 2); // Lower slightly to avoid Z-fighting
     createSchematicObject(floorGeom, floorGroup, floorMaterial, SURFACE_TYPES.INTERIOR_FLOOR);
     roomContainer.add(floorGroup);
+}
 
+/**
+ * Creates the ceiling geometry and adds it to the room container.
+ * @param {THREE.Group} roomContainer - The parent group for the ceiling.
+ * @param {object} dims - Dimensions object { W, L, H, ceilingThickness, wallThickness }.
+ * @private
+ */
+function _createCeiling(roomContainer, { W, L, H, ceilingThickness, wallThickness }) {
+    const isTransparent = getDom()['transparent-toggle'].checked;
+    const surfaceOpacity = isTransparent ? parseFloat(getDom()['surface-opacity'].value) : 1.0;
+    const materialProperties = { side: THREE.DoubleSide, clippingPlanes: renderer.clippingPlanes, clipIntersection: true, transparent: isTransparent, opacity: surfaceOpacity };
+    const ceilingMaterial = new THREE.MeshBasicMaterial({ ...materialProperties, color: new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--ceiling-color').trim()) });
+    
     const ceilingGeom = new THREE.BoxGeometry(W + 2 * wallThickness, L + 2 * wallThickness, ceilingThickness);
     const ceilingGroup = new THREE.Group();
     ceilingGroup.rotation.x = -Math.PI / 2;
     ceilingGroup.position.set(W / 2, H + ceilingThickness / 2 + 0.001, L / 2); // Raise slightly to avoid Z-fighting
     createSchematicObject(ceilingGeom, ceilingGroup, ceilingMaterial, SURFACE_TYPES.INTERIOR_CEILING);
     roomContainer.add(ceilingGroup);
+}
 
-    roomObject.add(roomContainer);
-
-    // Walls (added to wallSelectionGroup to be selectable)
+/**
+ * Creates all four walls and adds them to the selectable wall group.
+ * @param {object} dims - Dimensions object { W, L, H, wallThickness }.
+ * @private
+ */
+function _createWalls({ W, L, H, wallThickness }) {
     const wallContainer = new THREE.Group();
     wallContainer.position.set(-W / 2, 0, -L / 2);
 
+    const allWindows = getAllWindowParams();
     const walls = {
         n: { s: [W, H], p: [W / 2, H / 2, 0], r: [0, Math.PI, 0] },
         s: { s: [W, H], p: [W / 2, H / 2, L], r: [0, 0, 0] },
         w: { s: [L, H], p: [0, H / 2, L / 2], r: [0, Math.PI / 2, 0] },
         e: { s: [L, H], p: [W, H / 2, L / 2], r: [0, -Math.PI / 2, 0] },
     };
-
+    
     for (const [key, props] of Object.entries(walls)) {
-        const wallMeshGroup = new THREE.Group();
-        wallMeshGroup.position.set(...props.p);
-        wallMeshGroup.rotation.set(...props.r);
-        wallMeshGroup.userData = { canonicalId: key }; // Assign the canonical ID
-
-        const winParams = allWindows[key.toUpperCase()];
-
-        const isEW = key === 'e' || key === 'w';
-        let wallW = props.s[0];
-        const wallH = props.s[1];
-
-        // Extend the East/West walls by the thickness to ensure the corners are perfectly closed.
-        // The North/South walls will then fit snugly between them.
-        if (isEW) {
-            wallW += (2 * wallThickness);
-        }
-
-        if (winParams && winParams.ww > 0 && winParams.wh > 0 && winParams.winCount > 0) {
-            const { ww, wh, sh, winCount, mode, winDepthPos } = winParams;
-            const wallShape = new THREE.Shape();
-            wallShape.moveTo(-wallW / 2, -wallH / 2);
-            wallShape.lineTo(wallW / 2, -wallH / 2);
-            wallShape.lineTo(wallW / 2, wallH / 2);
-            wallShape.lineTo(-wallW / 2, wallH / 2);
-            wallShape.closePath();
-
-            const spacing = mode === 'wwr' ? 0.1 : ww / 2;
-            const groupWidth = winCount * ww + Math.max(0, winCount - 1) * spacing;
-            const startX = -groupWidth / 2;
-            const addFrame = dom['frame-toggle'].checked;
-            const ft = addFrame ? parseFloat(dom['frame-thick'].value) : 0;
-            const frameDepth = addFrame ? parseFloat(dom['frame-depth'].value) : 0;
-
-            for (let i = 0; i < winCount; i++) {
-                const winCenterX = startX + ww / 2 + i * (ww + spacing);
-                const winCenterY = sh + wh / 2 - H / 2;
-                const holePath = new THREE.Path();
-                holePath.moveTo(winCenterX - ww / 2, winCenterY - wh / 2);
-                holePath.lineTo(winCenterX + ww / 2, winCenterY - wh / 2);
-                holePath.lineTo(winCenterX + ww / 2, winCenterY + wh / 2);
-                holePath.lineTo(winCenterX - ww / 2, winCenterY + wh / 2);
-                holePath.closePath();
-                wallShape.holes.push(holePath);
-
-                // Invert depth position for East/West walls for intuitive slider control
-                const effectiveWinDepthPos = (key === 'e' || key === 'w') ? -winDepthPos : winDepthPos;
-
-                const glassWidth = Math.max(0, ww - 2 * ft);
-                const glassHeight = Math.max(0, wh - 2 * ft);
-                if (glassWidth > 0 && glassHeight > 0) {
-                    const glass = new THREE.Mesh(new THREE.PlaneGeometry(glassWidth, glassHeight), windowMaterial);
-                    glass.userData.surfaceType = SURFACE_TYPES.GLAZING; // Tag for ray tracer
-                    applyClippingToMaterial(glass.material, renderer.clippingPlanes);
-                    glass.position.set(winCenterX, winCenterY, effectiveWinDepthPos); // Position in the middle of the frame depth
-                    wallMeshGroup.add(glass);
-                }
-
-                if (addFrame && ft > 0) {
-                    const frameShape = new THREE.Shape();
-                    frameShape.moveTo(winCenterX - ww / 2, winCenterY - wh / 2);
-                    frameShape.lineTo(winCenterX + ww / 2, winCenterY - wh / 2);
-                    frameShape.lineTo(winCenterX + ww / 2, winCenterY + wh / 2);
-                    frameShape.lineTo(winCenterX - ww / 2, winCenterY + wh / 2);
-                    frameShape.closePath();
-                    const frameHole = new THREE.Path();
-                    frameHole.moveTo(winCenterX - glassWidth / 2, winCenterY - glassHeight / 2);
-                    frameHole.lineTo(winCenterX + glassWidth / 2, winCenterY - glassHeight / 2);
-                    frameHole.lineTo(winCenterX + glassWidth / 2, winCenterY + glassHeight / 2);
-                    frameHole.lineTo(winCenterX - glassWidth / 2, winCenterY + glassHeight / 2);
-                    frameHole.closePath();
-                    frameShape.holes.push(frameHole);
-
-                    const frameExtrudeSettings = { steps: 1, depth: frameDepth, bevelEnabled: false };
-                    const frameGeometry = new THREE.ExtrudeGeometry(frameShape, frameExtrudeSettings);
-                    // Center the frame geometry around the window's depth position
-                    frameGeometry.translate(0, 0, effectiveWinDepthPos - (frameDepth / 2));
-
-                    const frameMesh = new THREE.Mesh(frameGeometry, frameMaterial);
-                    frameMesh.userData.surfaceType = SURFACE_TYPES.FRAME;
-                    applyClippingToMaterial(frameMesh.material, renderer.clippingPlanes);
-
-                    wallMeshGroup.add(frameMesh);
-                }
-            }
-
-            const extrudeSettings = {
-                steps: 1,
-                depth: wallThickness,
-                bevelEnabled: false
-            };
-
-            const wallGeometry = new THREE.ExtrudeGeometry(wallShape, extrudeSettings);
-            // For E/W walls, we pre-translate the geometry backwards. The group rotation
-            // will then correctly position the wall with its thickness pointing outwards.
-            if (isEW) {
-                wallGeometry.translate(0, 0, -wallThickness);
-            }
-            // ExtrudeGeometry extrudes from Z=0 to Z=depth, so its inner face is already at Z=0.
-            const wallMeshWithHoles = createSchematicObject(wallGeometry, wallMeshGroup, wallMaterial, SURFACE_TYPES.INTERIOR_WALL);
-            wallMeshWithHoles.userData.isSelectableWall = true;
-        } else {
-            // Create a solid wall using BoxGeometry
-            const wallGeometry = new THREE.BoxGeometry(wallW, wallH, wallThickness);
-            // BoxGeometry is centered. We translate it to align its inner face at z=0.
-            // For E/W walls, rotation makes local Z point along world X. To push outwards,
-            // the local translation needs to be negative.
-            const z_translation = isEW ? -wallThickness / 2 : wallThickness / 2;
-            wallGeometry.translate(0, 0, z_translation);
-            const wallMesh = createSchematicObject(wallGeometry, wallMeshGroup, wallMaterial, SURFACE_TYPES.INTERIOR_WALL);
-            wallMesh.userData.isSelectableWall = true;
-        }
-        wallContainer.add(wallMeshGroup);
+        const wallSegment = _createWallSegment(key, props, allWindows[key.toUpperCase()], { H, wallThickness });
+        wallContainer.add(wallSegment);
     }
     wallSelectionGroup.add(wallContainer);
+}
+
+/**
+ * Creates a single wall segment, including windows and frames.
+ * @param {string} key - The wall identifier ('n', 's', 'e', 'w').
+ * @param {object} props - The wall's properties (size, position, rotation).
+ * @param {object} winParams - The window parameters for this wall.
+ * @param {object} roomDims - Room dimensions { H, wallThickness }.
+ * @returns {THREE.Group} The group containing the wall mesh and its components.
+ * @private
+ */
+function _createWallSegment(key, props, winParams, { H, wallThickness }) {
+    const dom = getDom();
+    const isTransparent = dom['transparent-toggle'].checked;
+    const surfaceOpacity = isTransparent ? parseFloat(dom['surface-opacity'].value) : 1.0;
+    const materialProperties = { polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1, side: THREE.DoubleSide, clippingPlanes: renderer.clippingPlanes, clipIntersection: true, transparent: isTransparent, opacity: surfaceOpacity };
+    const wallMaterial = new THREE.MeshBasicMaterial({ ...materialProperties, color: new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--wall-color').trim()) });
+    const windowMaterial = new THREE.MeshBasicMaterial({ color: 0xb3ecff, side: THREE.DoubleSide, transparent: true, opacity: parseFloat(dom['glazing-trans'].value), clippingPlanes: renderer.clippingPlanes, clipIntersection: true, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 1 });
+    const frameMaterial = new THREE.MeshBasicMaterial({ ...materialProperties, color: new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--frame-color').trim()) });
+
+    const wallMeshGroup = new THREE.Group();
+    wallMeshGroup.position.set(...props.p);
+    wallMeshGroup.rotation.set(...props.r);
+    wallMeshGroup.userData = { canonicalId: key };
+
+    const isEW = key === 'e' || key === 'w';
+    let wallW = props.s[0];
+    const wallH = props.s[1];
+    if (isEW) wallW += (2 * wallThickness);
+
+    if (winParams && winParams.ww > 0 && winParams.wh > 0 && winParams.winCount > 0) {
+        const { ww, wh, sh, winCount, mode, winDepthPos } = winParams;
+        const wallShape = new THREE.Shape();
+        wallShape.moveTo(-wallW / 2, -wallH / 2);
+        wallShape.lineTo(wallW / 2, -wallH / 2);
+        wallShape.lineTo(wallW / 2, wallH / 2);
+        wallShape.lineTo(-wallW / 2, wallH / 2);
+        wallShape.closePath();
+
+        const spacing = mode === 'wwr' ? 0.1 : ww / 2;
+        const groupWidth = winCount * ww + Math.max(0, winCount - 1) * spacing;
+        const startX = -groupWidth / 2;
+        const addFrame = dom['frame-toggle'].checked;
+        const ft = addFrame ? parseFloat(dom['frame-thick'].value) : 0;
+        const frameDepth = addFrame ? parseFloat(dom['frame-depth'].value) : 0;
+
+        for (let i = 0; i < winCount; i++) {
+            const winCenterX = startX + ww / 2 + i * (ww + spacing);
+            const winCenterY = sh + wh / 2 - H / 2;
+            const holePath = new THREE.Path();
+            holePath.moveTo(winCenterX - ww / 2, winCenterY - wh / 2);
+            holePath.lineTo(winCenterX + ww / 2, winCenterY - wh / 2);
+            holePath.lineTo(winCenterX + ww / 2, winCenterY + wh / 2);
+            holePath.lineTo(winCenterX - ww / 2, winCenterY + wh / 2);
+            holePath.closePath();
+            wallShape.holes.push(holePath);
+
+            const effectiveWinDepthPos = (isEW) ? -winDepthPos : winDepthPos;
+            const glassWidth = Math.max(0, ww - 2 * ft);
+            const glassHeight = Math.max(0, wh - 2 * ft);
+
+            if (glassWidth > 0 && glassHeight > 0) {
+                const glass = new THREE.Mesh(new THREE.PlaneGeometry(glassWidth, glassHeight), windowMaterial);
+                glass.userData.surfaceType = SURFACE_TYPES.GLAZING;
+                applyClippingToMaterial(glass.material, renderer.clippingPlanes);
+                glass.position.set(winCenterX, winCenterY, effectiveWinDepthPos);
+                wallMeshGroup.add(glass);
+            }
+
+            if (addFrame && ft > 0) {
+                const frameShape = new THREE.Shape();
+                frameShape.moveTo(winCenterX - ww / 2, winCenterY - wh / 2);
+                frameShape.lineTo(winCenterX + ww / 2, winCenterY - wh / 2);
+                frameShape.lineTo(winCenterX + ww / 2, winCenterY + wh / 2);
+                frameShape.lineTo(winCenterX - ww / 2, winCenterY + wh / 2);
+                frameShape.closePath();
+                const frameHole = new THREE.Path();
+                frameHole.moveTo(winCenterX - glassWidth / 2, winCenterY - glassHeight / 2);
+                frameHole.lineTo(winCenterX + glassWidth / 2, winCenterY - glassHeight / 2);
+                frameHole.lineTo(winCenterX + glassWidth / 2, winCenterY + glassHeight / 2);
+                frameHole.lineTo(winCenterX - glassWidth / 2, winCenterY + glassHeight / 2);
+                frameHole.closePath();
+                frameShape.holes.push(frameHole);
+
+                const frameExtrudeSettings = { steps: 1, depth: frameDepth, bevelEnabled: false };
+                const frameGeometry = new THREE.ExtrudeGeometry(frameShape, frameExtrudeSettings);
+                frameGeometry.translate(0, 0, effectiveWinDepthPos - (frameDepth / 2));
+                const frameMesh = new THREE.Mesh(frameGeometry, frameMaterial);
+                frameMesh.userData.surfaceType = SURFACE_TYPES.FRAME;
+                applyClippingToMaterial(frameMesh.material, renderer.clippingPlanes);
+                wallMeshGroup.add(frameMesh);
+            }
+        }
+
+        const extrudeSettings = { steps: 1, depth: wallThickness, bevelEnabled: false };
+        const wallGeometry = new THREE.ExtrudeGeometry(wallShape, extrudeSettings);
+        if (isEW) wallGeometry.translate(0, 0, -wallThickness);
+        const wallMeshWithHoles = createSchematicObject(wallGeometry, wallMeshGroup, wallMaterial, SURFACE_TYPES.INTERIOR_WALL);
+        wallMeshWithHoles.userData.isSelectableWall = true;
+    } else {
+        const wallGeometry = new THREE.BoxGeometry(wallW, wallH, wallThickness);
+        const z_translation = isEW ? -wallThickness / 2 : wallThickness / 2;
+        wallGeometry.translate(0, 0, z_translation);
+        const wallMesh = createSchematicObject(wallGeometry, wallMeshGroup, wallMaterial, SURFACE_TYPES.INTERIOR_WALL);
+        wallMesh.userData.isSelectableWall = true;
+    }
+    return wallMeshGroup;
 }
 
 /**
@@ -808,9 +818,7 @@ export function createShadingDevices() {
                 deviceGroup = createLouvers(ww, wh, shadeParams.louver, shadeColor);
             } else if (shadeParams.type === 'roller' && shadeParams.roller) {
                 deviceGroup = createRoller(ww, wh, shadeParams.roller, shadeColor);
-            } else if (shadeParams.type === 'generative') {
-                deviceGroup = createGenerativeDevice(orientation, shadeParams);
-        }
+            }
 
         if (deviceGroup) {
             // The original creation logic is correct for E/W walls but inverted for N/S.
@@ -2020,79 +2028,4 @@ export async function addImportedAsset(objContent, mtlContent, assetType) {
     }
 
     return objectGroup;
-}
-
-/**
- * Creates a generative shading device by calling the appropriate generator function.
- * @param {string} wallId - The canonical ID of the wall ('N', 'S', 'E', 'W').
- * @param {object} params - The shading parameters object, including type and pattern-specific parameters.
- * @returns {THREE.Group|null} A group containing the generated shading geometry, or null if creation fails.
- */
-function createGenerativeDevice(wallId, params) {
-    // Ensure getWindowParamsForWall is available and returns expected values
-    const windowParams = getWindowParamsForWall(wallId);
-    if (!windowParams) {
-        console.error(`Could not get window parameters for wall ${wallId}`);
-        return null;
-    }
-    const { ww, wh, sh } = windowParams;
-
-    if (!params || !params.patternType || !params.parameters) {
-        console.error("Invalid or missing parameters for createGenerativeDevice");
-        return null;
-    }
-
-    // Prepare parameters for the specific generator function
-    const generatorParams = {
-        windowWidth: ww,
-        windowHeight: wh,
-        sillHeight: sh, // Pass sill height if needed by generators
-        ...params.parameters // Spread the specific parameters (depth, spacingX, etc.)
-    };
-
-    let deviceGroup = null;
-
-    // Dispatch based on patternType
-    switch (params.patternType) {
-        case 'vertical_fins':
-            deviceGroup = generativeShading.createVerticalFins(generatorParams);
-            break;
-        case 'horizontal_fins':
-            deviceGroup = generativeShading.createHorizontalFins(generatorParams);
-            break;
-        case 'grid':
-            deviceGroup = generativeShading.createGridPattern(generatorParams);
-            break;
-        case 'perforated_screen':
-            deviceGroup = generativeShading.createPerforatedScreen(generatorParams);
-            break;
-        case 'voronoi':
-            deviceGroup = generativeShading.createVoronoiPattern(generatorParams);
-            break;
-        case 'l_system':
-            deviceGroup = generativeShading.createLSystemPattern(generatorParams);
-            break;
-        case 'topology_optimized':
-            deviceGroup = generativeShading.createTopologyOptimized(generatorParams);
-            break;
-        case 'solar_responsive':
-            deviceGroup = generativeShading.createSolarResponsive(generatorParams);
-            break;
-        case 'view_optimized':
-            deviceGroup = generativeShading.createViewOptimized(generatorParams);
-            break;
-        case 'penrose_tiling':
-            deviceGroup = generativeShading.createPenroseTiling(generatorParams);
-            break;
-        default:
-            console.warn(`Unknown generative pattern type: ${params.patternType}`);
-            return null;
-    }
-
-    if (deviceGroup) {
-        deviceGroup.userData.shadingType = 'generative'; // Add type for reference if needed
-        deviceGroup.userData.patternType = params.patternType;
-    }
-
-    return deviceGroup;
 }

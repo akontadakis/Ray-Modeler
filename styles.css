@@ -828,6 +828,7 @@ input[type=checkbox] {
   display: inline-block;
   position: relative;
   transition: background-color 0.2s, border-color 0.2s;
+  margin-right: 0.75rem;
 }
 
 input[type=checkbox]:checked {
@@ -1620,9 +1621,18 @@ html[data-theme="cafe58"] #welcome-logo-cafe58 {
     color: var(--text-secondary);
 }
 
-.window-icon-settings:hover {
+.window-icon-settings:hover, .window-icon-info:hover {
     opacity: 1;
     color: var(--text-primary);
+}
+
+.window-icon-info {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.2s ease, color 0.2s ease;
+    color: var(--text-secondary);
 }
 
 .ai-mode-selector {

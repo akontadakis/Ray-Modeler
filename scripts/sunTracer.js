@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { scene } from './scene.js';
 import { roomObject, shadingObject, wallSelectionGroup } from './geometry.js';
 import { project } from './project.js';
-import { getDom } from './ui.js';
+import { getDom } from './dom.js';
 
 const rayGroup = new THREE.Group();
 rayGroup.name = 'SunRayTraces';

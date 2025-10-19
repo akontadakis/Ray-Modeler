@@ -60,8 +60,4 @@
       "allowToChangeInstallationDirectory": true
     }
   },
-  "dependencies": {
-    "d3-delaunay": "^6.0.4",
-    "lsystem": "^1.2.1"
-  }
 }

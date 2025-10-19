@@ -1525,8 +1525,9 @@ if [ \$? -ne 0 ]; then echo "Error generating Sun Sky Matrix."; exit 1; fi
 # 6. Generate Daylight Coefficient Matrix for direct sun (C_ds)
 echo "6. Generating direct daylight coefficient matrix (C_ds)..."
 CDS_MTX="\${MATRIX_DIR}/cds.mtx"
-gendaymtx -d -s "\${WEATHER_FILE}" | rcontrib -I+ -w -ab 1 -ad 1024 -lw 1e-5 \\
-    -V- -i "\${OCTREE}" < "\${POINTS_FILE}" > "\${CDS_MTX}"
+# We use process substitution to feed the sun modifiers from gendaymtx into rcontrib's -M option.
+rcontrib -I+ -w -ab 1 -ad 1024 -lw 1e-5 \\
+    -V- -i "\${OCTREE}" -M <(gendaymtx -d -s "\${WEATHER_FILE}") < "\${POINTS_FILE}" > "\${CDS_MTX}"
 if [ \$? -ne 0 ]; then echo "Error generating CDS Matrix."; exit 1; fi
 
 # --- PART 7: Combine Matrices for Final Result ---
@@ -1633,7 +1634,10 @@ if %errorlevel% neq 0 ( echo "Error generating Sun Sky Matrix." & exit /b 1 )
 REM 6. Generate Daylight Coefficient Matrix for direct sun (C_ds)
 echo 6. Generating direct daylight coefficient matrix (C_ds)...
 set "CDS_MTX=%MATRIX_DIR%\\cds.mtx"
-(gendaymtx -d -s "%WEATHER_FILE%") | rcontrib -I+ -w -ab 1 -ad 1024 -lw 1e-5 -V- -i "%OCTREE%" < "%POINTS_FILE%" > "%CDS_MTX%"
+set "SUN_MODS_FILE=%MATRIX_DIR%\\sun_modifiers.rad"
+REM We must first write the sun modifiers to a temporary file for Windows
+gendaymtx -d -s "%WEATHER_FILE%" > "%SUN_MODS_FILE%"
+rcontrib -I+ -w -ab 1 -ad 1024 -lw 1e-5 -V- -i "%OCTREE%" -M "%SUN_MODS_FILE%" < "%POINTS_FILE%" > "%CDS_MTX%"
 if %errorlevel% neq 0 ( echo "Error generating CDS Matrix." & exit /b 1 )
 
 REM --- PART 7: Combine Matrices for Final Result ---
@@ -1871,7 +1875,7 @@ if [ \$? -ne 0 ]; then echo "Error during dcglare for GA."; exit 1; fi
 # 7. Calculate Spatial Glare Autonomy (sGA)
 echo "7. Calculating spatial Glare Autonomy (sGA) for a target of \${SGA_TARGET}..."
 SGA_RESULTS="\${RESULTS_DIR}/\${PROJECT_NAME}_sGA.txt"
-rcalc -e 'sGA = 100 * total(if(\$1-\${SGA_TARGET},1,0)) / (total(1)+1e-9)' "\${GA_RESULTS}" > "\${SGA_RESULTS}"
+rcalc -e 'sGA = 100 * total(gt($1, ${SGA_TARGET})) / total(1)' "\${GA_RESULTS}" > "\${SGA_RESULTS}"
 
 SGA_VALUE=\$(cat "\${SGA_RESULTS}")
 echo "---"
@@ -1968,7 +1972,7 @@ if %errorlevel% neq 0 ( echo "Error during dcglare for GA." & exit /b 1 )
 REM 7. Calculate Spatial Glare Autonomy (sGA)
 echo 7. Calculating spatial Glare Autonomy (sGA) for a target of %SGA_TARGET%...
 set "SGA_RESULTS=%RESULTS_DIR%\\%PROJECT_NAME%_sGA.txt"
-(type "%GA_RESULTS%") | rcalc -e "$1 = 100 * total(if($1-%SGA_TARGET%,1,0)) / (total(1)+1e-9)" > "%SGA_RESULTS%"
+(type "%GA_RESULTS%") | rcalc -e "$1 = 100 * total(gt($1, %SGA_TARGET%)) / total(1)" > "%SGA_RESULTS%"
 
 for /f "delims=" %%a in ('type "%SGA_RESULTS%"') do @set "SGA_VALUE=%%a"
 

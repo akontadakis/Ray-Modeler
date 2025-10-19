@@ -6,6 +6,8 @@
 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="googlebot" content="noindex, nofollow">
     <title>Ray Modeler</title>
     
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 511.987 511.987'><rect x='66.717' y='204.027' transform='matrix(-0.2411 -0.9705 0.9705 -0.2411 -177.6681 420.4137)' fill='%23B6F2FC' width='17.648' height='151.29'/><polygon fill='%238ED7E0' points='235.67,98.502 417.524,413.484 53.815,413.484'/><polygon fill='%23F4BD64' points='511.987,268.44 511.987,315.737 368.184,337.491 344.872,329.255 296.635,235.133'/><polygon fill='%234EB79B' points='511.987,315.737 511.987,363.022 384.886,356.939 384.874,356.939 344.872,329.255 356.814,308.325'/><polygon fill='%23E88158' points='511.987,221.156 511.987,268.44 328.73,259.687 276.634,248.075 300.658,211.061'/><polygon fill='%23B6F2FC' points='384.874,356.939 385.874,358.669 113.88,263.558 300.658,211.061 328.73,259.687 356.802,308.325 356.814,308.325'/></svg>">
@@ -19,6 +21,56 @@
     <link rel="stylesheet" href="styles.css">
 
     <style>
+        /* Password Manager Prevention */
+        input[type="password"],
+        input[type="text"],
+        input[type="email"],
+        input[type="tel"],
+        input[type="url"],
+        textarea,
+        select {
+            -webkit-text-security: none !important;
+            -webkit-appearance: none !important;
+            -moz-appearance: none !important;
+            appearance: none !important;
+        }
+
+        /* Hide password manager overlays and suggestions */
+        div[data-lastpass],
+        div[data-dashlane],
+        div[data-bitwarden],
+        div[data-keeper],
+        div[data-roboform],
+        div[data-1password],
+        div[data-password-manager],
+        .password-manager-overlay,
+        .password-suggestion,
+        .autocomplete-suggestion,
+        .password-autofill {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+
+        /* Prevent password manager icons and buttons */
+        input::-webkit-credentials-auto-fill-button,
+        input::-webkit-contacts-auto-fill-button,
+        input::-webkit-credit-card-auto-fill-button {
+            display: none !important;
+            visibility: hidden !important;
+        }
+
+        /* Additional password manager prevention */
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover,
+        input:-webkit-autofill:focus,
+        input:-webkit-autofill:active {
+            -webkit-box-shadow: 0 0 0 1000px white inset !important;
+            -webkit-text-fill-color: inherit !important;
+            transition: background-color 5000s ease-in-out 0s !important;
+        }
+
         #render-container {
             position: absolute;
             width: 100%;
@@ -89,8 +141,8 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 </head>
 
-<body>
-    <div id="welcome-screen">
+<body autocomplete="off">
+    <div id="welcome-screen" autocomplete="off">
     <div id="glow-portal"></div>
     <canvas id="glow-canvas"></canvas>
     <div class="welcome-content">
@@ -135,8 +187,7 @@
     </div>
     <p class="welcome-subheader">Your AI Assistant for Advanced Daylighting Simulation</p>
     <p class="welcome-description text-center max-w-lg text-lg text-[--text-secondary]">
-                Choose how you'd like to begin your modeling project. You can start with a predefined parametric shape or import your own custom model.
-            </p>
+                Choose how you'd like to begin your modeling project. You can start with a predefined parametric shape or import your own custom model.</p>
         <div class="welcome-options">
                 <button id="start-with-shoebox" class="welcome-option-card">
                     <svg xmlns="http://www.w3.org/2000/svg" class="option-icon" viewBox="0 0 100 100" fill="currentColor">
@@ -160,8 +211,8 @@
                     </div>
                 </button>
             </div>
+        </div>
     </div>
-</div>
 
     <div id="theme-switcher-container" class="fixed top-10 left-6 z-[10001] pointer-events-auto">
     <button id="theme-btn-cafe58" class="theme-btn" style="display: none;" aria-label="Switch to Cafe 58 Theme">
@@ -192,23 +243,23 @@
     </div>
 
     <div id="render-container">
-    <div id="viewport-main" class="viewport">
-        <div class="viewport-label">Perspective</div>
-        <div class="label-container"></div>
+        <div id="viewport-main" class="viewport">
+            <div class="viewport-label">Perspective</div>
+            <div class="label-container"></div>
+        </div>
+        <div id="viewport-top" class="viewport">
+            <div class="viewport-label">Top</div>
+            <div class="label-container"></div>
+        </div>
+        <div id="viewport-front" class="viewport">
+            <div class="viewport-label">Front</div>
+            <div class="label-container"></div>
+        </div>
+        <div id="viewport-side" class="viewport">
+            <div class="viewport-label">Right</div>
+            <div class="label-container"></div>
+        </div>
     </div>
-    <div id="viewport-top" class="viewport">
-        <div class="viewport-label">Top</div>
-        <div class="label-container"></div>
-    </div>
-    <div id="viewport-front" class="viewport">
-        <div class="viewport-label">Front</div>
-        <div class="label-container"></div>
-    </div>
-    <div id="viewport-side" class="viewport">
-        <div class="viewport-label">Right</div>
-        <div class="label-container"></div>
-    </div>
-</div>
     
     <div id="left-controls-container" class="absolute top-1/2 -translate-y-1/2 left-4 z-50 pointer-events-auto flex flex-col gap-4">
     <div id="left-toolbar" class="ui-panel p-1">
@@ -285,26 +336,25 @@
                     <button id="toggle-analysis-btn" class="btn" aria-label="Analysis">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 495.421 495.421" xml:space="preserve" fill="currentColor" stroke="none"><path d="M490.531 188.099a7.27 7.27 0 0 0-8.089 2.393l-85.909 110.192a15.1 15.1 0 0 1-14.407 5.619l-93.674-15.672c-4.783-.8-9.668.742-13.123 4.159l-85.609 84.633a15.1 15.1 0 0 1-9.148 4.291l-111.28 10.993a15.14 15.14 0 0 0-9.523 4.679L2.414 460.344a8.85 8.85 0 0 0-1.685 9.589 8.87 8.87 0 0 0 8.138 5.339h468.591c9.924 0 17.963-8.036 17.963-17.957V194.956a7.25 7.25 0 0 0-4.89-6.857M29.334 275.472c4.504 0 8.978-1.782 12.312-5.314l24.096-25.411c3.535 1.03 7.229 1.758 11.093 1.758 18.997 0 34.859-13.296 39.018-31.04l38.148-3.762c6.584 13.213 20.086 22.397 35.833 22.397 22.116 0 40.138-18.007 40.138-40.141 0-4.952-1.02-9.648-2.669-14.03l34.049-33.384c5.579 2.947 11.833 4.771 18.567 4.771 14.987 0 27.945-8.368 34.828-20.584l22.137 3.707c5.129 16.25 20.185 28.15 38.108 28.15 22.136 0 40.143-18.007 40.143-40.143 0-6.286-1.585-12.162-4.159-17.462l44.862-57.555c5.743-7.361 4.423-17.983-2.941-23.718-7.328-5.719-17.956-4.417-23.715 2.938l-44.848 56.869c-3.004-.725-6.108-1.212-9.343-1.212-14.192 0-26.605 7.443-33.733 18.584l-23.937-4.002c-5.794-15.077-20.316-25.855-37.403-25.855-22.131 0-40.138 18.007-40.138 40.141 0 2.691.295 5.316.79 7.858l-37.733 37.136c-4.089-1.42-8.434-2.352-13.003-2.352-16.392 0-30.469 9.895-36.708 24l-44.438 4.39c-7.328-9.648-18.817-15.984-31.854-15.984-22.116 0-40.142 18.007-40.142 40.141 0 5.729 1.254 11.157 3.434 16.084l-23.091 24.535c-6.404 6.802-6.073 17.497.71 23.895a16.85 16.85 0 0 0 11.589 4.595m345.658-167.813c8.153 0 14.792 6.634 14.792 14.787 0 8.156-6.639 14.79-14.792 14.79s-14.788-6.634-14.788-14.79c0-8.153 6.635-14.787 14.788-14.787m-95.073-11.272c8.153 0 14.793 6.634 14.793 14.787s-6.64 14.79-14.793 14.79c-8.154 0-14.787-6.637-14.787-14.79s6.633-14.787 14.787-14.787m-90.084 82.782c8.154 0 14.787 6.637 14.787 14.79s-6.633 14.79-14.787 14.79-14.792-6.637-14.792-14.79 6.639-14.79 14.792-14.79m-113 12.405c8.153 0 14.788 6.634 14.788 14.788s-6.634 14.789-14.788 14.789-14.787-6.636-14.787-14.789c0-8.154 6.633-14.788 14.787-14.788"/></svg>
                     </button>
-                    <span class="tooltip" role="tooltip">Analysis</span>
+                        <span class="tooltip" role="tooltip">Analysis</span>
+                    </div>
                 </div>
-
             </div>
         </div>
-    </div>
 
-    <div id="view-controls" class="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
-        <div class="ui-panel p-1">
-            <div class="btn-group">
-                <div class="action-button-container"><button id="view-btn-persp" class="btn active" aria-label="Perspective View"><svg viewBox="0 0 24 24"><path d="M3 8l8-4 8 4-8 4-8-4z" /><path d="M11 8v8M19 12l-8 4" /><path d="M3 8v8l8 4" /></svg></button><span class="tooltip" role="tooltip">Perspective View</span></div>
-                <div class="action-button-container"><button id="view-btn-ortho" class="btn" aria-label="Orthographic View"><svg viewBox="0 0 24 24"><path d="M4,8 L12,4 L20,8 L12,12 L4,8 Z" /><path d="M4,8 L4,16 L12,20 L12,12 Z" /><path d="M12,12 L12,20 L20,16 L20,8 Z" /></svg></button><span class="tooltip" role="tooltip">Orthographic View</span></div>
-                <div class="action-button-container"><button id="view-btn-top" class="btn" aria-label="Top View"><svg viewBox="0 0 24 24"><polygon class="face-fill" points="4,8 12,4 20,8 12,12" /><path d="M4 8l8 4 8-4" /><path d="M12 12v8M20 8l-8 4" /><path d="M4 8v8l8 4" /></svg></button><span class="tooltip" role="tooltip">Top View</span></div>
-                <div class="action-button-container"><button id="view-btn-front" class="btn" aria-label="Front View (South)"><svg viewBox="0 0 24 24"><polygon class="face-fill" points="4,16 12,20 12,12 4,8" /><path d="M4 8l8 4 8-4" /><path d="M12 12v8M20 8l-8 4" /><path d="M4 8v8l8 4" /></svg></button><span class="tooltip" role="tooltip">Front View (South)</span></div>
-                <div class="action-button-container"><button id="view-btn-back" class="btn" aria-label="Back View (North)"><svg viewBox="0 0 24 24"><polygon class="face-fill" points="12,4 20,8 20,16 12,12" /><path d="M4 8l8 4 8-4" /><path d="M12 12v8M20 8l-8 4" /><path d="M4 8v8l8 4" /></svg></button><span class="tooltip" role="tooltip">Back View (North)</span></div>
-                <div class="action-button-container"><button id="view-btn-left" class="btn" aria-label="Left View (West)"><svg viewBox="0 0 24 24"><polygon class="face-fill" points="4,8 12,4 12,12 4,16" /><path d="M4 8l8 4 8-4" /><path d="M12 12v8M20 8l-8 4" /><path d="M4 8v8l8 4" /></svg></button><span class="tooltip" role="tooltip">Left View (West)</span></div>
-                <div class="action-button-container"><button id="view-btn-right" class="btn" aria-label="Right View (East)"><svg viewBox="0 0 24 24"><polygon class="face-fill" points="12,4 20,8 20,16 12,20" /><path d="M4 8l8 4 8-4" /><path d="M12 12v8M20 8l-8 4" /><path d="M4 8v8l8 4" /></svg></button><span class="tooltip" role="tooltip">Right View (East)</span></div>
-                <div class="action-button-container"><button id="view-btn-quad" class="btn" aria-label="Quad View"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="12" x2="21" y2="12"></line><line x1="12" y1="3" x2="12" y2="21"></line></svg></button><span class="tooltip" role="tooltip">Quad View</span></div>
+        <div id="view-controls" class="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
+            <div class="ui-panel p-1">
+                <div class="btn-group">
+                    <div class="action-button-container"><button id="view-btn-persp" class="btn active" aria-label="Perspective View"><svg viewBox="0 0 24 24"><path d="M3 8l8-4 8 4-8 4-8-4z" /><path d="M11 8v8M19 12l-8 4" /><path d="M3 8v8l8 4" /></svg></button><span class="tooltip" role="tooltip">Perspective View</span></div>
+                    <div class="action-button-container"><button id="view-btn-ortho" class="btn" aria-label="Orthographic View"><svg viewBox="0 0 24 24"><path d="M4,8 L12,4 L20,8 L12,12 L4,8 Z" /><path d="M4,8 L4,16 L12,20 L12,12 Z" /><path d="M12,12 L12,20 L20,16 L20,8 Z" /></svg></button><span class="tooltip" role="tooltip">Orthographic View</span></div>
+                    <div class="action-button-container"><button id="view-btn-top" class="btn" aria-label="Top View"><svg viewBox="0 0 24 24"><polygon class="face-fill" points="4,8 12,4 20,8 12,12" /><path d="M4 8l8 4 8-4" /><path d="M12 12v8M20 8l-8 4" /><path d="M4 8v8l8 4" /></svg></button><span class="tooltip" role="tooltip">Top View</span></div>
+                    <div class="action-button-container"><button id="view-btn-front" class="btn" aria-label="Front View (South)"><svg viewBox="0 0 24 24"><polygon class="face-fill" points="4,16 12,20 12,12 4,8" /><path d="M4 8l8 4 8-4" /><path d="M12 12v8M20 8l-8 4" /><path d="M4 8v8l8 4" /></svg></button><span class="tooltip" role="tooltip">Front View (South)</span></div>
+                    <div class="action-button-container"><button id="view-btn-back" class="btn" aria-label="Back View (North)"><svg viewBox="0 0 24 24"><polygon class="face-fill" points="12,4 20,8 20,16 12,12" /><path d="M4 8l8 4 8-4" /><path d="M12 12v8M20 8l-8 4" /><path d="M4 8v8l8 4" /></svg></button><span class="tooltip" role="tooltip">Back View (North)</span></div>
+                    <div class="action-button-container"><button id="view-btn-left" class="btn" aria-label="Left View (West)"><svg viewBox="0 0 24 24"><polygon class="face-fill" points="4,8 12,4 12,12 4,16" /><path d="M4 8l8 4 8-4" /><path d="M12 12v8M20 8l-8 4" /><path d="M4 8v8l8 4" /></svg></button><span class="tooltip" role="tooltip">Left View (West)</span></div>
+                    <div class="action-button-container"><button id="view-btn-right" class="btn" aria-label="Right View (East)"><svg viewBox="0 0 24 24"><polygon class="face-fill" points="12,4 20,8 20,16 12,20" /><path d="M4 8l8 4 8-4" /><path d="M12 12v8M20 8l-8 4" /><path d="M4 8v8l8 4" /></svg></button><span class="tooltip" role="tooltip">Right View (East)</span></div>
+                    <div class="action-button-container"><button id="view-btn-quad" class="btn" aria-label="Quad View"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="12" x2="21" y2="12"></line><line x1="12" y1="3" x2="12" y2="21"></line></svg></button><span class="tooltip" role="tooltip">Quad View</span></div>
+                </div>
             </div>
-        </div>
     </div>
 
     <main id="window-container" class="relative">
@@ -319,13 +369,13 @@
             </div>
             <div class="window-content">
                 <div class="form-grid">
-                    <div class="form-column">
-                        <div><label for="project-name" class="label">Project Name</label><input type="text" id="project-name" placeholder="e.g., Simple Office Room"></div>
-                        <div><label for="project-desc" class="label">Project Description (Optional)</label><textarea id="project-desc" rows="3" placeholder="Enter your project description"></textarea></div>
-                        <div><label for="building-type" class="label">Building Type</label><select id="building-type"><option value="" disabled selected>Select Building Type</option><option>Office</option><option>Classroom</option><option>Laboratory</option><option>Libraries</option><option>Lobbies</option><option>Residential</option><option>Creative Arts</option></select></div>
-                        <div><label for="radiance-path" class="label">Radiance Installation Path</label><input type="text" id="radiance-path" placeholder="Path is OS-dependent..."></div>
+                    <div class="form-column" autocomplete="off">
+                        <div><label for="project-name" class="label">Project Name</label><input type="text" id="project-name" placeholder="e.g., Simple Office Room" autocomplete="off"></div>
+                        <div><label for="project-desc" class="label">Project Description (Optional)</label><textarea id="project-desc" rows="3" placeholder="Enter your project description" autocomplete="off"></textarea></div>
+                        <div><label for="building-type" class="label">Building Type</label><select id="building-type" autocomplete="off"><option value="" disabled selected>Select Building Type</option><option>Office</option><option>Classroom</option><option>Laboratory</option><option>Libraries</option><option>Lobbies</option><option>Residential</option><option>Creative Arts</option></select></div>
+                        <div><label for="radiance-path" class="label">Radiance Installation Path</label><input type="text" id="radiance-path" placeholder="Path is OS-dependent..." autocomplete="off"></div>
                     </div>
-                <div class="form-column">
+                <div class="form-column" autocomplete="off">
                     <div style="flex-grow: 1; display: flex; flex-direction: column;">
                         <label class="label">Climate Data Source</label>
                         <div class="flex items-center">
@@ -336,9 +386,9 @@
                     </div>
                     <div id="location-inputs-container" style="display: none;">
                         <label class="label">Location</label>
-                        <div class="location-grid">
-                            <input type="text" id="latitude" placeholder="Latitude e.g., 40.71">
-                            <input type="text" id="longitude" placeholder="Longitude e.g., -74.00">
+                        <div class="location-grid" autocomplete="off">
+                            <input type="text" id="latitude" placeholder="Latitude e.g., 40.71" autocomplete="off">
+                            <input type="text" id="longitude" placeholder="Longitude e.g., -74.00" autocomplete="off">
                         </div>
                     </div>
                     <div style="flex-grow: 1; display: flex; flex-direction: column;">
@@ -354,8 +404,8 @@
                             </label>
                             <div id="occupancy-controls" class="hidden pt-2 space-y-4">
                                 <div>
-                                    <label class="label text-xs" for="occupancy-schedule-filename">Schedule Filename</label>
-                                    <input type="text" id="occupancy-schedule-filename" class="w-full mt-1" value="occupancy.csv">
+                                    <label class="label text-xs" for="occupancy-schedule-filename">Schedule Filename</label> 
+                                    <input type="text" id="occupancy-schedule-filename" class="w-full mt-1" value="occupancy.csv" autocomplete="off">
                                 </div>
                                 <div>
                                     <label class="label text-xs">Occupied Days</label>
@@ -387,17 +437,17 @@
                 </div>
             </div>
         <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-</div>
-<div id="panel-dimensions" class="floating-window ui-panel hidden">
-  <div class="window-header">
-    <span>Dimensions & Geometry</span>
-        <div class="window-controls">
-            <div class="window-icon-max"></div>
-                <div class="collapse-icon"></div>
-                <div class="window-icon-close"></div>
-            </div>
-            </div>
-    <div class="window-content space-y-4">
+        </div>
+        <div id="panel-dimensions" class="floating-window ui-panel hidden">
+        <div class="window-header">
+            <span>Dimensions & Geometry</span>
+                <div class="window-controls">
+                    <div class="window-icon-max"></div>
+                        <div class="collapse-icon"></div>
+                        <div class="window-icon-close"></div>
+                    </div>
+                    </div>
+            <div class="window-content space-y-4">
 
         <div id="import-controls" class="hidden space-y-4">
             <p class="info-box !text-xs !py-2 !px-3">Import a .obj model. Parametric controls will be disabled. Ensure your model is in meters.</p>
@@ -593,16 +643,13 @@
                     <div><label class="label" for="sill-height-n">Sill Height (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="sill-height-n" min="0" max="10" value="1.0" step="0.05"><span id="sill-height-n-val" class="data-value font-mono w-12 text-left">1.0m</span></div></div>
                     <div><label class="label" for="win-depth-pos-n-manual">Window Depth Position (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="win-depth-pos-n-manual" min="0" max="0.2" value="0.1" step="0.01"><span id="win-depth-pos-n-val-manual" class="data-value font-mono w-12 text-left">0.10m</span></div></div>
                 </div>
-
-
-
                 <div class="shading-section-container space-y-4 pt-4 mt-4 border-t border-dashed border-[--grid-color]">
-                    <h4 class="font-semibold text-sm uppercase text-gray-700">North Wall Shading</h4>
-                    <label class="flex items-center cursor-pointer" for="shading-n-toggle"><input type="checkbox" id="shading-n-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Shading on this Wall</span></label>
-                    <div id="shading-controls-n" class="hidden space-y-5">
-                        <div><label class="label" for="shading-type-n">Device Type</label><select id="shading-type-n" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option><option value="generative">Generative (AI)</option><option value="imported_obj">Imported OBJ</option></select></div>
-                        <div id="shading-controls-overhang-n" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
-                            <div><label class="label" for="overhang-dist-above-n">Distance Above Top (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-dist-above-n" min="0" max="1.0" value="0" step="0.05"><span id="overhang-dist-above-n-val" class="data-value font-mono w-12 text-left">0.00m</span></div></div>
+                        <h4 class="font-semibold text-sm uppercase text-gray-700">North Wall Shading</h4>
+                            <label class="flex items-center cursor-pointer" for="shading-n-toggle"><input type="checkbox" id="shading-n-toggle"><span class="ml-3 text-sm font-normal text-[--text-primary]">Enable Shading on this Wall</span></label>
+                            <div id="shading-controls-n" class="hidden space-y-5">
+                                <div><label class="label" for="shading-type-n">Device Type</label><select id="shading-type-n" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option><option value="imported_obj">Imported OBJ</option></select></div>
+                            <div id="shading-controls-overhang-n" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
+                                <div><label class="label" for="overhang-dist-above-n">Distance Above Top (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-dist-above-n" min="0" max="1.0" value="0" step="0.05"><span id="overhang-dist-above-n-val" class="data-value font-mono w-12 text-left">0.00m</span></div></div>
 
 
                             <div><label class="label" for="overhang-tilt-n">Tilt Angle (°)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-tilt-n" min="-90" max="90" value="0" step="1"><span id="overhang-tilt-n-val" class="data-value font-mono w-12 text-left">0°</span></div></div>
@@ -676,110 +723,16 @@
                             </div>
                             <p class="info-box !text-xs !py-2 !px-3">Click the imported object in the 3D view to use the transform gizmo for interactive placement.</p>
                         </div>
-                        <div id="shading-controls-generative-n" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
-                            <p class="info-box !text-xs !py-2 !px-3">
-                                AI-generated pattern. Adjust common parameters below. New patterns can only be created by the AI assistant.
-                            </p>
-                            <div>
-                                <label class="label text-xs flex justify-between" for="shading-generative-depth-n"><span>Depth</span><span id="shading-generative-depth-n-val" class="data-value font-mono">0.5m</span></label>
-                                <input type="range" id="shading-generative-depth-n" min="0.1" max="2.0" step="0.05" value="0.5">
-                            </div>
-                            <div>
-                                <label class="label text-xs flex justify-between" for="shading-generative-spacing-x-n"><span>Spacing X</span><span id="shading-generative-spacing-x-n-val" class="data-value font-mono">0.3m</span></label>
-                                <input type="range" id="shading-generative-spacing-x-n" min="0.1" max="2.0" step="0.05" value="0.3">
-                            </div>
-                            <div>
-                                <label class="label text-xs flex justify-between" for="shading-generative-spacing-y-n"><span>Spacing Y</span><span id="shading-generative-spacing-y-n-val" class="data-value font-mono">0.3m</span></label>
-                                <input type="range" id="shading-generative-spacing-y-n" min="0.1" max="2.0" step="0.05" value="0.3">
-                            </div>
-
-
-
-
-
-
-                            <div>
-                            <label class="label text-xs flex justify-between" for="shading-generative-element-width-n"><span>Element Width</span><span id="shading-generative-element-width-n-val" class="data-value font-mono">0.05m</span></label>
-                            <input type="range" id="shading-generative-element-width-n" min="0.01" max="0.5" step="0.01" value="0.05">
-                        </div>
-                        <input type="hidden" id="shading-pattern-type-n">
-
-                        <!-- Solar Responsive Parameters -->
-                        <div id="solar-params-n" class="hidden space-y-3 pt-4 border-t border-dashed border-[--grid-color]">
-                            <h4 class="font-semibold text-sm">Solar Responsive Shading</h4>
-                            
-                            <!-- Analysis Quality -->
-                            <div>
-                                <label class="text-sm">Analysis Quality</label>
-                                <select id="solar-quality-n" class="input w-full">
-                                    <option value="quick">Quick (Monthly, Coarse Grid)</option>
-                                    <option value="standard" selected>Standard (Hourly, Medium Grid)</option>
-                                    <option value="high-fidelity">High-Fidelity (Sub-hourly, Fine Grid)</option>
-                                </select>
-                            </div>
-                            
-                            <!-- Radiation Threshold -->
-                            <div class="flex items-center justify-between">
-                                <label class="text-sm">Radiation Threshold</label>
-                                <div class="flex items-center gap-2">
-                                    <input type="range" id="solar-threshold-n" 
-                                           min="200" max="1000" step="50" value="500" class="slider flex-1">
-                                    <span id="solar-threshold-val-n" class="text-sm w-24 text-right">500 kWh/m²</span>
-                                </div>
-                            </div>
-                            
-                            <!-- Weather File -->
-                            <div>
-                                <label class="text-sm">Weather File</label>
-                                <input type="file" id="solar-epw-file-n" accept=".epw" class="input w-full text-sm">
-                            </div>
-                            
-                            <!-- Run Analysis Button -->
-                            <button id="solar-analyze-btn-n" class="btn btn-primary w-full">
-                                Run Solar Analysis
-                            </button>
-                            
-                            <!-- Progress indicator -->
-                            <div id="solar-progress-n" class="hidden">
-                                <div class="progress-bar">
-                                    <div id="solar-progress-fill-n" class="progress-fill"></div>
-                                </div>
-                                <p class="text-xs text-center mt-1" id="solar-progress-text-n">Analyzing...</p>
-                            </div>
-                            
-                            <!-- Results Summary (shown after analysis) -->
-                            <div id="solar-results-n" class="hidden p-3 bg-gray-800 rounded">
-                                <h5 class="font-semibold text-xs mb-2">Analysis Results</h5>
-                                <p class="text-xs">High-radiation hours: <span id="solar-high-hours-n">-</span></p>
-                                <p class="text-xs">Peak altitude: <span id="solar-peak-alt-n">-</span>°</p>
-                                <p class="text-xs">Fins generated: <span id="solar-fin-count-n">-</span></p>
-                            </div>
-                            
-                            <!-- Manual Adjustment -->
-                            <button id="solar-edit-btn-n" class="btn btn-secondary w-full hidden">
-                                Manually Adjust Pattern
-                            </button>
-                        </div>
-                    </div>
 
                 </div>
-                <div class="pt-4 mt-4 border-t border-dashed border-[--grid-color]">
-
-
-
-
-
-
-
-
-
-                        <input type="checkbox" id="sun-ray-tracing-toggle-n">
-                        <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Sun Ray Tracing</span>
-                    </label>
+                    <div class="pt-4 mt-4 border-t border-dashed border-[--grid-color]">
+                        <label class="flex items-center cursor-pointer" for="sun-ray-tracing-toggle-n">
+                            <input type="checkbox" id="sun-ray-tracing-toggle-n">
+                            <span class="ml-3 text-sm font-normal text-[--text-primary]">Enable Sun Ray Tracing</span>
+                        </label>
+                    </div>
                 </div>
             </div>
-        </div>
-
         <div id="aperture-controls-s" class="aperture-controls hidden space-y-5 pt-4 border-t border-[--grid-color]">
             <h3 class="font-semibold text-sm uppercase">South Wall Apertures</h3>
             <div><label class="label" for="win-count-s"># of Windows</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="win-count-s" min="0" max="10" value="0" step="1"><span id="win-count-s-val" class="data-value font-mono w-12 text-left">0</span></div></div>
@@ -797,9 +750,10 @@
                 </div>
                 <div class="shading-section-container space-y-4 pt-4 mt-4 border-t border-dashed border-[--grid-color]">
                     <h4 class="font-semibold text-sm uppercase text-gray-700">South Wall Shading</h4>
-                    <label class="flex items-center cursor-pointer" for="shading-s-toggle"><input type="checkbox" id="shading-s-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Shading on this Wall</span></label>
+                    <label class="flex items-center cursor-pointer" for="shading-s-toggle"><input type="checkbox" id="shading-s-toggle"><span class="ml-3 text-sm font-normal text-[--text-primary]">Enable Shading on this Wall</span></label>
                     <div id="shading-controls-s" class="hidden space-y-5">
-                        <div><label class="label" for="shading-type-s">Device Type</label><select id="shading-type-s" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option><option value="generative">Generative (AI)</option><option value="imported_obj">Imported OBJ</option></select></div>
+                        <div><label class="label" for="shading-type-s">Device Type</label><select id="shading-type-s" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option><option value="imported_obj">Imported OBJ</option></select></div>
+
                         <div id="shading-controls-overhang-s" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
                             <div><label class="label" for="overhang-dist-above-s">Distance Above Top (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-dist-above-s" min="0" max="1.0" value="0" step="0.05"><span id="overhang-dist-above-s-val" class="data-value font-mono w-12 text-left">0.00m</span></div></div>
                             <div><label class="label" for="overhang-tilt-s">Tilt Angle (°)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-tilt-s" min="-90" max="90" value="0" step="1"><span id="overhang-tilt-s-val" class="data-value font-mono w-12 text-left">0°</span></div></div>
@@ -873,90 +827,12 @@
                             </div>
                             <p class="info-box !text-xs !py-2 !px-3">Click the imported object in the 3D view to use the transform gizmo for interactive placement.</p>
                         </div>
-                        <div id="shading-controls-generative-s" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
-                            <p class="info-box !text-xs !py-2 !px-3">
-                                AI-generated pattern. Adjust common parameters below. New patterns can only be created by the AI assistant.
-                            </p>
-                            <div>
-                                <label class="label text-xs flex justify-between" for="shading-generative-depth-s"><span>Depth</span><span id="shading-generative-depth-s-val" class="data-value font-mono">0.5m</span></label>
-                                <input type="range" id="shading-generative-depth-s" min="0.1" max="2.0" step="0.05" value="0.5">
-                            </div>
-                            <div>
-                                <label class="label text-xs flex justify-between" for="shading-generative-spacing-x-s"><span>Spacing X</span><span id="shading-generative-spacing-x-s-val" class="data-value font-mono">0.3m</span></label>
-                                <input type="range" id="shading-generative-spacing-x-s" min="0.1" max="2.0" step="0.05" value="0.3">
-                            </div>
-                            <div>
-                                <label class="label text-xs flex justify-between" for="shading-generative-spacing-y-s"><span>Spacing Y</span><span id="shading-generative-spacing-y-s-val" class="data-value font-mono">0.3m</span></label>
-                                <input type="range" id="shading-generative-spacing-y-s" min="0.1" max="2.0" step="0.05" value="0.3">
-                            </div>
-                                                        <div>
-                            <label class="label text-xs flex justify-between" for="shading-generative-element-width-s"><span>Element Width</span><span id="shading-generative-element-width-s-val" class="data-value font-mono">0.05m</span></label>
-                            <input type="range" id="shading-generative-element-width-s" min="0.01" max="0.5" step="0.01" value="0.05">
-                        </div>
-                        <input type="hidden" id="shading-pattern-type-s">
-
-                        <!-- Solar Responsive Parameters -->
-                        <div id="solar-params-s" class="hidden space-y-3 pt-4 border-t border-dashed border-[--grid-color]">
-                            <h4 class="font-semibold text-sm">Solar Responsive Shading</h4>
-                            
-                            <!-- Analysis Quality -->
-                            <div>
-                                <label class="text-sm">Analysis Quality</label>
-                                <select id="solar-quality-s" class="input w-full">
-                                    <option value="quick">Quick (Monthly, Coarse Grid)</option>
-                                    <option value="standard" selected>Standard (Hourly, Medium Grid)</option>
-                                    <option value="high-fidelity">High-Fidelity (Sub-hourly, Fine Grid)</option>
-                                </select>
-                            </div>
-                            
-                            <!-- Radiation Threshold -->
-                            <div class="flex items-center justify-between">
-                                <label class="text-sm">Radiation Threshold</label>
-                                <div class="flex items-center gap-2">
-                                    <input type="range" id="solar-threshold-s" 
-                                           min="200" max="1000" step="50" value="500" class="slider flex-1">
-                                    <span id="solar-threshold-val-s" class="text-sm w-24 text-right">500 kWh/m²</span>
-                                </div>
-                            </div>
-                            
-                            <!-- Weather File -->
-                            <div>
-                                <label class="text-sm">Weather File</label>
-                                <input type="file" id="solar-epw-file-s" accept=".epw" class="input w-full text-sm">
-                            </div>
-                            
-                            <!-- Run Analysis Button -->
-                            <button id="solar-analyze-btn-s" class="btn btn-primary w-full">
-                                Run Solar Analysis
-                            </button>
-                            
-                            <!-- Progress indicator -->
-                            <div id="solar-progress-s" class="hidden">
-                                <div class="progress-bar">
-                                    <div id="solar-progress-fill-s" class="progress-fill"></div>
-                                </div>
-                                <p class="text-xs text-center mt-1" id="solar-progress-text-s">Analyzing...</p>
-                            </div>
-                            
-                            <!-- Results Summary (shown after analysis) -->
-                            <div id="solar-results-s" class="hidden p-3 bg-gray-800 rounded">
-                                <h5 class="font-semibold text-xs mb-2">Analysis Results</h5>
-                                <p class="text-xs">High-radiation hours: <span id="solar-high-hours-s">-</span></p>
-                                <p class="text-xs">Peak altitude: <span id="solar-peak-alt-s">-</span>°</p>
-                                <p class="text-xs">Fins generated: <span id="solar-fin-count-s">-</span></p>
-                            </div>
-                            
-                            <!-- Manual Adjustment -->
-                            <button id="solar-edit-btn-s" class="btn btn-secondary w-full hidden">
-                                Manually Adjust Pattern
-                            </button>
-                        </div>
-                    </div>
-                    
+                        
                 </div>
                 <div class="pt-4 mt-4 border-t border-dashed border-[--grid-color]">
+                    <label class="flex items-center cursor-pointer" for="sun-ray-tracing-toggle-s">
                         <input type="checkbox" id="sun-ray-tracing-toggle-s">
-                        <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Sun Ray Tracing</span>
+                        <span class="ml-3 text-sm font-normal text-[--text-primary]">Enable Sun Ray Tracing</span>
                     </label>
                 </div>
             </div>
@@ -979,9 +855,9 @@
                 </div>
             <div class="shading-section-container space-y-4 pt-4 mt-4 border-t border-dashed border-[--grid-color]">
                 <h4 class="font-semibold text-sm uppercase text-gray-700">East Wall Shading</h4>
-                    <label class="flex items-center cursor-pointer" for="shading-e-toggle"><input type="checkbox" id="shading-e-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Shading on this Wall</span></label>
+                    <label class="flex items-center cursor-pointer" for="shading-e-toggle"><input type="checkbox" id="shading-e-toggle"><span class="ml-3 text-sm font-normal text-[--text-primary]">Enable Shading on this Wall</span></label>
                     <div id="shading-controls-e" class="hidden space-y-5">
-                        <div><label class="label" for="shading-type-e">Device Type</label><select id="shading-type-e" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option><option value="generative">Generative (AI)</option><option value="imported_obj">Imported OBJ</option></select></div>
+                        <div><label class="label" for="shading-type-e">Device Type</label><select id="shading-type-e" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option><option value="imported_obj">Imported OBJ</option></select></div>
                         <div id="shading-controls-overhang-e" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
                             <div><label class="label" for="overhang-dist-above-e">Distance Above Top (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-dist-above-e" min="0" max="1.0" value="0" step="0.05"><span id="overhang-dist-above-e-val" class="data-value font-mono w-12 text-left">0.00m</span></div></div>
                         </div>
@@ -1051,90 +927,12 @@
                             </div>
                             <p class="info-box !text-xs !py-2 !px-3">Click the imported object in the 3D view to use the transform gizmo for interactive placement.</p>
                         </div>
-                        <div id="shading-controls-generative-e" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
-                            <p class="info-box !text-xs !py-2 !px-3">
-                                AI-generated pattern. Adjust common parameters below. New patterns can only be created by the AI assistant.
-                            </p>
-                            <div>
-                                <label class="label text-xs flex justify-between" for="shading-generative-depth-e"><span>Depth</span><span id="shading-generative-depth-e-val" class="data-value font-mono">0.5m</span></label>
-                                <input type="range" id="shading-generative-depth-e" min="0.1" max="2.0" step="0.05" value="0.5">
-                            </div>
-                            <div>
-                                <label class="label text-xs flex justify-between" for="shading-generative-spacing-x-e"><span>Spacing X</span><span id="shading-generative-spacing-x-e-val" class="data-value font-mono">0.3m</span></label>
-                                <input type="range" id="shading-generative-spacing-x-e" min="0.1" max="2.0" step="0.05" value="0.3">
-                            </div>
-                            <div>
-                                <label class="label text-xs flex justify-between" for="shading-generative-spacing-y-e"><span>Spacing Y</span><span id="shading-generative-spacing-y-e-val" class="data-value font-mono">0.3m</span></label>
-                                <input type="range" id="shading-generative-spacing-y-e" min="0.1" max="2.0" step="0.05" value="0.3">
-                            </div>
-                            <div>
-                            <label class="label text-e-xs flex justify-between" for="shading-generative-element-width-e"><span>Element Width</span><span id="shading-generative-element-width-e-val" class="data-value font-mono">0.05m</span></label>
-                            <input type="range" id="shading-generative-element-width-e" min="0.01" max="0.5" step="0.01" value="0.05">
-                        </div>
-                        <input type="hidden" id="shading-pattern-type-e">
-
-                        <!-- Solar Responsive Parameters -->
-                        <div id="solar-params-e" class="hidden space-y-3 pt-4 border-t border-dashed border-[--grid-color]">
-                            <h4 class="font-semibold text-sm">Solar Responsive Shading</h4>
-                            
-                            <!-- Analysis Quality -->
-                            <div>
-                                <label class="text-sm">Analysis Quality</label>
-                                <select id="solar-quality-e" class="input w-full">
-                                    <option value="quick">Quick (Monthly, Coarse Grid)</option>
-                                    <option value="standard" selected>Standard (Hourly, Medium Grid)</option>
-                                    <option value="high-fidelity">High-Fidelity (Sub-hourly, Fine Grid)</option>
-                                </select>
-                            </div>
-                            
-                            <!-- Radiation Threshold -->
-                            <div class="flex items-center justify-between">
-                                <label class="text-sm">Radiation Threshold</label>
-                                <div class="flex items-center gap-2">
-                                    <input type="range" id="solar-threshold-e" 
-                                           min="200" max="1000" step="50" value="500" class="slider flex-1">
-                                    <span id="solar-threshold-val-e" class="text-sm w-24 text-right">500 kWh/m²</span>
-                                </div>
-                            </div>
-                            
-                            <!-- Weather File -->
-                            <div>
-                                <label class="text-sm">Weather File</label>
-                                <input type="file" id="solar-epw-file-e" accept=".epw" class="input w-full text-sm">
-                            </div>
-                            
-                            <!-- Run Analysis Button -->
-                            <button id="solar-analyze-btn-e" class="btn btn-primary w-full">
-                                Run Solar Analysis
-                            </button>
-                            
-                            <!-- Progress indicator -->
-                            <div id="solar-progress-e" class="hidden">
-                                <div class="progress-bar">
-                                    <div id="solar-progress-fill-e" class="progress-fill"></div>
-                                </div>
-                                <p class="text-xs text-center mt-1" id="solar-progress-text-e">Analyzing...</p>
-                            </div>
-                            
-                            <!-- Results Summary (shown after analysis) -->
-                            <div id="solar-results-e" class="hidden p-3 bg-gray-800 rounded">
-                                <h5 class="font-semibold text-xs mb-2">Analysis Results</h5>
-                                <p class="text-xs">High-radiation hours: <span id="solar-high-hours-e">-</span></p>
-                                <p class="text-xs">Peak altitude: <span id="solar-peak-alt-e">-</span>°</p>
-                                <p class="text-xs">Fins generated: <span id="solar-fin-count-e">-</span></p>
-                            </div>
-                            
-                            <!-- Manual Adjustment -->
-                            <button id="solar-edit-btn-e" class="btn btn-secondary w-full hidden">
-                                Manually Adjust Pattern
-                            </button>
-                        </div>
-                    </div>
-                    
+                        
                 </div>
                 <div class="pt-4 mt-4 border-t border-dashed border-[--grid-color]">
+                    <label class="flex items-center cursor-pointer" for="sun-ray-tracing-toggle-e">
                         <input type="checkbox" id="sun-ray-tracing-toggle-e">
-                        <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Sun Ray Tracing</span>
+                        <span class="ml-3 text-sm font-normal text-[--text-primary]">Enable Sun Ray Tracing</span>
                     </label>
                 </div>
             </div>
@@ -1157,9 +955,11 @@
             </div>
             <div class="shading-section-container space-y-4 pt-4 mt-4 border-t border-dashed border-[--grid-color]">
                 <h4 class="font-semibold text-sm uppercase text-gray-700">West Wall Shading</h4>
-                    <label class="flex items-center cursor-pointer" for="shading-w-toggle"><input type="checkbox" id="shading-w-toggle"><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Shading on this Wall</span></label>
+                    <label class="flex items-center cursor-pointer" for="shading-w-toggle"><input type="checkbox" id="shading-w-toggle"><span class="ml-3 text-sm font-normal text-[--text-primary]">Enable Shading on this Wall</span></label>
                     <div id="shading-controls-w" class="hidden space-y-5">
-                        <div><label class="label" for="shading-type-w">Device Type</label><select id="shading-type-w" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option><option value="generative">Generative (AI)</option><option value="imported_obj">Imported OBJ</option></select></div>
+                        <div><label class="label" for="shading-type-w">Device Type</label><select id="shading-type-w" class="w-full mt-1"><option value="none" selected>None</option><option value="overhang">Overhang</option><option value="lightshelf">Light Shelf</option><option value="louver">Louver</option><option value="roller">Roller</option><option value="imported_obj">Imported OBJ</option></select></div>
+                        <div id="shading-controls-overhang-w" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
+                            <div><label class="label" for="overhang-dist-above-w">Distance Above Top (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-dist-above-w" min="0" max="1.0" value="0" step="0.05"><span id="overhang-dist-above-w-val" class="data-value font-mono w-12 text-left">0.00m</span></div></div>
                         <div id="shading-controls-overhang-w" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
                             <div><label class="label" for="overhang-dist-above-w">Distance Above Top (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="overhang-dist-above-w" min="0" max="1.0" value="0" step="0.05"><span id="overhang-dist-above-w-val" class="data-value font-mono w-12 text-left">0.00m</span></div></div>
                         </div>
@@ -1229,113 +1029,33 @@
                             </div>
                             <p class="info-box !text-xs !py-2 !px-3">Click the imported object in the 3D view to use the transform gizmo for interactive placement.</p>
                         </div>
-                        <div id="shading-controls-generative-w" class="hidden space-y-4 pt-4 border-t border-[--grid-color]">
-                            <p class="info-box !text-xs !py-2 !px-3">
-                                AI-generated pattern. Adjust common parameters below. New patterns can only be created by the AI assistant.
-                            </p>
-                            <div>
-                                <label class="label text-xs flex justify-between" for="shading-generative-depth-w"><span>Depth</span><span id="shading-generative-depth-w-val" class="data-value font-mono">0.5m</span></label>
-                                <input type="range" id="shading-generative-depth-w" min="0.1" max="2.0" step="0.05" value="0.5">
-                            </div>
-                            <div>
-                                <label class="label text-xs flex justify-between" for="shading-generative-spacing-x-w"><span>Spacing X</span><span id="shading-generative-spacing-x-w-val" class="data-value font-mono">0.3m</span></label>
-                                <input type="range" id="shading-generative-spacing-x-w" min="0.1" max="2.0" step="0.05" value="0.3">
-                            </div>
-                            <div>
-                                <label class="label text-xs flex justify-between" for="shading-generative-spacing-y-w"><span>Spacing Y</span><span id="shading-generative-spacing-y-w-val" class="data-value font-mono">0.3m</span></label>
-                                <input type="range" id="shading-generative-spacing-y-w" min="0.1" max="2.0" step="0.05" value="0.3">
-                            </div>
-                            <div>
-                            <label class="label text-xs flex justify-between" for="shading-generative-element-width-w"><span>Element Width</span><span id="shading-generative-element-width-w-val" class="data-value font-mono">0.05m</span></label>
-                            <input type="range" id="shading-generative-element-width-w" min="0.01" max="0.5" step="0.01" value="0.05">
-                        </div>
-                        <input type="hidden" id="shading-pattern-type-w">
-
-                        <!-- Solar Responsive Parameters -->
-                        <div id="solar-params-w" class="hidden space-y-3 pt-4 border-t border-dashed border-[--grid-color]">
-                            <h4 class="font-semibold text-sm">Solar Responsive Shading</h4>
-                            
-                            <!-- Analysis Quality -->
-                            <div>
-                                <label class="text-sm">Analysis Quality</label>
-                                <select id="solar-quality-w" class="input w-full">
-                                    <option value="quick">Quick (Monthly, Coarse Grid)</option>
-                                    <option value="standard" selected>Standard (Hourly, Medium Grid)</option>
-                                    <option value="high-fidelity">High-Fidelity (Sub-hourly, Fine Grid)</option>
-                                </select>
-                            </div>
-                            
-                            <!-- Radiation Threshold -->
-                            <div class="flex items-center justify-between">
-                                <label class="text-sm">Radiation Threshold</label>
-                                <div class="flex items-center gap-2">
-                                    <input type="range" id="solar-threshold-w" 
-                                           min="200" max="1000" step="50" value="500" class="slider flex-1">
-                                    <span id="solar-threshold-val-w" class="text-sm w-24 text-right">500 kWh/m²</span>
-                                </div>
-                            </div>
-                            
-                            <!-- Weather File -->
-                            <div>
-                                <label class="text-sm">Weather File</label>
-                                <input type="file" id="solar-epw-file-w" accept=".epw" class="input w-full text-sm">
-                            </div>
-                            
-                            <!-- Run Analysis Button -->
-                            <button id="solar-analyze-btn-w" class="btn btn-primary w-full">
-                                Run Solar Analysis
-                            </button>
-                            
-                            <!-- Progress indicator -->
-                            <div id="solar-progress-w" class="hidden">
-                                <div class="progress-bar">
-                                    <div id="solar-progress-fill-w" class="progress-fill"></div>
-                                </div>
-                                <p class="text-xs text-center mt-1" id="solar-progress-text-w">Analyzing...</p>
-                            </div>
-                            
-                            <!-- Results Summary (shown after analysis) -->
-                            <div id="solar-results-w" class="hidden p-3 bg-gray-800 rounded">
-                                <h5 class="font-semibold text-xs mb-2">Analysis Results</h5>
-                                <p class="text-xs">High-radiation hours: <span id="solar-high-hours-w">-</span></p>
-                                <p class="text-xs">Peak altitude: <span id="solar-peak-alt-w">-</span>°</p>
-                                <p class="text-xs">Fins generated: <span id="solar-fin-count-w">-</span></p>
-                            </div>
-                            
-                            <!-- Manual Adjustment -->
-                            <button id="solar-edit-btn-w" class="btn btn-secondary w-full hidden">
-                                Manually Adjust Pattern
-                            </button>
-                        </div>
-                    </div>
-                    
+                        
                 </div>
-                <div class="pt-4 mt-4 border-t border-dashed border-[--grid-color]">
+                    <div class="pt-4 mt-4 border-t border-dashed border-[--grid-color]">
+                        <label class="flex items-center cursor-pointer" for="sun-ray-tracing-toggle-w">
                             <input type="checkbox" id="sun-ray-tracing-toggle-w">
-                            <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Enable Sun Ray Tracing</span>
+                            <span class="ml-3 text-sm font-normal text-[--text-primary]">Enable Sun Ray Tracing</span>
                         </label>
                     </div>
                 </div>
             </div>
-
-            
-
-            <div class="pt-4 border-t border-[--grid-color]">
-                <label for="frame-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="frame-toggle" checked><span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Add Frame To All Windows</span></label>
-                <div id="frame-controls" class="mt-4">
-                <div>
-                    <label class="label" for="frame-thick">Frame Thick. (m)</label>
-                    <div class="flex items-center space-x-3 mt-1"><input type="range" id="frame-thick" min="0.00" max="1.00" value="0.01" step="0.01"><span id="frame-thick-val" class="data-value font-mono w-12 text-left">0.01m</span></div>
-                </div>
-                        <div class="mt-2">
-                            <label class="label" for="frame-depth">Frame Depth (m)</label>
-                            <div class="flex items-center space-x-3 mt-1"><input type="range" id="frame-depth" min="0.00" max="1.00" value="0.05" step="0.01"><span id="frame-depth-val" class="data-value font-mono w-12 text-left">0.05m</span></div>
-                        </div>
-                    </div>
-                </div>
-            </div> 
-            <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
         </div>
+        <div class="pt-4 border-t border-[--grid-color]">
+            <label for="frame-toggle" class="flex items-center cursor-pointer"><input type="checkbox" id="frame-toggle" checked><span class="ml-3 text-sm font-normal text-[--text-primary]">Add Frame To All Windows</span></label>
+            <div id="frame-controls" class="mt-4">
+            <div>
+                <label class="label" for="frame-thick">Frame Thick. (m)</label>
+                <div class="flex items-center space-x-3 mt-1"><input type="range" id="frame-thick" min="0.00" max="1.00" value="0.01" step="0.01"><span id="frame-thick-val" class="data-value font-mono w-12 text-left">0.01m</span></div>
+            </div>
+                  <div class="mt-2">
+                      <label class="label" for="frame-depth">Frame Depth (m)</label>
+                      <div class="flex items-center space-x-3 mt-1"><input type="range" id="frame-depth" min="0.00" max="1.00" value="0.05" step="0.01"><span id="frame-depth-val" class="data-value font-mono w-12 text-left">0.05m</span></div>
+                  </div>
+              </div>
+          </div>
+      </div> 
+          <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+      </div>
 
     <div id="panel-lighting" class="floating-window ui-panel hidden">
 
@@ -1853,22 +1573,46 @@
                     <div id="view-grid-controls" class="hidden space-y-5 pt-4 border-t border-[--grid-color]">
                         <p class="info-box !text-xs !py-2 !px-3">Generates a .ray file for imageless glare analysis with points on a horizontal plane.</p>
                         <div class="pt-2">
-                            <label for="show-view-grid-3d-toggle" class="flex items-center cursor-pointer">
+                                <label for="show-view-grid-3d-toggle" class="flex items-center cursor-pointer" data-lpignore="true">
                                 <input type="checkbox" id="show-view-grid-3d-toggle">
                                 <span class="ml-3 label !text-gray-600 !uppercase-none !font-normal">Show in 3D View</span>
                             </label>
                         </div>
-                        <div><label class="label" for="view-grid-spacing">Spacing (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="view-grid-spacing" min="0.05" max="2.0" value="0.75" step="0.05"><span id="view-grid-spacing-val" class="data-value font-mono w-12 text-left">0.75m</span></div></div>
-                        <div><label class="label" for="view-grid-offset">Height Offset (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="view-grid-offset" min="0" max="10" value="1.2" step="0.1"><span id="view-grid-offset-val" class="data-value font-mono w-12 text-left">1.2m</span></div></div>
+                            <div><label class="label" for="view-grid-spacing">Spacing (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="view-grid-spacing" min="0.05" max="2.0" value="0.75" step="0.05" data-lpignore="true"><span id="view-grid-spacing-val" class="data-value font-mono w-12 text-left">0.75m</span></div></div>
+                            <div><label class="label" for="view-grid-offset">Height Offset (m)</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="view-grid-offset" min="0" max="10" value="1.2" step="0.1" data-lpignore="true"><span id="view-grid-offset-val" class="data-value font-mono w-12 text-left">1.2m</span></div></div>
                         <div class="pt-4 border-t border-dashed border-[--grid-color] space-y-3">
                             <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">View Directions</h4>
-                            <div><label class="label" for="view-grid-directions">Number of Directions</label><input type="number" id="view-grid-directions" min="1" value="6" step="1" class="w-full mt-1"></div>
+                            <div>
+                                <label class="label flex justify-between" for="view-grid-directions">
+                                    <span>Number of Directions</span>
+                                    <span id="view-grid-directions-val" class="data-value font-mono">6</span>
+                                </label>
+                                <input type="range" id="view-grid-directions" min="1" max="12" value="6" step="1" class="w-full mt-1" data-lpignore="true">
+                            </div>
                             <div>
                                 <label class="label !mb-1">Starting Vector (X, Y, Z)</label>
                                 <div class="grid grid-cols-3 gap-2">
-                                    <input type="number" id="view-grid-start-vec-x" value="1" step="0.1">
-                                    <input type="number" id="view-grid-start-vec-y" value="0" step="0.1">
-                                    <input type="number" id="view-grid-start-vec-z" value="0" step="0.1">
+                                    <div>
+                                        <label class="label text-xs flex justify-between">
+                                            <span>X</span>
+                                            <span id="view-grid-start-vec-x-val" class="data-value font-mono">1.0</span>
+                                        </label>
+                                        <input type="range" id="view-grid-start-vec-x" min="-1" max="1" value="1" step="0.1" class="w-full" data-lpignore="true">
+                                    </div>
+                                    <div>
+                                        <label class="label text-xs flex justify-between">
+                                            <span>Y</span>
+                                            <span id="view-grid-start-vec-y-val" class="data-value font-mono">0.0</span>
+                                        </label>
+                                        <input type="range" id="view-grid-start-vec-y" min="-1" max="1" value="0" step="0.1" class="w-full" data-lpignore="true">
+                                    </div>
+                                    <div>
+                                        <label class="label text-xs flex justify-between">
+                                            <span>Z</span>
+                                            <span id="view-grid-start-vec-z-val" class="data-value font-mono">0.0</span>
+                                        </label>
+                                        <input type="range" id="view-grid-start-vec-z" min="-1" max="1" value="0" step="0.1" class="w-full" data-lpignore="true">
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -3092,33 +2836,19 @@
         <aside id="right-sidebar" class="ui-panel closed flex flex-col">
             <div class="resize-handle-edge left" style="cursor: ew-resize;"></div>
             <div class="window-header">
-            <span>AI Assistant</span>
-            <div class="window-controls">
-                    <button id="ai-settings-btn" class="window-icon-settings" aria-label="AI Settings">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                    </button>
-                </div>
+        <span>Helios</span>
+        <div class="window-controls">
+                <button id="ai-info-btn" class="window-icon-info" aria-label="Helios Capabilities" title="View Helios Capabilities">
+                    <svg width="16" height="16" viewBox="0 0 1024 1024" class="icon" xmlns="http://www.w3.org/2000/svg"><path d="M511.761 119.521c216.628 0 392.24 175.612 392.24 392.24s-175.612 392.24-392.24 392.24c-216.627 0-392.239-175.612-392.239-392.24s175.612-392.239 392.24-392.239" fill="var(--highlight-color)"/><path d="M511.761 83.968c-13.949 0-26.166 7.556-32.773 18.79a420.6 420.6 0 0 1 65.547 0c-6.607-11.234-18.825-18.79-32.774-18.79M238.9 200.908c-20.948 0-37.99 17.043-37.99 37.991 0 1.591.097 3.168.289 4.72a416 416 0 0 1 20.449-21.971 417 417 0 0 1 21.975-20.451 39 39 0 0 0-4.723-.288m541.002.287a416 416 0 0 1 21.974 20.452 416 416 0 0 1 20.451 21.974q.286-2.333.287-4.723c0-20.948-17.041-37.99-37.99-37.99a39 39 0 0 0-4.722.287M588.019 491.282h292.51a373 373 0 0 0-2.975-30.957l-.576-3.837c-8.847-58.983-32.3-115.61-67.821-163.755l-3.407-4.62a375 375 0 0 0-32.838-37.501 375 375 0 0 0-37.503-32.838l-4.618-3.407c-48.145-35.522-104.77-58.974-163.755-67.822l-3.817-.572a375 375 0 0 0-51.458-3.534 375 375 0 0 0-51.454 3.533l-3.82.573c-58.984 8.847-115.61 32.3-163.755 67.822l-4.61 3.4a374 374 0 0 0-17.455 14.192l208.092 208.093c10.295-4.727 21.585-7.24 33.002-7.24 36.453 0 67.215 24.834 76.258 58.47m332.745-12.293a418 418 0 0 1 1.28 32.773c0 10.992-.427 21.922-1.28 32.773 11.234-6.607 18.79-18.824 18.79-32.773 0-13.948-7.556-26.166-18.79-32.773m-818.005 0c-11.235 6.606-18.791 18.823-18.791 32.772 0 13.95 7.556 26.166 18.79 32.773a418 418 0 0 1-1.28-32.773c0-10.992.428-21.923 1.28-32.773zm385.465 2.95c-9.186 7.265-14.453 18.132-14.453 29.823 0 20.948 17.042 37.99 37.99 37.99s37.99-17.042 37.99-37.99-17.042-37.99-37.99-37.99c-8.626 0-16.752 2.814-23.501 8.139zM201.197 779.901a39 39 0 0 0-.287 4.72c0 20.95 17.041 37.991 37.99 37.991q2.389 0 4.722-.287a417 417 0 0 1-21.975-20.45 417 417 0 0 1-20.45-21.975zM779.9 822.326a39 39 0 0 0 4.724.287c20.948 0 37.99-17.041 37.99-37.99 0-1.59-.097-3.167-.288-4.721a417 417 0 0 1-20.451 21.974 416 416 0 0 1-21.975 20.45m-319.56 55.23a373 373 0 0 0 30.941 2.973V588.02c-33.636-9.043-58.47-39.805-58.47-76.258 0-16.54 5.069-32.286 14.323-45.409l-205.96-205.96a374 374 0 0 0-23.41 27.733l-3.399 4.607c-35.52 48.144-58.973 104.77-67.82 163.755l-.576 3.838a375 375 0 0 0-3.53 51.435c0 17.36 1.19 34.535 3.53 51.435l.576 3.84c8.847 58.985 32.3 115.61 67.821 163.756l3.405 4.615a375 375 0 0 0 32.84 37.506 375 375 0 0 0 37.502 32.837l4.618 3.408c48.147 35.521 104.772 58.974 163.756 67.821zm71.901-289.537v292.51a373 373 0 0 0 30.956-2.975l3.839-.576c58.984-8.847 115.61-32.3 163.755-67.821l4.627-3.414a375 375 0 0 0 37.494-32.83 375 375 0 0 0 32.83-37.495l3.415-4.628c35.521-48.144 58.974-104.77 67.821-163.754l.577-3.84a373 373 0 0 0 2.974-30.956H588.02c-7.287 27.104-28.675 48.492-55.778 55.778zM478.99 920.763c6.605 11.236 18.823 18.79 32.772 18.79 13.95 0 26.167-7.554 32.773-18.79a420 420 0 0 1-65.545 0m32.772 59.75c-39.061 0-71.588-28.518-77.86-65.823-27.998-5.378-55.354-13.69-81.848-24.896-24.944-10.552-48.594-23.43-70.779-38.518-12.539 8.01-27.112 12.297-42.375 12.297-43.532 0-78.95-35.416-78.95-78.95 0-15.262 4.287-29.837 12.297-42.375-15.089-22.185-27.965-45.835-38.517-70.78-11.205-26.492-19.518-53.849-24.896-81.849-37.307-6.268-65.825-38.795-65.825-77.857s28.518-71.59 65.825-77.86c5.378-27.999 13.69-55.354 24.896-81.848 10.552-24.944 23.428-48.594 38.517-70.779-8.01-12.538-12.296-27.112-12.296-42.375 0-43.533 35.417-78.95 78.95-78.95 15.262 0 29.837 4.287 42.374 12.297 22.185-15.089 45.835-27.966 70.78-38.517 26.493-11.205 53.85-19.52 81.848-24.896 6.27-37.309 38.797-65.826 77.86-65.826 39.06 0 71.587 28.517 77.86 65.825 27.997 5.376 55.354 13.69 81.847 24.896 24.944 10.55 48.594 23.428 70.778 38.517 12.54-8.01 27.114-12.298 42.377-12.298 43.533 0 78.95 35.418 78.95 78.95 0 15.264-4.287 29.837-12.298 42.376 15.09 22.185 27.967 45.835 38.518 70.78 11.205 26.493 19.519 53.848 24.896 81.848 37.306 6.27 65.825 38.798 65.825 77.86 0 39.06-28.519 71.587-65.825 77.858-5.377 28-13.69 55.356-24.896 81.848-10.55 24.944-23.43 48.595-38.517 70.78 8.01 12.538 12.297 27.113 12.297 42.374 0 43.535-35.417 78.95-78.95 78.95-15.263 0-29.837-4.285-42.376-12.296-22.185 15.09-45.835 27.965-70.78 38.518-26.492 11.205-53.849 19.517-81.848 24.896-6.27 37.306-38.797 65.823-77.859 65.823" fill="var(--bg-main)"/></svg>
+                </button>
+                <button id="ai-settings-btn" class="window-icon-settings" aria-label="Helios Settings">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path opacity=".4" d="m18.94 5.42-5.17-2.99c-.99-.57-2.54-.57-3.53 0L5.02 5.44c-2.07 1.4-2.19 1.61-2.19 3.84v5.43c0 2.23.12 2.45 2.23 3.87l5.17 2.99c.5.29 1.14.43 1.77.43s1.27-.14 1.76-.43l5.22-3.01c2.07-1.4 2.19-1.61 2.19-3.84V9.28c0-2.23-.12-2.44-2.23-3.86" fill="currentColor"/><path d="M12 15.25a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5" fill="currentColor"/></svg>
+                </button>
             </div>
+        </div>
             <div class="sidebar-content !p-0 flex flex-col">
-            <div class="p-3 border-b border-[--grid-color] space-y-3">
-                <div class="ai-mode-selector">
-                    <label for="ai-mode-select" class="label !mb-0 flex-shrink-0">Action:</label>
-                    <select id="ai-mode-select" class="flex-grow">
-                        <option value="" disabled selected>Start a new chat...</option>
-                        <option value="chat">Chat Assistant</option>
-                        <option value="generate">Generative Design</option>
-                        <option value="inspector">Design Inspector</option>
-                        <option value="critique">Results Critique</option>
-                        <option value="explorer">Data Explorer</option>
-                        <option value="tutor">Interactive Tutor</option>
-                    </select>
-                </div>
-                <div id="ai-mode-description-box" class="info-box !py-2 !px-3">
-                    <p id="ai-mode-description-text" class="leading-relaxed"></p>
-                </div>
-            </div>
-            <div id="ai-chat-tabs" class="ai-chat-tabs"></div>
-            <div id="ai-chat-messages" class="flex-grow p-4 space-y-4 overflow-y-auto">
+        <div id="ai-chat-tabs" class="ai-chat-tabs"></div>
+        <div id="ai-chat-messages" class="flex-grow p-4 space-y-4 overflow-y-auto">
             </div>
             <div id="ai-inspector-results" class="flex-grow p-4 space-y-3 overflow-y-auto hidden">
                 <div class="text-center text-sm text-[--text-secondary] p-4">
@@ -3133,10 +2863,10 @@
         <div id="ai-chat-input-container" class="p-4 border-t border-[--grid-color] relative">
             <div id="chat-resize-handle"></div>
                     <form id="ai-chat-form" class="flex gap-2 items-end">
-                        <textarea id="ai-chat-input" placeholder="Ask about Radiance or this app..." class="flex-grow" autocomplete="off" rows="1"></textarea>
-                        <button type="submit" id="ai-chat-send" class="btn btn-primary">Send</button>
-                    </form>
-                </div>
+                    <textarea id="ai-chat-input" placeholder="Ex tenebris lux" class="flex-grow" autocomplete="off" rows="1"></textarea>
+                    <button type="submit" id="ai-chat-send" class="btn btn-primary">Send</button>
+                </form>
+            </div>
             </div>
             </aside>
         </div>
@@ -3311,10 +3041,10 @@
     </div>
     <div id="ai-settings-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[10002] hidden items-center justify-center">
         <div class="ui-panel p-6 w-full max-w-md mx-auto bg-[--bg-main] relative">
-            <button id="ai-settings-close-btn" class="absolute top-3 right-3 text-[--text-secondary] hover:text-[--text-primary]" aria-label="Close AI Settings">
+            <button id="ai-settings-close-btn" class="absolute top-3 right-3 text-[--text-secondary] hover:text-[--text-primary]" aria-label="Close Helios Settings">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
-            <h3 class="text-lg font-bold mb-4">AI Assistant Settings</h3>
+            <h3 class="text-lg font-bold mb-4">Helios Settings</h3>
             <form id="ai-settings-form" class="space-y-4">
         <div>
         <label for="ai-provider-select" class="label">AI Provider</label>
@@ -3336,21 +3066,156 @@
             </div>
             <div>
                 <label for="ai-model-access-token" class="label">API Key</label>
-                <input type="password" id="ai-model-access-token" placeholder="Enter your API key" class="w-full" autocomplete="off">
+                <input type="password" id="ai-secret-field" placeholder="Enter your API key" class="w-full" autocomplete="new-password">
             </div>
             <div id="openrouter-info-box" class="info-box !text-xs hidden">
                 <b>Note:</b> To use free models on OpenRouter, you may need to adjust your
                 <a href="https://openrouter.ai/settings/privacy" target="_blank" class="text-[--text-secondary] underline">privacy settings</a>
                 to allow your data to be used for model improvement.
             </div>
-            <button type="submit" class="btn btn-primary w-full mt-4">Save Settings</button>
-            </form>
+                    <button type="submit" class="btn btn-primary w-full mt-4">Save Settings</button>
+                </form>
+            </div>
         </div>
-    </div>
 
-    <div id="shortcut-help-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[10002] hidden items-center justify-center">
-        <div class="ui-panel p-6 w-full max-w-2xl mx-auto bg-[--bg-main] relative">
-            <button id="shortcut-modal-close-btn" class="absolute top-3 right-3 text-[--text-secondary] hover:text-[--text-primary]" aria-label="Close Shortcuts">
+        <div id="helios-capabilities-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[10002] hidden items-center justify-center">
+            <div class="ui-panel p-6 w-full max-w-4xl mx-auto bg-[--bg-main] relative" style="max-height: 90vh; overflow-y: auto;">
+                <button id="helios-capabilities-close-btn" class="absolute top-3 right-3 text-[--text-secondary] hover:text-[--text-primary]" aria-label="Close Helios Capabilities">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+                <div class="flex items-center gap-3 mb-6">
+                    <div>
+                        <h3 class="text-2xl font-bold">Helios AI Assistant</h3>
+                        <p class="text-[--text-secondary]">Your Comprehensive AI Assistant for Advanced Daylighting Simulation</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
+                                Conversational AI & Help
+                            </h4>
+                            <p class="text-sm text-[--text-secondary] mb-3">Get instant answers to questions about Radiance, daylighting concepts, and simulation best practices.</p>
+                            <div class="bg-[--grid-color] rounded-lg p-3 text-sm">
+                                <strong>Examples:</strong><br>
+                                • "What is Daylight Autonomy and how do I calculate it?"<br>
+                                • "Explain the `-ab` parameter in Radiance and why it's important."<br>
+                                • "What's the difference between `rtrace` and `rpict`?"
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
+                                Generative Scene Design
+                            </h4>
+                            <p class="text-sm text-[--text-secondary] mb-3">Create complete 3D scenes using natural language descriptions.</p>
+                            <div class="bg-[--grid-color] rounded-lg p-3 text-sm">
+                                <strong>Example:</strong> "Create a 10m x 8m office with south-facing windows and add two desks in the center."
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
+                                Design Inspector
+                            </h4>
+                            <p class="text-sm text-[--text-secondary] mb-3">Analyze your project configuration for potential issues and conflicts.</p>
+                            <div class="bg-[--grid-color] rounded-lg p-3 text-sm">
+                                <strong>Example:</strong> "Check my project for simulation issues" → Identifies unrealistic material properties or conflicting settings.
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
+                                Results Analysis & Critique
+                            </h4>
+                            <p class="text-sm text-[--text-secondary] mb-3">Analyze simulation results and get specific design improvement suggestions.</p>
+                            <div class="bg-[--grid-color] rounded-lg p-3 text-sm">
+                                <strong>Example:</strong> "Analyze my DGP results" → Identifies glare problems and suggests specific fixes.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
+                                Data Explorer
+                            </h4>
+                            <p class="text-sm text-[--text-secondary] mb-3">Query and compare loaded datasets using natural language commands.</p>
+                            <div class="bg-[--grid-color] rounded-lg p-3 text-sm">
+                                <strong>Examples:</strong><br>
+                                • "Compare sDA between my two designs"<br>
+                                • "Show me points with illuminance below 300 lux"<br>
+                                • "What is the average daylight factor?"
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
+                                Interactive Tutor
+                            </h4>
+                            <p class="text-sm text-[--text-secondary] mb-3">Get step-by-step guidance through complex simulation workflows.</p>
+                            <div class="bg-[--grid-color] rounded-lg p-3 text-sm">
+                                <strong>Example:</strong> "Teach me how to run a glare analysis" → Step-by-step walkthrough with automatic UI actions.
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
+                                Direct Action Tools
+                            </h4>
+                            <p class="text-sm text-[--text-secondary] mb-3">Execute specific actions directly through natural language commands.</p>
+                            <div class="bg-[--grid-color] rounded-lg p-3 text-sm">
+                                <strong>Examples:</strong><br>
+                                • "Add a 0.5m overhang to the south wall"<br>
+                                • "Set ambient bounces to 6"<br>
+                                • "Load results file into dataset A"
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
+                                Design Optimization
+                            </h4>
+                            <p class="text-sm text-[--text-secondary] mb-3">Run automated optimization studies to find optimal design parameters.</p>
+                            <div class="bg-[--grid-color] rounded-lg p-3 text-sm">
+                                <strong>Example:</strong> "Find the best overhang depth between 0.5m and 2.0m that maximizes sDA while keeping ASE below 10%."
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-8 pt-6 border-t border-[--grid-color]">
+                    <h4 class="text-lg font-semibold mb-4">Supported AI Providers</h4>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="text-center p-3 bg-[--grid-color] rounded-lg">
+                            <div class="font-semibold text-sm">OpenRouter</div>
+                            <div class="text-xs text-[--text-secondary]">Multiple models</div>
+                        </div>
+                        <div class="text-center p-3 bg-[--grid-color] rounded-lg">
+                            <div class="font-semibold text-sm">OpenAI</div>
+                            <div class="text-xs text-[--text-secondary]">GPT-4, GPT-3.5</div>
+                        </div>
+                        <div class="text-center p-3 bg-[--grid-color] rounded-lg">
+                            <div class="font-semibold text-sm">Google Gemini</div>
+                            <div class="text-xs text-[--text-secondary]">Gemini Pro</div>
+                        </div>
+                        <div class="text-center p-3 bg-[--grid-color] rounded-lg">
+                            <div class="font-semibold text-sm">Anthropic</div>
+                            <div class="text-xs text-[--text-secondary]">Claude models</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 pt-6 border-t border-[--grid-color]">
+                    <p class="text-sm text-[--text-secondary] text-center">
+                        Helios combines all these capabilities into a unified, context-aware assistant that understands your Ray Modeler project and can help with any aspect of your daylighting simulation workflow.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div id="shortcut-help-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[10002] hidden items-center justify-center">
+            <div class="ui-panel p-6 w-full max-w-2xl mx-auto bg-[--bg-main] relative">
+                <button id="shortcut-modal-close-btn" class="absolute top-3 right-3 text-[--text-secondary] hover:text-[--text-primary]" aria-label="Close Shortcuts">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
             <h3 class="text-lg font-bold mb-4">Keyboard Shortcuts</h3>
@@ -3649,8 +3514,8 @@
                             <div class="param-section">
                                 <h4 class="text-base font-semibold">Grid-Based Illuminance (rtrace)</h4>
                                 <p class="info-box">Calculates illuminance or irradiance values on a sensor grid. Uses global simulation parameters for the calculation.</p>
-                                <div class="param-section">
-                                    <h5>Calculation Mode &amp; Switches</h5>
+                <div class="param-section" autocomplete="off">
+                    <h5 autocomplete="off">Calculation Mode &amp; Switches</h5>
                                     <div class="param-grid-sim mt-2">
                                         <div>
                                             <label class="label">Calculation Mode
@@ -3710,10 +3575,10 @@
                                 <div class="accordion-item open">
                                     <div class="accordion-header">Image Size &amp; Resolution <div class="accordion-chevron">▶</div></div>
                                     <div>
-                                        <div class="param-grid-sim">
-                                            <div><label class="label" for="rpict-x">X Resolution (-x)</label><input type="number" id="rpict-x" min="1" value="512" autocomplete="off"></div>
-                                            <div><label class="label" for="rpict-y">Y Resolution (-y)</label><input type="number" id="rpict-y" min="1" value="512" autocomplete="off"></div>
-                                            <div><label class="label" for="rpict-pa">Pixel Aspect Ratio (-pa)</label><input type="number" id="rpict-pa" min="0" value="1.0" step="0.1" autocomplete="off"></div>
+                        <div class="param-grid-sim" autocomplete="off">
+                            <div><label class="label" for="rpict-x">X Resolution (-x)</label><input type="number" id="rpict-x" min="1" value="512" autocomplete="off" ></div>
+                            <div><label class="label" for="rpict-y">Y Resolution (-y)</label><input type="number" id="rpict-y" min="1" value="512" autocomplete="off" ></div>
+                            <div><label class="label" for="rpict-pa">Pixel Aspect Ratio (-pa)</label><input type="number" id="rpict-pa" min="0" value="1.0" step="0.1" autocomplete="off" ></div>
                                         </div>
                                     </div>
                                 </div>
@@ -4454,14 +4319,261 @@
         "imports": {
             "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
             "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-            "three/examples/jsm/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-            "d3-delaunay": "https://unpkg.com/d3-delaunay?module",
-            "lsystem": "https://esm.sh/lsystem"
+            "three/examples/jsm/": "https://unpkg.com/three@0.160.0/examples/jsm/"
         }
     }
     </script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <script>
+        // Enhanced Password Manager Prevention Script
+        (function() {
+            'use strict';
+
+            // Block password manager content scripts
+            const originalDefineProperty = Object.defineProperty;
+            const originalGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+
+            // Override property access to prevent password manager detection
+            Object.defineProperty = function(obj, prop, descriptor) {
+                if (prop === 'ControlLooksLikePasswordCredentialField' ||
+                    prop === 'ControlLooksLikeCreditCardNumberField' ||
+                    prop === 'ControlLooksLikeCreditCardSecurityCodeField' ||
+                    prop === 'looksLikePasswordCredentialField' ||
+                    prop === 'looksLikeCreditCardNumberField' ||
+                    prop === 'looksLikeCreditCardSecurityCodeField') {
+                    return obj;
+                }
+                return originalDefineProperty.apply(this, arguments);
+            };
+
+            Object.getOwnPropertyDescriptor = function(obj, prop) {
+                if (prop === 'ControlLooksLikePasswordCredentialField' ||
+                    prop === 'ControlLooksLikeCreditCardNumberField' ||
+                    prop === 'ControlLooksLikeCreditCardSecurityCodeField' ||
+                    prop === 'looksLikePasswordCredentialField' ||
+                    prop === 'looksLikeCreditCardNumberField' ||
+                    prop === 'looksLikeCreditCardSecurityCodeField') {
+                    return undefined;
+                }
+                return originalGetOwnPropertyDescriptor.apply(this, arguments);
+            };
+
+            // Enhanced event listener blocking for password manager activity
+            const originalAddEventListener = EventTarget.prototype.addEventListener;
+            EventTarget.prototype.addEventListener = function(type, listener, options) {
+                if (type === 'focus' || type === 'blur' || type === 'input' || type === 'change' || type === 'focusin' || type === 'focusout') {
+                    // Check if this looks like password manager activity
+                    if (listener && typeof listener === 'function') {
+                        const listenerString = listener.toString();
+                        if (listenerString.includes('password') ||
+                            listenerString.includes('credential') ||
+                            listenerString.includes('autofill') ||
+                            listenerString.includes('ControlLooksLike') ||
+                            listenerString.includes('looksLike') ||
+                            listenerString.includes('getElementById') && listenerString.includes('type')) {
+                            return; // Block password manager listeners
+                        }
+                    }
+                }
+                return originalAddEventListener.apply(this, arguments);
+            };
+
+            // Enhanced DOM query blocking
+            const originalQuerySelector = document.querySelector;
+            const originalQuerySelectorAll = document.querySelectorAll;
+
+            document.querySelector = function(selector) {
+                if (selector && (selector.includes('[type="password"]') ||
+                                selector.includes('[autocomplete]') ||
+                                selector.includes('[data-password]') ||
+                                selector.includes('[name*="password"]') ||
+                                selector.includes('[id*="password"]'))) {
+                    return null;
+                }
+                return originalQuerySelector.apply(this, arguments);
+            };
+
+            document.querySelectorAll = function(selector) {
+                if (selector && (selector.includes('[type="password"]') ||
+                                selector.includes('[autocomplete]') ||
+                                selector.includes('[data-password]') ||
+                                selector.includes('[name*="password"]') ||
+                                selector.includes('[id*="password"]'))) {
+                    return [];
+                }
+                return originalQuerySelectorAll.apply(this, arguments);
+            };
+
+            // Enhanced element property blocking
+            const originalGetAttribute = Element.prototype.getAttribute;
+            Element.prototype.getAttribute = function(name) {
+                if (name === 'type' && this.tagName === 'INPUT') {
+                    const type = originalGetAttribute.call(this, name);
+                    if (type === 'password' || type === 'email' || type === 'tel') {
+                        return 'text'; // Return text instead of actual type
+                    }
+                }
+                return originalGetAttribute.apply(this, arguments);
+            };
+
+            // Block getElementsByTagName for password-related searches
+            const originalGetElementsByTagName = document.getElementsByTagName;
+            document.getElementsByTagName = function(tagName) {
+                if (tagName && tagName.toLowerCase() === 'input') {
+                    const elements = originalGetElementsByTagName.apply(this, arguments);
+                    return Array.from(elements).filter(el => {
+                        const type = el.getAttribute('type');
+                        return type !== 'password' && type !== 'email' && type !== 'tel';
+                    });
+                }
+                return originalGetElementsByTagName.apply(this, arguments);
+            };
+
+            // Prevent password manager overlays with enhanced detection
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    mutation.addedNodes.forEach(function(node) {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            const element = node;
+                            const elementString = element.outerHTML || element.innerHTML || '';
+
+                            if (element.id && (element.id.includes('password') ||
+                                             element.id.includes('credential') ||
+                                             element.id.includes('autofill') ||
+                                             element.id.includes('ControlLooksLike'))) {
+                                element.remove();
+                            }
+                            if (element.className && typeof element.className === 'string' &&
+                                (element.className.includes('password') ||
+                                 element.className.includes('credential') ||
+                                 element.className.includes('autofill') ||
+                                 element.className.includes('ControlLooksLike'))) {
+                                element.remove();
+                            }
+                            if (elementString.includes('password') ||
+                                elementString.includes('credential') ||
+                                elementString.includes('autofill') ||
+                                elementString.includes('ControlLooksLike')) {
+                                element.remove();
+                            }
+                        }
+                    });
+                });
+            });
+
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+
+            // Block common password manager global objects and properties
+            const blockedProperties = [
+                '__passwordManager', '__credentialManager', '__autofillManager',
+                'ControlLooksLikePasswordCredentialField', 'looksLikePasswordCredentialField',
+                'ControlLooksLikeCreditCardNumberField', 'looksLikeCreditCardNumberField',
+                'ControlLooksLikeCreditCardSecurityCodeField', 'looksLikeCreditCardSecurityCodeField'
+            ];
+
+            blockedProperties.forEach(prop => {
+                Object.defineProperty(window, prop, {
+                    get: function() { return undefined; },
+                    set: function() { return; },
+                    configurable: false
+                });
+            });
+
+            // Prevent password manager communication with enhanced blocking
+            const originalPostMessage = window.postMessage;
+            window.postMessage = function(message, targetOrigin, transfer) {
+                if (message && typeof message === 'object') {
+                    const messageString = JSON.stringify(message);
+                    if (message.type === 'password' || message.type === 'credential' ||
+                        message.type === 'autofill' || message.action === 'fill' ||
+                        messageString.includes('password') || messageString.includes('credential') ||
+                        messageString.includes('ControlLooksLike') || messageString.includes('looksLike')) {
+                        return; // Block password manager messages
+                    }
+                }
+                return originalPostMessage.apply(this, arguments);
+            };
+
+            // Enhanced form element protection
+            const originalGetElementsByName = document.getElementsByName;
+            document.getElementsByName = function(name) {
+                if (name && (name.includes('password') || name.includes('email') || name.includes('credential'))) {
+                    return [];
+                }
+                return originalGetElementsByName.apply(this, arguments);
+            };
+
+            // Block getElementById for password-related IDs
+            const originalGetElementById = document.getElementById;
+            document.getElementById = function(id) {
+                if (id && (id.includes('password') || id.includes('credential') || id.includes('autofill'))) {
+                    return null;
+                }
+                return originalGetElementById.apply(this, arguments);
+            };
+
+            // Override hasOwnProperty to hide password-related properties
+            const originalHasOwnProperty = Object.prototype.hasOwnProperty;
+            Object.prototype.hasOwnProperty = function(prop) {
+                if (prop === 'ControlLooksLikePasswordCredentialField' ||
+                    prop === 'ControlLooksLikeCreditCardNumberField' ||
+                    prop === 'ControlLooksLikeCreditCardSecurityCodeField' ||
+                    prop === 'looksLikePasswordCredentialField' ||
+                    prop === 'looksLikeCreditCardNumberField' ||
+                    prop === 'looksLikeCreditCardSecurityCodeField') {
+                    return false;
+                }
+                return originalHasOwnProperty.apply(this, arguments);
+            };
+
+            // Enhanced input element type protection
+            const originalSetAttribute = Element.prototype.setAttribute;
+            Element.prototype.setAttribute = function(name, value) {
+                if (name === 'type' && (value === 'password' || value === 'email' || value === 'tel')) {
+                    return; // Block setting password-like types
+                }
+                return originalSetAttribute.apply(this, arguments);
+            };
+
+            // Console protection - prevent password manager scripts from logging
+            const originalConsoleLog = console.log;
+            const originalConsoleError = console.error;
+            const originalConsoleWarn = console.warn;
+
+            console.log = function(...args) {
+                const message = args.join(' ');
+                if (message.includes('password') || message.includes('credential') ||
+                    message.includes('ControlLooksLike') || message.includes('autofill')) {
+                    return; // Block password manager console output
+                }
+                return originalConsoleLog.apply(this, arguments);
+            };
+
+            console.error = function(...args) {
+                const message = args.join(' ');
+                if (message.includes('password') || message.includes('credential') ||
+                    message.includes('ControlLooksLike') || message.includes('autofill')) {
+                    return; // Block password manager console output
+                }
+                return originalConsoleError.apply(this, arguments);
+            };
+
+            console.warn = function(...args) {
+                const message = args.join(' ');
+                if (message.includes('password') || message.includes('credential') ||
+                    message.includes('ControlLooksLike') || message.includes('autofill')) {
+                    return; // Block password manager console output
+                }
+                return originalConsoleWarn.apply(this, arguments);
+            };
+
+        })();
+    </script>
 
     <script type="module" src="scripts/resultsManager.js"></script>
     <script type="module" src="scripts/annualDashboard.js"></script>

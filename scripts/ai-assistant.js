@@ -1,6 +1,7 @@
 // scripts/ai-assistant.js
 
-import { getDom, showAlert, getNewZIndex, togglePanelVisibility, highlightSensorPoint, clearSensorHighlights, clearAllResultsDisplay, getSensorGridParams } from './ui.js';
+import { showAlert, getNewZIndex, togglePanelVisibility, highlightSensorPoint, clearSensorHighlights, clearAllResultsDisplay, getSensorGridParams, setCameraView, scheduleUpdate } from './ui.js';
+import { getDom } from './dom.js';
 import { loadKnowledgeBase, searchKnowledgeBase } from './knowledgeBase.js';
 import { project } from './project.js';
 import { resultsManager } from './resultsManager.js';
@@ -16,6 +17,17 @@ let dom;
 let conversations = {};
 let activeConversationId = null;
 let conversationCounter = 0; // Simple incrementing ID for new conversations
+
+// Master mode configuration - combines all previous modes
+const MASTER_MODE = {
+    name: 'master',
+    title: 'Helios AI Assistant',
+    description: 'I am Helios, your unified AI assistant. Ask me anything about your project, or click the ℹ️ button to see my full capabilities.',
+    placeholder: 'Ex tenebris lux...',
+    welcomeMessage: 'Hello! I\'m Helios.' +
+                   'You can ask me to create designs, analyze your project, critique results, explore data, or guide you through workflows. ' +
+                   'What would you like to work on today?'
+};
 
 // Define the tools the AI can use to interact with the application
 const availableTools = [
@@ -88,16 +100,7 @@ const availableTools = [
                     "required": ["recipeType"]
                 }
             },
-            {
-                "name": "runDesignInspector",
-                "description": "Performs a comprehensive AI-driven analysis of the entire project configuration, checking for conflicting settings, potential issues, and adherence to best practices. Returns a summary of findings for the AI to present to the user.",
-                "parameters": { "type": "OBJECT", "properties": {} }
-            },
-            {
-              "name": "runResultsCritique",
-              "description": "Performs an AI-driven analysis of the currently loaded simulation results. It identifies problems (e.g., high glare, low daylight autonomy), explains their likely causes based on the project configuration, and suggests specific, actionable design changes to the user.",
-              "parameters": { "type": "OBJECT", "properties": {} }
-            },
+
             {
                 "name": "setDimension",
                 "description": "Sets a primary room dimension (width, length, or height) to a new value.",
@@ -149,186 +152,6 @@ const availableTools = [
                 "required": ["wall"]
             }
         },
-        {
-            "name": "createShadingPattern",
-            "description": "Creates a generative shading pattern on a specified wall. Only the AI can create new patterns; users can then adjust common parameters.",
-            "parameters": {
-                "type": "OBJECT",
-                "properties": {
-                    "targetWall": {
-                        "type": "STRING",
-                        "enum": ["N", "S", "E", "W"],
-                        "description": "The wall to apply the pattern to"
-                    },
-                    "patternType": {
-                        "type": "STRING",
-                        "enum": ["vertical_fins", "horizontal_fins", "grid", "perforated_screen", "voronoi", "l_system", "solar_responsive", "view_optimized", "penrose_tiling"],
-                        "description": "The type of generative pattern"
-                    },
-                    "parameters": {
-                        "type": "OBJECT",
-                        "description": "Pattern parameters including depth, spacingX, spacingY, elementWidth, and algorithm-specific parameters",
-                        "properties": {
-                            "depth": { "type": "NUMBER", "description": "Depth of shading elements in meters" },
-                            "spacingX": { "type": "NUMBER", "description": "Horizontal spacing in meters" },
-                            "spacingY": { "type": "NUMBER", "description": "Vertical spacing in meters" },
-                            "elementWidth": { "type": "NUMBER", "description": "Width of individual elements" },
-                            "voronoi_cell_count": { "type": "NUMBER" },
-                            "l_system_iterations": { "type": "NUMBER" }
-                        }
-                    }
-                },
-                "required": ["targetWall", "patternType", "parameters"]
-            }
-        },
-        {
-            "name": "optimizeShadingDesign",
-            "description": "Runs an optimization loop to find the best generative shading pattern parameters based on simulation results. This is a long-running process that evaluates multiple design variations.",
-            "parameters": {
-                "type": "OBJECT",
-                "properties": {
-                    "targetWall": {
-                        "type": "STRING",
-                        "enum": ["N", "S", "E", "W"],
-                        "description": "The wall to optimize shading for"
-                    },
-                    "patternType": {
-                        "type": "STRING",
-                        "enum": ["vertical_fins", "horizontal_fins", "grid", "perforated_screen", "voronoi"],
-                        "description": "The type of generative pattern to optimize"
-                    },
-                    "optimizationGoal": {
-                        "type": "STRING",
-                        "enum": ["maximize_sDA", "minimize_ASE", "minimize_DGP_average"],
-                        "description": "The objective to optimize for"
-                    },
-                    "constraints": {
-                        "type": "OBJECT",
-                        "description": "Min/max ranges for each parameter, e.g., {depth: [0.1, 2.0], spacingX: [0.2, 1.5], spacingY: [0.2, 1.5], elementWidth: [0.05, 0.5]}"
-                    },
-                    "targetConstraint": {
-                        "type": "STRING",
-                        "description": "Optional constraint for valid solutions, e.g., 'ASE < 10' or 'sDA >= 60'. Leave empty for unconstrained optimization."
-                    },
-                    "algorithm": {
-                        "type": "STRING",
-                        "enum": ["genetic"],
-                        "description": "The optimization algorithm to use (currently only genetic is supported)"
-                    },
-                    "generations": {
-                        "type": "NUMBER",
-                        "description": "Number of generations for genetic algorithm (default: 10, recommended: 5-15)"
-                    },
-                    "populationSize": {
-                        "type": "NUMBER",
-                        "description": "Population size for genetic algorithm (default: 20, recommended: 15-30)"
-                    },
-                    "quality": {
-                        "type": "STRING",
-                        "enum": ["draft", "medium", "high"],
-                        "description": "Simulation quality preset. Draft is fastest for testing, high is most accurate (default: medium)"
-                    }
-                },
-                "required": ["targetWall", "patternType", "optimizationGoal", "constraints"]
-            }
-        },
-        {
-            "name": "generateSolarResponsiveShading",
-            "description": "Creates a solar-responsive shading pattern that blocks high-radiation sun angles while preserving desirable daylight. Requires annual solar analysis using an EPW weather file. The pattern will be optimized based on the site's specific solar conditions.",
-            "parameters": {
-                "type": "OBJECT",
-                "properties": {
-                    "targetWall": {
-                        "type": "STRING",
-                        "enum": ["N", "S", "E", "W"],
-                        "description": "The wall to apply the pattern to"
-                    },
-                    "quality": {
-                        "type": "STRING",
-                        "enum": ["quick", "standard", "high-fidelity"],
-                        "description": "Analysis quality/resolution: quick (monthly averages, coarse grid), standard (hourly, medium grid), or high-fidelity (sub-hourly, fine grid)"
-                    },
-                    "threshold": {
-                        "type": "NUMBER",
-                        "description": "Solar radiation threshold in kWh/m²/year. Sun angles exceeding this will be blocked. Typical range: 200-1000"
-                    },
-                    "depth": {
-                        "type": "NUMBER",
-                        "description": "Depth of the shading fins in meters. Typical range: 0.2-0.5"
-                    }
-                },
-                "required": ["targetWall", "quality", "threshold"]
-            }
-        },
-
-
-{
-    name: "generateViewOptimizedShading",
-    description: "Creates view-optimized shading that preserves sight lines to desirable views while blocking undesirable views or glare sources.",
-    parameters: {
-        type: "OBJECT",
-        properties: {
-            targetWall: {
-                type: "STRING",
-                enum: ["N", "S", "E", "W"],
-                description: "The wall to apply the pattern to"
-            },
-            viewpoint: {
-                type: "OBJECT",
-                properties: {
-                    x: { type: "NUMBER" },
-                    y: { type: "NUMBER" },
-                    z: { type: "NUMBER" }
-                },
-                description: "Observer position coordinates"
-            },
-            desirableViews: {
-                type: "ARRAY",
-                items: {
-                    type: "OBJECT",
-                    properties: {
-                        description: { type: "STRING" },
-                        direction: {
-                            type: "OBJECT",
-                            properties: {
-                                x: { type: "NUMBER" },
-                                y: { type: "NUMBER" },
-                                z: { type: "NUMBER" }
-                            }
-                        },
-                        angularWidth: { type: "NUMBER" }
-                    }
-                },
-                description: "Array of view targets to preserve"
-            },
-            blockViews: {
-                type: "ARRAY",
-                items: {
-                    type: "OBJECT",
-                    properties: {
-                        description: { type: "STRING" },
-                        direction: {
-                            type: "OBJECT",
-                            properties: {
-                                x: { type: "NUMBER" },
-                                y: { type: "NUMBER" },
-                                z: { type: "NUMBER" }
-                            }
-                        }
-                    }
-                },
-                description: "Array of views to block"
-            },
-            samplingDensity: {
-                type: "NUMBER",
-                minimum: 25,
-                maximum: 400,
-                description: "Analysis detail in rays per square meter"
-            }
-        },
-        required: ["targetWall", "viewpoint"]
-    }
-},
         {
             "name": "setSensorGrid",
             "description": "Configures parameters for the illuminance sensor grid on a specific surface.",
@@ -757,17 +580,10 @@ function initAiAssistant() {
     dom['ai-settings-btn']?.addEventListener('click', openSettingsModal);
     dom['ai-settings-close-btn']?.addEventListener('click', closeSettingsModal);
     dom['ai-settings-form']?.addEventListener('submit', saveSettings);
+    dom['ai-info-btn']?.addEventListener('click', openCapabilitiesModal);
+    dom['helios-capabilities-close-btn']?.addEventListener('click', closeCapabilitiesModal);
 
-    dom['ai-mode-select']?.addEventListener('change', (e) => {
-        const selectedMode = e.target.value;
-        if (!selectedMode) return; // Do nothing if the disabled placeholder is selected
 
-        // Immediately reset the dropdown's visual state to the placeholder.
-        e.target.selectedIndex = 0; 
-        
-        // Now create the conversation with the mode we captured.
-        createNewConversation(selectedMode);
-    });
 
     dom['ai-provider-select']?.addEventListener('change', (e) => {
     const provider = e.target.value;
@@ -792,26 +608,18 @@ function initAiAssistant() {
     loadSettings();
     loadKnowledgeBase();
 
-    // Start with a default chat conversation
-    createNewConversation('chat');
+    // Start with a default master mode conversation
+    createNewConversation();
 }
 
 // --- START: Tabbed Conversation Management ---
 
 /**
-* Creates a new conversation, adds it to the state, and makes it active.
-* @param {string} mode - The mode for the new conversation ('chat', 'generate', etc.).
+* Creates a new conversation using the master mode, adds it to the state, and makes it active.
+* @param {string} conversationName - Optional name for the conversation tab.
 */
-function createNewConversation(mode) {
-    // First, check if a conversation for this mode already exists.
-    const existingConversation = Object.values(conversations).find(conv => conv.mode === mode);
-    if (existingConversation) {
-        // If it exists, just switch to it and do nothing else.
-        switchConversation(existingConversation.id);
-        return;
-    }
-
-    // If no tab exists for this mode, check if we're at the total tab limit.
+function createNewConversation(conversationName = null) {
+    // Check if we're at the total tab limit.
     if (Object.keys(conversations).length >= 6) {
         showAlert("You can have a maximum of 6 active conversations.", "Tab Limit Reached");
         return;
@@ -820,27 +628,21 @@ function createNewConversation(mode) {
     // Proceed with creating a new conversation
     conversationCounter++;
     const newId = `conv-${conversationCounter}`;
-    const modeTitle = mode.charAt(0).toUpperCase() + mode.slice(1);
+    const tabTitle = conversationName || `Chat ${conversationCounter}`;
 
     conversations[newId] = {
         id: newId,
-        mode: mode,
-        title: modeTitle, // Title is now just the mode name
+        mode: MASTER_MODE.name,
+        title: tabTitle,
         history: [],
         isActive: false // Will be set to true by switchConversation
     };
 
-    // Add mode-specific welcome message
-    const welcomeMessages = {
-        chat: "Hello! How can I assist you with your Radiance project today?",
-        generate: "Generative Mode activated. Please describe the scene you want to create.",
-        explorer: "Data Explorer mode activated. You can now ask me to compare your loaded datasets (A and B) or highlight specific points in the 3D view. For example, 'compare sDA' or 'in dataset A, highlight points below 300 lux'.",
-        tutor: "Welcome to Tutor Mode! What would you like to learn? You can ask me to guide you through a specific workflow, like a 'Daylight Factor study'."
-    };
-
-    if (welcomeMessages[mode]) {
-        conversations[newId].history.push({ role: 'model', parts: [{ text: welcomeMessages[mode] }] });
-    }
+    // Add master mode welcome message
+    conversations[newId].history.push({
+        role: 'model',
+        parts: [{ text: MASTER_MODE.welcomeMessage }]
+    });
 
     switchConversation(newId);
 }
@@ -924,49 +726,44 @@ function renderTabs() {
 }
 
 /**
-* Renders the content (messages, inspector UI) for the currently active conversation.
+* Renders the content for the currently active conversation.
+* In master mode, always show the chat interface since all functionality is unified.
 */
 function renderActiveConversation() {
     const conv = conversations[activeConversationId];
     if (!conv) {
-
-    // Handle case where there are no conversations. Check for element existence.
-    if (dom['ai-chat-messages']) {
-        dom['ai-chat-messages'].innerHTML = '';
+        // Handle case where there are no conversations. Check for element existence.
+        if (dom['ai-chat-messages']) {
+            dom['ai-chat-messages'].innerHTML = '';
+        }
+        updateModeDescription('master');
+        return;
     }
-    updateModeDescription('chat');
-    return;
-    };
 
-    const isInspector = conv.mode === 'inspector';
-    const isCritique = conv.mode === 'critique';
+    // In master mode, always show the chat interface
+    // Hide inspector/critique specific UI elements since they're handled through chat
+    dom['ai-chat-messages']?.classList.remove('hidden');
+    dom['ai-chat-form']?.classList.remove('hidden');
+    dom['ai-inspector-results']?.classList.add('hidden');
+    dom['run-inspector-btn']?.classList.add('hidden');
+    dom['ai-critique-results']?.classList.add('hidden');
+    dom['run-critique-btn']?.classList.add('hidden');
 
-    // Toggle main content visibility using optional chaining to prevent errors
-    dom['ai-chat-messages']?.classList.toggle('hidden', isInspector || isCritique);
-    dom['ai-chat-form']?.classList.toggle('hidden', isInspector || isCritique);
-    dom['ai-inspector-results']?.classList.toggle('hidden', !isInspector);
-    dom['run-inspector-btn']?.classList.toggle('hidden', !isInspector);
-    dom['ai-critique-results']?.classList.toggle('hidden', !isCritique);
-    dom['run-critique-btn']?.classList.toggle('hidden', !isCritique);
+    updateModeDescription('master');
 
-    updateModeDescription(conv.mode);
+    // Render chat history
+    const messagesContainer = dom['ai-chat-messages'];
+    if (messagesContainer) {
+        messagesContainer.innerHTML = '';
+        conv.history.forEach(msg => {
+            const sender = msg.role === 'model' ? 'ai' : 'user';
+            addMessageToDOM(sender, msg.parts[0].text, messagesContainer);
+        });
+    }
 
-    if (!isInspector && !isCritique) {
-
-        // Render chat history
-        const messagesContainer = dom['ai-chat-messages'];
-        if (messagesContainer) {
-            messagesContainer.innerHTML = '';
-            conv.history.forEach(msg => {
-                const sender = msg.role === 'model' ? 'ai' : 'user';
-                addMessageToDOM(sender, msg.parts[0].text, messagesContainer);
-            });
-        }
-
-        if (dom['ai-chat-input']) {
-            dom['ai-chat-input'].placeholder = getPlaceholderText(conv.mode);
-            dom['ai-chat-input'].focus();
-        }
+    if (dom['ai-chat-input']) {
+        dom['ai-chat-input'].placeholder = MASTER_MODE.placeholder;
+        dom['ai-chat-input'].focus();
     }
 }
 
@@ -984,22 +781,13 @@ function getPlaceholderText(mode) {
 }
 
 /**
-* Updates the description box based on the selected AI mode.
-* @param {string} mode - The selected mode ('chat', 'generate', 'inspector', 'tutor').
+* Updates the description box to show the master mode capabilities.
+* @param {string} mode - The mode (should always be 'master' now).
 */
 function updateModeDescription(mode) {
-    const descriptions = {
-    chat: '<strong>Chat Assistant:</strong> Ask questions about Radiance, get help with this application, or request changes to your scene.',
-    generate: '<strong>Generative Design:</strong> Describe a scene you want to create, and the AI will build it for you. E.g., "create a 10m by 8m office with two windows on the south wall."',
-    inspector: '<strong>Design Inspector:</strong> Analyzes your current project for common errors, potential issues, and adherence to best practices. Click "Run Inspector" to start.',
-    critique: '<strong>Results Critique:</strong> Analyzes loaded simulation results, identifies potential issues (e.g., high glare, low daylight), and suggests actionable design improvements.',
-    explorer: '<strong>Data Explorer:</strong> Use natural language to query and compare your loaded result sets. Examples: "Compare uniformity", "Show me points in dataset B that are over 2000 lux".',
-    tutor: '<strong>Interactive Tutor:</strong> Get step-by-step guidance through common simulation workflows. E.g., ask "guide me through a Daylight Factor study".'
-    };
-
     const descriptionText = dom['ai-mode-description-text'];
     if (descriptionText) {
-    descriptionText.innerHTML = descriptions[mode] || '';
+        descriptionText.innerHTML = MASTER_MODE.description;
     }
 }
 
@@ -1290,123 +1078,148 @@ function addMessageToDOM(sender, text, container) {
     // Convert markdown code blocks to pre tags
     text = text.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
     messageBubble.innerHTML = text;
-    
+
     messageWrapper.appendChild(messageBubble);
     container.appendChild(messageWrapper);
     return messageWrapper;
 }
 
 /**
- * Creates a comprehensive system prompt including the base persona, knowledge base context,
- * and the full current state of the application.
- * @param {string} userQuery - The user's most recent message.
- * @returns {Promise<string>} A promise that resolves to the complete system prompt string.
+ * Creates a comprehensive system prompt that includes all capabilities from all previous modes.
+ * @param {string} userMessage - The user's message to provide context.
+ * @returns {Promise<string>} The complete system prompt.
  * @private
  */
-async function _createContextualSystemPrompt(userQuery) {
-    const activeConversation = conversations[activeConversationId];
-    if (!activeConversation) throw new Error("No active conversation found.");
+async function _createContextualSystemPrompt(userMessage) {
+    try {
+        const projectData = await project.gatherAllProjectData();
+        const dataForPrompt = JSON.parse(JSON.stringify(projectData));
+        dataForPrompt.epwFileContent = dataForPrompt.epwFileContent ? `[Loaded: ${dataForPrompt.projectInfo.epwFileName}]` : null;
+        if (dataForPrompt.simulationFiles) {
+            Object.values(dataForPrompt.simulationFiles).forEach(file => {
+                if (file && file.content) file.content = `[Content Loaded for ${file.name}]`;
+            });
+        }
 
-    let systemPrompt = `You are Helios, an expert AI assistant with deep knowledge of the Radiance Lighting Simulation Engine embedded within the Ray Modeler web application. Your purpose is to guide users through daylighting analysis, lighting simulation, and building performance modeling. You can explain Radiance concepts, troubleshoot errors, and interpret results. Your tone is that of a seasoned mentor: clear, precise, and encouraging.
+        const resultsData = {
+            datasetA: resultsManager.datasets.a ? {
+                fileName: resultsManager.datasets.a.fileName,
+                stats: resultsManager.datasets.a.stats,
+                glareResult: !!resultsManager.datasets.a.glareResult,
+                isAnnual: resultsManager.hasAnnualData('a')
+            } : null,
+            datasetB: resultsManager.datasets.b ? {
+                fileName: resultsManager.datasets.b.fileName,
+                stats: resultsManager.datasets.b.stats,
+                glareResult: !!resultsManager.datasets.b.glareResult,
+                isAnnual: resultsManager.hasAnnualData('b')
+            } : null
+        };
 
-GENERATIVE SHADING PATTERN CATALOG:
-When recommending shading patterns, consider these available options:
+        const appState = { projectConfiguration: dataForPrompt, loadedResultsSummary: resultsData };
+        const appStateJSON = JSON.stringify(appState, null, 2);
 
-1. **vertical_fins** - Vertical blade system
-   - Best for: East/West facades, low-angle sun control
-   - Key params: depth (0.3-1.5m), spacingX (0.2-0.6m), elementWidth (0.03-0.15m)
-   - Effect: Blocks low-angle sun while maintaining views
-   - Performance: Excellent for morning/evening glare control
+        const systemPrompt = `You are Ray Modeler's Master AI Assistant - a comprehensive, unified assistant that combines all capabilities in one interface. You have access to extensive tools and can help users with any aspect of their daylighting simulation project.
 
-2. **horizontal_fins** - Horizontal louver system
-   - Best for: South facades (Northern hemisphere), high-angle sun
-   - Key params: depth (0.3-1.5m), spacingY (0.2-0.5m), elementWidth (0.03-0.15m), tilt (0-45°)
-   - Effect: Blocks overhead sun, tilt adjusts seasonal performance
-   - Performance: Optimal for summer sun control
+## Your Core Capabilities
 
-3. **grid** - Egg-crate pattern (combined vertical + horizontal)
-   - Best for: All orientations, balanced control
-   - Key params: depth (0.3-1.0m), spacingX (0.3-0.6m), spacingY (0.3-0.6m), elementWidth (0.03-0.1m)
-   - Effect: Omnidirectional shading with geometric aesthetic
-   - Performance: Good all-around performance, higher material use
+### 💬 General Chat & Help
+- Answer questions about Radiance and daylighting concepts
+- Provide guidance on simulation best practices
+- Help troubleshoot issues and explain results
+- Offer suggestions for improving simulation accuracy
 
-4. **voronoi** - Organic cell-based pattern
-   - Best for: Aesthetic facades, diffuse shading, biophilic design
-   - Key params: depth (0.2-0.8m), elementWidth (0.03-0.1m), voronoi_cell_count (20-100), seed (any integer)
-   - Effect: Natural, non-repeating organic appearance
-   - Performance: Moderate shading, excellent for visual interest
-   - Note: Higher cell counts create finer patterns but more geometry
+### 🎨 Generative Design
+- Create complete scenes from natural language descriptions
+- Place furniture, vegetation, and other assets
+- Configure complex shading systems and apertures
+- Set material properties and lighting systems
 
-5. **l_system** - Branching fractal pattern
-   - Best for: Artistic installations, biomimetic design, unique aesthetics
-   - Key params: depth (0.2-0.8m), elementWidth (0.02-0.08m), l_system_iterations (3-6), branch_angle (15-45°)
-   - Effect: Tree-like branching structures, fractal complexity
-   - Performance: Variable shading density, highly distinctive
-   - Note: Iterations 3-4 recommended (5+ creates very dense patterns)
+### 🔍 Design Inspector
+- Analyze project configurations for potential issues
+- Check for conflicting settings or unrealistic parameters
+- Identify best practice violations
+- Suggest specific fixes for common problems
 
-6. **perforated_screen** - Regular perforation pattern
-   - Best for: Privacy screens, filtered light, consistent coverage
-   - Key params: depth (0.1-0.3m), elementWidth (0.03-0.08m), perforation_size (0.05-0.3m), perforation_spacing (0.1-0.5m), perforation_shape ('rectangular' or 'circular')
-   - Effect: Creates a screen with regularly spaced holes, balancing privacy with light transmission
-   - Performance: Moderate shading, excellent for privacy while maintaining daylight
-   - Note: Circular perforations use 8-segment approximation for efficient geometry
+### 📊 Results Critique
+- Analyze loaded simulation results
+- Identify performance issues (high glare, low daylight, poor uniformity)
+- Correlate problems with project configuration
+- Suggest actionable design improvements
 
-7. **penrose_tiling** - Non-repeating geometric tiling
-   - Best for: Mathematical aesthetics, artistic facades, unique non-periodic patterns
-   - Key params: depth (0.05-0.2m), elementWidth (0.01-0.03m for gaps), tile_size (0.1-0.5m), subdivision_depth (2-5), seed (any integer)
-   - Effect: Creates beautiful aperiodic patterns based on golden ratio subdivision
-   - Performance: Variable shading density, highly distinctive appearance
-   - Note: Uses P2 Penrose tiling with kite and dart tiles. Subdivision depth 3-4 recommended (higher creates very dense patterns)
+### 🗂️ Data Explorer
+- Query loaded datasets using natural language
+- Compare metrics between datasets
+- Filter and highlight points based on conditions
+- Generate statistical summaries and insights
 
+### 👨‍🏫 Interactive Tutor
+- Provide step-by-step guidance through complex workflows
+- Teach users about specific simulation methods
+- Walk through recipe configuration and execution
 
+## How You Work
 
-9. **solar_responsive** - Solar radiation-based density (FUTURE)
-   - Best for: Climate-responsive facades
-   - Status: Requires sun path data integration
+1. **Tool-First Approach**: When users ask you to do something specific, use the available tools to execute actions directly rather than just explaining.
 
-10. **view_optimized** - View-preserving pattern (FUTURE)
-    - Best for: Balancing views with shading
-    - Status: Requires view analysis integration
+2. **Context Awareness**: You have access to the current project state and loaded results. Use this information to provide relevant, specific guidance.
 
-PATTERN SELECTION GUIDELINES:
-- For glare control: vertical_fins (E/W), horizontal_fins (S/N)
-- For aesthetics: voronoi, l_system
-- For balanced performance: grid
-- For optimization: Use the optimizeShadingDesign tool with appropriate pattern
-- Always consider: orientation, climate, user priorities (performance vs. aesthetics)`;
+3. **Proactive Assistance**: Look for opportunities to be helpful beyond the immediate question. If you notice potential issues or improvements, mention them.
 
-    if (activeConversation.mode === 'tutor') {
-        systemPrompt += `\n\nCRITICAL INSTRUCTION: You are currently in a tutorial mode. Your goal is to guide the user step-by-step through a workflow. At each step, you must: 1. Explain what you are doing and why. 2. Use one, and only one, tool to perform the action. 3. After the tool call, ask the user for confirmation or what to do next. Do not perform multiple tool calls at once. When the workflow is complete or if the user wants to stop, you must call the 'endWalkthrough' tool.`;
+4. **Educational Style**: When appropriate, explain not just what you're doing, but why, to help users learn.
+
+## Available Tools
+
+You have access to ${availableTools[0].functionDeclarations.length} different tools that allow you to:
+- Manipulate the 3D scene (place assets, set dimensions, configure materials)
+- Control the user interface (open panels, change views, toggle settings)
+- Run simulations and manage results
+- Query and analyze data
+- Generate reports and export data
+
+## Response Guidelines
+
+- **Be Direct**: Users can ask you to do anything, and you'll use the appropriate tools automatically
+- **Show Your Work**: When using tools, explain what you're doing and why
+- **Be Comprehensive**: Consider the full context of the user's project
+- **Offer Next Steps**: Suggest logical follow-up actions when appropriate
+
+## Current Context
+
+Project State: ${appStateJSON}
+
+User Message: "${userMessage}"
+
+Based on the user's request and the current project context, determine the best way to help them. This might involve:
+- Using tools to make changes to their scene
+- Running analysis on their project configuration
+- Querying their results data
+- Providing educational guidance
+- Opening relevant UI panels
+- Any combination of the above
+
+Always prioritize being helpful and using your tools to take direct action when requested.`;
+
+        return systemPrompt;
+
+    } catch (error) {
+        console.error("Failed to create contextual system prompt:", error);
+        // Fallback to a basic system prompt
+        return `You are Ray Modeler's Master AI Assistant with comprehensive capabilities for daylighting simulation.
+
+## Your Capabilities:
+- **Scene Design**: Create and modify 3D scenes using natural language
+- **Project Analysis**: Inspect configurations and identify issues
+- **Results Analysis**: Critique simulation results and suggest improvements
+- **Data Exploration**: Query and compare loaded datasets
+- **Educational Guidance**: Provide step-by-step workflow guidance
+- **Direct Action**: Use tools to manipulate the scene, run simulations, and control the UI
+
+## Current Context:
+User Message: "${userMessage}"
+
+Please help the user with their request using any of your available capabilities.`;
     }
-
-    const contextChunks = searchKnowledgeBase(userQuery);
-    if (contextChunks.length > 0) {
-        const contextText = contextChunks.map(chunk => `Source: ${chunk.source}\nTopic: ${chunk.topic}\nContent: ${chunk.content}`).join('\n\n---\n\n');
-        systemPrompt += `\n\nUse the following information from the application's knowledge base to help answer the user's question. Prioritize this information.\n\n--- KNOWLEDGE BASE CONTEXT ---\n${contextText}\n--- END OF CONTEXT ---`;
-    }
-
-    const projectData = await project.gatherAllProjectData();
-    const resultsData = {
-        datasetA: resultsManager.datasets.a ? { fileName: resultsManager.datasets.a.fileName, stats: resultsManager.datasets.a.stats, glareResult: !!resultsManager.datasets.a.glareResult, isAnnual: resultsManager.hasAnnualData('a') } : null,
-        datasetB: resultsManager.datasets.b ? { fileName: resultsManager.datasets.b.fileName, stats: resultsManager.datasets.b.stats, glareResult: !!resultsManager.datasets.b.glareResult, isAnnual: resultsManager.hasAnnualData('b') } : null
-    };
-
-    const dataForPrompt = JSON.parse(JSON.stringify(projectData));
-    dataForPrompt.epwFileContent = dataForPrompt.epwFileContent ? `[Loaded: ${dataForPrompt.projectInfo.epwFileName}]` : null;
-    if (dataForPrompt.simulationFiles) {
-        Object.values(dataForPrompt.simulationFiles).forEach(file => { if (file && file.content) file.content = `[Content Loaded for ${file.name}]`; });
-    }
-
-    const appState = {
-        projectConfiguration: dataForPrompt,
-        loadedResultsSummary: resultsData
-    };
-
-    const appStateJSON = JSON.stringify(appState, null, 2);
-
-    systemPrompt += `\n\nCRITICAL: Analyze the user's query in the context of the current application state provided below in JSON format. This state represents all the user's current settings, inputs, and a summary of loaded data. Use this information as the primary source of truth to provide specific, context-aware answers about their current project.\n\n--- CURRENT APPLICATION STATE ---\n${appStateJSON}\n--- END OF STATE ---`;
-
-    return systemPrompt;
 }
 
 /**
@@ -1437,10 +1250,10 @@ async function handleSendMessage(event) {
         }
 
         if (!apiKey || !provider || !model) {
-            const errorMessage = 'AI settings are incomplete. Please configure the provider, model, and API key in settings (the ⚙️ icon).';
-            showAlert(errorMessage, 'Configuration Needed');
-            addMessage('ai', errorMessage);
-            setLoadingState(false);
+        const errorMessage = 'AI settings are incomplete. Please configure the provider, model, and API key in settings.';
+        showAlert(errorMessage, 'Configuration Needed');
+        addMessage('ai', errorMessage);
+        setLoadingState(false);
             return;
         }
 
@@ -1574,7 +1387,7 @@ async function _handleSceneTool(name, args) {
 async function _handleViewTool(name, args) {
     switch (name) {
         case 'changeView': {
-            const { setCameraView } = await import('./ui.js');
+            
             const viewMap = { 'perspective': 'persp', 'top': 'top', 'front': 'front', 'back': 'back', 'left': 'left', 'right': 'right' };
             if (!viewMap[args.view]) throw new Error(`Invalid view: ${args.view}`);
             setCameraView(viewMap[args.view]);
@@ -1703,60 +1516,7 @@ async function _handleResultsTool(name, args) {
     }
 }
 
-async function _handleGenerativeTool(name, args) {
-    switch (name) {
-        case 'createShadingPattern': {
-            const { targetWall, patternType, parameters } = args;
-            const wallDir = targetWall.toLowerCase();
-            const implementedPatterns = ['vertical_fins', 'horizontal_fins', 'grid', 'voronoi', 'l_system', 'perforated_screen', 'penrose_tiling'];
-            if (!implementedPatterns.includes(patternType)) throw new Error(`Unknown pattern type: '${patternType}'.`);
-            const { setShadingState, storeGenerativeParams, setGenerativeSliderValues, scheduleUpdate } = await import('./ui.js');
-            setShadingState(wallDir, { enabled: true, type: 'generative' });
-            storeGenerativeParams(wallDir, patternType, parameters);
-            setGenerativeSliderValues(wallDir, parameters);
-            scheduleUpdate('createShadingPattern');
-            return { success: true, message: `Successfully created ${patternType} pattern on the ${targetWall} wall.` };
-        }
-        case 'generateSolarResponsiveShading': {
-            const { targetWall, quality, threshold, depth } = args;
-            if (!project.epwFileContent) throw new Error("Solar responsive shading requires an EPW weather file.");
-            const wallDir = targetWall.toLowerCase();
-            const { setShadingState, storeGenerativeParams, setGenerativeSliderValues, scheduleUpdate } = await import('./ui.js');
-            setShadingState(wallDir, { enabled: true, type: 'generative' });
-            const parameters = { depth: depth || 0.3, quality, threshold, orientation: targetWall, epwFile: project.epwFileName || 'weather.epw' };
-            storeGenerativeParams(wallDir, 'solar_responsive', parameters);
-            setGenerativeSliderValues(wallDir, { depth: parameters.depth });
-            scheduleUpdate('generateSolarResponsiveShading');
-            return { success: true, message: `Initiated solar-responsive shading for ${targetWall} wall.` };
-        }
-        case 'generateViewOptimizedShading': {
-            const { targetWall, viewpoint, desirableViews, blockViews, samplingDensity } = args;
-            const wallDir = targetWall.toLowerCase();
-            const { setShadingState, storeGenerativeParams, scheduleUpdate } = await import('./ui.js');
-            setShadingState(wallDir, { enabled: true, type: 'generative' });
-            const parameters = { depth: 0.1, viewpoint, desirableViews: desirableViews || [], blockViews: blockViews || [], samplingDensity: samplingDensity || 100 };
-            storeGenerativeParams(wallDir, 'view_optimized', parameters);
-            scheduleUpdate('generateViewOptimizedShading');
-            const viewDesc = desirableViews?.length ? `preserving ${desirableViews.length} desirable view(s)` : 'with custom view targets';
-            return { success: true, message: `Initiated view-optimized shading for ${targetWall} wall, ${viewDesc}.` };
-        }
-        case 'optimizeShadingDesign':
-        case 'runGenerativeDesign': {
-            const message = name === 'optimizeShadingDesign'
-                ? `🔬 Starting optimization for ${args.patternType} on the ${args.targetWall} wall.\n\nGoal: ${args.optimizationGoal}`
-                : `Starting generative design study for ${args.variable} on the ${args.targetElement}.`;
-            addMessage('ai', message);
-            setLoadingState(true);
-            const promise = name === 'optimizeShadingDesign' ? _performGenerativeOptimization(args) : _performGenerativeDesign(args);
-            promise.then(result => addMessage('ai', result.message))
-                   .catch(error => addMessage('ai', `🔴 **Optimization Failed:**\n${error.message}`))
-                   .finally(() => setLoadingState(false));
-            return { success: true, message: "Generative process initiated. Results will be reported when complete." };
-        }
-        default:
-            throw new Error(`Unknown generative tool: ${name}`);
-    }
-}
+
 
 async function _handleSimulationTool(name, args) {
     switch (name) {
@@ -1917,41 +1677,134 @@ async function _handleTutorTool(name, args) {
     }
 }
 
+// Tool registry - maps tool names to their handler functions
+const toolHandlers = {
+    // Scene tools
+    'addAperture': (args) => _handleSceneTool('addAperture', args),
+    'placeAsset': (args) => _handleSceneTool('placeAsset', args),
+    'setDimension': (args) => _handleSceneTool('setDimension', args),
+    'configureShading': (args) => _handleSceneTool('configureShading', args),
+    'setSensorGrid': (args) => _handleSceneTool('setSensorGrid', args),
+    'setMaterialProperty': (args) => _handleSceneTool('setMaterialProperty', args),
+    'traceSunRays': (args) => _handleSceneTool('traceSunRays', args),
+    'toggleSunRayVisibility': (args) => _handleSceneTool('toggleSunRayVisibility', args),
+
+    // View tools
+    'changeView': (args) => _handleViewTool('changeView', args),
+    'setViewpointPosition': (args) => _handleViewTool('setViewpointPosition', args),
+
+    // Results tools
+    'compareMetrics': (args) => _handleResultsTool('compareMetrics', args),
+    'filterAndHighlightPoints': (args) => _handleResultsTool('filterAndHighlightPoints', args),
+    'queryResultsData': (args) => _handleResultsTool('queryResultsData', args),
+    'getDatasetStatistics': (args) => _handleResultsTool('getDatasetStatistics', args),
+    'highlightResultPoint': (args) => _handleResultsTool('highlightResultPoint', args),
+    'displayResultsForTime': (args) => _handleResultsTool('displayResultsForTime', args),
+    'showAnalysisDashboard': (args) => _handleResultsTool('showAnalysisDashboard', args),
+    'clearResults': (args) => _handleResultsTool('clearResults', args),
+    'loadResultsFile': (args) => _handleResultsTool('loadResultsFile', args),
+
+    // Simulation tools
+    'openSimulationRecipe': (args) => _handleSimulationTool('openSimulationRecipe', args),
+    'configureSimulationRecipe': (args) => _handleSimulationTool('configureSimulationRecipe', args),
+    'runSimulation': (args) => _handleSimulationTool('runSimulation', args),
+    'setGlobalRadianceParameter': (args) => _handleSimulationTool('setGlobalRadianceParameter', args),
+    'configureDaylightingSystem': (args) => _handleSimulationTool('configureDaylightingSystem', args),
+
+    // UI tools
+    'toggleUIPanel': (args) => _handleUITool('toggleUIPanel', args),
+    'toggleDataTable': (args) => _handleUITool('toggleDataTable', args),
+    'filterDataTable': (args) => _handleUITool('filterDataTable', args),
+    'toggleHdrViewer': (args) => _handleUITool('toggleHdrViewer', args),
+    'configureHdrViewer': (args) => _handleUITool('configureHdrViewer', args),
+    'setTheme': (args) => _handleUITool('setTheme', args),
+    'toggleComparisonMode': (args) => _handleUITool('toggleComparisonMode', args),
+
+    // Project tools
+    'saveProject': (args) => _handleProjectTool('saveProject', args),
+    'loadProject': (args) => _handleProjectTool('loadProject', args),
+    'generateReport': (args) => _handleProjectTool('generateReport', args),
+    'searchKnowledgeBase': (args) => _handleProjectTool('searchKnowledgeBase', args),
+
+    // Tutor tools
+    'startWalkthrough': (args) => _handleTutorTool('startWalkthrough', args),
+    'endWalkthrough': (args) => _handleTutorTool('endWalkthrough', args),
+
+    // Special tools (handled directly)
+    'runDesignInspector': async (args) => {
+        // These are handled by their own top-level functions, not this executor
+        return { success: true, message: "Inspector/Critique initiated." };
+    },
+    'runResultsCritique': async (args) => {
+        // These are handled by their own top-level functions, not this executor
+        return { success: true, message: "Inspector/Critique initiated." };
+    }
+};
+
 async function _executeToolCall(toolCall) {
     const { name, args } = toolCall.functionCall;
     console.log(`👾 Executing tool: ${name}`, args);
 
     try {
-        const toolCategoryMap = {
-            'addAperture': _handleSceneTool, 'placeAsset': _handleSceneTool, 'setDimension': _handleSceneTool, 'configureShading': _handleSceneTool, 'setSensorGrid': _handleSceneTool, 'setMaterialProperty': _handleSceneTool, 'traceSunRays': _handleSceneTool, 'toggleSunRayVisibility': _handleSceneTool,
-            'changeView': _handleViewTool, 'setViewpointPosition': _handleViewTool,
-            'compareMetrics': _handleResultsTool, 'filterAndHighlightPoints': _handleResultsTool, 'queryResultsData': _handleResultsTool, 'getDatasetStatistics': _handleResultsTool, 'highlightResultPoint': _handleResultsTool, 'displayResultsForTime': _handleResultsTool, 'showAnalysisDashboard': _handleResultsTool, 'clearResults': _handleResultsTool, 'loadResultsFile': _handleResultsTool,
-            'createShadingPattern': _handleGenerativeTool, 'generateSolarResponsiveShading': _handleGenerativeTool, 'generateViewOptimizedShading': _handleGenerativeTool, 'optimizeShadingDesign': _handleGenerativeTool, 'runGenerativeDesign': _handleGenerativeTool,
-            'openSimulationRecipe': _handleSimulationTool, 'configureSimulationRecipe': _handleSimulationTool, 'runSimulation': _handleSimulationTool, 'setGlobalRadianceParameter': _handleSimulationTool, 'configureDaylightingSystem': _handleSimulationTool,
-            'toggleUIPanel': _handleUITool, 'toggleDataTable': _handleUITool, 'filterDataTable': _handleUITool, 'toggleHdrViewer': _handleUITool, 'configureHdrViewer': _handleUITool, 'setTheme': _handleUITool, 'toggleComparisonMode': _handleUITool,
-            'saveProject': _handleProjectTool, 'loadProject': _handleProjectTool, 'generateReport': _handleProjectTool, 'searchKnowledgeBase': _handleProjectTool,
-            'startWalkthrough': _handleTutorTool, 'endWalkthrough': _handleTutorTool,
-            'runDesignInspector': () => { /* Special case, handled outside */ }, 'runResultsCritique': () => { /* Special case, handled outside */ }
-        };
-
-        const handler = toolCategoryMap[name];
+        const handler = toolHandlers[name];
         if (handler) {
-            return await handler(name, args);
+            return await handler(args);
         }
 
-        // Fallback for tools not in the map or special cases
-        switch (name) {
-            case 'runDesignInspector':
-            case 'runResultsCritique':
-                // These are handled by their own top-level functions, not this executor
-                return { success: true, message: "Inspector/Critique initiated." };
-            default:
-                throw new Error(`The tool "${name}" is not yet implemented or is unknown.`);
-        }
+        throw new Error(`Unknown tool: ${name}`);
     } catch (error) {
         console.error(`Tool execution failed for '${name}':`, error);
         return { success: false, message: error.message };
     }
+}
+
+/**
+ * Centralized helper to call the appropriate AI model API.
+ * @param {object} payload - The request body for the API call.
+ * @param {string} provider - The AI provider ('openrouter', 'openai', 'gemini', 'anthropic').
+ * @param {string} apiKey - The user's API key.
+ * @param {string} model - The model identifier (needed for Gemini).
+ * @returns {Promise<object>} The parsed JSON response from the API.
+ * @private
+ */
+async function _callModelAPI(payload, provider, apiKey, model) {
+    let apiUrl, headers = { 'Content-Type': 'application/json' };
+
+    switch (provider) {
+        case 'openrouter':
+            apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
+            headers['Authorization'] = `Bearer ${apiKey}`;
+            headers['HTTP-Referer'] = 'http://localhost'; // Replace with your actual site
+            headers['X-Title'] = 'Ray Modeler';
+            break;
+        case 'openai':
+            apiUrl = 'https://api.openai.com/v1/chat/completions';
+            headers['Authorization'] = `Bearer ${apiKey}`;
+            break;
+        case 'gemini':
+            apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            break;
+        case 'anthropic':
+            apiUrl = 'https://api.anthropic.com/v1/messages';
+            headers['x-api-key'] = apiKey;
+            headers['anthropic-version'] = '2023-06-01';
+            break;
+        default:
+            throw new Error(`Unsupported provider: ${provider}`);
+    }
+
+    const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || errorData.message || `API Error: ${response.status}`);
+    }
+
+    return response.json();
 }
 
 /**
@@ -1974,8 +1827,11 @@ async function performAIInspection() {
             throw new Error('AI settings are incomplete. Please configure them first.');
         }
 
+        if (provider !== 'openrouter' && provider !== 'openai') {
+            throw new Error(`AI Inspection currently requires an OpenAI or OpenRouter provider that supports JSON mode.`);
+        }
+
         const projectData = await project.gatherAllProjectData();
-        // Sanitize project data for the prompt to avoid sending large file contents
         const dataForPrompt = JSON.parse(JSON.stringify(projectData));
         dataForPrompt.epwFileContent = dataForPrompt.epwFileContent ? `[Loaded: ${dataForPrompt.projectInfo.epwFileName}]` : null;
         if (dataForPrompt.simulationFiles) {
@@ -1983,52 +1839,13 @@ async function performAIInspection() {
         }
         const appStateJSON = JSON.stringify(dataForPrompt, null, 2);
 
-        const systemPrompt = `You are a building performance simulation expert for the Radiance Lighting Simulation Engine.
-        Your task is to analyze a project's configuration provided in JSON format and identify potential issues.
-        Analyze the following project state. Identify potential issues, common mistakes, or combinations of parameters that could lead to inaccurate results, long simulation times, or runtime errors.
-        For each issue, explain the problem and its consequences in simple terms.
-        If a simple, direct fix is possible using one of the available tools, suggest it.
-
-        CRITICAL: Respond ONLY with a single, valid JSON object. Do not include any text, notes, or markdown before or after the JSON.
-        The JSON object must have three keys: "errors", "warnings", and "suggestions". Each key should be an array of objects.
-        Each object in the arrays must have a "message" key (string).
-        Optionally, an object can have "action" (string, must be a valid tool name like 'addOverhang' or 'openPanel'), "actionLabel" (string, e.g., 'Add 0.8m Overhang'), and "params" (an object of parameters for the action).
-
-        Example for a warning:
-        { "message": "The south-facing wall has windows but no shading, creating a high risk of glare.", "action": "addOverhang", "actionLabel": "Add 0.8m Overhang", "params": { "wall": "south", "depth": 0.8 } }
-
-        Example for an error:
-        { "message": "DGP recipe is open, but the Viewpoint is not Fisheye. This will fail.", "action": "openPanel", "actionLabel": "Go to Viewpoint", "params": { "panel": "viewpoint" } }
-
-        Now, analyze the user's project.`;
-
+        const systemPrompt = `You are a building performance simulation expert for the Radiance Lighting Simulation Engine. Your task is to analyze a project's configuration provided in JSON format and identify potential issues. Analyze the following project state. Identify potential issues, common mistakes, or combinations of parameters that could lead to inaccurate results, long simulation times, or runtime errors. For each issue, explain the problem and its consequences in simple terms. If a simple, direct fix is possible using one of the available tools, suggest it. CRITICAL: Respond ONLY with a single, valid JSON object. Do not include any text, notes, or markdown before or after the JSON. The JSON object must have three keys: "errors", "warnings", and "suggestions". Each key should be an array of objects. Each object in the arrays must have a "message" key (string). Optionally, an object can have "action" (string, must be a valid tool name like 'addOverhang' or 'openPanel'), "actionLabel" (string, e.g., 'Add 0.8m Overhang'), and "params" (an object of parameters for the action). Now, analyze the user's project.`;
         const userMessage = `Project JSON to analyze: \n\n${appStateJSON}`;
 
-        let apiUrl, headers, payload;
         const messages = [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMessage }];
+        const payload = { model: model, messages: messages, response_format: { type: "json_object" } };
 
-        if (provider === 'openrouter' || provider === 'openai') {
-            apiUrl = provider === 'openrouter' ? 'https://openrouter.ai/api/v1/chat/completions' : 'https://api.openai.com/v1/chat/completions';
-            headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
-            if (provider === 'openrouter') {
-                headers['HTTP-Referer'] = 'http://localhost';
-                headers['X-Title'] = 'Ray Modeler';
-            }
-            // Use JSON mode if supported by the model/provider
-            payload = { model: model, messages: messages, response_format: { type: "json_object" } };
-        } else {
-            // Simplified path for other providers; they might not support JSON mode as reliably.
-            // This could be expanded in the future.
-            throw new Error(`AI Inspection currently requires an OpenAI or OpenRouter provider that supports JSON mode.`);
-        }
-
-        const response = await fetch(apiUrl, { method: 'POST', headers: headers, body: JSON.stringify(payload) });
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error?.message || `API Error: ${response.status}`);
-        }
-
-        const data = await response.json();
+        const data = await _callModelAPI(payload, provider, apiKey, model);
         const responseText = data.choices?.[0]?.message?.content;
 
         if (!responseText) {
@@ -2076,91 +1893,48 @@ async function _performAICritique() {
             throw new Error('AI settings are incomplete. Please configure them first.');
         }
 
- const projectData = await project.gatherAllProjectData();
- // Sanitize project data for the prompt
- const dataForPrompt = JSON.parse(JSON.stringify(projectData));
- dataForPrompt.epwFileContent = dataForPrompt.epwFileContent ? `[Loaded: ${dataForPrompt.projectInfo.epwFileName}]` : null;
- if (dataForPrompt.simulationFiles) {
-     Object.values(dataForPrompt.simulationFiles).forEach(file => { if (file && file.content) file.content = `[Content Loaded for ${file.name}]`; });
- }
+        if (provider !== 'openrouter' && provider !== 'openai') {
+            throw new Error(`AI Critique currently requires an OpenAI or OpenRouter provider that supports JSON mode.`);
+        }
 
- // Gather results data
- const resultsData = {
-     datasetA: resultsManager.datasets.a ? { fileName: resultsManager.datasets.a.fileName, stats: resultsManager.datasets.a.stats, glareResult: !!resultsManager.datasets.a.glareResult, isAnnual: resultsManager.hasAnnualData('a') } : null,
-     datasetB: resultsManager.datasets.b ? { fileName: resultsManager.datasets.b.fileName, stats: resultsManager.datasets.b.stats, glareResult: !!resultsManager.datasets.b.glareResult, isAnnual: resultsManager.hasAnnualData('b') } : null
- };
+        const projectData = await project.gatherAllProjectData();
+        const dataForPrompt = JSON.parse(JSON.stringify(projectData));
+        dataForPrompt.epwFileContent = dataForPrompt.epwFileContent ? `[Loaded: ${dataForPrompt.projectInfo.epwFileName}]` : null;
+        if (dataForPrompt.simulationFiles) {
+            Object.values(dataForPrompt.simulationFiles).forEach(file => { if (file && file.content) file.content = `[Content Loaded for ${file.name}]`; });
+        }
 
- const appState = {
-     projectConfiguration: dataForPrompt,
-     loadedResultsSummary: resultsData
- };
+        const resultsData = {
+            datasetA: resultsManager.datasets.a ? { fileName: resultsManager.datasets.a.fileName, stats: resultsManager.datasets.a.stats, glareResult: !!resultsManager.datasets.a.glareResult, isAnnual: resultsManager.hasAnnualData('a') } : null,
+            datasetB: resultsManager.datasets.b ? { fileName: resultsManager.datasets.b.fileName, stats: resultsManager.datasets.b.stats, glareResult: !!resultsManager.datasets.b.glareResult, isAnnual: resultsManager.hasAnnualData('b') } : null
+        };
+        const appState = { projectConfiguration: dataForPrompt, loadedResultsSummary: resultsData };
+        const appStateJSON = JSON.stringify(appState, null, 2);
 
- const appStateJSON = JSON.stringify(appState, null, 2);
+        const systemPrompt = `You are a building performance simulation expert for the Radiance Lighting Simulation Engine. Your task is to analyze a project's configuration and its simulation results, provided in JSON format, and provide a design critique. 1. Identify key findings from the results (e.g., high DGP, low average illuminance, poor uniformity). 2. Correlate these findings with the project configuration (e.g., "high DGP is likely due to the unshaded south-facing window at this time of day"). 3. Propose specific, actionable solutions using the available tools. 4. Explain your reasoning clearly and concisely for each suggestion. CRITICAL: Respond ONLY with a single, valid JSON object. Do not include any text, notes, or markdown before or after the JSON. The JSON object must have one key: "findings". This key should be an array of objects. Each object in the array must have a "message" key (string, explaining the issue and suggestion) and a "type" key (string: 'critique', 'suggestion', or 'positive'). Optionally, an object can have "action" (string, a valid tool name), "actionLabel" (string, e.g., 'Add 0.8m Overhang'), and "params" (an object of parameters for the action). Now, analyze the user's project and results.`;
+        const userMessage = `Project and Results JSON to analyze: \n\n${appStateJSON}`;
 
- const systemPrompt = `You are a building performance simulation expert for the Radiance Lighting Simulation Engine.
- Your task is to analyze a project's configuration and its simulation results, provided in JSON format, and provide a design critique.
- 1. Identify key findings from the results (e.g., high DGP, low average illuminance, poor uniformity).
- 2. Correlate these findings with the project configuration (e.g., "high DGP is likely due to the unshaded south-facing window at this time of day").
- 3. Propose specific, actionable solutions using the available tools.
- 4. Explain your reasoning clearly and concisely for each suggestion.
+        const messages = [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMessage }];
+        const payload = { model: model, messages: messages, response_format: { type: "json_object" } };
 
- CRITICAL: Respond ONLY with a single, valid JSON object. Do not include any text, notes, or markdown before or after the JSON.
- The JSON object must have one key: "findings". This key should be an array of objects.
- Each object in the array must have a "message" key (string, explaining the issue and suggestion) and a "type" key (string: 'critique', 'suggestion', or 'positive').
- Optionally, an object can have "action" (string, a valid tool name), "actionLabel" (string, e.g., 'Add 0.8m Overhang'), and "params" (an object of parameters for the action).
+        const data = await _callModelAPI(payload, provider, apiKey, model);
+        const responseText = data.choices?.[0]?.message?.content;
 
- Example for a finding:
- {
-   "type": "critique",
-   "message": "The DGP value of 0.47 is 'Intolerable'. This is caused by direct sun through the large west-facing window in the afternoon. I suggest adding vertical louvers to block the low-angle sun.",
-   "action": "configureShading",
-   "actionLabel": "Add Vertical Louvers",
-   "params": { "wall": "west", "enable": true, "deviceType": "louver", "slatOrientation": "vertical", "slatAngle": 45 }
- }
+        if (!responseText) {
+            throw new Error("Received an empty response from the AI model.");
+        }
 
- Now, analyze the user's project and results.`;
+        const critique = JSON.parse(responseText);
 
- const userMessage = `Project and Results JSON to analyze: \n\n${appStateJSON}`;
-
- let apiUrl, headers, payload;
- const messages = [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMessage }];
-
- if (provider === 'openrouter' || provider === 'openai') {
-     apiUrl = provider === 'openrouter' ? 'https://openrouter.ai/api/v1/chat/completions' : 'https://api.openai.com/v1/chat/completions';
-     headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
-     if (provider === 'openrouter') {
-         headers['HTTP-Referer'] = 'http://localhost';
-         headers['X-Title'] = 'Ray Modeler';
-     }
-     payload = { model: model, messages: messages, response_format: { type: "json_object" } };
- } else {
-     throw new Error(`AI Critique currently requires an OpenAI or OpenRouter provider that supports JSON mode.`);
- }
-
- const response = await fetch(apiUrl, { method: 'POST', headers: headers, body: JSON.stringify(payload) });
- if (!response.ok) {
-     const errorData = await response.json();
-     throw new Error(errorData.error?.message || `API Error: ${response.status}`);
- }
-
- const data = await response.json();
- const responseText = data.choices?.[0]?.message?.content;
-
- if (!responseText) {
-     throw new Error("Received an empty response from the AI model.");
- }
-
- const critique = JSON.parse(responseText);
-
- return {
-     findings: Array.isArray(critique.findings) ? critique.findings : []
- };
-} catch (error) {
-console.error("AI Results Critique failed:", error);
-return {
-findings: [{ type: 'critique', message: `An error occurred during AI critique: ${error.message}` }]
-};
-}
+        return {
+            findings: Array.isArray(critique.findings) ? critique.findings : []
+        };
+    } catch (error) {
+        console.error("AI Results Critique failed:", error);
+        return {
+            findings: [{ type: 'critique', message: `An error occurred during AI critique: ${error.message}` }]
+        };
+    }
 }
 
 /**
@@ -2172,43 +1946,24 @@ findings: [{ type: 'critique', message: `An error occurred during AI critique: $
  * @returns {Promise<string>} The text response from the AI model.
  */
 async function callGenerativeAI(apiKey, provider, model, systemPrompt) {
-    let apiUrl, headers, payload;
+    let payload;
 
     const activeConversation = conversations[activeConversationId];
     if (!activeConversation) throw new Error("No active conversation found.");
 
-    // Prepare message history in OpenAI format for providers that use it.
+    // Prepare message history, converting to 'assistant' role where needed.
     let messages = activeConversation.history.map(msg => ({
-        role: msg.role === 'model' ? 'assistant' : 'user', // Convert 'model' to 'assistant'
+        role: msg.role === 'model' ? 'assistant' : 'user',
         content: msg.parts[0].text
     }));
     messages.unshift({ role: 'system', content: systemPrompt });
 
     const openAITools = convertGeminiToolsToOpenAI(availableTools);
 
-    if (provider === 'openrouter') {
-        apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-            'HTTP-Referer': 'http://localhost',
-            'X-Title': 'Ray Modeler'
-        };
-        payload = { model: model, messages: messages, tools: openAITools, tool_choice: "auto" };
-    } else if (provider === 'openai') {
-        apiUrl = 'https://api.openai.com/v1/chat/completions';
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-        };
+    // Construct the provider-specific payload
+    if (provider === 'openrouter' || provider === 'openai') {
         payload = { model: model, messages: messages, tools: openAITools, tool_choice: "auto" };
     } else if (provider === 'gemini') {
-        // For Gemini, we need to use the Gemini API format
-        apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-        headers = {
-            'Content-Type': 'application/json'
-        };
-        // Convert to Gemini format, including the system prompt correctly
         const userMessages = messages.filter(m => m.role === 'user' || m.role === 'model' || m.role === 'tool');
         const geminiContents = userMessages.map(m => ({
             role: m.role === 'tool' ? 'tool' : (m.role === 'user' ? 'user' : 'model'),
@@ -2220,40 +1975,19 @@ async function callGenerativeAI(apiKey, provider, model, systemPrompt) {
             tools: availableTools
         };
     } else if (provider === 'anthropic') {
-        apiUrl = 'https://api.anthropic.com/v1/messages';
-        headers = {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01'
-        };
-        // Convert to Anthropic format
         const anthropicMessages = messages.map(m => ({
             role: m.role === 'user' ? 'user' : 'assistant',
             content: m.content
         }));
-        payload = {
-            model: model,
-            max_tokens: 4096,
-            messages: anthropicMessages,
-            system: systemPrompt // Anthropic uses separate system parameter
-        };
-        // Note: Anthropic doesn't support tools in the same way, so we'll handle without tools for now
-        delete payload.tools;
+        payload = { model: model, max_tokens: 4096, messages: anthropicMessages, system: systemPrompt };
     } else {
         throw new Error(`Unsupported provider: ${provider}`);
     }
 
-    const response = await fetch(apiUrl, { method: 'POST', headers: headers, body: JSON.stringify(payload) });
+    const data = await _callModelAPI(payload, provider, apiKey, model);
 
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || errorData.message || `API Error: ${response.status}`);
-    }
-
-    const data = await response.json();
-
+    // Process the response to check for tool calls
     let responseMessage, toolCalls, text;
-
     if (provider === 'openrouter' || provider === 'openai') {
         responseMessage = data.choices?.[0]?.message;
         if (!responseMessage) throw new Error("Invalid response structure from API.");
@@ -2262,19 +1996,19 @@ async function callGenerativeAI(apiKey, provider, model, systemPrompt) {
     } else if (provider === 'gemini') {
         responseMessage = data.candidates?.[0]?.content;
         if (!responseMessage) throw new Error("Invalid response structure from Gemini API.");
-        // Gemini handles tools differently - for now, just get text
+        // TODO: Add full Gemini tool call handling if needed
         text = responseMessage.parts?.[0]?.text || '';
     } else if (provider === 'anthropic') {
+        // TODO: Add full Anthropic tool call handling if needed
         text = data.content?.[0]?.text || '';
     }
 
+    // Handle tool calls for supported providers
     if (toolCalls && toolCalls.length > 0 && (provider === 'openrouter' || provider === 'openai')) {
-        // Execute tools
         const toolPromises = toolCalls.map(tc => _executeToolCall({ functionCall: { name: tc.function.name, args: JSON.parse(tc.function.arguments) } }));
         const toolResults = await Promise.all(toolPromises);
 
-        // Add the assistant's message (with tool_calls) and our tool results to the messages for the next API call
-        messages.push(responseMessage);
+        messages.push(responseMessage); // Add original assistant message with tool calls
         toolResults.forEach((result, i) => {
             messages.push({
                 role: 'tool',
@@ -2284,15 +2018,19 @@ async function callGenerativeAI(apiKey, provider, model, systemPrompt) {
             });
         });
 
-        const secondResponse = await fetch(apiUrl, { method: 'POST', headers, body: JSON.stringify({ ...payload, messages: messages }) });
+        // Make the second API call with the tool results
+        const secondPayload = { ...payload, messages: messages };
+        const secondData = await _callModelAPI(secondPayload, provider, apiKey, model);
+        const finalText = secondData.choices?.[0]?.message?.content;
 
-        if (!secondResponse.ok) throw new Error(`API Error after tool call: ${secondResponse.status}`);
-        const secondData = await secondResponse.json();
-        const finalText = (provider === 'openrouter' || provider === 'openai') ? secondData.choices?.[0]?.message?.content : secondData.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (finalText === null || finalText === undefined) throw new Error('Received an invalid final response from API after tool call.');
+        if (finalText === null || finalText === undefined) {
+            throw new Error('Received an invalid final response from API after tool call.');
+        }
         return finalText;
     } else {
-        if (text === null || text === undefined) throw new Error('Received an invalid response from API.');
+        if (text === null || text === undefined) {
+            throw new Error('Received an invalid response from API.');
+        }
         return text;
     }
 }
@@ -2331,13 +2069,26 @@ function closeSettingsModal() {
     dom['ai-settings-modal']?.classList.replace('flex', 'hidden');
 }
 
+/** Opens the Helios capabilities modal window. */
+function openCapabilitiesModal() {
+    const modal = dom['helios-capabilities-modal'];
+    if (!modal) return;
+    modal.style.zIndex = getNewZIndex();
+    modal.classList.replace('hidden', 'flex');
+}
+
+/** Closes the Helios capabilities modal window. */
+function closeCapabilitiesModal() {
+    dom['helios-capabilities-modal']?.classList.replace('flex', 'hidden');
+}
+
 /**
  * Saves the API key and provider to localStorage.
  * @param {Event} event - The form submission event.
  */
 function saveSettings(event) {
     event.preventDefault();
-    const keyInput = dom['ai-api-key-input'];
+    const keyInput = dom['ai-secret-field'];
     const providerSelect = dom['ai-provider-select'];
     const modelSelect = dom['ai-model-select'];
     const customModelInput = dom['ai-custom-model-input'];
@@ -2358,7 +2109,7 @@ function saveSettings(event) {
  * Loads the API key and provider from localStorage into the settings form.
  */
 function loadSettings() {
-    const keyInput = dom['ai-api-key-input'];
+    const keyInput = dom['ai-secret-field'];
     const providerSelect = dom['ai-provider-select'];
     const modelSelect = dom['ai-model-select'];
     const customModelInput = dom['ai-custom-model-input'];
@@ -2480,6 +2231,154 @@ export function triggerProactiveSuggestion(context) {
 export { initAiAssistant };
 
 /**
+ * Updates a message bubble in the chat UI with new content.
+ * @param {HTMLElement} messageElement - The DOM element of the message to update.
+ * @param {string} newHtml - The new HTML content for the message bubble.
+ * @private
+ */
+function _updateProgressMessage(messageElement, newHtml) {
+    if (messageElement && messageElement.querySelector) {
+        messageElement.querySelector('.message-bubble').innerHTML = newHtml;
+    }
+}
+
+/**
+ * Runs a single simulation iteration for a generative design study.
+ * @param {string} variable - The design parameter being iterated (e.g., 'overhang depth').
+ * @param {string} targetElement - The scene element to modify (e.g., 'south').
+ * @param {number} currentValue - The value of the design parameter for this iteration.
+ * @returns {Promise<object>} A promise that resolves with the sDA and ASE results for the iteration.
+ * @private
+ */
+async function _runGenerativeDesignIteration(variable, targetElement, currentValue) {
+    // 1. Configure the design variable for this iteration.
+    if (variable === 'overhang depth') {
+        await _executeToolCall({
+            functionCall: {
+                name: 'configureShading',
+                args: { wall: targetElement, enable: true, deviceType: 'overhang', depth: currentValue }
+            }
+        });
+    } else {
+        throw new Error(`This generative design workflow currently only supports the 'overhang depth' variable.`);
+    }
+
+    // 2. Generate the simulation package and run the script.
+    const sdaPanel = document.querySelector('[data-template-id="template-recipe-sda-ase"]');
+    if (!sdaPanel) throw new Error("sDA/ASE recipe panel could not be found.");
+
+    const scriptInfo = await programmaticallyGeneratePackage(sdaPanel);
+    await runScriptAndWait(scriptInfo.shFile);
+
+    // 3. Load and query results from the output files.
+    const projectName = project.projectName || 'scene';
+    const aseFile = await _getFileFromElectron(`08_results/${projectName}_ASE_direct_only.ill`);
+    const sdaFile = await _getFileFromElectron(`08_results/${projectName}_sDA_final.ill`);
+
+    await resultsManager.loadAndProcessFile(aseFile, 'a');
+    const aseMetrics = resultsManager.calculateAnnualMetrics('a', {});
+
+    await resultsManager.loadAndProcessFile(sdaFile, 'a');
+    const sdaMetrics = resultsManager.calculateAnnualMetrics('a', {});
+
+    return {
+        variableValue: currentValue,
+        sDA: sdaMetrics.sDA,
+        ASE: aseMetrics.ASE
+    };
+}
+
+/**
+ * Analyzes the results of a generative study to find the best option.
+ * @param {Array<object>} results - An array of result objects from each iteration.
+ * @param {string} goal - The optimization objective (e.g., 'maximize sDA').
+ * @param {string} constraints - The constraint for valid solutions (e.g., 'ASE < 10').
+ * @returns {{bestOption: object, validOptions: Array<object>}} The best result and all valid options.
+ * @private
+ */
+function _analyzeGenerativeDesignResults(results, goal, constraints) {
+    const constraintRegex = /(sDA|ASE)\s*(<|<=|>|>=)\s*(\d+\.?\d*)/;
+    const constraintMatch = constraints.match(constraintRegex);
+    if (!constraintMatch) throw new Error("Could not parse the provided constraint string: " + constraints);
+
+    const [, constraintMetric, operator, constraintValueStr] = constraintMatch;
+    const constraintValue = parseFloat(constraintValueStr);
+
+    const validOptions = results.filter(res => {
+        const metricValue = res[constraintMetric];
+        switch (operator) {
+            case '<': return metricValue < constraintValue;
+            case '<=': return metricValue <= constraintValue;
+            case '>': return metricValue > constraintValue;
+            case '>=': return metricValue >= constraintValue;
+            default: return false;
+        }
+    });
+
+    if (validOptions.length === 0) {
+        return { bestOption: null, validOptions: [] };
+    }
+
+    const goalMetric = goal.includes('sDA') ? 'sDA' : 'ASE';
+    const sortDirection = goal.startsWith('maximize') ? -1 : 1;
+
+    validOptions.sort((a, b) => (a[goalMetric] - b[goalMetric]) * sortDirection);
+
+    return { bestOption: validOptions[0], validOptions };
+}
+
+/**
+ * Formats the final summary message for a completed optimization run.
+ * @param {object} bestDesign - The best design object found by the optimizer.
+ * @param {object} args - The original arguments for the optimization.
+ * @returns {string} A formatted markdown string for the chat window.
+ * @private
+ */
+function _formatOptimizationSummary(bestDesign, args) {
+    const { patternType, targetWall, optimizationGoal, targetConstraint } = args;
+
+    let summary = `✅ **Optimization Complete!**\n\n### 🏆 Best Design Found\n\n`;
+    summary += `**Pattern Type:** ${patternType}\n`;
+    summary += `**Target Wall:** ${targetWall}\n`;
+    summary += `**${optimizationGoal.replace(/_/g, ' ')}:** ${bestDesign.fitness.metricValue.toFixed(2)}${bestDesign.fitness.unit}\n\n`;
+
+    summary += `**Parameters:**\n`;
+    for (const [key, value] of Object.entries(bestDesign.params)) {
+        summary += `- \`${key}\`: ${value.toFixed(3)}\n`;
+    }
+
+    if (targetConstraint) {
+        summary += `\n**Constraint Met:** ${targetConstraint} ✓\n`;
+    }
+
+    summary += `\nThe optimized design has been applied to your scene.`;
+    return summary;
+}
+
+/**
+ * Applies a set of design parameters to the scene and waits for the geometry to update.
+ * @param {object} designParams - The parameters for the generative shading pattern.
+ * @param {string} targetWall - The wall to apply the pattern to (e.g., 'S').
+ * @param {string} patternType - The type of pattern (e.g., 'voronoi').
+ * @private
+ */
+async function _applyDesignAndWaitForUpdate(designParams, targetWall, patternType) {
+    const wallDir = targetWall.toLowerCase();
+    const { setShadingState, storeGenerativeParams, setGenerativeSliderValues, scheduleUpdate } = await import('./ui.js');
+
+    setShadingState(wallDir, { enabled: true, type: 'generative' });
+    storeGenerativeParams(wallDir, patternType, designParams);
+    setGenerativeSliderValues(wallDir, designParams);
+
+    // Wait for the scene update to complete
+    await new Promise(resolve => {
+        scheduleUpdate('optimizationFitnessEval');
+        // A short timeout gives the renderer time to process the new geometry
+        setTimeout(resolve, 300); 
+    });
+}
+
+/**
  * Executes the full generative design workflow asynchronously.
  * @param {object} args - The arguments for the design study from the AI tool call.
  * @returns {Promise<object>} A promise that resolves with the final summary message.
@@ -2512,39 +2411,40 @@ async function _performGenerativeDesign(args) {
         }
     }
 
-    for (let i = 0; i < steps; i++) {
-        const currentValue = min + (i / (steps - 1)) * (max - min);
-
+for (let i = 0; i < steps; i++) {
+    const currentValue = min + (i / (steps - 1)) * (max - min);
+    try {
         // 1. Configure the design variable for this iteration.
         if (variable === 'overhang depth') {
-            await _executeToolCall({ functionCall: {
-                name: 'configureShading',
-                args: { wall: targetElement, enable: true, deviceType: 'overhang', depth: currentValue }
-            }});
+            await _executeToolCall({
+                functionCall: {
+                    name: 'configureShading',
+                    args: { wall: targetElement, enable: true, deviceType: 'overhang', depth: currentValue }
+                }
+            });
         } else {
             throw new Error(`This generative design workflow currently only supports the 'overhang depth' variable.`);
         }
-        
+
         // Update progress message in the chat window.
         statusMessageElement.querySelector('.message-bubble').innerHTML = progressMessage + `<p>Running simulation ${i + 1}/${steps} with depth ${currentValue.toFixed(2)}m...</p>`;
 
         // 2. Generate the simulation package and run the script, waiting for completion.
         const sdaPanel = document.querySelector('[data-template-id="template-recipe-sda-ase"]');
         if (!sdaPanel) throw new Error("sDA/ASE recipe panel could not be found.");
-        
+
         const scriptInfo = await programmaticallyGeneratePackage(sdaPanel);
         await runScriptAndWait(scriptInfo.shFile);
 
         // 3. Load and query results from the output files.
-        // NOTE: This assumes an Electron API function `readFile` is available.
         const projectName = project.projectName || 'scene';
         const aseFile = await _getFileFromElectron(`08_results/${projectName}_ASE_direct_only.ill`);
         const sdaFile = await _getFileFromElectron(`08_results/${projectName}_sDA_final.ill`);
-        
+
         // Load into the results manager to calculate metrics.
         await resultsManager.loadAndProcessFile(aseFile, 'a');
         const aseMetrics = resultsManager.calculateAnnualMetrics('a', {});
-        
+
         await resultsManager.loadAndProcessFile(sdaFile, 'a');
         const sdaMetrics = resultsManager.calculateAnnualMetrics('a', {});
 
@@ -2554,11 +2454,28 @@ async function _performGenerativeDesign(args) {
             ASE: aseMetrics.ASE
         };
         results.push(iterationResult);
-        
+
         // Append this step's results to the progress message.
-        progressMessage += `<p>Step ${i + 1}: Depth ${currentValue.toFixed(2)}m → sDA: ${iterationResult.sDA.toFixed(1)}%, ASE: ${iterationResult.ASE.toFixed(1)}%</p>`;
+        progressMessage += `<p>✅ Step ${i + 1}: Depth ${currentValue.toFixed(2)}m → sDA: ${iterationResult.sDA.toFixed(1)}%, ASE: ${iterationResult.ASE.toFixed(1)}%</p>`;
         statusMessageElement.querySelector('.message-bubble').innerHTML = progressMessage;
+
+    } catch (error) {
+        console.error(`Generative design iteration ${i + 1} failed for value ${currentValue.toFixed(2)}m:`, error);
+
+        // Assign a "worst" fitness score and continue
+        results.push({
+            variableValue: currentValue,
+            sDA: 0, // Worst possible sDA
+            ASE: 100 // Worst possible ASE
+        });
+
+        // Update the UI to show the failure for this step
+        progressMessage += `<p>❌ Step ${i + 1} (Depth ${currentValue.toFixed(2)}m): Simulation failed. Assigning worst result and continuing.</p>`;
+        statusMessageElement.querySelector('.message-bubble').innerHTML = progressMessage;
+
+        continue; // Move to the next iteration
     }
+}
 
     // 4. Analyze all results to find the best option.
     const constraintRegex = /(sDA|ASE)\s*(<|<=|>|>=)\s*(\d+\.?\d*)/;

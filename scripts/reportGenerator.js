@@ -4,7 +4,8 @@ import { project } from './project.js';
 import { resultsManager } from './resultsManager.js';
 import { captureSceneSnapshot } from './scene.js';
 import { getDashboardChartsAsBase64 } from './annualDashboard.js';
-import { showAlert, getDom } from './ui.js';
+import { showAlert } from './ui.js';
+import { getDom } from './dom.js';
 
 /**
  * Handles the collection of data and generation of a self-contained HTML report.

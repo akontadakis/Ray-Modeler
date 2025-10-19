@@ -1,5 +1,6 @@
 // scripts/ui.js
 
+import { getDom } from './dom.js';
 import { updateScene, axesObject, updateSensorGridColors, roomObject, shadingObject, sensorMeshes, wallSelectionGroup, highlightWall, clearWallHighlights, updateHighlightColor, furnitureObject, addFurniture, updateFurnitureColor, resizeHandlesObject, contextObject, vegetationObject, addImportedAsset } from './geometry.js';
 
 import { activeCamera, perspectiveCamera, orthoCamera, setActiveCamera, onWindowResize, controls, transformControls, sensorTransformControls, viewpointCamera, scene, updateLiveViewType, renderer, toggleFirstPersonView as sceneToggleFPV, isFirstPersonView as sceneIsFPV, fpvOrthoCamera, updateViewpointFromUI, setGizmoVisibility, setUpdatingFromSliders, isUpdatingCameraFromSliders, setGizmoMode } from './scene.js';
@@ -130,8 +131,7 @@ function openShortcutHelp() {
 }
 
 // --- MODULE STATE ---
-const dom = {}; // No longer exported directly
-export function getDom() { return dom; } // Export a getter function instead
+const dom = getDom(); // Get the cached dom from the new module
 
 let updateScheduled = false;
 let isResizeMode = false;
@@ -178,73 +178,6 @@ const debouncedScheduleUpdate = debounce(scheduleUpdate, 250); // 250ms delay
 
 const debouncedWindowResize = debounce(() => window.dispatchEvent(new Event('resize')), 100);
 
-function setupSolarResponsiveControls(wallDir) {
-    const analyzeBtn = dom[`solar-analyze-btn-${wallDir}`];
-    const epwFileInput = dom[`solar-epw-file-${wallDir}`];
-    const progress = dom[`solar-progress-${wallDir}`];
-    const progressText = dom[`solar-progress-text-${wallDir}`];
-    const resultsDiv = dom[`solar-results-${wallDir}`];
-
-    epwFileInput?.addEventListener('change', (event) => {
-        const file = event.target.files[0];
-        if (file) {
-            handleFileSelection(file, `solar-epw-file-${wallDir}`, null);
-        }
-    });
-
-    analyzeBtn?.addEventListener('click', async () => {
-        const wallData = project.walls[wallDir];
-        if (!wallData || wallData.windows.length === 0) {
-            showAlert('Please add a window to this wall first.', 'Error');
-            return;
-        }
-
-        const epwFile = project.getSimulationFile(`solar-epw-file-${wallDir}`);
-        if (!epwFile) {
-            showAlert('Please select an EPW weather file for this wall.', 'Error');
-            return;
-        }
-
-        progress.classList.remove('hidden');
-        progressText.textContent = 'Analyzing...';
-        resultsDiv.classList.add('hidden');
-
-        try {
-            const params = {
-                windowWidth: wallData.windows[0].width, // Assuming one window for now
-                windowHeight: wallData.windows[0].height,
-                quality: dom[`solar-quality-${wallDir}`].value,
-                threshold: dom[`solar-threshold-${wallDir}`].value,
-                epwFile: epwFile.name,
-                orientation: wallDir.toUpperCase(),
-                latitude: project.projectInfo.latitude,
-                longitude: project.projectInfo.longitude
-            };
-
-            const shadingGroup = await createSolarResponsive(params);
-            
-            project.generativeShadingParams[wallDir] = {
-                patternType: 'solar_responsive',
-                parameters: params,
-                result: shadingGroup.userData // Storing results for UI update
-            };
-            scheduleUpdate(`solar-analyze-btn-${wallDir}`);
-            
-            progress.classList.add('hidden');
-            resultsDiv.classList.remove('hidden');
-            
-            dom[`solar-high-hours-${wallDir}`].textContent = shadingGroup.userData.highRadiationHours || 'N/A';
-            dom[`solar-peak-alt-${wallDir}`].textContent = shadingGroup.userData.peakAltitude || 'N/A';
-            dom[`solar-fin-count-${wallDir}`].textContent = shadingGroup.children.length;
-
-        } catch (error) {
-            console.error('Solar Responsive Shading failed:', error);
-            showAlert(`Solar analysis failed: ${error.message}`, 'Error');
-            progress.classList.add('hidden');
-        }
-    });
-}
-
 let map, tileLayer;
 let maxZ = 100;
 
@@ -253,6 +186,8 @@ let maxZ = 100;
 * and stores it in the project's simulation files.
 */
 function generateAndStoreOccupancyCsv() {
+    const dom = getDom();
+
     // Only generate if the feature is toggled on
     if (!dom['occupancy-toggle']?.checked) return;
 
@@ -292,6 +227,8 @@ function generateAndStoreOccupancyCsv() {
 * @param {Event} event The input event from the slider.
 */
 export function updateOccupancyTimeRangeDisplay(event) {
+    const dom = getDom();
+
     if (!dom['occupancy-time-range-display'] || !dom['occupancy-time-slider-container']) return;
 
     const startSlider = dom['occupancy-time-range-start'];
@@ -334,6 +271,8 @@ export function updateOccupancyTimeRangeDisplay(event) {
 * @param {HTMLElement} [displayElement] - The optional span to show the filename.
 */
 function handleFileSelection(file, baseId, displayElement) {
+    const dom = getDom();
+
     if (!file) {
         project.addSimulationFile(baseId, null, null);
         if (displayElement) {
@@ -448,6 +387,8 @@ export function getNewZIndex() {
  * @param {object} allParams - The full parameter object provided by the AI.
  */
 export function storeGenerativeParams(wallDir, patternType, allParams) {
+    const dom = getDom();
+
     // Store pattern type in hidden input for retrieval by getAllShadingParams
     const patternInput = dom[`shading-pattern-type-${wallDir}`];
     if (patternInput) {
@@ -475,6 +416,8 @@ export function storeGenerativeParams(wallDir, patternType, allParams) {
  * @param {object} commonParams - An object containing common parameters like { depth, spacingX, spacingY, elementWidth }.
  */
 export function setGenerativeSliderValues(wallDir, commonParams) {
+    const dom = getDom();
+
     // Update visible sliders
     const sliders = ['depth', 'spacing-x', 'spacing-y', 'element-width'];
     sliders.forEach(sliderBaseName => {
@@ -501,6 +444,8 @@ export function setGenerativeSliderValues(wallDir, commonParams) {
  * @param {object} state - An object with { enabled: boolean, type: string }.
  */
 export function setShadingState(wallDir, state) {
+    const dom = getDom();
+
     const toggle = dom[`shading-${wallDir}-toggle`];
     const typeSelect = dom[`shading-type-${wallDir}`];
 
@@ -536,318 +481,6 @@ export function scheduleUpdate(id = null) {
 // --- INITIALIZATION and EVENT LISTENERS ---
 const wallDirections = ['n', 's', 'e', 'w'];
 let windowModes = {'n': 'wwr', 's': 'wwr', 'e': 'wwr', 'w': 'wwr'};
-
-export function setupDOM() {
-const ids = [
-    // Global
-    'theme-btn-light', 'theme-btn-dark', 'theme-btn-cyber', 'theme-btn-cafe58', 'theme-switcher-container',
-    'render-container', 'sidebar-wrapper', 'right-sidebar',
-    'welcome-screen', 'glow-canvas', 'start-with-shoebox', 'start-with-import', 'welcome-effect-switcher', 'cycle-effect-btn',
-    'generate-scene-button', 'panel-simulation-modules', 'globals-toggle', 'globals-controls', 'panel-analysis-modules', 'toggle-modules-btn', 'toggle-analysis-btn',
-    'save-project-button', 'load-project-button', 'run-simulation-button', 'custom-alert',
-    'custom-alert-title', 'custom-alert-message', 'custom-alert-close',
-
-    // Toolbars
-    'left-toolbar', 'left-controls-container', 'toggle-panel-project-btn', 'toggle-panel-dimensions-btn', 
-    'toggle-panel-aperture-btn', 'toggle-panel-lighting-btn', 'toggle-panel-materials-btn',
-    'toggle-panel-sensor-btn', 'toggle-panel-viewpoint-btn', 'toggle-panel-scene-btn',
-    'view-controls', 'view-btn-persp', 'view-btn-ortho', 'view-btn-top', 'view-btn-front', 'view-btn-back', 'view-btn-left', 'view-btn-right', 'view-btn-quad',
-    'viewport-main', 'viewport-top', 'viewport-front', 'viewport-side',
-
-    // Scene Elements Panel
-    'panel-scene-elements', 'asset-library', 'asset-library-vegetation', 'transform-controls-section',
-    'gizmo-mode-translate', 'gizmo-mode-rotate', 'gizmo-mode-scale', 'remove-selected-object-btn',
-    'obj-pos-x', 'obj-pos-y', 'obj-pos-z', 'obj-pos-x-val', 'obj-pos-y-val', 'obj-pos-z-val',
-    'obj-rot-y', 'obj-rot-y-val', // We now only have a single rotation slider for simplicity
-    'obj-scale-uniform', 'obj-scale-uniform-val',
-
-    // Project Panel
-    'project-name', 'project-desc', 'building-type',
-    'project-name', 'project-desc', 'building-type',
-    'upload-epw-btn', 'epw-file-name', 'epw-upload-modal', 'epw-modal-close', 'modal-file-drop-area', 'epw-file-input',
-    'latitude', 'longitude', 'map', 'location-inputs-container', 'radiance-path',
-
-    // Dimensions Panel
-    'width', 'width-val', 'length', 'length-val', 'height', 'height-val', 'elevation', 'elevation-val', 'room-orientation', 'room-orientation-val',
-    'resize-mode-toggle', 'resize-mode-info',
-    'surface-thickness', 'surface-thickness-val',
-    'mode-parametric-btn', 'mode-import-btn', 'parametric-controls', 'import-controls',
-    'import-obj-file', 'import-scale', 'import-center-toggle', 'load-model-btn',
-
-    // Apertures Panel (Frames)
-    'frame-toggle', 'frame-controls', 'frame-thick', 'frame-thick-val',
-    'frame-depth', 'frame-depth-val',
-    
-
-    // Materials Panel
-    'wall-mat-type', 'floor-mat-type', 'ceiling-mat-type', 'frame-mat-type', 'shading-mat-type', 'furniture-mat-type',
-    'wall-refl', 'wall-refl-val', 'floor-refl', 'floor-refl-val', 'ceiling-refl', 'ceiling-refl-val', 'furniture-refl', 'furniture-refl-val',
-    'glazing-trans', 'glazing-trans-val',
-    'wall-spec', 'wall-spec-val', 'floor-spec', 'floor-spec-val', 'ceiling-spec', 'ceiling-spec-val', 'furniture-spec', 'furniture-spec-val',
-    'wall-rough', 'wall-rough-val', 'floor-rough', 'floor-rough-val', 'ceiling-rough', 'ceiling-rough-val', 'furniture-rough', 'furniture-rough-val',
-    'frame-refl', 'frame-refl-val', 'frame-spec', 'frame-spec-val', 'frame-rough', 'frame-rough-val',
-    'shading-rough-val', 'wall-color', 'floor-color', 'ceiling-color', 'frame-color', 'shading-color',
-    'wall-mode-refl', 'wall-mode-srd', 'wall-refl-controls', 'wall-srd-controls', 'wall-srd-file',
-    'floor-mode-refl', 'floor-mode-srd', 'floor-refl-controls', 'floor-srd-controls', 'floor-srd-file',
-    'ceiling-mode-refl', 'ceiling-mode-srd', 'ceiling-refl-controls', 'ceiling-srd-controls', 'ceiling-srd-file',
-    'bsdf-toggle', 'bsdf-controls', 'view-bsdf-btn', 'bsdf-viewer-panel', 'bsdf-info-display', 
-    'bsdf-incident-angle-select', 'bsdf-polar-plot-canvas',
-
-    // Sensor Panel
-    'illuminance-grid-color', 'view-grid-color', 'bsdf-file',
-    'illuminance-grid-toggle', 'view-grid-toggle', 'illuminance-grid-controls', 
-    'view-grid-controls', 'grid-floor-toggle', 'grid-ceiling-toggle', 'grid-north-toggle', 
-    'grid-south-toggle', 'grid-east-toggle', 'grid-west-toggle', 'floor-grid-controls', 
-    'ceiling-grid-controls', 'wall-grid-controls', 'floor-grid-spacing', 'floor-grid-spacing-val',
-    'floor-grid-offset', 'floor-grid-offset-val', 'ceiling-grid-spacing', 'ceiling-grid-spacing-val',
-    'ceiling-grid-offset', 'ceiling-grid-offset-val', 'wall-grid-spacing', 'wall-grid-spacing-val',
-    'wall-grid-offset', 'wall-grid-offset-val','show-floor-grid-3d-toggle',
-
-    // EN 12464-1 Task/Surrounding Grids
-    'task-area-toggle', 'task-area-controls',
-    'task-area-visualizer-container', 'task-area-canvas',
-    'task-area-start-x', 'task-area-start-x-val', 'task-area-start-z', 'task-area-start-z-val',
-    'task-area-width', 'task-area-width-val', 'task-area-depth', 'task-area-depth-val',
-    'surrounding-area-toggle', 'surrounding-area-controls', 'surrounding-area-width', 'surrounding-area-width-val',
-
-    'show-view-grid-3d-toggle', 'view-grid-spacing', 'view-grid-spacing-val',
-    'view-grid-offset', 'view-grid-offset-val', 'view-grid-directions',
-    'view-grid-start-vec-x', 'view-grid-start-vec-y', 'view-grid-start-vec-z',
-
-    // Viewpoint Panel
-    'panel-viewpoint', 'view-type', 'fpv-toggle-btn', 'gizmo-toggle',
-    'view-pos-x', 'view-pos-x-val', 'view-pos-y', 'view-pos-y-val', 'view-pos-z', 'view-pos-z-val',
-    'view-dir-x', 'view-dir-x-val', 'view-dir-y', 'view-dir-y-val', 'view-dir-z', 'view-dir-z-val',
-    'view-fov', 'view-fov-val', 'view-dist', 'view-dist-val',
-
-    // View Options Panel
-    'transparent-toggle', 'transparency-controls', 'surface-opacity', 'surface-opacity-val', 'ground-plane-toggle', 'ground-grid-controls', 'ground-grid-size', 'ground-grid-size-val', 'ground-grid-divisions', 'ground-grid-divisions-val', 'world-axes-toggle', 'world-axes-size', 'world-axes-size-val',
-    'h-section-toggle', 'h-section-controls', 'h-section-dist', 'h-section-dist-val',
-    'v-section-toggle', 'v-section-controls', 'v-section-dist', 'v-section-dist-val',
-    'live-preview-section', 'preview-date', 'preview-time', 'render-section-preview-btn',
-    'occupancy-toggle', 'occupancy-controls', 'occupancy-schedule-filename',
-    'occupancy-time-range-display', 'occupancy-time-slider-container',
-    'occupancy-time-range-start', 'occupancy-time-range-end', 'generate-occupancy-btn',
-
-    // Lighting Panel
-    'panel-lighting', 'lighting-enabled-toggle', 'lighting-controls-wrapper', 'light-source-color', 'light-type-selector', 
-    'light-geometry-section', 'light-geometry-selector', 'geometry-params-section', 'light-geometry-selector', 
-    'geometry-params-section', 'geo-params-polygon', 'geo-params-sphere', 'geo-sphere-radius', 
-    'geo-params-cylinder', 'geo-cylinder-radius', 'geo-cylinder-length', 
-    'geo-params-ring', 'geo-ring-radius-in', 'geo-ring-radius-out', 
-    'params-light', 'light-rgb-r', 'light-rgb-g', 'light-rgb-b', 
-    'params-spotlight', 'spot-rgb-r', 'spot-rgb-g', 'spot-rgb-b', 
-    'spot-cone-angle', 'spot-dir-x', 'spot-dir-y', 'spot-dir-z', 'spot-normalize-toggle', 
-    'params-glow', 'glow-rgb-r', 'glow-rgb-g', 'glow-rgb-b', 
-    'glow-behavior', 'glow-radius-input-container', 'glow-max-radius', 
-    'params-illum', 'illum-rgb-r', 'illum-rgb-g', 'illum-rgb-b', 'illum-alt-material', 
-    'params-ies', 'ies-file-input', 'ies-units', 'ies-multiplier', 
-    'ies-lamp-type', 'ies-force-color-toggle', 'ies-color-override-inputs', 
-    'ies-color-r', 'ies-color-g', 'ies-color-b', 'placement-mode-individual', 'placement-mode-grid', 
-    'light-pos-x', 'light-pos-y', 'light-pos-z', 'light-rot-x', 'light-rot-y', 'light-rot-z', 
-    'grid-layout-inputs', 'grid-rows', 'grid-cols', 'grid-row-spacing', 'grid-col-spacing',
-    'lighting-power-section', 'lighting-spec-section',
-
-    // Daylighting Controls
-    'ies-photometry-viewer', 'ies-polar-plot-canvas', 'ies-info-display',
-    'luminaire-wattage', 'lpd-display',
-    'luminaire-wattage', 'lpd-display',
-    'daylighting-enabled-toggle', 'daylighting-controls-wrapper', 'daylighting-control-type', 'daylighting-visualize-zones-toggle',
-    'daylighting-zoning-strategy-controls', 'daylighting-zone-strategy-rows', 'daylighting-zone-strategy-cols',
-    'daylight-sensor-count',
-    'daylighting-setpoint', 'daylight-continuous-params', 'daylighting-min-power-frac', 'daylighting-min-power-frac-val', 'daylighting-min-light-frac', 'daylighting-min-light-frac-val',
-    'daylight-stepped-params', 'daylighting-steps', 'daylighting-availability-schedule',
-    'daylight-sensor-controls-container', 'daylight-sensor-1-controls', 'daylight-sensor-2-controls',
-    'daylight-sensor1-x', 'daylight-sensor1-x-val', 'daylight-sensor1-y', 'daylight-sensor1-y-val',
-    'daylight-sensor1-z', 'daylight-sensor1-z-val',
-    'daylight-sensor1-gizmo-toggle',
-    'daylight-sensor2-gizmo-toggle',
-    'daylight-sensor1-dir-x', 'daylight-sensor1-dir-x-val',
-    'daylight-sensor1-dir-y', 'daylight-sensor1-dir-y-val',
-    'daylight-sensor1-dir-z', 'daylight-sensor1-dir-z-val',
-    'daylight-sensor1-percent', 'daylight-sensor1-percent-val',
-    'daylight-sensor2-x', 'daylight-sensor2-x-val',
-    'daylight-sensor2-y', 'daylight-sensor2-y-val',
-    'daylight-sensor2-z', 'daylight-sensor2-z-val',
-    'daylight-sensor2-dir-x', 'daylight-sensor2-dir-x-val',
-    'daylight-sensor2-dir-y', 'daylight-sensor2-dir-y-val',
-    'daylight-sensor2-dir-z', 'daylight-sensor2-dir-z-val',
-    'daylight-sensor2-percent', 'daylight-sensor2-percent-val',
-    'daylighting-zone-visualizer-container', 'daylighting-zone-canvas',
-
-    // EN 12464-1 Specific
-    'maintenance-factor', 'maintenance-factor-val',
-    'light-source-ra', 'light-source-tcp',
-
-    // Results Panel
-    'results-file-input-a', 'results-file-name-a', 'compare-mode-toggle', 'comparison-file-loader',
-    'results-file-input-b', 'results-file-name-b', 'view-mode-selector', 'view-mode-a-btn',
-    'view-mode-b-btn', 'view-mode-diff-btn', 'summary-stats-container', 'summary-a', 'summary-b',
-    'results-min-val-a', 'results-avg-val-a', 'results-max-val-a', 'results-min-val-b',
-    'results-avg-val-b', 'results-max-val-b', 'color-scale-section', 'standard-color-scale',
-    'difference-color-scale', 'difference-legend', 'diff-legend-min-label', 'diff-legend-max-label',
-    'results-dashboard', 'results-legend', 'legend-min-label', 'legend-max-label',
-    'results-scale-min', 'results-scale-min-num',
-
-    // Data Table
-    'data-table-btn', 'data-table-panel', 'data-table-filter-input',
-    'results-data-table', 'data-table-head', 'data-table-body',
-
-    // Spectral Metrics Dashboard
-    'spectral-metrics-dashboard', 'metric-photopic-val', 'metric-melanopic-val', 'metric-neuropic-val',
-
-    // Info Panel & AI Assistant
-    'info-button', 'panel-info', 'ai-assistant-button', 'ai-chat-messages',
-    'ai-chat-form', 'ai-chat-input', 'ai-chat-send', 'ai-mode-select', 'ai-mode-description-box', 
-    'ai-mode-description-text', 'ai-chat-tabs', 'run-inspector-btn', 'ai-inspector-results', 
-    'run-critique-btn', 'ai-critique-results', 'ai-settings-btn', 'ai-settings-modal', 
-    'ai-settings-close-btn', 'ai-settings-form', 'ai-provider-select', 'ai-model-select', 
-    'ai-api-key-input', 'ai-custom-model-input', 'openrouter-info-box',
-
-    // Project Access Prompt
-    'project-access-prompt', 'select-folder-btn', 'dismiss-prompt-btn',
-
-    // Results Analysis Panel
-    'stats-uniformity-val', 'highlight-min-btn', 'highlight-max-btn', 'clear-highlights-btn', 'heatmap-canvas',
-    'heatmap-controls-container', 'heatmap-mode-selector', 'da-threshold-controls', 'da-threshold-slider', 'da-threshold-val',
-
-    // Annual Time-Series Explorer
-    'annual-time-series-explorer', 'time-series-chart', 'time-scrubber', 'time-scrubber-display',
-
-    // HDR Viewer
-    'view-hdr-btn', 'hdr-viewer-panel',
-
-    // Glare Analysis
-    'glare-analysis-dashboard', 'glare-dgp-val', 'glare-source-count', 
-    'glare-source-list', 'clear-glare-highlight-btn',
-
-    // Temporal Map
-    'temporal-map-panel', 'temporal-map-point-id', 'temporal-map-canvas',
-
-    // Annual Glare Rose
-    'annual-glare-controls', 'glare-rose-btn', 'glare-rose-panel',
-    'glare-rose-threshold', 'glare-rose-threshold-val', 'glare-rose-canvas',
-
-    // Combined Analysis
-    'combined-analysis-btn', 'combined-analysis-panel', 'combined-glare-threshold',
-    'combined-glare-threshold-val', 'combined-analysis-canvas',
-
-    'sensor-context-menu', 'set-viewpoint-here-btn',
-
-    // Simulation Console
-    'simulation-console-panel', 'simulation-output', 'simulation-status',
-
-    // Aperture Panel
-    'selected-wall-display', 'wall-select-lock-btn', 'lock-icon-unlocked', 'lock-icon-locked',
-
-    // AI Proactive Suggestions
-    'proactive-suggestion-container',
-
-    'generate-report-btn',
-
-    // Climate Analysis Dashboard
-    'climate-analysis-controls', 'climate-dashboard-btn', 'climate-analysis-panel',
-    'wind-rose-canvas', 'solar-radiation-canvas', 'temperature-chart-canvas',
-
-    // Lighting Energy Dashboard
-    'lighting-energy-dashboard', 'lpd-val', 'energy-val', 'energy-savings-val',
-
-    // Circadian Dashboard
-    'circadian-metrics-dashboard', 'cs-gauge', 'cs-value', 'eml-value', 'cct-value', 'well-compliance-checklist',
-
-    // Metric Selector for 3D View
-    'metric-selector-container', 'metric-selector',
-
-    // Sun Ray Tracing
-    'sun-ray-trace-section', 'sun-ray-date', 'sun-ray-time', 'sun-ray-count',
-    'sun-ray-count-val', 'sun-ray-bounces', 'sun-ray-bounces-val',
-    'sun-rays-visibility-toggle', 'trace-sun-rays-btn',
-    'sun-ray-info-display', 'sun-altitude-val', 'sun-azimuth-val', 'sun-dni-val', 'sun-dhi-val',
-    'sun-ray-tracing-toggle-n', 'sun-ray-tracing-toggle-s', 'sun-ray-tracing-toggle-e', 'sun-ray-tracing-toggle-w',
-
-    // Saved Views
-    'save-view-btn', 'saved-views-list',
-
-    // Context & Site Modeling
-    'context-mode-none', 'context-mode-osm', 'context-mode-massing', 'context-mode-topo',
-    'osm-controls', 'osm-radius', 'osm-radius-val', 'fetch-osm-data-btn', 'context-visibility-toggle',
-    'massing-controls', 'add-massing-block-btn',
-
-    // Enhanced Massing Controls
-    'massing-shape', 'massing-width', 'massing-width-val', 'massing-depth', 'massing-depth-val',
-    'massing-height', 'massing-height-val', 'massing-radius', 'massing-radius-val',
-    'massing-pos-x', 'massing-pos-x-val', 'massing-pos-y', 'massing-pos-y-val', 'massing-pos-z', 'massing-pos-z-val',
-    'massing-count', 'massing-count-val', 'massing-spacing', 'massing-spacing-val',
-    'massing-pattern', 'create-massing-blocks-btn', 'clear-massing-blocks-btn',
-    'massing-info', 'massing-count-display', 'massing-volume-display',
-    'topo-controls', 'topo-heightmap-file', 'topo-plane-size', 'topo-plane-size-val', 'topo-vertical-scale', 'topo-vertical-scale-val',
-    'context-material-controls', 'context-mat-type', 'context-refl', 'context-refl-val',
-
-    // Context Object Management
-    'context-object-management', 'context-object-search', 'context-object-filter',
-    'select-all-objects', 'clear-selection', 'invert-selection',
-    'context-object-list', 'bulk-delete', 'bulk-copy', 'bulk-change-material', 'bulk-select-by-type',
-    'context-object-properties', 'object-info-display', 'obj-name', 'obj-type', 'obj-position',
-    'obj-dimensions', 'obj-volume', 'delete-single-object', 'copy-single-object', 'focus-object',
-
-    // Shortcut Modal
-    'shortcut-help-btn', 'shortcut-help-modal', 'shortcut-modal-close-btn',
-
-    // Recipe Guides
-    'recipe-guides-btn', 'panel-recipe-guides', 'guide-selector', 'guide-content',
-
-    // Custom Asset Importer
-    'custom-asset-importer',
-
-    // EN 17037 Compliance Recipe
-    'en17037-provision-toggle', 'en17037-provision-level',
-    'en17037-sunlight-toggle', 'en17037-sunlight-date', 'en17037-sunlight-level',
-    'en17037-view-toggle', 'en17037-view-level', 'en17037-view-factor-toggle',
-    'en17037-glare-toggle', 'en17037-glare-level',
-];
-
-    ids.forEach(id => { const el = document.getElementById(id); if(el) dom[id] = el; });
-    
-    // Aperture panel IDs are generated dynamically
-    wallDirections.forEach(dir => {
-    const controlIds = [
-            `aperture-controls-${dir}`, `win-count-${dir}`, `win-count-${dir}-val`,
-            `mode-wwr-btn-${dir}`, `mode-manual-btn-${dir}`, `wwr-controls-${dir}`, `manual-controls-${dir}`,
-            `wwr-${dir}`, `wwr-${dir}-val`, `wwr-sill-height-${dir}`, `wwr-sill-height-${dir}-val`,
-            `win-width-${dir}`, `win-width-${dir}-val`, `win-height-${dir}`, `win-height-${dir}-val`, `sill-height-${dir}`, `sill-height-${dir}-val`, `win-depth-pos-${dir}`, `win-depth-pos-${dir}-val`, `win-depth-pos-${dir}-manual`, `win-depth-pos-${dir}-val-manual`,
-            `shading-${dir}-toggle`, `shading-controls-${dir}`, `shading-type-${dir}`, `shading-controls-overhang-${dir}`,
-            `shading-controls-lightshelf-${dir}`, `shading-controls-louver-${dir}`, `overhang-dist-above-${dir}`, `overhang-dist-above-${dir}-val`,
-            `overhang-tilt-${dir}`, `overhang-tilt-${dir}-val`, `overhang-depth-${dir}`, `overhang-depth-${dir}-val`, `overhang-thick-${dir}`, `overhang-thick-${dir}-val`, `overhang-extension-${dir}`, `overhang-extension-${dir}-val`,
-            `lightshelf-placement-ext-${dir}`, `lightshelf-placement-int-${dir}`, `lightshelf-placement-both-${dir}`, `lightshelf-controls-ext-${dir}`,
-            `lightshelf-controls-int-${dir}`, `lightshelf-dist-below-ext-${dir}`, `lightshelf-dist-below-ext-${dir}-val`, `lightshelf-tilt-ext-${dir}`,
-            `lightshelf-tilt-ext-${dir}-val`, `lightshelf-depth-ext-${dir}`, `lightshelf-depth-ext-${dir}-val`, `lightshelf-thick-ext-${dir}`, `lightshelf-thick-ext-${dir}-val`, `lightshelf-dist-below-int-${dir}`,
-            `lightshelf-dist-below-int-${dir}-val`, `lightshelf-tilt-int-${dir}`, `lightshelf-tilt-int-${dir}-val`, `lightshelf-depth-int-${dir}`, `lightshelf-depth-int-${dir}-val`, `lightshelf-thick-int-${dir}`, `lightshelf-thick-int-${dir}-val`,
-            `louver-placement-ext-${dir}`, `louver-placement-int-${dir}`, `louver-slat-orientation-${dir}`, `louver-slat-width-${dir}`, `louver-slat-width-${dir}-val`,
-            `louver-slat-sep-${dir}`, `louver-slat-sep-${dir}-val`, `louver-slat-thick-${dir}`, `louver-slat-thick-${dir}-val`, `louver-slat-angle-${dir}`,
-            `louver-slat-angle-${dir}-val`, `louver-dist-to-glass-${dir}`, `louver-dist-to-glass-${dir}-val`,
-            `shading-controls-roller-${dir}`,
-            `roller-top-opening-${dir}`, `roller-top-opening-${dir}-val`,
-            `roller-bottom-opening-${dir}`, `roller-bottom-opening-${dir}-val`,
-            `roller-left-opening-${dir}`, `roller-left-opening-${dir}-val`,
-            `roller-right-opening-${dir}`, `roller-right-opening-${dir}-val`,
-            `roller-dist-to-glass-${dir}`, `roller-dist-to-glass-${dir}-val`,
-            `roller-solar-trans-${dir}`, `roller-solar-trans-${dir}-val`,
-            `roller-solar-refl-${dir}`, `roller-solar-refl-${dir}-val`,
-            `roller-vis-trans-${dir}`, `roller-vis-trans-${dir}-val`,
-            `roller-vis-refl-${dir}`, `roller-vis-refl-${dir}-val`,
-            `roller-ir-emis-${dir}`, `roller-ir-emis-${dir}-val`,
-            `roller-ir-trans-${dir}`, `roller-ir-trans-${dir}-val`,
-            `roller-thickness-${dir}`, `roller-thickness-${dir}-val`,
-            `roller-conductivity-${dir}`, `roller-conductivity-${dir}-val`,
-            `solar-params-${dir}`, `solar-quality-${dir}`, `solar-threshold-${dir}`, `solar-threshold-val-${dir}`,
-            `solar-epw-file-${dir}`, `solar-analyze-btn-${dir}`, `solar-progress-${dir}`, `solar-progress-fill-${dir}`,
-            `solar-progress-text-${dir}`, `solar-results-${dir}`, `solar-high-hours-${dir}`, `solar-peak-alt-${dir}`,
-            `solar-fin-count-${dir}`, `solar-edit-btn-${dir}`,
-        ];
-        controlIds.forEach(id => { const el = document.getElementById(id); if (el) dom[id] = el; });
-        setupSolarResponsiveControls(dir);
-    });
-}
 
 /**
 * Sets up a MutationObserver to automatically initialize controls
@@ -906,6 +539,8 @@ export function clearSensorHighlights() {
 * @param {'min' | 'max'} type - The type of value to highlight.
 */
 export function highlightSensorPoint(type) {
+    const dom = getDom();
+
     const activeData = resultsManager.getActiveData();
     const activeStats = resultsManager.getActiveStats();
 
@@ -973,7 +608,9 @@ export function highlightPointsByIndices(indices, color = 0xffa500) {
 */
 // This helper function updates the lock icon's appearance based on the state
 function updateLockIcon() {
+    const dom = getDom();
     const lockBtn = dom['wall-select-lock-btn'];
+
     if (!lockBtn) return;
 
     dom['lock-icon-unlocked']?.classList.toggle('hidden', isWallSelectionLocked);
@@ -987,6 +624,8 @@ function updateLockIcon() {
 * @param {string} viewType - The selected view type ('v', 'h', 'c', 'l', 'a').
 */
 function updateFovControlsForViewType(viewType) {
+    const dom = getDom();
+
     const fovSlider = dom['view-fov'];
     // Find the parent container of the FOV slider to hide it entirely for parallel view
     const fovContainer = fovSlider?.closest('.border-t.pt-4.space-y-4');
@@ -1026,6 +665,8 @@ function updateFovControlsForViewType(viewType) {
 * Updates the visibility of the viewpoint gizmo based on the toggle's state.
 */
 function updateGizmoVisibility() {
+    const dom = getDom();
+
     setGizmoVisibility(dom['gizmo-toggle'].checked);
 }
 
@@ -1035,6 +676,8 @@ function updateGizmoVisibility() {
 * @param {object} rect - An object with {x, z, w, d} for the task area.
 */
 function updateSlidersFromCanvas(rect) {
+    const dom = getDom();
+
     const W = parseFloat(dom.width.value);
     const L = parseFloat(dom.length.value);
 
@@ -1068,6 +711,8 @@ function updateSlidersFromCanvas(rect) {
 * Draws the room outline and the task area rectangle on the 2D canvas.
 */
 function drawTaskAreaVisualizer() {
+    const dom = getDom();
+
     if (!taskAreaCtx || !dom['task-area-toggle']?.checked) return;
 
     const container = dom['task-area-visualizer-container'];
@@ -1125,6 +770,8 @@ function drawTaskAreaVisualizer() {
 * Helper to get current task area values from the sliders.
 */
 function getTaskAreaValues() {
+    const dom = getDom();
+
     return {
         x: parseFloat(dom['task-area-start-x'].value),
         z: parseFloat(dom['task-area-start-z'].value),
@@ -1137,6 +784,8 @@ function getTaskAreaValues() {
 * Helper to get all metrics needed for canvas calculations.
 */
 function getCanvasMetrics(e) {
+    const dom = getDom();
+
     const container = dom['task-area-visualizer-container'];
     const W = parseFloat(dom.width.value);
     const L = parseFloat(dom.length.value);
@@ -1222,6 +871,8 @@ function onTaskAreaMouseMove(e) {
 * Handles the mouse up event to end the drag/resize operation.
 */
 function onTaskAreaMouseUp() {
+    const dom = getDom();
+
     isDraggingTaskArea = false;
     isResizingTaskArea = false;
     resizeHandle = null;
@@ -1233,6 +884,8 @@ function onTaskAreaMouseUp() {
 * Sets up all event listeners for the task area visualizer.
 */
 function setupTaskAreaVisualizer() {
+    const dom = getDom();
+
     taskAreaCanvas = dom['task-area-canvas'];
     if (!taskAreaCanvas) return;
     taskAreaCtx = taskAreaCanvas.getContext('2d');
@@ -1259,6 +912,8 @@ function setupTaskAreaVisualizer() {
 // --- END: New functions for Task Area Visualizer ---
 
 export async function setupEventListeners() {
+    const dom = getDom();
+
     // Global listener for all keyboard shortcuts
     window.addEventListener('keydown', handleKeyDown);
 
@@ -1384,6 +1039,7 @@ export async function setupEventListeners() {
             triggerProactiveSuggestion('task_area_enabled');
         }
     });
+
     dom['surrounding-area-toggle']?.addEventListener('change', (e) => {
         dom['surrounding-area-controls']?.classList.toggle('hidden', !e.target.checked);
         scheduleUpdate();
@@ -1461,6 +1117,23 @@ export async function setupEventListeners() {
                 setGizmoVisibility(dom['gizmo-toggle'].checked);
         }
     });
+
+    // Add listeners for the new sun ray tracing toggles in the aperture panel
+    ['n', 's', 'e', 'w'].forEach(dir => {
+        dom[`sun-ray-tracing-toggle-${dir}`]?.addEventListener('change', handleSunRayToggle);
+    });
+
+    dom['sun-rays-visibility-toggle']?.addEventListener('change', async (e) => {
+        const { toggleSunRaysVisibility } = await import('./sunTracer.js');
+        toggleSunRaysVisibility(e.target.checked);
+    });
+
+    dom['ground-plane-toggle']?.addEventListener('change', (e) => {
+        dom['ground-grid-controls']?.classList.toggle('hidden', !e.target.checked);
+        scheduleUpdate();
+    });
+    dom['world-axes-toggle']?.addEventListener('change', scheduleUpdate);
+
 
         ['depth', 'spacing-x', 'spacing-y', 'element-width'].forEach(param => {
         wallDirections.forEach(dir => {
@@ -2077,6 +1750,23 @@ dom['view-bsdf-btn']?.addEventListener('click', openBsdfViewer);
             applySavedView(parseInt(viewItem.dataset.index, 10));
         }
     });
+
+    // Add focus/blur handlers to the AI API key field to prevent password manager interference.
+    // Some extensions are aggressive and cause errors even with autocomplete="off".
+    // By changing the type, we make it look like a normal text field when not in use.
+    const apiKeyInput = dom['ai-secret-field'];
+    if (apiKeyInput) {
+        apiKeyInput.addEventListener('focus', () => {
+            // Use a timeout to ensure this runs after the extension's own focus handlers
+            setTimeout(() => { apiKeyInput.type = 'password'; }, 50);
+        });
+        apiKeyInput.addEventListener('blur', () => {
+            // Only change it back if the field is empty, for security.
+            if (apiKeyInput.value === '') {
+                apiKeyInput.type = 'text';
+            }
+        });
+    }
 }
 
 // --- UI LOGIC & EVENT HANDLERS ---
@@ -2124,6 +1814,8 @@ function updateMetricSelector(spectralData) {
 * @param {string} btnId The ID of the button that controls the panel.
 */
 export function togglePanelVisibility(panelId, btnId) {
+    const dom = getDom();
+
     const panel = document.getElementById(panelId);
     const btn = document.getElementById(btnId);
     if (!panel || !btn) return;
@@ -2197,6 +1889,8 @@ export function togglePanelVisibility(panelId, btnId) {
 * Sets up the click listeners for the new left toolbar buttons.
 */
 function setupPanelToggleButtons() {
+    const dom = getDom();
+
     const panelMap = {
         'toggle-panel-project-btn': 'panel-project',
         'toggle-panel-dimensions-btn': 'panel-dimensions',
@@ -2223,6 +1917,8 @@ function setupPanelToggleButtons() {
 }
 
 function setupAperturePanel() {
+    const dom = getDom();
+
     wallDirections.forEach(dir => {
         const apertureControls = dom[`aperture-controls-${dir}`];
         const shadingToggle = dom[`shading-${dir}-toggle`];
@@ -2587,6 +2283,8 @@ export function makeResizable(element, handles) {
 * @param {HTMLElement} handle The drag handle element.
 */
 function makeSidebarResizable(sidebar, handle) {
+    const dom = getDom();
+
     handle.onmousedown = function(e) {
         e.preventDefault();
         e.stopPropagation();
@@ -2624,6 +2322,8 @@ function makeSidebarResizable(sidebar, handle) {
 * Makes the AI chat input area vertically resizable.
 */
 function makeChatInputResizable() {
+    const dom = getDom();
+
     const handle = dom['chat-resize-handle'];
     const container = dom['ai-chat-input-container'];
     if (!handle || !container) return;
@@ -2658,6 +2358,8 @@ function makeChatInputResizable() {
 }
 
 export function setupSidebar() {
+    const dom = getDom();
+
     // This now controls the AI assistant sidebar on the right.
     dom['ai-assistant-button']?.addEventListener('click', () => {
         const sidebar = dom['right-sidebar'];
@@ -2681,6 +2383,8 @@ export function setupSidebar() {
 }
 
 function setupProjectPanel() {
+    const dom = getDom();
+
     setupEpwUploadModal();
     checkRadiancePath();
 
@@ -2728,6 +2432,8 @@ function setupProjectPanel() {
 }
 
 function setupEpwUploadModal() {
+    const dom = getDom();
+
     const dropArea = dom['modal-file-drop-area'];
     const fileInput = dom['epw-file-input'];
     const modal = dom['epw-upload-modal'];
@@ -2815,7 +2521,9 @@ function setupEpwUploadModal() {
     });
 }
 
-function setCameraView(view) {
+export function setCameraView(view) {
+    const dom = getDom();
+
     console.log(`setCameraView called with view: ${view}`);
 
     // Validate inputs
@@ -2937,6 +2645,8 @@ function setCameraView(view) {
 }
 
 async function handleInputChange(e) {
+    const dom = getDom();
+
     const id = e.target.id;
     const val = e.target.value;
     const valEl = dom[`${id}-val`];
@@ -3020,6 +2730,8 @@ export function updateValueLabel(element, value, unit, id) {
 }
 
 export function updateAllLabels() {
+    const dom = getDom();
+
     Object.keys(dom).forEach(id => {
         const el = dom[id];
         const valEl = dom[`${id}-val`];
@@ -3035,6 +2747,8 @@ export function updateAllLabels() {
 }
 
 export function validateInputs(changedId = null) {
+    const dom = getDom();
+
     const H = parseFloat(dom.height.value);
     const W = parseFloat(dom.width.value);
     const L = parseFloat(dom.length.value);
@@ -3208,6 +2922,8 @@ export function validateInputs(changedId = null) {
 }
 
 export function getWindowParamsForWall(orientation) {
+    const dom = getDom();
+
     const W = parseFloat(dom.width.value), L = parseFloat(dom.length.value), H = parseFloat(dom.height.value);
     const wallWidth = (orientation === 'N' || orientation === 'S') ? W : L;
     const dir = orientation.toLowerCase();
@@ -3260,6 +2976,8 @@ export function getAllWindowParams() {
 }
 
 export function getAllShadingParams() {
+    const dom = getDom();
+
     const params = {};
     wallDirections.forEach(dir => {
         if (!dom[`shading-${dir}-toggle`]?.checked) return; // Use return to skip iteration
@@ -3269,32 +2987,7 @@ export function getAllShadingParams() {
 
         const shadeParams = { type };
 
-        // --- START ADDITION ---
-        if (type === 'generative') {
-            const patternTypeInput = dom[`shading-pattern-type-${dir}`];
-            const patternType = patternTypeInput ? patternTypeInput.value : null;
-            const storedParamsData = project.generativeShadingParams ? project.generativeShadingParams[dir] : null;
-
-            if (!patternType || !storedParamsData) {
-                console.warn(`Generative shading selected for wall ${dir} but pattern type or stored params are missing.`);
-                return; // Skip this wall if essential generative data is missing
-            }
-
-            // Merge stored params (including algorithm-specific ones) with current slider values
-            shadeParams.patternType = patternType;
-            shadeParams.parameters = {
-                ...(storedParamsData.parameters || {}), // Start with stored specific params
-                depth: parseFloat(dom[`shading-generative-depth-${dir}`]?.value || 0.5),
-                spacingX: parseFloat(dom[`shading-generative-spacing-x-${dir}`]?.value || 0.3),
-                spacingY: parseFloat(dom[`shading-generative-spacing-y-${dir}`]?.value || 0.3),
-                elementWidth: parseFloat(dom[`shading-generative-element-width-${dir}`]?.value || 0.05)
-            };
-            // Store the merged result back in the temporary object for this function's scope
-            // No, we don't store back here, just construct the object to return
-
-        }
-        // --- END ADDITION ---
-        else if (type === 'overhang') {
+        if (type === 'overhang') {
             shadeParams.overhang = {
                 depth: parseFloat(dom[`overhang-depth-${dir}`]?.value || 0),
                 tilt: parseFloat(dom[`overhang-tilt-${dir}`]?.value || 0),
@@ -3402,7 +3095,7 @@ export function getSensorGridParams() {
 
     const viewParams = {
         enabled: getChecked('view-grid-toggle'),
-        showIn3D: getChecked('show-view-grid-3d-toggle'),
+        showIn3D: getChecked('show-view-grid-3d-toggle', true), // Default to true if element not found
         spacing: getFloat('view-grid-spacing', 0.75),
         offset: getFloat('view-grid-offset', 1.2),
         numDirs: getInt('view-grid-directions', 6),
@@ -3420,6 +3113,8 @@ export function getSensorGridParams() {
 }
 
 function setProjectionMode(mode, updateViewButtons = true) {
+    const dom = getDom();
+
     const isPersp = mode === 'perspective';
     const oldCam = activeCamera;
     const newCam = isPersp ? perspectiveCamera : orthoCamera;
@@ -3440,6 +3135,8 @@ function setProjectionMode(mode, updateViewButtons = true) {
 updateViewpointFromSliders
 
 export function setWindowMode(dir, mode, triggerUpdate = true) {
+    const dom = getDom();
+
     windowModes[dir] = mode;
     dom[`mode-wwr-btn-${dir}`].classList.toggle('active', mode === 'wwr');
     dom[`mode-manual-btn-${dir}`].classList.toggle('active', mode !== 'wwr');
@@ -3449,6 +3146,8 @@ export function setWindowMode(dir, mode, triggerUpdate = true) {
 }
 
 function updateGridControls() {
+    const dom = getDom();
+
     dom['floor-grid-controls'].classList.toggle('hidden', !dom['grid-floor-toggle'].checked);
     dom['ceiling-grid-controls'].classList.toggle('hidden', !dom['grid-ceiling-toggle'].checked);
     const wallsChecked = ['north', 'south', 'east', 'west'].some(dir => dom[`grid-${dir}-toggle`].checked);
@@ -3457,14 +3156,14 @@ function updateGridControls() {
 }
 
 export async function handleShadingTypeChange(dir, triggerUpdate = true) {
+    const dom = getDom();
+
     const type = dom[`shading-type-${dir}`]?.value;
     if (type === undefined) return;
-    // Include 'generative' and 'imported_obj' in the list of types to manage visibility
-    ['overhang', 'lightshelf', 'louver', 'roller', 'generative', 'imported_obj'].forEach(t => {
-        const controlEl = dom[`shading-controls-${t}-${dir}`];
+        ['overhang', 'lightshelf', 'louver', 'roller', 'imported_obj'].forEach(t => {
+            const controlEl = dom[`shading-controls-${t}-${dir}`];
         if (controlEl) controlEl.classList.toggle('hidden', type !== t);
     });
-
     // Show/Hide Topology specific controls
     const patternType = project.generativeShadingParams?.[dir]?.patternType;
     const topoParamsEl = document.getElementById(`topology-params-${dir}`);
@@ -3485,6 +3184,8 @@ export async function handleShadingTypeChange(dir, triggerUpdate = true) {
 }
 
 function setupShadingPanelButtonGroups(dir) {
+    const dom = getDom();
+
     const lsBtns = { ext: dom[`lightshelf-placement-ext-${dir}`], int: dom[`lightshelf-placement-int-${dir}`], both: dom[`lightshelf-placement-both-${dir}`] };
     Object.keys(lsBtns).forEach(key => {
         if (!lsBtns[key]) return;
@@ -3511,6 +3212,8 @@ function setupShadingPanelButtonGroups(dir) {
 * Provides a one-time reminder to check the Radiance installation path.
 */
 function checkRadiancePath() {
+    const dom = getDom();
+
     if (!dom['radiance-path']) return;
 
     const isWindows = navigator.platform.toUpperCase().indexOf('WIN') !== -1;
@@ -3549,6 +3252,8 @@ function checkRadiancePath() {
 * Shows a prompt asking the user to select a project directory if one hasn't been chosen.
 */
 function promptForProjectDirectory() {
+    const dom = getDom();
+
     // We use localStorage to remember if the user dismissed the prompt.
     if (project.dirHandle || localStorage.getItem('projectPromptDismissed') === 'true') {
         dom['project-access-prompt']?.classList.add('hidden');
@@ -3572,6 +3277,8 @@ function promptForProjectDirectory() {
 }
 
 export function showAlert(message, title = "Notification") {
+    const dom = getDom();
+
     dom['custom-alert-title'].textContent = title;
     dom['custom-alert-message'].innerHTML = message;
     dom['custom-alert'].style.zIndex = getNewZIndex();
@@ -3579,6 +3286,8 @@ export function showAlert(message, title = "Notification") {
 }
 
 function hideAlert() {
+    const dom = getDom();
+
     dom['custom-alert'].classList.replace('flex', 'hidden');
 }
 
@@ -3587,6 +3296,8 @@ function hideAlert() {
 * @param {boolean} enabled - Whether to enable or disable the mode.
 */
 function toggleComparisonMode(enabled) {
+    const dom = getDom();
+
     dom['comparison-file-loader']?.classList.toggle('hidden', !enabled);
 
     if (!enabled) {
@@ -3608,6 +3319,8 @@ function toggleComparisonMode(enabled) {
 * @param {'a' | 'b' | 'diff'} mode - The view mode to activate.
 */
 function setViewMode(mode) {
+    const dom = getDom();
+
     resultsManager.activeView = mode;
 
     // Update button active states
@@ -3632,6 +3345,8 @@ function setViewMode(mode) {
 * Sets up the theme switcher functionality for multiple themes.
 */
 export function setupThemeSwitcher() {
+    const dom = getDom();
+
     const lightBtn = dom['theme-btn-light'];
     const darkBtn = dom['theme-btn-dark'];
     const cyberBtn = dom['theme-btn-cyber'];
@@ -3751,6 +3466,8 @@ let timeSeriesChart = null;
 * Clears all UI elements related to results visualization.
 */
 export async function clearAllResultsDisplay() {
+    const dom = getDom();
+
     // Clear all previous results visualizations from all panels
     if (dom['data-table-btn']) dom['data-table-btn'].classList.add('hidden');
     if (dom['data-table-panel']) dom['data-table-panel'].classList.add('hidden');
@@ -3784,6 +3501,8 @@ export async function clearAllResultsDisplay() {
 * @param {File} file The results file selected by the user.
 */
 async function handleResultsFile(file, key) {
+    const dom = getDom();
+
     if (!file) return;
 
     const fileNameDisplay = dom[`results-file-name-${key}`];
@@ -3927,6 +3646,8 @@ async function handleResultsFile(file, key) {
 * @param {object} stats - The statistics object from resultsManager.
 */
 function updateResultsDashboard() {
+    const dom = getDom();
+
     const statsA = resultsManager.datasets.a?.stats;
     const statsB = resultsManager.datasets.b?.stats;
     const activeStats = resultsManager.getActiveStats();
@@ -4009,6 +3730,8 @@ function updateResultsDashboard() {
 * Draws the color gradient legend on its canvas.
 */
 function updateResultsLegend() {
+    const dom = getDom();
+
     const canvas = dom['results-legend'];
     if (!canvas) return;
 
@@ -4034,6 +3757,8 @@ function updateResultsLegend() {
 * Draws the color gradient legend for the difference map.
 */
 function updateDifferenceLegend() {
+    const dom = getDom();
+
     const canvas = dom['difference-legend'];
     if (!canvas) return;
 
@@ -4059,6 +3784,8 @@ dom['diff-legend-max-label'].textContent = `+${maxAbs.toFixed(0)}`;
 }
 
 export function updateViewpointFromSliders() {
+    const dom = getDom();
+
     // If the camera is currently being updated by the gizmo-to-slider sync,
     // don't process this slider input to prevent a feedback loop.
     if (isUpdatingCameraFromSliders) {
@@ -4137,6 +3864,8 @@ async function onSensorClick(event) {
  * @param {number} [imageHeight=1500] - The height of the source fisheye image.
  */
 function projectGlareSource(pixelPos, imageWidth, imageHeight) {
+    const dom = getDom();
+
     // Fallback to default dimensions if not provided, enhancing robustness.
     const effectiveWidth = imageWidth || 1500;
     const effectiveHeight = imageHeight || 1500;
@@ -4202,6 +3931,8 @@ function projectGlareSource(pixelPos, imageWidth, imageHeight) {
 * @param {object} glareResult - The parsed glare result object from resultsManager.
 */
 function populateGlareSourceList(glareResult) {
+    const dom = getDom();
+
     const list = dom['glare-source-list'];
     if (!list || !glareResult || !glareResult.sources) return;
 
@@ -4242,6 +3973,8 @@ function populateGlareSourceList(glareResult) {
 * @param {'a' | 'b' | null} key - The dataset key to display, or null to clear.
 */
 function updateSpectralMetricsDashboard(key) {
+    const dom = getDom();
+
     const dashboard = dom['spectral-metrics-dashboard'];
     if (!dashboard) return;
 
@@ -4289,6 +4022,8 @@ dom['clear-glare-highlight-btn']?.addEventListener('click', () => {
 * @param {MouseEvent} event The contextmenu event.
 */
 function onSensorRightClick(event) {
+    const dom = getDom();
+
     // Hide the menu first to handle cases where it's already open
     dom['sensor-context-menu'].classList.add('hidden');
 
@@ -4333,6 +4068,8 @@ function onSensorRightClick(event) {
  * @param {number} value - The new numeric value for the slider.
  */
 function _updateViewpointSliderAndDispatch(id, value) {
+    const dom = getDom();
+
     const slider = dom[id];
     if (!slider) return;
 
@@ -4354,6 +4091,8 @@ function _updateViewpointSliderAndDispatch(id, value) {
  * @param {string} mode - The desired gizmo mode ('translate', 'rotate', 'scale').
  */
 function setAndDisplayGizmoMode(mode) {
+    const dom = getDom();
+
     setGizmoMode(mode); 
 
     // Update UI button states
@@ -4366,6 +4105,8 @@ function setAndDisplayGizmoMode(mode) {
 * Handles the click event for the "Set Viewpoint Here" button in the context menu.
 */
 function onSetViewpointHere() {
+    const dom = getDom();
+
     const menu = dom['sensor-context-menu'];
     const pointString = menu.dataset.point;
     if (!pointString) return;
@@ -4421,6 +4162,8 @@ function onSetViewpointHere() {
 Sets up the welcome screen with interactive visual effects that can be cycled through.
 */
 export function setupWelcomeScreen() {
+    const dom = getDom();
+
     const welcomeScreen = document.getElementById('welcome-screen');
     const canvas = document.getElementById('glow-canvas');
     if (!welcomeScreen || !canvas) return;
@@ -4644,6 +4387,8 @@ export function setupWelcomeScreen() {
 * @param {MouseEvent} event The click event.
 */
 function onSceneClick(event) {
+    const dom = getDom();
+
     // Prevent selection when interacting with gizmos
     if (transformControls.dragging || sensorTransformControls.dragging) {
         return;
@@ -4716,6 +4461,8 @@ function handleWallDeselection() {
 * @param {string|null} id - The canonical ID ('n', 's', 'e', 'w') of the wall, or null to hide all.
 */
 function showApertureControlsFor(id) {
+    const dom = getDom();
+
     const wallNames = { n: 'North', s: 'South', e: 'East', w: 'West' };
 
     // Hide all wall control panels first
@@ -4746,6 +4493,8 @@ function showApertureControlsFor(id) {
  * @param {THREE.Object3D} object The object that was clicked.
  */
 function selectTransformableObject(object) {
+    const dom = getDom();
+
     handleWallDeselection(); // Deselect any walls first
     transformControls.attach(object);
     dom['transform-controls-section']?.classList.remove('hidden');
@@ -4818,6 +4567,8 @@ function handleDeselection() {
 * @private
 */
 function _updateLivePreviewVisibility() {
+    const dom = getDom();
+
     if (!project.epwFileContent) return; // Don't show if no EPW is loaded
     const hEnabled = dom['h-section-toggle']?.checked;
     const vEnabled = dom['v-section-toggle']?.checked;
@@ -4829,6 +4580,8 @@ function _updateLivePreviewVisibility() {
 * Orchestrates the live rendering process and displays the result.
 */
 async function handleRenderPreview() {
+    const dom = getDom();
+
     if (!project.epwFileContent) {
         showAlert('Please load an EPW weather file in the Project Setup panel before rendering a preview.', 'Weather Data Missing');
         return;
@@ -4876,6 +4629,8 @@ async function handleRenderPreview() {
 * @private
 */
 function _updateLpdDisplay() {
+    const dom = getDom();
+
     if (!dom['lpd-display'] || !dom['luminaire-wattage']) return;
 
     const W = parseFloat(dom.width.value);
@@ -4942,6 +4697,8 @@ export function getViewpointFileContent(forceFisheye = false) {
  * @param {string} htmlContent - The inner HTML for the suggestion, which may contain <strong data-action="..."> tags.
  */
 export function displayProactiveSuggestion(htmlContent) {
+    const dom = getDom();
+
     const container = dom['proactive-suggestion-container'];
     if (!container) return;
 
@@ -5040,6 +4797,8 @@ export function highlightSensorByIndex(index) {
 * This function handles sorting and rendering the table rows.
 */
 function populateDataTable() {
+    const dom = getDom();
+
     const tableBody = dom['data-table-body'];
     const tableHead = dom['data-table-head'];
     
@@ -5108,6 +4867,8 @@ function populateDataTable() {
 * @param {number} percent - The new fraction for sensor 1 (0 to 1).
 */
 function updateZoneSlidersFromCanvas(percent) {
+    const dom = getDom();
+
     const s1 = dom['daylight-sensor1-percent'];
     const s2 = dom['daylight-sensor2-percent'];
     if (!s1 || !s2) return;
@@ -5134,6 +4895,8 @@ function updateZoneSlidersFromCanvas(percent) {
 * Draws the room outline and colored zones on the 2D canvas.
 */
 function drawDaylightingZoneVisualizer() {
+    const dom = getDom();
+
     if (!zoneCtx || !dom['daylighting-enabled-toggle']?.checked) return;
 
     const container = dom['daylighting-zone-visualizer-container'];
@@ -5204,6 +4967,8 @@ function drawDaylightingZoneVisualizer() {
 * Handles the mouse down event on the zone canvas to initiate dragging.
 */
 function onZoneMouseDown(e) {
+    const dom = getDom();
+
     const isCols = dom['daylighting-zone-strategy-cols'].classList.contains('active');
     const W = parseFloat(dom.width.value);
     const L = parseFloat(dom.length.value);
@@ -5229,6 +4994,8 @@ function onZoneMouseDown(e) {
 * Handles the mouse move event to update the zone divider and cursor style.
 */
 function onZoneMouseMove(e) {
+    const dom = getDom();
+
     const container = dom['daylighting-zone-visualizer-container'];
     const isCols = dom['daylighting-zone-strategy-cols'].classList.contains('active');
     const W = parseFloat(dom.width.value);
@@ -5273,6 +5040,8 @@ function onZoneMouseUp() {
 * Sets up all event listeners for the daylighting zone visualizer.
 */
 function setupDaylightingZoneVisualizer() {
+    const dom = getDom();
+
     zoneCanvas = dom['daylighting-zone-canvas'];
     if (!zoneCanvas) return;
     zoneCtx = zoneCanvas.getContext('2d');
@@ -5299,6 +5068,8 @@ function setupDaylightingZoneVisualizer() {
 * Filters the visible rows in the data table based on the filter input field.
 */
 function filterDataTable() {
+    const dom = getDom();
+
     const input = dom['data-table-filter-input'];
     const tableBody = dom['data-table-body'];
         if (!input || !tableBody) return;
@@ -5344,6 +5115,8 @@ function filterDataTable() {
 * Opens the BSDF viewer panel and triggers parsing and rendering of the BSDF data.
 */
 async function openBsdfViewer() {
+    const dom = getDom();
+
     const { _parseBsdfXml } = await import('./radiance.js');
     const bsdfFile = project.simulationFiles['bsdf-file'];
 
@@ -5399,6 +5172,8 @@ async function openBsdfViewer() {
  * Renders the list of saved camera views in the UI.
  */
 function renderSavedViews() {
+    const dom = getDom();
+
     const listContainer = dom['saved-views-list'];
     if (!listContainer) return;
 
@@ -5428,6 +5203,8 @@ function renderSavedViews() {
  * Captures the current camera view and adds it to the saved views list.
  */
 async function saveCurrentView() {
+    const dom = getDom();
+
     const { getCameraState, captureSceneSnapshot } = await import('./scene.js');
     const cameraState = getCameraState();
     const thumbnail = captureSceneSnapshot(128); // 128px wide thumbnail
@@ -5450,6 +5227,8 @@ async function saveCurrentView() {
  * @param {number} index - The index of the view to apply in the savedViews array.
  */
 async function applySavedView(index) {
+    const dom = getDom();
+
     if (index < 0 || index >= savedViews.length) return;
     const { applyCameraState } = await import('./scene.js');
     const view = savedViews[index];
@@ -5473,6 +5252,8 @@ async function applySavedView(index) {
  * Sets up event listeners and logic for the Context & Site Modeling panel.
  */
 async function setupContextControls() {
+    const dom = getDom();
+
     const { contextObject, clearContextObjects, updateContextMaterial, createContextFromOsm } = await import('./geometry.js');
 
     const toggleContextMode = (mode) => {
@@ -5578,6 +5359,8 @@ async function setupContextControls() {
  * @param {number} index - The index of the view to delete from the savedViews array.
  */
 function deleteSavedView(index) {
+    const dom = getDom();
+
     if (index < 0 || index >= savedViews.length) return;
     savedViews.splice(index, 1);
     // Re-name subsequent views to keep numbering consistent
@@ -5612,6 +5395,8 @@ export function getSavedViews() {
 * @param {number} incidentIndex - The index of the incident angle to display.
 */
 function renderBsdfPlot(bsdfData, incidentIndex) {
+    const dom = getDom();
+
     const canvas = dom['bsdf-polar-plot-canvas'];
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -5680,6 +5465,8 @@ function renderBsdfPlot(bsdfData, incidentIndex) {
 * @param {Event} event - The change event from the checkbox.
 */
 function handleSunRayToggle(event) {
+    const dom = getDom();
+
     const sunRaySection = dom['sun-ray-trace-section'];
     if (!sunRaySection) return;
 
@@ -5708,6 +5495,8 @@ function handleSunRayToggle(event) {
 * Gathers parameters and initiates the sun ray tracing visualization.
 */
 async function handleSunRayTrace() {
+    const dom = getDom();
+
 if (!project.epwFileContent) {
     showAlert('Please load an EPW weather file in the Project Setup panel before tracing sun rays.', 'Weather Data Missing');
     return;
@@ -5751,6 +5540,8 @@ await new Promise(resolve => setTimeout(resolve, 10));
  * @private
  */
 function _setupAssetLibraryDragDrop() {
+    const dom = getDom();
+
     const assetLibrary = dom['asset-library'];
     const renderContainer = dom['render-container'];
     if (!assetLibrary || !renderContainer) return;
@@ -5883,6 +5674,8 @@ function _setupAssetLibraryDragDrop() {
 * @private
 */
 function _updateTransformSlidersFromObject(object) {
+    const dom = getDom();
+
     if (!object) return;
 
     // Position
@@ -5909,6 +5702,8 @@ function _updateTransformSlidersFromObject(object) {
 * @private
 */
 function _updateObjectFromTransformSliders() {
+    const dom = getDom();
+
     const object = transformControls.object;
     if (!object) return;
 
@@ -5932,6 +5727,8 @@ function _updateObjectFromTransformSliders() {
 * @private
 */
 async function _removeSelectedObject() {
+    const dom = getDom();
+
     const object = transformControls.object;
     if (!object) {
         return; // Nothing selected, do nothing.
@@ -5968,6 +5765,8 @@ async function _removeSelectedObject() {
  * Handles the pointer down event to initiate a resize drag or prepare for a click.
  */
 function onPointerDown(event) {
+    const dom = getDom();
+
     if (event.button !== 0) return;
     pointerDownPosition.set(event.clientX, event.clientY);
 
@@ -6008,6 +5807,8 @@ function onPointerDown(event) {
  * Handles the pointer move event to perform the resize and update the UI.
  */
 function onPointerMove(event) {
+    const dom = getDom();
+
     if (isResizeMode) {
         updateResizeCursor(event); // Update cursor style on hover
     }
@@ -6075,6 +5876,8 @@ function onPointerUp(event) {
  * Contains the logic for selecting objects in the scene, formerly in onSceneClick.
  */
 function handleSceneClick(event) {
+    const dom = getDom();
+
     if (transformControls.dragging || sensorTransformControls.dragging || isResizeMode) return;
 
     const { isQuadView, topCamera, frontCamera, sideCamera } = MESH;
@@ -6178,6 +5981,8 @@ function updateResizeCursor(event) {
 }
 
 export function switchGeometryMode(mode) {
+    const dom = getDom();
+
 const isParametric = mode === 'parametric';
 
 // Toggle button active state
@@ -6208,6 +6013,8 @@ dom['import-controls']?.classList.toggle('hidden', isParametric);
 }
 
 async function handleModelImport() {
+    const dom = getDom();
+
 const { loadImportedModel } = await import('./geometry.js');
 const fileInput = dom['import-obj-file'];
 
@@ -6268,6 +6075,8 @@ try {
 }
 
 function openMaterialTagger(materials) {
+    const dom = getDom();
+
 const template = document.getElementById('template-material-tagger');
 if (!template) return;
 
@@ -6316,6 +6125,8 @@ ensureWindowInView(taggerPanel);
  * @private
  */
 function setupMassingTools() {
+    const dom = getDom();
+
     // Shape selection radio buttons
     const shapeRadios = document.querySelectorAll('input[name="massing-shape"]');
     shapeRadios.forEach(radio => {
@@ -6390,6 +6201,8 @@ function setupMassingTools() {
  * @private
  */
 function handleMassingShapeChange() {
+    const dom = getDom();
+
     const selectedShape = document.querySelector('input[name="massing-shape"]:checked').value;
     const boxDimensions = dom['box-dimensions'];
     const radiusDimension = dom['radius-dimension'];
@@ -6417,6 +6230,8 @@ function handleMassingShapeChange() {
  * @private
  */
 function updateMassingInfo() {
+    const dom = getDom();
+
     const shape = document.querySelector('input[name="massing-shape"]:checked').value;
     const count = parseInt(dom['massing-count'].value);
     const infoEl = dom['massing-info'];
@@ -6454,6 +6269,8 @@ function updateMassingInfo() {
  * @private
  */
 async function createMassingBlocks() {
+    const dom = getDom();
+
     const shape = document.querySelector('input[name="massing-shape"]:checked').value;
     const count = parseInt(dom['massing-count'].value);
     const spacing = parseFloat(dom['massing-spacing'].value);
@@ -6527,6 +6344,8 @@ async function clearAllMassingBlocks() {
  * @private
  */
 function _setValueAndLabel(id, value, unit) {
+    const dom = getDom();
+
     const slider = dom[id];
     if (!slider) return;
     slider.value = value;
@@ -6541,6 +6360,8 @@ function _setValueAndLabel(id, value, unit) {
  * @private
  */
 async function _updateSelectedMassingBlock() {
+    const dom = getDom();
+
     const object = transformControls.object;
     if (!object || !object.userData.isMassingBlock) return;
 
@@ -6776,6 +6597,8 @@ function generateGenericFlowchart() {
  * Parses the guide text, generates enhanced flowcharts, and sets up the recipe guides panel.
  */
 function setupRecipeGuidesPanel() {
+    const dom = getDom();
+
     const guideText = `
 # Guide to the "Illuminance Map" Recipe
 

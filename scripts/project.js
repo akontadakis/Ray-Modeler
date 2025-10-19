@@ -944,16 +944,10 @@ class Project {
                 setValue(`shading-type-${dir}`, shadingData.type);
                 ui.handleShadingTypeChange(dir, false); // This reveals the correct controls panel
 
-                if (shadingData.type === 'generative') {
-                    // As per the plan, call new UI functions to restore generative shading state
-                    ui.storeGenerativeParams(dir, shadingData.patternType, shadingData.parameters);
-                    ui.setGenerativeSliderValues(dir, shadingData.parameters);
-                } else {
                     // Handle existing, non-generative shading types
                     if (shadingData.overhang) Object.keys(shadingData.overhang).forEach(p => setValue(`overhang-${p}-${dir}`, shadingData.overhang[p]));
                     if (shadingData.lightshelf) Object.keys(shadingData.lightshelf).forEach(p => setValue(`lightshelf-${p}-${dir}`, shadingData.lightshelf[p]));
                     if (shadingData.louver) Object.keys(shadingData.louver).forEach(p => setValue(`louver-${p}-${dir}`, shadingData.louver[p]));
-                }
             }
         });
 
