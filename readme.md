@@ -3,9 +3,7 @@
 > **Editor's Note:** This is a passion project that I've been developing for the past year, primarily as a learning exercise. It is not intended for commercial use but rather as a tool to help others explore, learn, and understand Radiance simulations and how they can improve building design.
 > Please consider this a **beta version**. The intent is to improve it over time, but many features have not been extensively tested. If you run into a bug, your feedback would be greatly appreciated!
 
-Ray Modeler is a web-based graphical user interface for the Radiance Lighting Simulation Suite, with an integrated AI Assistant to automate workflows and provide expert guidance. It streamlines the entire daylighting and electric lighting analysis workflow, from parametric 3D modeling to simulation script generation and advanced results visualization.
-
-Ray Modeler provides an intuitive, interactive environment to model, simulate, and analyze lighting performance in single-zone spaces without needing to write Radiance code manually.
+Ray Modeler is a desktop application providing a graphical user interface (GUI) for the Radiance Lighting Simulation Suite. Integrated with an AI Assistant, it streamlines daylighting and electric lighting analysis, from 3D modeling to simulation and results visualization.
 
 ![Ray Modeler Welcome Screen](./Pictures/welcome_screen.png)
 
@@ -15,7 +13,7 @@ Ray Modeler provides an intuitive, interactive environment to model, simulate, a
   - [Table of Contents](#table-of-contents)
   - [🚀 Getting Started](#-getting-started)
   - [✨ Core Capabilities](#-core-capabilities)
-  - [🤖 AI Assistant](#-ai-assistant)
+  - [🤖 AI Assistant (Helios)](#-ai-assistant-helios)
     - [AI-Powered Actions (Tool Use)](#ai-powered-actions-tool-use)
     - [Design Inspector](#design-inspector)
     - [Results Critique](#results-critique)
@@ -46,8 +44,7 @@ Ray Modeler provides an intuitive, interactive environment to model, simulate, a
 
 ## 🚀 Getting Started
 
-To use Ray Modeler, you will need a modern web browser and a local installation of the Radiance Lighting Simulation Suite.
-The desktop version provides the most seamless experience.
+To use Ray Modeler, you need a modern web browser and a local installation of the Radiance Lighting Simulation Suite. The desktop version (recommended) offers the best experience.
 
 1. **Install Radiance**:
    Download and install [Radiance](https://www.radiance-online.org/) from the official website or the [NREL](https://github.com/NREL/Radiance) GitHub repository. Ensure the Radiance `bin` directory is in your system's PATH.
@@ -56,12 +53,12 @@ The desktop version provides the most seamless experience.
    Download the latest release for your operating system (macOS or Windows) from the project's Releases page.
 
 3. **Run the Application**:
-   - *Windows*: Run the Ray Modeler Setup X.X.X.exe installer.
-   - *macOS*: Open the Ray Modeler-X.X.X.dmg and drag the application to your Applications folder.
+   - *Windows*: Run the Ray Modeler Setup `.exe` installer.
+   - *macOS*: Open the Ray Modeler `.dmg` and drag the application to your Applications folder.
 
-Security Warnings on First Launch:
+**Security Warnings on First Launch**:
 
-Because the application is not yet code-signed, your operating system will likely show a security warning. When a user on a Mac downloads and tries to open the unsigned app, they will be stopped by Gatekeeper, which will show a message like "Ray Modeler cannot be opened because the developer cannot be verified."
+Because the app isn't code-signed, your OS might show a security warning. When a user on a Mac downloads and tries to open the unsigned app, they will be stopped by Gatekeeper, which will show a message like "Ray Modeler cannot be opened because the developer cannot be verified."
 
 - **On Windows (SmartScreen)**: Click "**More info**", then click "**Run anyway**".
 
@@ -71,23 +68,23 @@ Because the application is not yet code-signed, your operating system will likel
 
 Ray Modeler is packed with features that automate and enhance the Radiance workflow:
 
-- **Parametric Scene Modeling**: Visually define room dimensions, orientation, window-to-wall ratios (WWR), and complex shading devices like overhangs, light shelves, louvers, and roller shades.
+- **Parametric Scene Modeling**: Define room dimensions, orientation, window-to-wall ratios (WWR), and shading devices like overhangs, light shelves, louvers, and roller shades.
 
-- **Geometry Importer**: Import complex models from `.obj` files, with an interactive UI to tag surfaces (walls, floors, glazing) for accurate simulation setup.
+- **Geometry Importer**: Import `.obj` models, with an interactive UI to tag surfaces (walls, floors, glazing) for simulation setup.
 
-- **Context & Site Modeling**: Improve simulation accuracy by adding surrounding context, either through simple massing tools, topography from heightmaps, or by automatically fetching building data from OpenStreetMaps.
+- **Context & Site Modeling**: Adding surrounding context, either through simple massing tools, topography from heightmaps, or by automatically fetching building data from OpenStreetMaps.
 
-- **Interior Furniture Library**: Place simple furniture and partition objects from a pre-built library via drag-and-drop to create more realistic interior scenes.
+- **Interior Furniture Library**: Place simple furniture and partition objects from a pre-built library via drag-and-drop or import custom `.obj` assets..
 
 - **Radiance Material Editor**: Configure standard Radiance materials (`plastic`, `metal`, `glass`) by adjusting properties like reflectance, specularity, and roughness. It also supports spectral data (`.dat`) files for advanced material definitions.
 
-- **Advanced Glazing Systems**: Model glazing using simple transmittance values or incorporate complex fenestration data via Bidirectional Scattering Distribution Function (BSDF) `.xml` files. The application correctly converts intuitive transmittance to physically-based transmissivity for simulations.
+- **Advanced Glazing Systems**: Model glazing using simple transmittance values or incorporate complex fenestration data via Bidirectional Scattering Distribution Function (BSDF) `.xml` files. The application converts intuitive transmittance to physically-based transmissivity for simulations.
 
-- **Interactive BSDF Viewer**: Demystify complex glazing by providing immediate visual feedback. When a BSDF `.xml` file is loaded, the application can parse the Klems matrix and render an interactive 2D polar plot showing the angular distribution of transmitted light for any incident angle.
+- **Interactive BSDF Viewer**: When a BSDF `.xml` file is loaded, the application can parse the Klems matrix and render an interactive 2D polar plot showing the angular distribution of transmitted light for any incident angle.
 
-- **Electric Lighting Design**: Place and configure multiple Radiance light source types (light, spotlight, glow, illum) or import real-world luminaire data using IES photometric files in individual or grid-based layouts.
+- **Electric Lighting Design**: Place and configure Radiance light source types (light, spotlight, glow, illum) or import luminaire data using `.ies` photometric files in individual or grid-based layouts.
 
-- **Advanced IES Photometry Viewer**: In addition to a 2D polar plot, visualize luminaire distributions with an interactive 3D photometric web and view key metadata like lumens and wattage directly from the `.ies` file.
+- **IES Photometry Viewer**: In addition to a 2D polar plot, visualize luminaire distributions with an interactive 3D photometric web and view key metadata like lumens and wattage directly from the `.ies` file.
 
 - **Daylighting Controls**: Simulate energy savings by implementing photosensor-controlled lighting systems with continuous, stepped, or off modes.
 
@@ -101,7 +98,7 @@ Ray Modeler is packed with features that automate and enhance the Radiance workf
 
 - **Advanced Annual Analysis**: Generate and view temporal heatmaps, glare rose diagrams, and combined daylight/glare scatter plots to deeply understand annual performance.
 
-- **Recipe-Based Simulation Engine**: Automate complex Radiance workflows with pre-configured "recipes." The application generates all necessary geometry files, material definitions, and executable run scripts (`.sh`, `.bat`) in a standardized project folder.
+- **Recipe-Based Simulation Engine**: Automate complex Radiance workflows with pre-configured "recipes." The application generates all necessary geometry files, material definitions, and executable run scripts (`.sh`, `.bat`) in a standardized project folder. Includes recipes for `IES LM-83 (sDA/ASE)`, `EN 17037`, and `EN 12464-1`.
 
 - **Advanced Annual Methods**: Support for industry-standard annual simulation methods, including 3-Phase and 5-Phase Daylight Analysis.
 
@@ -115,7 +112,7 @@ Ray Modeler is packed with features that automate and enhance the Radiance workf
 
 - **File System Integration**: Using the File System Access API (or Electron's APIs), Ray Modeler can directly read from and save to a local project folder, enabling a seamless desktop-like experience.
   
-- **AI Assistant**: An integrated, context-aware AI chat powered by generative AI (Google Gemini or models via OpenRouter) that can answer questions and directly manipulate the scene, run simulations, and control the UI using natural language commands.
+- **AI Assistant (Helios)**: An integrated, context-aware AI chat powered by generative AI (Google Gemini, Anthropic, OpenAI, OpenRouter models) to help answer questions and directly manipulate the scene, run simulations, and control the UI using natural language commands.
 
 - **Automated Report Generation**: Generate comprehensive HTML reports with a single click. The report includes project details, a 3D scene snapshot, key performance metrics (sDA, ASE, DGP), and all generated dashboard charts (UDI, Glare Rose), ready for printing or saving as a PDF.
 
@@ -127,17 +124,13 @@ Ray Modeler is packed with features that automate and enhance the Radiance workf
 
 - **Advanced Circadian Health Dashboard**: Analyze results from spectral simulations to calculate and visualize key circadian lighting metrics like Circadian Stimulus (CS), Equivalent Melanopic Lux (EML), and check for compliance with WELL building standards.
 
-- **Advanced IES Photometry Viewer**: In addition to a 2D polar plot, visualize luminaire distributions with an interactive 3D photometric web and view key metadata like lumens and wattage directly from the `.ies` file.
-
-- **Interactive 3D Room Resizing**: A "Resize Mode" that allows you to directly manipulate the room's dimensions in the 3D viewport by dragging its exterior faces, providing immediate tactile feedback.
-
 - **Keyboard Shortcuts**: Accelerate your workflow with keyboard shortcuts for common actions, such as `T` for Top View, `P` for Perspective, and `Ctrl+S` to save the project. A help modal (`?`) displays all available shortcuts.
 
 - **Multi-View Layout (Quad View)**: Split the main viewport into four synchronized cameras (Perspective, Top, Front, Side) for comprehensive spatial awareness and precise object placement, a standard in professional 3D software.
 
 - **Vegetation & Tree Modeling**: Add simple procedural trees and bushes from the Scene Elements library to your site. The vegetation canopy uses a Radiance `trans` material to accurately simulate its light-filtering effects, improving the realism of site-specific analyses.
 
-## 🤖 AI Assistant
+## 🤖 AI Assistant (Helios)
 
 The AI Assistant panel provides a chat interface to help you with your workflow. It understands the application's current state and can perform actions on your behalf using natural language commands.
 

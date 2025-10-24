@@ -55,9 +55,12 @@ app.whenReady().then(() => {
   ipcMain.on('run-script', (event, { projectPath, scriptName }) => {
     const scriptPath = path.join(projectPath, '07_scripts', scriptName);
     const isWindows = process.platform === 'win32';
-    const command = isWindows ? `cd "${path.dirname(scriptPath)}" && ${scriptName}` : `chmod +x "${scriptPath}" && "${scriptPath}"`;
+    const scriptDir = path.dirname(scriptPath); // Get the script's directory
+    // For Windows, the command is just the script name. Rely on 'cwd'.
+    // For non-Windows, ensure executable and run.
+    const command = isWindows ? scriptName : `chmod +x "${scriptPath}" && "${scriptPath}"`;
 
-    const child = exec(command, { cwd: path.join(projectPath, '07_scripts') });
+    const child = exec(command, { cwd: scriptDir }); // Set cwd to the script's directory
 
     child.stdout.on('data', (data) => {
       event.sender.send('script-output', data.toString());
@@ -84,14 +87,15 @@ ipcMain.handle('run-script-headless', async (event, { projectPath, scriptContent
     await fs.writeFile(scriptPath, scriptContent);
 
     return new Promise((resolve) => {
-      const isWindows = process.platform === 'win32';
-      // Make executable on non-windows, then run.
-      const command = isWindows 
-        ? `cd "${scriptDir}" && ${finalScriptName}` 
-        : `chmod +x "${scriptPath}" && "${scriptPath}"`;
+    const isWindows = process.platform === 'win32';
+    // For Windows, the command is just the script name. Rely on 'cwd'.
+    // For non-Windows, ensure executable and run.
+    const command = isWindows
+      ? finalScriptName
+      : `chmod +x "${scriptPath}" && "${scriptPath}"`;
 
-      exec(command, { cwd: scriptDir }, (error, stdout, stderr) => {
-        // Clean up the temporary script
+    exec(command, { cwd: scriptDir }, (error, stdout, stderr) => {
+      // Clean up the temporary script
         if (!scriptName) {
           fs.unlink(scriptPath).catch(err => console.error("Failed to delete temp script:", err));
         }
@@ -130,11 +134,13 @@ ipcMain.handle('run-simulations-parallel', async (event, { simulations }) => {
                       await fs.mkdir(scriptDir, { recursive: true });
                       await fs.writeFile(scriptPath, task.scriptContent);
 
-                      const isWindows = process.platform === 'win32';
-                      const command = isWindows ? `cd "${scriptDir}" && ${finalScriptName}` : `chmod +x "${scriptPath}" && "${scriptPath}"`;
+                  const isWindows = process.platform === 'win32';
+                  // For Windows, the command is just the script name. Rely on 'cwd'.
+                  // For non-Windows, ensure executable and run.
+                  const command = isWindows ? finalScriptName : `chmod +x "${scriptPath}" && "${scriptPath}"`;
 
-                      exec(command, { cwd: scriptDir }, (error, stdout, stderr) => {
-                          if (!task.scriptName) {
+                  exec(command, { cwd: scriptDir }, (error, stdout, stderr) => {
+                      if (!task.scriptName) {
                               fs.unlink(scriptPath).catch(err => console.error("Failed to delete temp script:", err));
                           }
                           if (error) {

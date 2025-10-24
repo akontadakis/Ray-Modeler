@@ -3,24 +3,39 @@
 /* --- THEME VARIABLES --- */
 :root {
   --ai-sidebar-width: 380px;
-  /* Light Theme (Default) */
-  --bg-main: #E9E9EF;
-  --bg-selection: #000000;
-  --highlight-color: #3b82f6;
-  --text-on-selection: #FFFFFF;
-  --text-primary: #343434;
-  --text-secondary: #858585;
-  --line-color: #343434;
-  --grid-color: #D2D2D7;
-  --panel-bg: #e9e9efd9;
-  --north-arrow-color: #343434; /* Primary Text Color for Light Theme */
-  
+  /* Light Theme (Default) - Base RGB Values */
+  --bg-main-rgb: 233, 233, 239;
+  --panel-bg-rgb: 233, 233, 239;
+  --bg-selection-rgb: 0, 0, 0;
+  --grid-color-rgb: 210, 210, 215;
+  --text-primary-rgb: 52, 52, 52;
+  --text-secondary-rgb: 133, 133, 133;
+  --highlight-rgb: 59, 130, 246;
+
+  /* Alpha Values */
+  --panel-alpha: 1.00;
+  --docked-panel-alpha: 1.00; /* Adjustable transparency for docked panels */
+  --text-on-selection: #ffffff; /* White text on selection */
+
+  /* Derived Colors (Used in Components) */
+  --bg-main: rgba(var(--bg-main-rgb), 1);
+  --panel-bg: rgba(var(--panel-bg-rgb), var(--panel-alpha));
+  --docked-panel-bg: rgba(var(--panel-bg-rgb), var(--docked-panel-alpha)); /* New derived color */
+  --bg-selection: rgba(var(--bg-selection-rgb), 1);
+  --text-primary: rgba(var(--text-primary-rgb), 1);
+  --text-secondary: rgba(var(--text-secondary-rgb), 1);
+  --highlight-color: rgba(var(--highlight-rgb), 1);
+  --grid-color: rgba(var(--grid-color-rgb), 1);
+  --north-arrow-color: var(--text-primary);
+  --btn-secondary-bg: #DDDEE3;
+  --btn-secondary-hover-bg: #D2D2D7;
+
   /* Visualization Colors */
   --wall-color: #808080;
   --floor-color: #333333;
   --ceiling-color: #cccccc;
   --frame-color: #1f1f1f;
-   --furniture-color: #464646; /* Brown Grey */
+  --furniture-color: #464646; /* Brown Grey */
   --shading-color: #1f1f1f;
   --light-source-color: #ffbf00; /* Amber */
   --illuminance-grid-color: #343434;
@@ -29,23 +44,31 @@
 
   --resize-handle-icon: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="%23858585" stroke-width="2" stroke-linecap="round"><path d="M8 4L4 8M10 2L2 10"/></svg>');
   --select-arrow-icon: url('data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns="http://www.w3.org/2000/svg" width="292.4" height="292.4"%3E%3Cpath fill="%23343434" d="M287 69.4a17.6 17.6 0 0 0-13-5.4H18.4c-5 0-9.3 1.8-12.9 5.4A17.6 17.6 0 0 0 0 82.2c0 5 1.8 9.3 5.4 12.9l128 127.9c3.6 3.6 7.8 5.4 12.8 5.4s9.2-1.8 12.8-5.4L287 95c3.5-3.5 5.4-7.8 5.4-12.8 0-5-1.9-9.2-5.5-12.8z"%2F%3E%3C/svg%3E');
-  --btn-secondary-bg: #DDDEE3;
-  --btn-secondary-hover-bg: #D2D2D7;
-
 }
 
 html[data-theme="dark"] {
-  /* Dark Theme */
-  --bg-main: #212121;
-  --bg-selection: #555555;
-  --highlight-color: #f59e0b;
-  --text-on-selection: #FFFFFF;
-  --text-primary: #e0e0e0;
-  --text-secondary: #888888;
-  --line-color: #e0e0e0;
-  --grid-color: #3a3a3a;
-  --panel-bg: #2d2d2dd9;
-  --north-arrow-color: #e0e0e0;   /* Primary Text Color for Dark Theme */
+  /* Dark Theme - Base RGB Values */
+  --bg-main-rgb: 33, 33, 33;
+  --panel-bg-rgb: 45, 45, 45;
+  --bg-selection-rgb: 85, 85, 85;
+  --grid-color-rgb: 58, 58, 58;
+  --text-primary-rgb: 224, 224, 224;
+  --text-secondary-rgb: 136, 136, 136;
+  --highlight-rgb: 245, 158, 11;
+  --text-on-selection: #ffffff; /* White text on selection */
+
+  /* Derived Colors (Alpha values are inherited from :root unless overridden) */
+  --bg-main: rgba(var(--bg-main-rgb), 1);
+  --panel-bg: rgba(var(--panel-bg-rgb), var(--panel-alpha));
+  --docked-panel-bg: rgba(var(--panel-bg-rgb), var(--docked-panel-alpha)); /* Use adjusted alpha */
+  --bg-selection: rgba(var(--bg-selection-rgb), 1);
+  --text-primary: rgba(var(--text-primary-rgb), 1);
+  --text-secondary: rgba(var(--text-secondary-rgb), 1);
+  --highlight-color: rgba(var(--highlight-rgb), 1);
+  --grid-color: rgba(var(--grid-color-rgb), 1);
+  --north-arrow-color: var(--text-primary);
+  --btn-secondary-bg: #3a3a3a;
+  --btn-secondary-hover-bg: #4c4c4c;
 
   /* Visualization Colors */
   --wall-color: #616161;
@@ -61,26 +84,33 @@ html[data-theme="dark"] {
 
   --resize-handle-icon: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="%23888888" stroke-width="2" stroke-linecap="round"><path d="M8 4L4 8M10 2L2 10"/></svg>');
   --select-arrow-icon: url('data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns="http://www.w3.org/2000/svg" width="292.4" height="292.4"%3E%3Cpath fill="%23e0e0e0" d="M287 69.4a17.6 17.6 0 0 0-13-5.4H18.4c-5 0-9.3 1.8-12.9 5.4A17.6 17.6 0 0 0 0 82.2c0 5 1.8 9.3 5.4 12.9l128 127.9c3.6 3.6 7.8 5.4 12.8 5.4s9.2-1.8 12.8-5.4L287 95c3.5-3.5 5.4-7.8 5.4-12.8 0-5-1.9-9.2-5.5-12.8z"%2F%3E%3C/svg%3E');
-  
-  --btn-secondary-bg: #3a3a3a;
-  --btn-secondary-hover-bg: #4c4c4c;
-
-  /* Dark Theme Workflow Colors */
-  .workflow-step { background-color: #a1a1aa; }
 }
 
 html[data-theme="cyber"] {
-  /* Cyber Theme */
-  --bg-main: #030d22;
-  --bg-selection: #ee0077;
-  --highlight-color: #00f6ff;
-  --text-on-selection: #FFFFFF;
-  --text-primary: #e1efff;
-  --text-secondary: #4d8bee;
-  --line-color: #ff2e97;
-  --grid-color: #11215e;
-  --panel-bg: rgba(14, 9, 82, 0.85);
-  --north-arrow-color: #ff2e97;   /* Pink for Cyber Theme */
+  /* Cyber Theme - Base RGB Values */
+  --bg-main-rgb: 3, 13, 34;
+  --panel-bg-rgb: 14, 9, 82;
+  --bg-selection-rgb: 238, 0, 119;
+  --grid-color-rgb: 17, 33, 94;
+  --text-primary-rgb: 225, 239, 255;
+  --text-secondary-rgb: 77, 139, 238;
+  --highlight-rgb: 0, 246, 255;
+  --line-color-rgb: 255, 46, 151; /* Pink for lines */
+  --text-on-selection: #ffffff; /* White text on selection */
+
+  /* Derived Colors */
+  --bg-main: rgba(var(--bg-main-rgb), 1);
+  --panel-bg: rgba(var(--panel-bg-rgb), var(--panel-alpha));
+  --docked-panel-bg: rgba(var(--panel-bg-rgb), var(--docked-panel-alpha));
+  --bg-selection: rgba(var(--bg-selection-rgb), 1);
+  --text-primary: rgba(var(--text-primary-rgb), 1);
+  --text-secondary: rgba(var(--text-secondary-rgb), 1);
+  --highlight-color: rgba(var(--highlight-rgb), 1);
+  --line-color: rgba(var(--line-color-rgb), 1);
+  --grid-color: rgba(var(--grid-color-rgb), 1);
+  --north-arrow-color: rgba(var(--line-color-rgb), 1); /* Pink */
+  --btn-secondary-bg: #0d0931;
+  --btn-secondary-hover-bg: #161130;
 
   /* Visualization Colors */
   --wall-color: #4d8bee;
@@ -96,26 +126,33 @@ html[data-theme="cyber"] {
 
   --resize-handle-icon: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="%23ffd400" stroke-width="2" stroke-linecap="round"><path d="M8 4L4 8M10 2L2 10"/></svg>');
   --select-arrow-icon: url('data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns="http://www.w3.org/2000/svg" width="292.4" height="292.4"%3E%3Cpath fill="%23ffd400" d="M287 69.4a17.6 17.6 0 0 0-13-5.4H18.4c-5 0-9.3 1.8-12.9 5.4A17.6 17.6 0 0 0 0 82.2c0 5 1.8 9.3 5.4 12.9l128 127.9c3.6 3.6 7.8 5.4 12.8 5.4s9.2-1.8 12.8-5.4L287 95c3.5-3.5 5.4-7.8 5.4-12.8 0-5-1.9-9.2-5.5-12.8z"%2F%3E%3C/svg%3E');
-  
-  --btn-secondary-bg: #0d0931;
-  --btn-secondary-hover-bg: #161130;
-
-  /* Cyber Theme Workflow Colors */
-  .workflow-step { background-color: #ff2e97; }
 }
 
 html[data-theme="cafe58"] {
-  /* Cafe 58 Theme */
-  --bg-main: #E1DEDE;
-  --bg-selection: #FF6D1D;
-  --highlight-color: #FF6D1D;
-  --text-on-selection: #FFFFFF;
-  --text-primary: #26303D;
-  --text-secondary: #5a687a;
-  --line-color: #FFA518;
-  --grid-color: #D4D1D1;
-  --panel-bg: rgba(225, 222, 222, 0.85);
-  --north-arrow-color: #26303D;
+  /* Cafe 58 Theme - Base RGB Values */
+  --bg-main-rgb: 225, 222, 222;
+  --panel-bg-rgb: 225, 222, 222;
+  --bg-selection-rgb: 255, 109, 29;
+  --grid-color-rgb: 212, 209, 209;
+  --text-primary-rgb: 38, 48, 61;
+  --text-secondary-rgb: 90, 104, 122;
+  --highlight-rgb: 255, 109, 29;
+  --line-color-rgb: 255, 165, 24; /* Orange */
+  --text-on-selection: #ffffff; /* White text on selection */
+
+  /* Derived Colors */
+  --bg-main: rgba(var(--bg-main-rgb), 1);
+  --panel-bg: rgba(var(--panel-bg-rgb), var(--panel-alpha));
+  --docked-panel-bg: rgba(var(--panel-bg-rgb), var(--docked-panel-alpha));
+  --bg-selection: rgba(var(--bg-selection-rgb), 1);
+  --text-primary: rgba(var(--text-primary-rgb), 1);
+  --text-secondary: rgba(var(--text-secondary-rgb), 1);
+  --highlight-color: rgba(var(--highlight-rgb), 1);
+  --line-color: rgba(var(--line-color-rgb), 1);
+  --grid-color: rgba(var(--grid-color-rgb), 1);
+  --north-arrow-color: var(--text-primary);
+  --btn-secondary-bg: #D4D1D1;
+  --btn-secondary-hover-bg: #C7C4C4;
 
   /* Visualization Colors */
   --wall-color: #707C8A;
@@ -131,12 +168,6 @@ html[data-theme="cafe58"] {
 
   --resize-handle-icon: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="%235a687a" stroke-width="2" stroke-linecap="round"><path d="M8 4L4 8M10 2L2 10"/></svg>');
   --select-arrow-icon: url('data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns="http://www.w3.org/2000/svg" width="292.4" height="292.4"%3E%3Cpath fill="%2326303D" d="M287 69.4a17.6 17.6 0 0 0-13-5.4H18.4c-5 0-9.3 1.8-12.9 5.4A17.6 17.6 0 0 0 0 82.2c0 5 1.8 9.3 5.4 12.9l128 127.9c3.6 3.6 7.8 5.4 12.8 5.4s9.2-1.8 12.8-5.4L287 95c3.5-3.5 5.4-7.8 5.4-12.8 0-5-1.9-9.2-5.5-12.8z"%2F%3E%3C/svg%3E');
-
-  --btn-secondary-bg: #D4D1D1;
-  --btn-secondary-hover-bg: #C7C4C4;
-
-  /* Cafe 58 Theme Workflow Colors */
-  .workflow-step { background-color: #FFA518; }
 }
 
 /* --- BASE LAYOUT & CANVAS --- */
@@ -176,7 +207,6 @@ canvas {
   display: none !important;
 }
 
-
 /* --- PANELS (Glassmorphism) --- */
 .ui-panel {
   background-color: var(--panel-bg);
@@ -187,7 +217,6 @@ canvas {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.07);
   transition: all 0.3s ease;
 }
-
 
 /* --- BUTTONS & BUTTON GROUPS (Unified) --- */
 .btn {
@@ -305,6 +334,7 @@ canvas {
   align-items: center;
 }
 
+/* Default Tooltip Position (Right Side) */
 .action-button-container .tooltip {
   visibility: hidden;
   opacity: 0;
@@ -319,33 +349,51 @@ canvas {
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
   position: absolute;
   z-index: 100;
-  left: calc(100% + 10px);
+  left: calc(100% + 10px); /* Default to right */
   top: 50%;
   transform: translateY(-50%);
   pointer-events: none;
   transition: opacity 0.2s ease-in-out;
 }
 
+/* Default Tooltip Arrow (Pointing Left) */
 .action-button-container .tooltip::after {
   content: '';
   position: absolute;
   top: 50%;
-  right: 100%;
+  right: 100%; /* Arrow on the left edge */
   margin-top: -5px;
   border-width: 5px;
   border-style: solid;
-  border-color: transparent var(--text-primary) transparent transparent;
+  border-color: transparent var(--text-primary) transparent transparent; /* Points left */
 }
 
-/* Override for tooltips inside certain containers to appear below */
-.btn-group .action-button-container .tooltip,
+/* Override for tooltips inside button groups (TOP TOOLBAR) to appear BELOW */
+#view-controls .btn-group .action-button-container .tooltip {
+    top: calc(100% + 10px); /* Position BELOW the button */
+    bottom: auto; /* Remove default bottom positioning */
+    left: 50%;
+    transform: translateX(-50%); /* Center horizontally */
+}
+
+#view-controls .btn-group .action-button-container .tooltip::after {
+    bottom: 100%; /* Arrow at the top edge of the tooltip */
+    top: auto; /* Remove default top positioning */
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%); /* Center the arrow */
+    margin-bottom: -1px; /* Prevents gap */
+    margin-top: 0;
+    border-color: transparent transparent var(--text-primary) transparent; /* Arrow points UP */
+}
+
+/* Keep rule for AI mode selector tooltips (appear below) */
 .ai-mode-selector .action-button-container .tooltip {
     top: calc(100% + 10px);
     left: 50%;
     transform: translateX(-50%);
 }
 
-.btn-group .action-button-container .tooltip::after,
 .ai-mode-selector .action-button-container .tooltip::after {
     bottom: 100%;
     left: 50%;
@@ -409,10 +457,15 @@ body.is-resizing {
     user-select: none;
 }
 body.is-resizing .floating-window {
-    transition: none !important;
-}
+        transition: none !important;
+    }
 
-.resize-handle-edge.top { top: -4px; left: 8px; right: 8px; height: 8px; cursor: ns-resize; }
+    /* Disable transitions on toolbars/panels being dragged */
+    .is-dragging {
+        transition: none !important;
+    }
+
+    .resize-handle-edge.top { top: -4px; left: 8px; right: 8px; height: 8px; cursor: ns-resize; }
 .resize-handle-edge.bottom { bottom: -4px; left: 8px; right: 8px; height: 8px; cursor: ns-resize; }
 .resize-handle-edge.left { left: -4px; top: 8px; bottom: 8px; width: 8px; cursor: ew-resize; }
 .resize-handle-edge.right { right: -4px; top: 8px; bottom: 8px; width: 8px; cursor: ew-resize; }
@@ -587,13 +640,58 @@ body.is-resizing .floating-window {
     transition: width 0.4s ease-in-out, left 0.4s ease-in-out;
 }
 
+/* --- Adjust layout when AI sidebar is open --- */
+
+/* Always shrink render container when AI sidebar is open */
 body.ai-sidebar-open #render-container {
     width: calc(100% - var(--ai-sidebar-width));
+    transition: width 0.4s ease-in-out, margin-left 0.4s ease-in-out; /* Match sidebar transition */
+}
+/* If LEFT bar is docked, adjust margin and width accordingly */
+body.ai-sidebar-open.left-sidebar-docked #render-container {
+    margin-left: 60px; /* Keep margin for left bar */
+    width: calc(100% - 60px - var(--ai-sidebar-width)); /* Shrink by both */
 }
 
-body.ai-sidebar-open #view-controls {
+/* Recenter FLOATING view controls when AI sidebar opens */
+body.ai-sidebar-open:not(.top-sidebar-docked) #view-controls {
+    /* Center in the remaining space */
     left: calc((100% - var(--ai-sidebar-width)) / 2);
+    width: auto; /* Allow natural width when floating */
 }
+/* Adjust recentering if LEFT is docked but TOP is floating */
+body.ai-sidebar-open:not(.top-sidebar-docked).left-sidebar-docked #view-controls {
+    left: calc(60px + (100% - 60px - var(--ai-sidebar-width)) / 2);
+    width: auto;
+}
+
+/* Recenter FLOATING view controls when AI sidebar opens */
+body.ai-sidebar-open:not(.top-sidebar-docked) #view-controls {
+    left: calc((100% - var(--ai-sidebar-width)) / 2); /* Center in remaining space */
+    width: auto; /* Allow natural width */
+    transform: translateX(-50%); /* Keep horizontal centering */
+    transition: left 0.4s ease-in-out; /* Match sidebar transition */
+}
+/* Adjust FLOATING centering if LEFT is docked */
+body.ai-sidebar-open:not(.top-sidebar-docked).left-sidebar-docked #view-controls {
+    left: calc(60px + (100% - 60px - var(--ai-sidebar-width)) / 2);
+}
+
+/* Adjust DOCKED view controls width when AI sidebar opens (NO left dock) */
+body.ai-sidebar-open.top-sidebar-docked:not(.left-sidebar-docked) #view-controls.docked {
+    width: calc(100% - var(--ai-sidebar-width));
+    left: 0;
+    transform: none;
+    transition: width 0.4s ease-in-out, left 0.4s ease-in-out;
+}
+/* Adjust DOCKED view controls width when AI sidebar opens AND LEFT is docked */
+body.ai-sidebar-open.top-sidebar-docked.left-sidebar-docked #view-controls.docked {
+    left: 60px; /* Start after left docked bar */
+    width: calc(100% - 60px - var(--ai-sidebar-width)); /* Shrink by both */
+    transform: none;
+    transition: width 0.4s ease-in-out, left 0.4s ease-in-out;
+}
+
 
 /* --- FIX: Sidebar Resizing --- */
 #right-sidebar .resize-handle-edge.left {
@@ -837,7 +935,6 @@ input[type=checkbox]:checked {
   background-image: none;
 }
 
-
 /* --- FILE DROP AREA --- */
 .file-drop-area {
   border: 2px dashed var(--grid-color);
@@ -913,11 +1010,13 @@ html[data-theme="light"] .leaflet-tile-pane {
   filter: grayscale(1);
 }
 
-/* --- THEME SWITCHER --- */
 #theme-switcher-container {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  display: flex; /* Keep as flex container for internal button layout */
+  gap: 0.5rem; /* Spacing between theme buttons */
+  align-items: center; /* Vertically align buttons */
+  margin-right: 1rem; /* Add space after the theme buttons */
+  pointer-events: auto; /* Make sure buttons are clickable */
+  /* Removed positioning properties as it's now part of the bottom-left flow */
 }
 
 .theme-btn {
@@ -1070,7 +1169,6 @@ html[data-theme="light"] .leaflet-tile-pane {
   margin-left: auto;
 }
 
-
 /* --- INFO POPOVERS & BOXES --- */
 .info-icon {
   position: relative;
@@ -1135,7 +1233,6 @@ html[data-theme="light"] .leaflet-tile-pane {
   font-family: 'Courier New', Courier, monospace;
   font-weight: bold;
 }
-
 
 /* --- BOTTOM ACTION BUTTONS --- */
 .bottom-action-button {
@@ -1243,7 +1340,6 @@ html[data-theme="light"] .leaflet-tile-pane {
     transform: translateY(-50%);
     pointer-events: none; /* Allows clicks to go through to the sliders */
 }
-
 
 /* Common styles for both range inputs */
 #time-range-slider-container input[type="range"] {
@@ -1940,4 +2036,341 @@ background-color: var(--grid-color);
     background-color: var(--btn-secondary-bg);
     display: flex;
     justify-content: center;
+}
+
+/* --- Helios Mode Toggle --- */
+.helios-toggle {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 28px;
+}
+
+.helios-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.helios-toggle .slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--grid-color);
+  transition: .4s;
+  border-radius: 28px;
+}
+
+.helios-toggle .slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+.helios-toggle input:checked + .slider {
+  background-color: var(--highlight-color);
+}
+
+.helios-toggle input:focus + .slider {
+  box-shadow: 0 0 1px var(--highlight-color);
+}
+
+.helios-toggle input:checked + .slider:before {
+  transform: translateX(22px);
+}
+
+.window-controls .btn-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* --- Left Sidebar Docking --- */
+
+body.left-sidebar-docked #render-container {
+    margin-left: 60px; /* Adjust based on docked sidebar width */
+    width: calc(100% - 60px); /* Adjust based on docked sidebar width */
+    transition: margin-left 0.3s ease, width 0.3s ease;
+}
+
+/* START: Add rules for bottom controls */
+/* Apply only translateX when only left is docked */
+body.left-sidebar-docked #bottom-left-controls { /* Keep bottom-left moving only horizontally */
+    transform: translateX(calc(60px + 1rem)); /* 60px sidebar + 16px margin */
+    transition: transform 0.3s ease;
+}
+#theme-switcher-container,
+#bottom-left-controls {
+    /* Add base transition for smooth undocking */
+    transition: transform 0.3s ease;
+}
+/* END: Add rules for bottom controls */
+
+#left-controls-container.docked {
+    position: fixed; /* Override absolute positioning */
+    top: 0;
+    left: 0;
+    height: 100vh; /* Full viewport height */
+    width: 60px; /* Set a fixed width when docked */
+    transform: none !important; /* Remove any translation */
+    z-index: 100; /* Ensure it's above render container but below modals */
+    padding-left: 0.5rem; /* Remove fixed padding */
+    padding-right: 0.5rem; /* Remove fixed padding */
+    background-color: var(--docked-panel-bg); /* Use specific docked background */
+    /* box-shadow: 2px 0 5px rgba(0,0,0,0.1); /* Optional shadow */
+    justify-content: center; /* Center flex items vertically in the column */
+    transition: width 0.3s ease, transform 0.3s ease, left 0.3s ease, top 0.3s ease, height 0.3s ease;
+    border-radius: 0; /* Remove rounding when docked */
+    border-top: none;
+    border-bottom: none;
+    border-left: none; /* Remove left border */
+    border-right: none; /* Explicitly remove right border */
+    background-color: var(--docked-panel-bg); /* Use the specific docked background variable */
+
+}
+
+/* START: Remove border/bg from inner panel when docked */
+#left-controls-container.docked #left-toolbar.ui-panel {
+    border: none;
+    background-color: transparent; /* Make inner toolbar transparent */
+    box-shadow: none;
+    padding: 0; /* Remove inner padding */
+    backdrop-filter: none; /* Ensure no blur effect */
+    -webkit-backdrop-filter: none; /* Ensure no blur effect */
+}
+/* END: Remove border/bg from inner panel when docked */
+
+/* Ensure the draggable handle (the container itself) is not draggable when docked */
+#left-controls-container.docked {
+    cursor: default !important;
+}
+
+/* Style the dock button */
+#dock-left-sidebar-btn {
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+#left-controls-container:hover #dock-left-sidebar-btn,
+#left-controls-container.docked #dock-left-sidebar-btn {
+    opacity: 1; /* Always show fully when docked */
+}
+
+/* --- Top Sidebar Docking --- */
+
+#view-controls.docked {
+    position: fixed;
+    top: 0;
+    left: 0; /* Default: starts at left edge */
+    width: 100%; /* Default: spans full width */
+    transform: none !important;
+    z-index: 100;
+    padding: 0.5rem 1rem;
+    background-color: var(--docked-panel-bg);
+    border-radius: 0;
+    justify-content: center;
+    transition: width 0.4s ease-in-out, left 0.4s ease-in-out; /* Match AI sidebar transition */
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    cursor: default !important;
+}
+
+/* Adjust docked top bar when LEFT sidebar is ALSO docked */
+body.left-sidebar-docked #view-controls.docked {
+    left: 60px; /* Start after the left docked bar */
+    width: calc(100% - 60px); /* Adjust width */
+}
+
+/* Make sure the main panel within the docked bar keeps its style */
+#view-controls.docked .ui-panel {
+    background-color: transparent; /* Remove nested panel background */
+    border: none;
+    box-shadow: none;
+    padding: 0; /* Remove nested padding */
+}
+
+/* Ensure the draggable handle (the container itself) is not draggable when docked */
+#view-controls.docked {
+    cursor: default !important;
+}
+
+/* Style the dock button */
+#dock-top-sidebar-btn {
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+#view-controls:hover #dock-top-sidebar-btn,
+#view-controls.docked #dock-top-sidebar-btn {
+    opacity: 1; /* Always show fully when docked */
+}
+
+/* Adjust tooltip position for the top dock button */
+#dock-top-sidebar-btn + .tooltip {
+    top: calc(100% + 10px); /* Position below the button */
+    left: 50%;
+    transform: translateX(-50%);
+}
+#dock-top-sidebar-btn + .tooltip::after {
+    bottom: 100%; /* Arrow points up */
+    left: 50%;
+    top: auto;
+    right: auto;
+    transform: translateX(-50%);
+    margin-top: 0;
+    margin-bottom: -1px; /* Prevents a small gap */
+    border-color: transparent transparent var(--text-primary) transparent;
+}
+
+/* --- Fill Docked Icon When Active --- */
+#dock-left-sidebar-btn.active .dock-icon-undocked,
+#dock-top-sidebar-btn.active .dock-icon-undocked {
+    display: none; /* Hide unfilled icon when active */
+}
+
+#dock-left-sidebar-btn.active .dock-icon-docked,
+#dock-top-sidebar-btn.active .dock-icon-docked {
+    display: block; /* Show filled icon when active */
+    fill: currentColor; /* Use the button's text color */
+    stroke: none; /* Remove outline */
+}
+
+/* --- Viewport Label Positioning with Docked Sidebars --- */
+
+.viewport-label {
+    /* Add transition for smooth movement */
+    transition: top 0.3s ease, left 0.3s ease;
+}
+
+/* Move labels down when top bar is docked */
+body.top-sidebar-docked .viewport-label {
+    top: calc(0px + 8px); /* Approx height of docked top bar + default margin */
+}
+
+/* Move labels right when left bar is docked */
+/* Specificity: Only apply to the main viewport when NOT in quad view,
+   OR apply to top-left viewport (main) when IN quad view */
+body.left-sidebar-docked #viewport-main .viewport-label {
+   left: calc(0px + 8px); /* Width of docked left bar + default margin */
+}
+/* Ensure the top-right viewport label also moves right */
+body.left-sidebar-docked #render-container.quad-view-active #viewport-top .viewport-label {
+    left: calc(0px + 8px); /* Width of docked left bar + default margin */
+}
+
+/* When BOTH are docked, the top-left (main) label needs both adjustments */
+body.left-sidebar-docked.top-sidebar-docked #viewport-main .viewport-label {
+    top: calc(60px + 8px);
+    left: calc(0px + 8px);
+}
+/* When BOTH are docked, the top-right label needs both adjustments */
+body.left-sidebar-docked.top-sidebar-docked #render-container.quad-view-active #viewport-top .viewport-label {
+     top: calc(60px + 8px);
+     left: calc(0px + 8px);
+}
+
+/* Ensure bottom-left label only moves down when top is docked in quad view */
+body.top-sidebar-docked #render-container.quad-view-active #viewport-front .viewport-label {
+     top: calc(0px + 8px);
+}
+
+/* --- Specific Tooltip Positioning for Helios Header Icons --- */
+#right-sidebar .window-controls .action-button-container .tooltip {
+    top: calc(100% + 10px); /* Position below the button */
+    left: 50%;
+    transform: translateX(-50%); /* Center horizontally */
+    /* Remove inherited left positioning and vertical centering */
+    right: auto; 
+}
+
+#right-sidebar .window-controls .action-button-container .tooltip::after {
+    bottom: 100%; /* Arrow points up from the bottom edge of the tooltip */
+    left: 50%;
+    transform: translateX(-50%); /* Center the arrow horizontally */
+    /* Remove inherited left positioning */
+    right: auto; 
+    top: auto;
+    margin-top: 0;
+    margin-bottom: -1px; /* Prevents a small gap */
+    border-color: transparent transparent var(--text-primary) transparent; /* Arrow points up */
+}
+
+/* --- Tooltip Position for Bottom Left Controls --- */
+#bottom-left-controls .action-button-container .tooltip {
+    bottom: calc(100% + 10px); /* Position ABOVE the button */
+    top: auto; /* Remove default top positioning */
+    left: 50%;
+    transform: translateX(-50%); /* Center horizontally */
+    /* Remove inherited left/right positioning */
+    right: auto;
+}
+
+#bottom-left-controls .action-button-container .tooltip::after {
+    top: 100%; /* Arrow at the bottom edge of the tooltip */
+    bottom: auto; /* Remove default bottom positioning */
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%); /* Center the arrow */
+    margin-top: -1px; /* Prevents gap */
+    margin-bottom: 0;
+    border-color: var(--text-primary) transparent transparent transparent; /* Arrow points DOWN */
+}
+
+/* --- Tooltip Position for Left Sidebar --- */
+#left-controls-container .action-button-container .tooltip {
+    left: calc(100% + 10px); /* Position to the left */ 
+    right: auto; /* Remove default left positioning */
+}
+
+#left-controls-container .action-button-container .tooltip::after {
+  content: ''; /* Ensure content is present */
+  position: absolute;
+  top: 50%; /* Vertically center the arrow */
+  right: 100%; /* Position arrow's right edge at the tooltip's left edge */
+  margin-top: -5px; /* Adjust vertical position */
+  border-width: 5px;
+  border-style: solid;
+  border-color: transparent var(--text-primary) transparent transparent; /* Arrow points LEFT */
+  /* Remove margin-left which might cause the gap */
+}
+
+/* Adjust if ONLY left sidebar is docked (AI closed) */
+body.left-sidebar-docked:not(.ai-sidebar-open) #view-controls.docked {
+    left: 60px;
+    width: calc(100% - 60px);
+}
+
+/* Adjust if ONLY AI sidebar is open (Left NOT docked) */
+body.ai-sidebar-open:not(.left-sidebar-docked) #view-controls.docked {
+    left: 0;
+    width: calc(100% - var(--ai-sidebar-width));
+}
+
+/* Adjust if BOTH left sidebar is docked AND AI sidebar is open */
+body.left-sidebar-docked.ai-sidebar-open #view-controls.docked {
+    left: 60px;
+    width: calc(100% - 60px - var(--ai-sidebar-width));
+}
+
+/* Adjust render container ONLY when left is docked (independent of AI) */
+body.left-sidebar-docked #render-container {
+    margin-left: 60px;
+    width: calc(100% - 60px);
+}
+
+/* Adjust render container width ALSO when AI is open (independent of left) */
+body.ai-sidebar-open #render-container {
+    width: calc(100% - var(--ai-sidebar-width));
+}
+
+/* Adjust render container width/margin when BOTH left is docked AND AI is open */
+body.left-sidebar-docked.ai-sidebar-open #render-container {
+    margin-left: 60px;
+    width: calc(100% - 60px - var(--ai-sidebar-width));
 }

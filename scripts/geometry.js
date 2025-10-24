@@ -2029,3 +2029,20 @@ export async function addImportedAsset(objContent, mtlContent, assetType) {
 
     return objectGroup;
 }
+
+// --- START: Added getWallGroupById Function ---
+/**
+ * Finds and returns a wall group object based on its canonical ID.
+ * @param {string} id - The canonical ID ('n', 's', 'e', 'w').
+ * @returns {THREE.Group | null} The found wall group or null.
+ */
+export function getWallGroupById(id) {
+    // wallSelectionGroup contains one child: wallContainer. We search within wallContainer.
+    const wallContainer = wallSelectionGroup.children[0];
+    if (!wallContainer) {
+        console.warn("Wall container not found in wallSelectionGroup.");
+        return null;
+    }
+    // Find the specific wall segment group within the container
+    return wallContainer.children.find(group => group.userData.canonicalId === id) || null;
+}

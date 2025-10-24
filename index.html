@@ -8,6 +8,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
     <meta name="googlebot" content="noindex, nofollow">
+    
     <title>Ray Modeler</title>
     
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 511.987 511.987'><rect x='66.717' y='204.027' transform='matrix(-0.2411 -0.9705 0.9705 -0.2411 -177.6681 420.4137)' fill='%23B6F2FC' width='17.648' height='151.29'/><polygon fill='%238ED7E0' points='235.67,98.502 417.524,413.484 53.815,413.484'/><polygon fill='%23F4BD64' points='511.987,268.44 511.987,315.737 368.184,337.491 344.872,329.255 296.635,235.133'/><polygon fill='%234EB79B' points='511.987,315.737 511.987,363.022 384.886,356.939 384.874,356.939 344.872,329.255 356.814,308.325'/><polygon fill='%23E88158' points='511.987,221.156 511.987,268.44 328.73,259.687 276.634,248.075 300.658,211.061'/><polygon fill='%23B6F2FC' points='384.874,356.939 385.874,358.669 113.88,263.558 300.658,211.061 328.73,259.687 356.802,308.325 356.814,308.325'/></svg>">
@@ -133,6 +134,9 @@
             pointer-events: none;
             z-index: 1;
         }
+        body.top-sidebar-docked .viewport-label {
+            top: 56px; /* Adjust to be below the docked top toolbar */
+        }
     </style>
 
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
@@ -214,34 +218,6 @@
         </div>
     </div>
 
-    <div id="theme-switcher-container" class="fixed top-10 left-6 z-[10001] pointer-events-auto">
-    <button id="theme-btn-cafe58" class="theme-btn" style="display: none;" aria-label="Switch to Cafe 58 Theme">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-        <path d="M3 14c.83 .642 2.077 1.017 3.5 1c1.423 .017 2.67 -.358 3.5 -1c.83 -.642 2.077 -1.017 3.5 -1c1.423 -.017 2.67 .358 3.5 1"></path>
-        <path d="M8 3a2.4 2.4 0 0 0 -1 2a2.4 2.4 0 0 0 1 2"></path>
-        <path d="M12 3a2.4 2.4 0 0 0 -1 2a2.4 2.4 0 0 0 1 2"></path>
-        <path d="M3 10h14v5a6 6 0 0 1 -6 6h-2a6 6 0 0 1 -6 -6v-5z"></path>
-        <path d="M16.746 16.726a3 3 0 1 0 .252 -5.555"></path>
-        </svg>
-    </button>
-    <button id="theme-btn-cyber" class="theme-btn" style="display: none;" aria-label="Switch to Cyber Theme">
-        <svg width="800" height="800" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-            <path d="M8 0C3.6 0 0 3.6 0 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8m0 15c-3.9 0-7-3.1-7-7 0-2.4 1.2-4.6 3.2-5.9C4.1 2.7 4 3.4 4 4c0 4.9 4 8.9 8.9 9-1.3 1.3-3 2-4.9 2"/>
-        </svg>
-    </button>
-    <button id="theme-btn-light" class="theme-btn" aria-label="Switch to Light Theme">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-            </svg>
-        </button>
-        <button id="theme-btn-dark" class="theme-btn" style="display: none;" aria-label="Switch to Dark Theme">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-            </svg>
-        </button>
-    </div>
-
     <div id="render-container">
         <div id="viewport-main" class="viewport">
             <div class="viewport-label">Perspective</div>
@@ -260,25 +236,40 @@
             <div class="label-container"></div>
         </div>
     </div>
-    
+    <div id="toggle-buttons-container" class="absolute top-1/2 -translate-y-1/2 left-4 z-50 pointer-events-auto flex flex-col gap-4">
+        <button id="toggle-buttons-btn" class="btn" aria-label="Toggle Buttons">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="1" />
+            </svg>
+        </button>
+    </div>
+    </div>
     <div id="left-controls-container" class="absolute top-1/2 -translate-y-1/2 left-4 z-50 pointer-events-auto flex flex-col gap-4">
+    <div class="action-button-container self-center mb-1">
+        <button id="dock-left-sidebar-btn" class="btn btn-icon p-1 bg-[--panel-bg] hover:bg-[--grid-color] rounded-full" aria-label="Dock Left Sidebar">
+            <svg class="dock-icon-undocked" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 2.25c-1.32.09-2.6.48-3.83.99l-3.82 2.01a1.5 1.5 0 0 0-.8 1.34v7.32a1.5 1.5 0 0 0 .8 1.34l3.82 2.01c1.23.51 2.51.9 3.83.99m8.25-10.5h-9m9 0c.93 0 1.69.76 1.69 1.69v5.62c0 .93-.76 1.69-1.69 1.69h-9" />
+            </svg>
+            <svg class="dock-icon-docked hidden" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M14.25 2.25c-1.32.09-2.6.48-3.83.99l-3.82 2.01a1.5 1.5 0 0 0-.8 1.34v7.32a1.5 1.5 0 0 0 .8 1.34l3.82 2.01c1.23.51 2.51.9 3.83.99m8.25-10.5h-9m9 0c.93 0 1.69.76 1.69 1.69v5.62c0 .93-.76 1.69-1.69 1.69h-9" />
+            </svg>
+        </button>
+        <span class="tooltip" role="tooltip">Dock Sidebar</span>
+    </div>
     <div id="left-toolbar" class="ui-panel p-1">
         <div class="btn-group flex-col">
-
-                <div class="action-button-container">
-                    <button id="toggle-panel-project-btn" class="btn" aria-label="Project Setup">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 567.917 567.917" xml:space="preserve" fill="currentColor" stroke="none"><path d="M32.902 161.491h502.106l4.302-35.974c1.004-8.39-5.033-15.192-13.482-15.192H287.017c-8.448 0-21.019-3.767-28.075-8.415l-46.175-30.417c-7.056-4.648-19.627-8.415-28.079-8.415H35.109c-8.449 0-14.397 6.79-13.284 15.166zm32.547 328.412c1.833 8.25 10.168 14.936 18.62 14.936h399.777c8.448 0 16.787-6.686 18.62-14.936l65.092-292.913c1.833-8.25-3.531-14.936-11.979-14.936H12.339c-8.449 0-13.813 6.686-11.98 14.936z"/></svg>
-                </button>
-                <span class="tooltip" role="tooltip">Project Setup</span>
-                </div>
-
-                <div class="action-button-container">
-                    <button id="toggle-panel-dimensions-btn" class="btn" aria-label="Dimensions">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" xml:space="preserve"><path d="M160 213.333c-5.888 0-10.667-4.779-10.667-10.667H0v202.667C0 411.221 4.779 416 10.667 416h330.667v-85.333c-5.888 0-10.667-4.779-10.667-10.667s4.779-10.667 10.667-10.667V202.667H170.667c0 5.888-4.779 10.666-10.667 10.666m-10.667 32c0-5.888 4.779-10.667 10.667-10.667s10.667 4.779 10.667 10.667v21.333c0 5.888-4.779 10.667-10.667 10.667s-10.667-4.779-10.667-10.667zM46.592 398.507l-9.216 5.376a10.64 10.64 0 0 1-5.355 1.451 10.66 10.66 0 0 1-9.216-5.291c-2.965-5.077-1.259-11.605 3.84-14.592l9.216-5.376c5.099-2.965 11.627-1.259 14.592 3.84 2.923 5.077 1.216 11.626-3.861 14.592m65.749-38.336L90.432 372.95a10.64 10.64 0 0 1-5.355 1.451 10.72 10.72 0 0 1-9.237-5.291c-2.965-5.099-1.237-11.627 3.84-14.592l21.909-12.779c5.099-2.944 11.627-1.237 14.592 3.84 2.944 5.077 1.238 11.626-3.84 14.592m164.992-50.838h21.333c5.888 0 10.667 4.779 10.667 10.667s-4.779 10.667-10.667 10.667h-21.333c-5.888 0-10.667-4.779-10.667-10.667s4.779-10.667 10.667-10.667m-64 0h21.333c5.888 0 10.667 4.779 10.667 10.667s-4.779 10.667-10.667 10.667h-21.333c-5.888 0-10.667-4.779-10.667-10.667s4.779-10.667 10.667-10.667M181.355 320c0 5.888-4.8 10.667-10.688 10.667h-7.787l-6.72 3.925a10.64 10.64 0 0 1-5.355 1.451 10.66 10.66 0 0 1-9.216-5.291c-2.965-5.077-1.259-11.605 3.84-14.592l3.925-2.283v-4.544c0-5.888 4.779-10.667 10.667-10.667s10.667 4.779 10.667 10.667c5.888 0 10.667 4.779 10.667 10.667m181.312-121.771v111.104c5.888 0 10.667 4.779 10.667 10.667s-4.779 10.667-10.667 10.667v80.853l143.957-82.261A10.67 10.67 0 0 0 512 320V114.24zm64 132.438h-21.333c-5.888 0-10.667-4.779-10.667-10.667s4.779-10.667 10.667-10.667h21.333c5.888 0 10.667 4.779 10.667 10.667s-4.779 10.667-10.667 10.667m53.333 0h-10.667c-5.888 0-10.667-4.779-10.667-10.667s4.779-10.667 10.667-10.667H480c5.888 0 10.667 4.779 10.667 10.667s-4.779 10.667-10.667 10.667M160 96c-1.856 0-3.669.491-5.291 1.408L7.829 181.333h141.504c0-5.888 4.779-10.667 10.667-10.667s10.667 4.779 10.667 10.667h178.539L500.907 96zm10.667 42.667c0 5.888-4.779 10.667-10.667 10.667s-10.667-4.779-10.667-10.667V128c0-5.888 4.779-10.667 10.667-10.667s10.667 4.779 10.667 10.667z"/></svg>
-                        </button>
-                    <span class="tooltip" role="tooltip">Dimensions & Geometry</span>
-                </div>
-                
+        <div class="action-button-container">
+            <button id="toggle-panel-project-btn" class="btn" aria-label="Project Setup">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 567.917 567.917" xml:space="preserve" fill="currentColor" stroke="none"><path d="M32.902 161.491h502.106l4.302-35.974c1.004-8.39-5.033-15.192-13.482-15.192H287.017c-8.448 0-21.019-3.767-28.075-8.415l-46.175-30.417c-7.056-4.648-19.627-8.415-28.079-8.415H35.109c-8.449 0-14.397 6.79-13.284 15.166zm32.547 328.412c1.833 8.25 10.168 14.936 18.62 14.936h399.777c8.448 0 16.787-6.686 18.62-14.936l65.092-292.913c1.833-8.25-3.531-14.936-11.979-14.936H12.339c-8.449 0-13.813 6.686-11.98 14.936z"/></svg>
+            </button>
+            <span class="tooltip" role="tooltip">Project Setup</span>
+        </div>
+        <div class="action-button-container">
+            <button id="toggle-panel-dimensions-btn" class="btn" aria-label="Dimensions">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" xml:space="preserve"><path d="M160 213.333c-5.888 0-10.667-4.779-10.667-10.667H0v202.667C0 411.221 4.779 416 10.667 416h330.667v-85.333c-5.888 0-10.667-4.779-10.667-10.667s4.779-10.667 10.667-10.667V202.667H170.667c0 5.888-4.779 10.666-10.667 10.666m-10.667 32c0-5.888 4.779-10.667 10.667-10.667s10.667 4.779 10.667 10.667v21.333c0 5.888-4.779 10.667-10.667 10.667s-10.667-4.779-10.667-10.667zM46.592 398.507l-9.216 5.376a10.64 10.64 0 0 1-5.355 1.451 10.66 10.66 0 0 1-9.216-5.291c-2.965-5.077-1.259-11.605 3.84-14.592l9.216-5.376c5.099-2.965 11.627-1.259 14.592 3.84 2.923 5.077 1.216 11.626-3.861 14.592m65.749-38.336L90.432 372.95a10.64 10.64 0 0 1-5.355 1.451 10.72 10.72 0 0 1-9.237-5.291c-2.965-5.099-1.237-11.627 3.84-14.592l21.909-12.779c5.099-2.944 11.627-1.237 14.592 3.84 2.944 5.077 1.238 11.626-3.84 14.592m164.992-50.838h21.333c5.888 0 10.667 4.779 10.667 10.667s-4.779 10.667-10.667 10.667h-21.333c-5.888 0-10.667-4.779-10.667-10.667s4.779-10.667 10.667-10.667m-64 0h21.333c5.888 0 10.667 4.779 10.667 10.667s-4.779 10.667-10.667 10.667h-21.333c-5.888 0-10.667-4.779-10.667-10.667s4.779-10.667 10.667-10.667M181.355 320c0 5.888-4.8 10.667-10.688 10.667h-7.787l-6.72 3.925a10.64 10.64 0 0 1-5.355 1.451 10.66 10.66 0 0 1-9.216-5.291c-2.965-5.077-1.259-11.605 3.84-14.592l3.925-2.283v-4.544c0-5.888 4.779-10.667 10.667-10.667s10.667 4.779 10.667 10.667c5.888 0 10.667 4.779 10.667 10.667m181.312-121.771v111.104c5.888 0 10.667 4.779 10.667 10.667s-4.779 10.667-10.667 10.667v80.853l143.957-82.261A10.67 10.67 0 0 0 512 320V114.24zm64 132.438h-21.333c-5.888 0-10.667-4.779-10.667-10.667s4.779-10.667 10.667-10.667h21.333c5.888 0 10.667 4.779 10.667 10.667s-4.779 10.667-10.667 10.667m53.333 0h-10.667c-5.888 0-10.667-4.779-10.667-10.667s4.779-10.667 10.667-10.667H480c5.888 0 10.667 4.779 10.667 10.667s-4.779 10.667-10.667 10.667M160 96c-1.856 0-3.669.491-5.291 1.408L7.829 181.333h141.504c0-5.888 4.779-10.667 10.667-10.667s10.667 4.779 10.667 10.667h178.539L500.907 96zm10.667 42.667c0 5.888-4.779 10.667-10.667 10.667s-10.667-4.779-10.667-10.667V128c0-5.888 4.779-10.667 10.667-10.667s10.667 4.779 10.667 10.667z"/></svg>
+            </button>
+            <span class="tooltip" role="tooltip">Dimensions & Geometry</span>
+            </div>
                 <div class="action-button-container">
                 <button id="toggle-panel-aperture-btn" class="btn" aria-label="Apertures & Shading">
                     <svg viewBox="0 0 51 51" xmlns="http://www.w3.org/2000/svg" fill="currentColor" stroke="none"><path d="m8.375 8 .098.098L8.57 8zm3.117 0L9.934 9.559l1.46 1.46L14.413 8zm5.842 0-4.479 4.48 1.46 1.46L20.254 8zm5.844 0-7.403 7.4 1.461 1.461L26.1 8zm5.84 0-10.32 10.322 1.46 1.461L31.94 8Zm5.843 0L21.62 21.244l1.46 1.46L37.782 8Zm5.844 0L24.54 24.164 26 25.625l17-17V8zM27.461 27.086 11.547 43h2.922l14.453-14.453Zm2.92 2.92L17.387 43h2.922l11.533-11.533Zm2.922 2.922L23.23 43h2.922l8.612-8.611zm2.922 2.922L29.075 43h2.921l5.69-5.69zm2.92 2.92L34.915 43h2.92l2.77-2.77zm2.921 2.921L40.758 43H43v-.375z"/><path d="m8 7.625 18 18-18 18z"/><path d="M4 4v43h43V4Zm4 4h35v35H8Z"/></svg>
@@ -293,15 +284,15 @@
                 <span class="tooltip" role="tooltip">Artificial Lighting</span>
             </div>
                 
-                <div class="action-button-container">
-                    <button id="toggle-panel-materials-btn" class="btn" aria-label="Material Properties">
-                        <svg viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg" fill="currentColor" stroke="none"><path d="m35.435 9.494 7.071 7.071.002-.002a4 4 0 0 1 0 5.657l-.002.002L24 40.703V15.264l5.777-5.771h.001a4 4 0 0 1 5.656.002zM50 36v10a4 4 0 0 1-4 4H21l18-18h7a4 4 0 0 1 4 4M2 41.046V6a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v35.046a9 9 0 0 1-18 0M11 45a4 4 0 1 0 0-8 4 4 0 0 0 0 8"/></svg>
-                    </button>
-                    <span class="tooltip" role="tooltip">Material Properties</span>
-                </div>
+            <div class="action-button-container">
+                <button id="toggle-panel-materials-btn" class="btn" aria-label="Material Properties">
+                    <svg viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg" fill="currentColor" stroke="none"><path d="m35.435 9.494 7.071 7.071.002-.002a4 4 0 0 1 0 5.657l-.002.002L24 40.703V15.264l5.777-5.771h.001a4 4 0 0 1 5.656.002zM50 36v10a4 4 0 0 1-4 4H21l18-18h7a4 4 0 0 1 4 4M2 41.046V6a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v35.046a9 9 0 0 1-18 0M11 45a4 4 0 1 0 0-8 4 4 0 0 0 0 8"/></svg>
+                </button>
+                <span class="tooltip" role="tooltip">Material Properties</span>
+            </div>
                 
-                <div class="action-button-container">
-                    <button id="toggle-panel-sensor-btn" class="btn" aria-label="Sensor Grid">
+            <div class="action-button-container">
+                <button id="toggle-panel-sensor-btn" class="btn" aria-label="Sensor Grid">
                     <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M23.584 47.441a3.5 3.5 0 0 0-2.393 1.024l-4.949 4.95a3.5 3.5 0 0 0 0 4.948l7.746 7.746-7.746 7.746a3.5 3.5 0 0 0 0 4.95l4.95 4.95a3.5 3.5 0 0 0 4.95 0l7.747-7.743 7.744 7.744a3.5 3.5 0 0 0 4.951 0l4.951-4.951a3.5 3.5 0 0 0 0-4.95L43.79 66.11l7.746-7.746a3.5 3.5 0 0 0-.002-4.949l-4.951-4.95a3.5 3.5 0 0 0-4.95 0l-7.743 7.747-7.746-7.746a3.5 3.5 0 0 0-2.559-1.024z" fill-rule="evenodd"/>
                     <path d="M11.896 12h12.041v12.041h-12.04zm16.041 0H39.98v12.041H27.938zm16.042 0h12.04v12.041H43.98zm16.04 0h12.042v12.041H60.02zm16.042 0H88.1v12.041H76.06zM11.896 28.041h12.041v12.041h-12.04zm16.041 0H39.98v12.041H27.938zm16.042 0h12.04v12.041H43.98zm16.04 0h12.042v12.041H60.02zm16.042 0H88.1v12.041H76.06zM60.02 44.082h12.04v12.041H60.02zm16.04 0h12.042v12.041H76.06zM60.02 60.123h12.04v12.041H60.02zm16.04 0h12.042v12.041H76.06zM60.02 76.164h12.04v12.041H60.02zm16.04 0h12.042v12.041H76.06zM7.897.102V8H0v4h7.896v12.041H0v4h7.896v12.041H0v4h7.896v12.041H0v4h7.896v12.041H0v4h7.896v12.041H0v4h7.896v7.897h4v-7.897h12.041v7.897h4v-7.897H39.98v7.897h4v-7.897h12.04v7.897h4v-7.897h12.042v7.897h4v-7.897H88.1v7.897h4v-7.897h7.9v-4h-7.898v-12.04H100v-4h-7.898V60.122H100v-4h-7.898v-12.04H100v-4h-7.898V28.041H100v-4h-7.898V12H100V8h-7.898V.102h-4V8H76.06V.102h-4V8H60.02V.102h-4V8H43.979V.102h-4V8H27.938V.102h-4V8H11.896V.102zm4 43.98h12.041v1.373a5.6 5.6 0 0 1 2.442.707c.55.392 1.062.836 1.558 1.295v-3.375H39.98v3.186a5.84 5.84 0 0 1 4-1.797v-1.389h12.04v12.041h-1.5c-.025.84-.215 1.674-.632 2.418-.395.56-.846 1.078-1.31 1.582h3.443v12.041h-3.325a5.84 5.84 0 0 1 1.836 4h1.489v12.041H43.979v-1.46c-.87-.01-1.737-.2-2.508-.63a15 15 0 0 1-1.492-1.222v3.312H27.938v-3.4c-1.007 1.152-2.484 1.854-4 1.947v1.453H11.896v-12.04h1.36c.015-.85.2-1.693.613-2.448a15 15 0 0 1 1.27-1.553h-3.243V60.123h3.26c-1.137-1.014-1.815-2.487-1.898-4h-1.362z" fill-rule="evenodd" fill-opacity="0.4"/>
                     </svg>
@@ -341,8 +332,18 @@
                 </div>
             </div>
         </div>
-
-        <div id="view-controls" class="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
+        <div id="view-controls" class="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-auto flex items-center gap-2">
+            <div class="action-button-container">
+                <button id="dock-top-sidebar-btn" class="btn btn-icon p-1 bg-[--panel-bg] hover:bg-[--grid-color] rounded-full self-center" aria-label="Dock Top Sidebar">
+                    <svg class="dock-icon-undocked" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="transform: rotate(90deg);">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 2.25c-1.32.09-2.6.48-3.83.99l-3.82 2.01a1.5 1.5 0 0 0-.8 1.34v7.32a1.5 1.5 0 0 0 .8 1.34l3.82 2.01c1.23.51 2.51.9 3.83.99m8.25-10.5h-9m9 0c.93 0 1.69.76 1.69 1.69v5.62c0 .93-.76 1.69-1.69 1.69h-9" />
+                    </svg>
+                    <svg class="dock-icon-docked hidden" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="transform: rotate(90deg);">
+                        <path d="M14.25 2.25c-1.32.09-2.6.48-3.83.99l-3.82 2.01a1.5 1.5 0 0 0-.8 1.34v7.32a1.5 1.5 0 0 0 .8 1.34l3.82 2.01c1.23.51 2.51.9 3.83.99m8.25-10.5h-9m9 0c.93 0 1.69.76 1.69 1.69v5.62c0 .93-.76 1.69-1.69 1.69h-9" />
+                    </svg>
+                </button>
+                <span class="tooltip !top-full !mt-2" role="tooltip">Dock Toolbar</span>
+            </div>
             <div class="ui-panel p-1">
                 <div class="btn-group">
                     <div class="action-button-container"><button id="view-btn-persp" class="btn active" aria-label="Perspective View"><svg viewBox="0 0 24 24"><path d="M3 8l8-4 8 4-8 4-8-4z" /><path d="M11 8v8M19 12l-8 4" /><path d="M3 8v8l8 4" /></svg></button><span class="tooltip" role="tooltip">Perspective View</span></div>
@@ -355,12 +356,17 @@
                     <div class="action-button-container"><button id="view-btn-quad" class="btn" aria-label="Quad View"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="12" x2="21" y2="12"></line><line x1="12" y1="3" x2="12" y2="21"></line></svg></button><span class="tooltip" role="tooltip">Quad View</span></div>
                 </div>
             </div>
-    </div>
+        </div>
 
     <main id="window-container" class="relative">
         <div id="panel-project" class="floating-window ui-panel hidden">
             <div class="window-header">
+                <div class="flex items-center gap-2"> <button class="panel-dock-button left hidden" aria-label="Dock Panel Left">
+                    <svg class="dock-icon-undocked h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.25 2.25c-1.32.09-2.6.48-3.83.99l-3.82 2.01a1.5 1.5 0 0 0-.8 1.34v7.32a1.5 1.5 0 0 0 .8 1.34l3.82 2.01c1.23.51 2.51.9 3.83.99m8.25-10.5h-9m9 0c.93 0 1.69.76 1.69 1.69v5.62c0 .93-.76 1.69-1.69 1.69h-9" /></svg>
+                    <svg class="dock-icon-docked hidden h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M14.25 2.25c-1.32.09-2.6.48-3.83.99l-3.82 2.01a1.5 1.5 0 0 0-.8 1.34v7.32a1.5 1.5 0 0 0 .8 1.34l3.82 2.01c1.23.51 2.51.9 3.83.99m8.25-10.5h-9m9 0c.93 0 1.69.76 1.69 1.69v5.62c0 .93-.76 1.69-1.69 1.69h-9" /></svg>
+                </button>
                 <span>Project Setup</span>
+            </div>
                 <div class="window-controls">
                     <div class="window-icon-max"></div>
                     <div class="collapse-icon"></div>
@@ -1457,10 +1463,10 @@
                 <div><label class="label text-xs">Specularity</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="furniture-spec" min="0" max="1" value="0.05" step="0.01"><span id="furniture-spec-val" class="data-value font-mono w-12 text-left">0.05</span></div></div>
                 <div><label class="label text-xs">Roughness</label><div class="flex items-center space-x-3 mt-1"><input type="range" id="furniture-rough" min="0" max="1" value="0.1" step="0.01"><span id="furniture-rough-val" class="data-value font-mono w-12 text-left">0.10</span></div></div>
             </div>
-        </div> <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-</div>
+            </div> <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+        </div>
 
-<div id="panel-sensor" class="floating-window ui-panel hidden">
+        <div id="panel-sensor" class="floating-window ui-panel hidden">
             <div class="window-header">
                 <span>Sensor Grid</span>
                 <div class="window-controls">
@@ -2794,91 +2800,121 @@
                     <span>Generate Report</span>
                 </button>
             </div>
+                </div>
+                    <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+                </div>
             </div>
+
+            <div id="panel-recipe-guides" class="floating-window ui-panel hidden" style="width: 600px; height: 70vh;">
+                <div class="window-header">
+                <span>Recipe Guides</span>
+                    <div class="window-controls">
+                        <div class="window-icon-max"></div>
+                        <div class="collapse-icon"></div>
+                        <div class="window-icon-close"></div>
+                    </div>
+                </div>
+                <div class="window-content space-y-4">
+                    <div>
+                        <label for="guide-selector" class="label">Select a Recipe Guide</label>
+                        <select id="guide-selector" class="w-full mt-1">
+                            <option value="" disabled selected>-- Choose a guide to display --</option>
+                        </select>
+                    </div>
+                    <div id="guide-content" class="prose max-w-none h-full overflow-y-auto border border-[--grid-color] p-4 rounded-md bg-[--grid-color]">
+                        <p class="text-[--text-secondary]">Please select a recipe from the dropdown above to see its guide.</p>
+                    </div>
+                </div>
                 <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
             </div>
-        </div>
-
-        <div id="panel-recipe-guides" class="floating-window ui-panel hidden" style="width: 600px; height: 70vh;">
-            <div class="window-header">
-            <span>Recipe Guides</span>
-                <div class="window-controls">
-                    <div class="window-icon-max"></div>
-                    <div class="collapse-icon"></div>
-                    <div class="window-icon-close"></div>
-                </div>
+                </main> <div id="left-docking-container" class="fixed top-0 bottom-0 left-[60px] z-[99] hidden flex-col border-r border-[--grid-color] bg-[--docked-panel-bg] overflow-hidden" style="width: var(--docked-panel-width, 380px);">
+            <div id="docked-panels-content" class="flex-grow overflow-y-auto">
             </div>
-            <div class="window-content space-y-4">
-                <div>
-                    <label for="guide-selector" class="label">Select a Recipe Guide</label>
-                    <select id="guide-selector" class="w-full mt-1">
-                        <option value="" disabled selected>-- Choose a guide to display --</option>
-                    </select>
-                </div>
-                <div id="guide-content" class="prose max-w-none h-full overflow-y-auto border border-[--grid-color] p-4 rounded-md bg-[--grid-color]">
-                    <p class="text-[--text-secondary]">Please select a recipe from the dropdown above to see its guide.</p>
-                </div>
+                <div id="docked-panel-resizer" class="absolute top-0 bottom-0 right-0 w-2 cursor-ew-resize z-[100]"></div>
             </div>
-            <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-        </div>
-    </main>
 
-    <div id="sidebar-wrapper">
-    <div id="ai-assistant-toggle-container" class="action-button-container">
-        <button id="ai-assistant-button" class="bottom-action-button" aria-label="Open AI Assistant">
-            <svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 0 14 14" width="28px" fill="currentColor">
-                <path fill-rule="evenodd" clip-rule="evenodd" d="M11.958 10.945a1.786 1.786 0 1 1-3.573 0 1.786 1.786 0 0 1 3.573 0Zm-.298-3.84a1.489 1.489 0 1 1-2.978 0 1.489 1.489 0 0 1 2.978 0ZM13 5.287a.744.744 0 1 1-1.489 0 .744.744 0 0 1 1.489 0ZM8.325 4.93a3.663 3.663 0 0 1-3.662 3.662A3.663 3.663 0 0 1 1 4.931a3.663 3.663 0 0 1 3.663-3.663 3.663 3.663 0 0 1 3.662 3.663Z"/>
-            </svg>
-        </button>
-        <span class="tooltip" role="tooltip">AI Assistant</span>
+
+
+        <div id="sidebar-wrapper">
+        <div id="ai-assistant-toggle-container" class="action-button-container">
+            <button id="ai-assistant-button" class="bottom-action-button" aria-label="Open Helios Assistant">
+                <svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 0 14 14" width="28px" fill="currentColor">
+                    <path fill-rule="evenodd" clip-rule="evenodd" d="M11.958 10.945a1.786 1.786 0 1 1-3.573 0 1.786 1.786 0 0 1 3.573 0Zm-.298-3.84a1.489 1.489 0 1 1-2.978 0 1.489 1.489 0 0 1 2.978 0ZM13 5.287a.744.744 0 1 1-1.489 0 .744.744 0 0 1 1.489 0ZM8.325 4.93a3.663 3.663 0 0 1-3.662 3.662A3.663 3.663 0 0 1 1 4.931a3.663 3.663 0 0 1 3.663-3.663 3.663 3.663 0 0 1 3.662 3.663Z"/>
+                </svg>
+            </button>
+            <span class="tooltip" role="tooltip">Helios Assistant</span>
         </div>
-         </aside>
         <aside id="right-sidebar" class="ui-panel closed flex flex-col">
             <div class="resize-handle-edge left" style="cursor: ew-resize;"></div>
             <div class="window-header">
-        <span>Helios</span>
-        <div class="window-controls">
-                <button id="ai-info-btn" class="window-icon-info" aria-label="Helios Capabilities" title="View Helios Capabilities">
-                    <svg width="16" height="16" viewBox="0 0 1024 1024" class="icon" xmlns="http://www.w3.org/2000/svg"><path d="M511.761 119.521c216.628 0 392.24 175.612 392.24 392.24s-175.612 392.24-392.24 392.24c-216.627 0-392.239-175.612-392.239-392.24s175.612-392.239 392.24-392.239" fill="var(--highlight-color)"/><path d="M511.761 83.968c-13.949 0-26.166 7.556-32.773 18.79a420.6 420.6 0 0 1 65.547 0c-6.607-11.234-18.825-18.79-32.774-18.79M238.9 200.908c-20.948 0-37.99 17.043-37.99 37.991 0 1.591.097 3.168.289 4.72a416 416 0 0 1 20.449-21.971 417 417 0 0 1 21.975-20.451 39 39 0 0 0-4.723-.288m541.002.287a416 416 0 0 1 21.974 20.452 416 416 0 0 1 20.451 21.974q.286-2.333.287-4.723c0-20.948-17.041-37.99-37.99-37.99a39 39 0 0 0-4.722.287M588.019 491.282h292.51a373 373 0 0 0-2.975-30.957l-.576-3.837c-8.847-58.983-32.3-115.61-67.821-163.755l-3.407-4.62a375 375 0 0 0-32.838-37.501 375 375 0 0 0-37.503-32.838l-4.618-3.407c-48.145-35.522-104.77-58.974-163.755-67.822l-3.817-.572a375 375 0 0 0-51.458-3.534 375 375 0 0 0-51.454 3.533l-3.82.573c-58.984 8.847-115.61 32.3-163.755 67.822l-4.61 3.4a374 374 0 0 0-17.455 14.192l208.092 208.093c10.295-4.727 21.585-7.24 33.002-7.24 36.453 0 67.215 24.834 76.258 58.47m332.745-12.293a418 418 0 0 1 1.28 32.773c0 10.992-.427 21.922-1.28 32.773 11.234-6.607 18.79-18.824 18.79-32.773 0-13.948-7.556-26.166-18.79-32.773m-818.005 0c-11.235 6.606-18.791 18.823-18.791 32.772 0 13.95 7.556 26.166 18.79 32.773a418 418 0 0 1-1.28-32.773c0-10.992.428-21.923 1.28-32.773zm385.465 2.95c-9.186 7.265-14.453 18.132-14.453 29.823 0 20.948 17.042 37.99 37.99 37.99s37.99-17.042 37.99-37.99-17.042-37.99-37.99-37.99c-8.626 0-16.752 2.814-23.501 8.139zM201.197 779.901a39 39 0 0 0-.287 4.72c0 20.95 17.041 37.991 37.99 37.991q2.389 0 4.722-.287a417 417 0 0 1-21.975-20.45 417 417 0 0 1-20.45-21.975zM779.9 822.326a39 39 0 0 0 4.724.287c20.948 0 37.99-17.041 37.99-37.99 0-1.59-.097-3.167-.288-4.721a417 417 0 0 1-20.451 21.974 416 416 0 0 1-21.975 20.45m-319.56 55.23a373 373 0 0 0 30.941 2.973V588.02c-33.636-9.043-58.47-39.805-58.47-76.258 0-16.54 5.069-32.286 14.323-45.409l-205.96-205.96a374 374 0 0 0-23.41 27.733l-3.399 4.607c-35.52 48.144-58.973 104.77-67.82 163.755l-.576 3.838a375 375 0 0 0-3.53 51.435c0 17.36 1.19 34.535 3.53 51.435l.576 3.84c8.847 58.985 32.3 115.61 67.821 163.756l3.405 4.615a375 375 0 0 0 32.84 37.506 375 375 0 0 0 37.502 32.837l4.618 3.408c48.147 35.521 104.772 58.974 163.756 67.821zm71.901-289.537v292.51a373 373 0 0 0 30.956-2.975l3.839-.576c58.984-8.847 115.61-32.3 163.755-67.821l4.627-3.414a375 375 0 0 0 37.494-32.83 375 375 0 0 0 32.83-37.495l3.415-4.628c35.521-48.144 58.974-104.77 67.821-163.754l.577-3.84a373 373 0 0 0 2.974-30.956H588.02c-7.287 27.104-28.675 48.492-55.778 55.778zM478.99 920.763c6.605 11.236 18.823 18.79 32.772 18.79 13.95 0 26.167-7.554 32.773-18.79a420 420 0 0 1-65.545 0m32.772 59.75c-39.061 0-71.588-28.518-77.86-65.823-27.998-5.378-55.354-13.69-81.848-24.896-24.944-10.552-48.594-23.43-70.779-38.518-12.539 8.01-27.112 12.297-42.375 12.297-43.532 0-78.95-35.416-78.95-78.95 0-15.262 4.287-29.837 12.297-42.375-15.089-22.185-27.965-45.835-38.517-70.78-11.205-26.492-19.518-53.849-24.896-81.849-37.307-6.268-65.825-38.795-65.825-77.857s28.518-71.59 65.825-77.86c5.378-27.999 13.69-55.354 24.896-81.848 10.552-24.944 23.428-48.594 38.517-70.779-8.01-12.538-12.296-27.112-12.296-42.375 0-43.533 35.417-78.95 78.95-78.95 15.262 0 29.837 4.287 42.374 12.297 22.185-15.089 45.835-27.966 70.78-38.517 26.493-11.205 53.85-19.52 81.848-24.896 6.27-37.309 38.797-65.826 77.86-65.826 39.06 0 71.587 28.517 77.86 65.825 27.997 5.376 55.354 13.69 81.847 24.896 24.944 10.55 48.594 23.428 70.778 38.517 12.54-8.01 27.114-12.298 42.377-12.298 43.533 0 78.95 35.418 78.95 78.95 0 15.264-4.287 29.837-12.298 42.376 15.09 22.185 27.967 45.835 38.518 70.78 11.205 26.493 19.519 53.848 24.896 81.848 37.306 6.27 65.825 38.798 65.825 77.86 0 39.06-28.519 71.587-65.825 77.858-5.377 28-13.69 55.356-24.896 81.848-10.55 24.944-23.43 48.595-38.517 70.78 8.01 12.538 12.297 27.113 12.297 42.374 0 43.535-35.417 78.95-78.95 78.95-15.263 0-29.837-4.285-42.376-12.296-22.185 15.09-45.835 27.965-70.78 38.518-26.492 11.205-53.849 19.517-81.848 24.896-6.27 37.306-38.797 65.823-77.859 65.823" fill="var(--bg-main)"/></svg>
-                </button>
-                <button id="ai-settings-btn" class="window-icon-settings" aria-label="Helios Settings">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path opacity=".4" d="m18.94 5.42-5.17-2.99c-.99-.57-2.54-.57-3.53 0L5.02 5.44c-2.07 1.4-2.19 1.61-2.19 3.84v5.43c0 2.23.12 2.45 2.23 3.87l5.17 2.99c.5.29 1.14.43 1.77.43s1.27-.14 1.76-.43l5.22-3.01c2.07-1.4 2.19-1.61 2.19-3.84V9.28c0-2.23-.12-2.44-2.23-3.86" fill="currentColor"/><path d="M12 15.25a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5" fill="currentColor"/></svg>
-                </button>
-            </div>
-        </div>
-            <div class="sidebar-content !p-0 flex flex-col">
-        <div id="ai-chat-tabs" class="ai-chat-tabs"></div>
-        <div id="ai-chat-messages" class="flex-grow p-4 space-y-4 overflow-y-auto">
-            </div>
+                <div class="flex items-center gap-4">
+                    <div class="ai-mode-selector">
+                        <span class="font-semibold text-sm uppercase">Helios</span>
+                    </div>
+                </div>
+                    <div class="window-controls">
+                        <div class="action-button-container">
+                            <button id="ai-settings-btn" class="btn btn-icon" aria-label="Settings">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M18.48 18.537H21m-10.831-6.493H21m-8.199-6.493H3m18 0h-2.52M3 18.537h9.801" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                                    <path d="M17.88 18.6a2.4 2.4 0 1 1-4.8 0 2.4 2.4 0 0 1 4.8 0ZM9.48 12a2.4 2.4 0 1 1-4.8 0 2.4 2.4 0 0 1 4.8 0Zm8.4-6.6a2.4 2.4 0 1 1-4.8 0 2.4 2.4 0 0 1 4.8 0Z" stroke="var(--highlight-color)" stroke-width="1.5" stroke-linecap="round"/>
+                                </svg>
+                            </button>
+                            <span class="tooltip" role="tooltip">Helios Settings</span>
+                        </div>
+                    <div class="action-button-container">
+                        <button id="ai-info-btn" class="btn btn-icon" aria-label="Info">
+                            <svg width="24" height="24" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M16.247 4.733c0 1.684 1.271 2.825 2.84 2.825s2.842-1.142 2.842-2.825c0-1.685-1.272-2.826-2.842-2.826-1.568 0-2.84 1.141-2.84 2.826" fill="var(--highlight-color)"/>
+                                <path d="m10.096 14.375c0 .334-.061 1.163.008 1.662l2.479-2.983c.513-.562 1.106-.955 1.409-.849s.47.463.371.795L10.26 26.59c-.473 1.588.421 3.148 2.599 3.504 3.189 0 5.084-2.158 6.948-4.955 0-.334.111-1.213.044-1.713l-2.479 2.982c-.514.562-1.151.955-1.455.85-.28-.098-.444-.41-.389-.721l4.132-13.653c.344-1.734-.59-3.312-2.564-3.514-2.076.001-5.136 2.209-7 5.005" fill="currentColor"/>
+                            </svg>
+                        </button>
+                        <span class="tooltip" role="tooltip">Helios Info</span>
+                    </div>
+                    <div class="action-button-container">
+                        <button id="ai-new-chat-btn" class="btn btn-icon" aria-label="New Chat">
+                            <svg width="24" height="24" viewBox="0 0 24 24" data-name="Flat Color" xmlns="http://www.w3.org/2000/svg" class="icon flat-color">
+                                <rect x="2" y="3" width="20" height="18" rx="2" fill="currentColor"/>
+                                <circle cx="6" cy="12" r="1.5" fill="var(--highlight-color)"/>
+                            </svg>
+                        </button>
+                        <span class="tooltip" role="tooltip">New Chat</span>
+                    </div>
+                </div>            </div>
+    <div id="ai-chat-tabs" class="flex items-center px-4 py-2 border-b border-[--grid-color] bg-[--grid-color]">
+                <button id="ai-chat-tab-1" class="ai-chat-tab active" data-tab="1">Chat 1</button>
+                </div>
+            <div id="ai-chat-messages" class="flex-grow p-4 space-y-4 overflow-y-auto">
+                </div>
             <div id="ai-inspector-results" class="flex-grow p-4 space-y-3 overflow-y-auto hidden">
                 <div class="text-center text-sm text-[--text-secondary] p-4">
                     <p>Click "Run Inspector" to analyze your current project setup for potential issues and design suggestions.</p>
                 </div>
             </div>
             <div id="ai-critique-results" class="flex-grow p-4 space-y-3 overflow-y-auto hidden">
-            <div class="text-center text-sm text-[--text-secondary] p-4">
-                <p>Load a simulation result file, then click "Analyze Results" for an AI-powered critique and design suggestions.</p>
+                <div class="text-center text-sm text-[--text-secondary] p-4">
+                    <p>Load a simulation result file, then click "Analyze Results" for an AI-powered critique and design suggestions.</p>
+                </div>
             </div>
-        </div>
-        <div id="ai-chat-input-container" class="p-4 border-t border-[--grid-color] relative">
-            <div id="chat-resize-handle"></div>
-                    <form id="ai-chat-form" class="flex gap-2 items-end">
+            <div id="ai-chat-input-container" class="p-4 border-t border-[--grid-color] relative">
+                <div id="chat-resize-handle"></div>
+                <form id="ai-chat-form" class="flex gap-2 items-end">
                     <textarea id="ai-chat-input" placeholder="Ex tenebris lux" class="flex-grow" autocomplete="off" rows="1"></textarea>
                     <button type="submit" id="ai-chat-send" class="btn btn-primary">Send</button>
                 </form>
             </div>
-            </div>
-            </aside>
-        </div>
+        </aside>
+    </div>
 
-            <div id="results-analysis-panel" class="floating-window ui-panel hidden">
-                <div class="window-header">
-                    <span>Results Analysis</span>
-                    <div class="window-controls">
-                        <div class="window-icon-max"></div>
-                        <div class="collapse-icon"></div>
-                        <div class="window-icon-close"></div>
-                    </div>
+    <div id="results-analysis-panel" class="floating-window ui-panel hidden">
+        <div class="window-header">
+            <span>Results Analysis</span>
+            <div class="window-controls">
+                <div class="window-icon-max"></div>
+                <div class="collapse-icon"></div>
+                <div class="window-icon-close"></div>
+            </div>
+
                 </div>
                 <div class="window-content space-y-5">
                     <div class="param-section">
@@ -3271,44 +3307,76 @@
             <p class="text-xs text-[--text-secondary] mt-4 text-center">Shortcuts are disabled when typing in input fields.</p>
         </div>
     </div>
-    <div id="bottom-left-controls" class="fixed bottom-6 left-6 z-50 flex gap-4 items-center">
-        <div class="action-button-container">
-            <button id="save-project-button" class="bottom-action-button" aria-label="Save Project File">
-                <svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 0 24 24" width="28px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm2 16H5V5h11.17L19 7.83V19zm-7-7c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3zM6 6h9v4H6z"/></svg>
-            </button>
-            <span class="tooltip" role="tooltip">Save Project</span>
-        </div>
-        <div class="action-button-container">
-            <button id="load-project-button" class="bottom-action-button" aria-label="Load Project File">
-                <svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 0 24 24" width="28px"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
-            </button>
-            <span class="tooltip" role="tooltip">Load Project</span>
-        </div>
-        <div class="action-button-container">
-            <button id="info-button" class="bottom-action-button" aria-label="Show App Info">
-                <svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 0 24 24" width="28px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
-            </button>
-            <span class="tooltip" role="tooltip">App Information</span>
-            </div>
-        <div class="action-button-container">
-          <button id="recipe-guides-btn" class="bottom-action-button" aria-label="Show Recipe Guides">
-              <svg xmlns="http://www.w3.org/2000/svg" height="28px" width="28px" viewBox="0 0 32 32">
-                  <path d="M8 4h22v28H8z" style="fill:var(--btn-secondary-bg)"></path>
-                  <path d="M8 4v28l16-4V0z" style="fill:var(--grid-color)"></path>
-                  <path d="M2 0h22v28H2z" style="fill:var(--bg-main)"></path>
-                  <path d="M26 19h2v2h-2zm3 0h1v2h-1zm-5 0h1v2h-1z" style="fill:var(--text-primary)"></path>
-                  <path d="M4 7h2v2H4zm3 0h2v2H7zm6 0h2v2h-2zm3 0h2v2h-2zm0 3h2v2h-2zm0 3h2v2h-2zm0 3h2v2h-2zm3 0h2v2h-2zm3 0h2v2h-2zM2 7h1v2H2zm8 0h2v2h-2z" style="fill:var(--text-secondary)"></path>
-              </svg>
-          </button>
-          <span class="tooltip" role="tooltip">Recipe Guides</span>
-      </div>
-          <div class="action-button-container">
-                <button id="shortcut-help-btn" class="bottom-action-button" aria-label="Show Keyboard Shortcuts">
-                    <svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 0 24 24" width="28px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm-1-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg>
-                </button>
-                <span class="tooltip" role="tooltip">Shortcuts (?)</span>
-            </div>
-        </div>
+
+
+
+
+<div id="bottom-left-controls" class="fixed bottom-6 left-6 z-50 flex gap-4 items-center">
+    <div id="theme-switcher-container" class="flex gap-2 items-center pointer-events-auto">
+        <button id="theme-btn-cafe58" class="theme-btn" style="display: none;" aria-label="Switch to Cafe 58 Theme">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+            <path d="M3 14c.83 .642 2.077 1.017 3.5 1c1.423 .017 2.67 -.358 3.5 -1c.83 -.642 2.077 -1.017 3.5 -1c1.423 -.017 2.67 .358 3.5 1"></path>
+            <path d="M8 3a2.4 2.4 0 0 0 -1 2a2.4 2.4 0 0 0 1 2"></path>
+            <path d="M12 3a2.4 2.4 0 0 0 -1 2a2.4 2.4 0 0 0 1 2"></path>
+            <path d="M3 10h14v5a6 6 0 0 1 -6 6h-2a6 6 0 0 1 -6 -6v-5z"></path>
+            <path d="M16.746 16.726a3 3 0 1 0 .252 -5.555"></path>
+            </svg>
+        </button>
+        <button id="theme-btn-cyber" class="theme-btn" style="display: none;" aria-label="Switch to Cyber Theme">
+            <svg width="800" height="800" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+                <path d="M8 0C3.6 0 0 3.6 0 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8m0 15c-3.9 0-7-3.1-7-7 0-2.4 1.2-4.6 3.2-5.9C4.1 2.7 4 3.4 4 4c0 4.9 4 8.9 8.9 9-1.3 1.3-3 2-4.9 2"/>
+            </svg>
+        </button>
+        <button id="theme-btn-light" class="theme-btn" aria-label="Switch to Light Theme">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+        </button>
+        <button id="theme-btn-dark" class="theme-btn" style="display: none;" aria-label="Switch to Dark Theme">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+    </button>
+    </div>
+    <div class="action-button-container">
+        <button id="save-project-button" class="bottom-action-button" aria-label="Save Project File">
+            <svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 0 24 24" width="28px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm2 16H5V5h11.17L19 7.83V19zm-7-7c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3zM6 6h9v4H6z"/></svg>
+        </button>
+        <span class="tooltip" role="tooltip">Save Project</span>
+    </div>
+    <div class="action-button-container">
+        <button id="load-project-button" class="bottom-action-button" aria-label="Load Project File">
+            <svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 0 24 24" width="28px"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+        </button>
+        <span class="tooltip" role="tooltip">Load Project</span>
+    </div>
+
+    <div class="action-button-container">
+        <button id="info-button" class="bottom-action-button" aria-label="Show App Info">
+            <svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 0 24 24" width="28px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
+        </button>
+        <span class="tooltip" role="tooltip">App Information</span>
+    </div>
+    <div class="action-button-container">
+      <button id="recipe-guides-btn" class="bottom-action-button" aria-label="Show Recipe Guides">
+          <svg xmlns="http://www.w3.org/2000/svg" height="28px" width="28px" viewBox="0 0 32 32">
+              <path d="M8 4h22v28H8z" style="fill:var(--btn-secondary-bg)"></path>
+              <path d="M8 4v28l16-4V0z" style="fill:var(--grid-color)"></path>
+              <path d="M2 0h22v28H2z" style="fill:var(--bg-main)"></path>
+              <path d="M26 19h2v2h-2zm3 0h1v2h-1zm-5 0h1v2h-1z" style="fill:var(--text-primary)"></path>
+              <path d="M4 7h2v2H4zm3 0h2v2H7zm6 0h2v2h-2zm3 0h2v2h-2zm0 3h2v2h-2zm0 3h2v2h-2zm0 3h2v2h-2zm3 0h2v2h-2zm3 0h2v2h-2zM2 7h1v2H2zm8 0h2v2h-2z" style="fill:var(--text-secondary)"></path>
+          </svg>
+      </button>
+      <span class="tooltip" role="tooltip">Recipe Guides</span>
+    </div>
+    <div class="action-button-container">
+        <button id="shortcut-help-btn" class="bottom-action-button" aria-label="Show Keyboard Shortcuts">
+            <svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 0 24 24" width="28px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm-1-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg>
+        </button>
+        <span class="tooltip" role="tooltip">Shortcuts (?)</span>
+    </div>
+</div>
 
         <div id="templates" class="hidden">
     <template id="template-view-target-item">
@@ -4582,6 +4650,7 @@
     <script type="module" src="scripts/sunTracer.js"></script>
     <script type="module" src="scripts/main.js"></script>
     <script type="module" src="scripts/ai-assistant.js"></script>
+
 
 </body>
 </html>

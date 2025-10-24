@@ -1,13 +1,13 @@
 // scripts/ai-assistant.js
 
-import { showAlert, getNewZIndex, togglePanelVisibility, highlightSensorPoint, clearSensorHighlights, clearAllResultsDisplay, getSensorGridParams, setCameraView, scheduleUpdate } from './ui.js';
-import { getDom } from './dom.js';
 import { loadKnowledgeBase, searchKnowledgeBase } from './knowledgeBase.js';
 import { project } from './project.js';
 import { resultsManager } from './resultsManager.js';
+import { showAlert, getNewZIndex, togglePanelVisibility, highlightSensorPoint, clearSensorHighlights, clearAllResultsDisplay, getSensorGridParams, setCameraView, scheduleUpdate, setShadingState } from './ui.js';
+import { getDom } from './dom.js';
 import { openGlareRoseDiagram, openCombinedAnalysisPanel } from './annualDashboard.js';
 import { openRecipePanelByType, programmaticallyGeneratePackage } from './simulation.js';
-import { addFurniture, addVegetation } from './geometry.js';
+import { addFurniture, addVegetation, getWallGroupById, highlightWall } from './geometry.js';
 import * as THREE from 'three';
 
 // Module-level cache for DOM elements
@@ -18,11 +18,13 @@ let conversations = {};
 let activeConversationId = null;
 let conversationCounter = 0; // Simple incrementing ID for new conversations
 
+let currentMode = 'master';
+
 // Master mode configuration - combines all previous modes
 const MASTER_MODE = {
     name: 'master',
     title: 'Helios AI Assistant',
-    description: 'I am Helios, your unified AI assistant. Ask me anything about your project, or click the ℹ️ button to see my full capabilities.',
+    description: 'I am Helios, your unified AI assistant. Ask me anything about your project, or click the button to see my full capabilities.',
     placeholder: 'Ex tenebris lux...',
     welcomeMessage: 'Hello! I\'m Helios.' +
                    'You can ask me to create designs, analyze your project, critique results, explore data, or guide you through workflows. ' +
@@ -191,283 +193,268 @@ const availableTools = [
                     "required": ["enable"]
                 }
             },
+
             {
-                "name": "runGenerativeDesign",
-                "description": "Runs an iterative design study to optimize a parameter based on a goal and constraints. For example, 'find the best overhang depth to maximize sDA while keeping ASE below 10%'. This is a long-running process that runs simulations in the background and reports the result when complete.",
+                "name": "startWalkthrough",
+                "description": "Initiates a step-by-step interactive tutorial to guide the user through a specific simulation workflow, such as Daylight Factor (df), Daylight Glare Probability (dgp), or Spatial Daylight Autonomy (sda).",
                 "parameters": {
                     "type": "OBJECT",
                     "properties": {
-                        "goal": { "type": "STRING", "description": "The optimization objective. Must be 'maximize sDA' or 'minimize ASE'." },
-                        "variable": { "type": "STRING", "description": "The design parameter to iterate. Currently, only 'overhang depth' is supported." },
-                        "targetElement": { "type": "STRING", "description": "The scene element to modify. For 'overhang depth', this must be the wall, e.g., 'south'." },
-                        "range": { "type": "ARRAY", "description": "A two-element array with the [min, max] values for the variable in meters." },
-                        "steps": { "type": "NUMBER", "description": "The number of simulations to run within the range (e.g., 5)." },
-                        "constraints": { "type": "STRING", "description": "The constraint for valid solutions, e.g., 'ASE < 10' or 'sDA >= 60'." }
-                },
-                "required": ["goal", "variable", "targetElement", "range", "steps", "constraints"]
-            }
-        },
-        {
-            "name": "startWalkthrough",
-            "description": "Initiates a step-by-step interactive tutorial to guide the user through a specific simulation workflow, such as Daylight Factor (df), Daylight Glare Probability (dgp), or Spatial Daylight Autonomy (sda).",
-            "parameters": {
-                "type": "OBJECT",
-                "properties": {
-                    "topic": {
-                        "type": "STRING",
-                        "description": "The simulation topic for the walkthrough. Must be one of 'dgp', 'df', or 'sda'."
-                    }
-                },
-                "required": ["topic"]
-            }
-        },
-        {
-            "name": "endWalkthrough",
-            "description": "Ends the current interactive walkthrough or tutorial mode.",
-            "parameters": { "type": "OBJECT", "properties": {} }
-        },
-        {
-            "name": "configureSimulationRecipe",
-            "description": "Sets parameters within an already OPEN simulation recipe panel.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "recipeType": { "type": "STRING", "description": "The type of recipe to configure. E.g., 'illuminance', 'rendering', 'dgp'." },
-                        "parameters": {
-                            "type": "OBJECT",
-                            "description": "A JSON object of key-value pairs to set. Keys must match the base ID of the input controls, e.g., 'pit-month', 'quality-preset', 'rpict-x'."
+                        "topic": {
+                            "type": "STRING",
+                            "description": "The simulation topic for the walkthrough. Must be one of 'dgp', 'df', or 'sda'."
                         }
                     },
-                    "required": ["recipeType", "parameters"]
+                    "required": ["topic"]
                 }
             },
             {
-                "name": "showAnalysisDashboard",
-                "description": "Opens a specific annual analysis dashboard if the required results files are loaded.",
+                "name": "endWalkthrough",
+                "description": "Ends the current interactive walkthrough or tutorial mode.",
+                "parameters": { "type": "OBJECT", "properties": {} }
+            },
+            {
+                "name": "configureSimulationRecipe",
+                "description": "Sets parameters within an already OPEN simulation recipe panel.",
+                    "parameters": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "recipeType": { "type": "STRING", "description": "The type of recipe to configure. E.g., 'illuminance', 'rendering', 'dgp'." },
+                            "parameters": {
+                                "type": "OBJECT",
+                                "description": "A JSON object of key-value pairs to set. Keys must match the base ID of the input controls, e.g., 'pit-month', 'quality-preset', 'rpict-x'."
+                            }
+                        },
+                        "required": ["recipeType", "parameters"]
+                    }
+                },
+                {
+                    "name": "showAnalysisDashboard",
+                    "description": "Opens a specific annual analysis dashboard if the required results files are loaded.",
+                    "parameters": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "dashboardType": { "type": "STRING", "description": "The dashboard to open. Must be one of 'glareRose' or 'combinedAnalysis'." }
+                        },
+                    "required": ["dashboardType"]
+                    }
+                },
+                {
+                    "name": "toggleUIPanel",
+                "description": "Opens or closes a primary UI panel from the left toolbar, such as 'Project Setup' or 'Dimensions'.",
                 "parameters": {
                     "type": "OBJECT",
                     "properties": {
-                        "dashboardType": { "type": "STRING", "description": "The dashboard to open. Must be one of 'glareRose' or 'combinedAnalysis'." }
+                        "panelName": { "type": "STRING", "description": "The friendly name of the panel to toggle. Must be one of: 'project', 'dimensions', 'apertures', 'lighting', 'materials', 'sensors', 'viewpoint', 'viewOptions', 'info', 'aiAssistant'." },
+                        "state": { "type": "STRING", "description": "The desired state for the panel. Must be 'open' or 'close'." }
                     },
-                   "required": ["dashboardType"]
+                    "required": ["panelName", "state"]
                 }
             },
             {
-                "name": "toggleUIPanel",
-            "description": "Opens or closes a primary UI panel from the left toolbar, such as 'Project Setup' or 'Dimensions'.",
-            "parameters": {
-                "type": "OBJECT",
-                "properties": {
-                    "panelName": { "type": "STRING", "description": "The friendly name of the panel to toggle. Must be one of: 'project', 'dimensions', 'apertures', 'lighting', 'materials', 'sensors', 'viewpoint', 'viewOptions', 'info', 'aiAssistant'." },
-                    "state": { "type": "STRING", "description": "The desired state for the panel. Must be 'open' or 'close'." }
-                },
-                "required": ["panelName", "state"]
-            }
-        },
-        {
-           "name": "runSimulation",
-            "description": "Initiates a simulation by programmatically clicking the 'Run Simulation' button within an open and configured recipe panel.",
-            "parameters": {
-                "type": "OBJECT",
-                "properties": {
-                    "recipeType": { "type": "STRING", "description": "The type of recipe to run. Must match the recipe's internal type, e.g., 'illuminance', 'rendering', 'dgp', 'annual-3ph'." }
-                },
-                "required": ["recipeType"]
-            }
-        },
-        {
-            "name": "highlightResultPoint",
-            "description": "Visually highlights sensor points in the 3D view that correspond to the minimum, maximum, or clears existing highlights.",
-            "parameters": {
-                "type": "OBJECT",
-                "properties": {
-                    "type": { "type": "STRING", "description": "The type of highlight to apply. Must be one of 'min', 'max', or 'clear'." }
-                },
-                "required": ["type"]
-            }
-        },
-        {
-            "name": "displayResultsForTime",
-            "description": "Updates the 3D visualization to show the illuminance distribution for a specific hour of the year from a loaded annual simulation file.",
-            "parameters": {
-                "type": "OBJECT",
-                "properties": {
-                    "hour": { "type": "NUMBER", "description": "The hour of the year to display, from 0 to 8759." }
-                },
-                "required": ["hour"]
-            }
-        },
-        {
-            "name": "queryResultsData",
-            "description": "Performs a simple query on the currently loaded results data and returns the numerical answer. Does not modify the UI.",
-            "parameters": {
-                "type": "OBJECT",
-                "properties": {
-                    "queryType": { "type": "STRING", "description": "The type of query to perform. Must be one of 'average', 'min', 'max', 'countBelow', 'countAbove'." },
-                    "threshold": { "type": "NUMBER", "description": "The illuminance threshold in lux. Required only for 'countBelow' and 'countAbove' queries." }
-                },
-               "required": ["queryType"]
-            }
-        },
-        {
-            "name": "getDatasetStatistics",
-            "description": "Retrieves the summary statistics (min, max, average, count) for a specific dataset (A or B), regardless of which one is currently active in the UI.",
-            "parameters": {
-                "type": "OBJECT",
-                "properties": {
-                    "dataset": { "type": "STRING", "description": "The dataset to query. Must be 'a' or 'b'." }
-                },
-                "required": ["dataset"]
-            }
-        },
-        {
-            "name": "saveProject",
-            "description": "Saves the current project state by triggering a file download for the user.",
-            "parameters": { "type": "OBJECT", "properties": {} }
-        },
-        {
-            "name": "loadResultsFile",
-            "description": "Opens the system's file dialog for the user to select a results file to load into a specific dataset.",
-            "parameters": {
-                "type": "OBJECT",
-                "properties": {
-                    "dataset": { "type": "STRING", "description": "The dataset to load the file into. Must be 'a' or 'b'." }
-                },
-                "required": ["dataset"]
-            }
-        },
-        {
-            "name": "clearResults",
-            "description": "Clears all loaded simulation results data and resets the analysis UI panels.",
-            "parameters": { "type": "OBJECT", "properties": {} }
-        },
-        {
-            "name": "setMaterialProperty",
-            "description": "Sets a specific material property for a surface in the scene, such as reflectance or roughness.",
-            "parameters": {
-                "type": "OBJECT",
-                "properties": {
-                    "surface": { "type": "STRING", "description": "The surface to modify. Must be one of 'wall', 'floor', 'ceiling', 'frame', 'shading', or 'glazing'." },
-                    "property": { "type": "STRING", "description": "The property to change. Must be one of 'reflectance', 'specularity', 'roughness', or 'transmittance' (for glazing only)." },
-                    "value": { "type": "NUMBER", "description": "The new value for the property, typically between 0.0 and 1.0." }
-                },
-                "required": ["surface", "property", "value"]
-            }
-        },
-        {
-            "name": "searchKnowledgeBase",
-            "description": "Searches the application's built-in help documentation and knowledge base for topics related to a query. Useful for defining terms (e.g., 'What is Daylight Factor?') or explaining concepts.",
-            "parameters": {
-                "type": "OBJECT",
-                "properties": {
-                    "query": { "type": "STRING", "description": "The search term or question to look up in the knowledge base." }
-                },
-                "required": ["query"]
-            }
-        },
-        {
-            "name": "traceSunRays",
-            "description": "Configures and runs the Sun Ray Tracing visualization. Sets the date, time, number of rays, and max bounces, then initiates the trace. Requires an EPW file to be loaded.",
-            "parameters": {
-                "type": "OBJECT",
-                "properties": {
-                    "date": { "type": "STRING", "description": "The date for the sun position, formatted as 'Month Day', e.g., 'Jun 21' or 'Dec 21'." },
-                    "time": { "type": "STRING", "description": "The 24-hour time for the sun position, formatted as 'HH:MM', e.g., '14:30'." },
-                    "rayCount": { "type": "NUMBER", "description": "The total number of sun rays to trace through all glazing. e.g., 200." },
-                    "maxBounces": { "type": "NUMBER", "description": "The maximum number of times a ray can bounce inside the room after entering. e.g., 3." }
-                },
-                "required": ["date", "time", "rayCount", "maxBounces"]
-            }
-        },
-        {
-            "name": "toggleSunRayVisibility",
-            "description": "Shows or hides the currently displayed sun ray traces in the 3D view.",
-            "parameters": {
-                "type": "OBJECT",
-                "properties": {
-                    "visible": { "type": "BOOLEAN", "description": "Set to true to show the rays, false to hide them." }
-                },
-                "required": ["visible"]
-            }
-        },
-        {
-            "name": "generateReport",
-            "description": "Generates and downloads a PDF summary report of the current project state and loaded simulation results.",
-            "parameters": { "type": "OBJECT", "properties": {} }
-        },
-        {
-            "name": "toggleDataTable",
-            "description": "Shows or hides the interactive data table for the currently loaded results.",
-            "parameters": {
-                "type": "OBJECT",
-                "properties": {
-                    "show": { "type": "BOOLEAN", "description": "Set to true to show the data table, false to hide it." }
-                },
-                "required": ["show"]
-            }
-        },
-        {
-            "name": "filterDataTable",
-            "description": "Applies a filter to the interactive data table to show only specific rows. The query should be a simple comparison operator followed by a number.",
-            "parameters": {
-                "type": "OBJECT",
-                "properties": {
-                    "query": { "type": "STRING", "description": "The filter query, e.g., '> 500', '<= 100', '== 0'." }
-                },
-                "required": ["query"]
-            }
-        },
-        {
-            "name": "toggleHdrViewer",
-            "description": "Opens or closes the High Dynamic Range (HDR) image viewer, if an HDR result file has been loaded.",
-            "parameters": {
-                "type": "OBJECT",
-                "properties": {
-                    "show": { "type": "BOOLEAN", "description": "Set to true to show the HDR viewer, false to hide it." }
-                },
-                "required": ["show"]
-            }
-        },
-        {
-            "name": "configureHdrViewer",
-            "description": "Adjusts the settings of the currently open HDR viewer.",
-            "parameters": {
-                "type": "OBJECT",
-                "properties": {
-                    "exposure": { "type": "NUMBER", "description": "Sets the exposure level (EV). Can be positive or negative." },
-                    "falseColor": { "type": "BOOLEAN", "description": "Set to true to enable the false color luminance view, false to disable it." }
+            "name": "runSimulation",
+                "description": "Initiates a simulation by programmatically clicking the 'Run Simulation' button within an open and configured recipe panel.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "recipeType": { "type": "STRING", "description": "The type of recipe to run. Must match the recipe's internal type, e.g., 'illuminance', 'rendering', 'dgp', 'annual-3ph'." }
+                    },
+                    "required": ["recipeType"]
+                }
+            },
+            {
+                "name": "highlightResultPoint",
+                "description": "Visually highlights sensor points in the 3D view that correspond to the minimum, maximum, or clears existing highlights.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "type": { "type": "STRING", "description": "The type of highlight to apply. Must be one of 'min', 'max', or 'clear'." }
+                    },
+                    "required": ["type"]
+                }
+            },
+            {
+                "name": "displayResultsForTime",
+                "description": "Updates the 3D visualization to show the illuminance distribution for a specific hour of the year from a loaded annual simulation file.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "hour": { "type": "NUMBER", "description": "The hour of the year to display, from 0 to 8759." }
+                    },
+                    "required": ["hour"]
+                }
+            },
+            {
+                "name": "queryResultsData",
+                "description": "Performs a simple query on the currently loaded results data and returns the numerical answer. Does not modify the UI.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "queryType": { "type": "STRING", "description": "The type of query to perform. Must be one of 'average', 'min', 'max', 'countBelow', 'countAbove'." },
+                        "threshold": { "type": "NUMBER", "description": "The illuminance threshold in lux. Required only for 'countBelow' and 'countAbove' queries." }
+                    },
+                "required": ["queryType"]
+                }
+            },
+            {
+                "name": "getDatasetStatistics",
+                "description": "Retrieves the summary statistics (min, max, average, count) for a specific dataset (A or B), regardless of which one is currently active in the UI.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "dataset": { "type": "STRING", "description": "The dataset to query. Must be 'a' or 'b'." }
+                    },
+                    "required": ["dataset"]
+                }
+            },
+            {
+                "name": "saveProject",
+                "description": "Saves the current project state by triggering a file download for the user.",
+                "parameters": { "type": "OBJECT", "properties": {} }
+            },
+            {
+                "name": "loadResultsFile",
+                "description": "Opens the system's file dialog for the user to select a results file to load into a specific dataset.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "dataset": { "type": "STRING", "description": "The dataset to load the file into. Must be 'a' or 'b'." }
+                    },
+                    "required": ["dataset"]
+                }
+            },
+            {
+                "name": "clearResults",
+                "description": "Clears all loaded simulation results data and resets the analysis UI panels.",
+                "parameters": { "type": "OBJECT", "properties": {} }
+            },
+            {
+                "name": "setMaterialProperty",
+                "description": "Sets a specific material property for a surface in the scene, such as reflectance or roughness.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "surface": { "type": "STRING", "description": "The surface to modify. Must be one of 'wall', 'floor', 'ceiling', 'frame', 'shading', or 'glazing'." },
+                        "property": { "type": "STRING", "description": "The property to change. Must be one of 'reflectance', 'specularity', 'roughness', or 'transmittance' (for glazing only)." },
+                        "value": { "type": "NUMBER", "description": "The new value for the property, typically between 0.0 and 1.0." }
+                    },
+                    "required": ["surface", "property", "value"]
+                }
+            },
+            {
+                "name": "searchKnowledgeBase",
+                "description": "Searches the application's built-in help documentation and knowledge base for topics related to a query. Useful for defining terms (e.g., 'What is Daylight Factor?') or explaining concepts.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "query": { "type": "STRING", "description": "The search term or question to look up in the knowledge base." }
+                    },
+                    "required": ["query"]
+                }
+            },
+            {
+                "name": "traceSunRays",
+                "description": "Configures and runs the Sun Ray Tracing visualization. Sets the date, time, number of rays, and max bounces, then initiates the trace. Requires an EPW file to be loaded.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "date": { "type": "STRING", "description": "The date for the sun position, formatted as 'Month Day', e.g., 'Jun 21' or 'Dec 21'." },
+                        "time": { "type": "STRING", "description": "The 24-hour time for the sun position, formatted as 'HH:MM', e.g., '14:30'." },
+                        "rayCount": { "type": "NUMBER", "description": "The total number of sun rays to trace through all glazing. e.g., 200." },
+                        "maxBounces": { "type": "NUMBER", "description": "The maximum number of times a ray can bounce inside the room after entering. e.g., 3." }
+                    },
+                    "required": ["date", "time", "rayCount", "maxBounces"]
+                }
+            },
+            {
+                "name": "toggleSunRayVisibility",
+                "description": "Shows or hides the currently displayed sun ray traces in the 3D view.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "visible": { "type": "BOOLEAN", "description": "Set to true to show the rays, false to hide them." }
+                    },
+                    "required": ["visible"]
+                }
+            },
+            {
+                "name": "generateReport",
+                "description": "Generates and downloads a PDF summary report of the current project state and loaded simulation results.",
+                "parameters": { "type": "OBJECT", "properties": {} }
+            },
+            {
+                "name": "toggleDataTable",
+                "description": "Shows or hides the interactive data table for the currently loaded results.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "show": { "type": "BOOLEAN", "description": "Set to true to show the data table, false to hide it." }
+                    },
+                    "required": ["show"]
+                }
+            },
+            {
+                "name": "filterDataTable",
+                "description": "Applies a filter to the interactive data table to show only specific rows. The query should be a simple comparison operator followed by a number.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "query": { "type": "STRING", "description": "The filter query, e.g., '> 500', '<= 100', '== 0'." }
+                    },
+                    "required": ["query"]
+                }
+            },
+            {
+                "name": "toggleHdrViewer",
+                "description": "Opens or closes the High Dynamic Range (HDR) image viewer, if an HDR result file has been loaded.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "show": { "type": "BOOLEAN", "description": "Set to true to show the HDR viewer, false to hide it." }
+                    },
+                    "required": ["show"]
+                }
+            },
+            {
+                "name": "configureHdrViewer",
+                "description": "Adjusts the settings of the currently open HDR viewer.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "exposure": { "type": "NUMBER", "description": "Sets the exposure level (EV). Can be positive or negative." },
+                        "falseColor": { "type": "BOOLEAN", "description": "Set to true to enable the false color luminance view, false to disable it." }
+                    }
+                }
+            },
+            {
+                "name": "setTheme",
+                "description": "Changes the visual theme of the application.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "themeName": { "type": "STRING", "description": "The name of the theme to apply. Must be one of: 'light', 'dark', 'cyber', 'cafe58'." }
+                    },
+                    "required": ["themeName"]
+                }
+            },
+            {
+                "name": "loadProject",
+                "description": "Initiates the process to load a previously saved project file by opening the system's file dialog for the user.",
+                "parameters": { "type": "OBJECT", "properties": {} }
+            },
+            {
+                "name": "toggleComparisonMode",
+                "description": "Enables or disables the comparative analysis mode in the results panel, which allows loading a second dataset.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "enable": { "type": "BOOLEAN", "description": "Set to true to enable comparison mode, false to disable it." }
+                    },
+                    "required": ["enable"]
                 }
             }
-        },
-        {
-            "name": "setTheme",
-            "description": "Changes the visual theme of the application.",
-            "parameters": {
-                "type": "OBJECT",
-                "properties": {
-                    "themeName": { "type": "STRING", "description": "The name of the theme to apply. Must be one of: 'light', 'dark', 'cyber', 'cafe58'." }
-                },
-                "required": ["themeName"]
-            }
-        },
-        {
-            "name": "loadProject",
-            "description": "Initiates the process to load a previously saved project file by opening the system's file dialog for the user.",
-            "parameters": { "type": "OBJECT", "properties": {} }
-        },
-        {
-            "name": "toggleComparisonMode",
-            "description": "Enables or disables the comparative analysis mode in the results panel, which allows loading a second dataset.",
-            "parameters": {
-                "type": "OBJECT",
-                "properties": {
-                    "enable": { "type": "BOOLEAN", "description": "Set to true to enable comparison mode, false to disable it." }
-                },
-                "required": ["enable"]
-            }
-        }
-    ]
-}
+        ]
+    }
 ];
 
 // A shared map of recipe types to their template IDs. Used by multiple AI tools.
@@ -582,8 +569,7 @@ function initAiAssistant() {
     dom['ai-settings-form']?.addEventListener('submit', saveSettings);
     dom['ai-info-btn']?.addEventListener('click', openCapabilitiesModal);
     dom['helios-capabilities-close-btn']?.addEventListener('click', closeCapabilitiesModal);
-
-
+    dom['ai-new-chat-btn']?.addEventListener('click', () => createNewConversation());
 
     dom['ai-provider-select']?.addEventListener('change', (e) => {
     const provider = e.target.value;
@@ -605,6 +591,60 @@ function initAiAssistant() {
     dom['run-critique-btn']?.addEventListener('click', handleRunCritique);
     dom['ai-critique-results']?.addEventListener('click', handleCritiqueActionClick);
 
+    // --- START: Generator Tab Logic ---
+    const generatorBtn = dom['helios-mode-generator-btn'];
+    const generatorContent = dom['helios-generator-content'];
+    const chatContent = dom['ai-chat-messages']; // Assuming this is the main chat view
+    const inspectorContent = dom['ai-inspector-results'];
+    const critiqueContent = dom['ai-critique-results'];
+    const chatTabsContainer = dom['ai-chat-tabs'];
+
+    if (generatorBtn && generatorContent && chatContent && inspectorContent && critiqueContent && chatTabsContainer) {
+        generatorBtn.addEventListener('click', () => {
+            // Update internal state
+            currentMode = 'generator';
+
+            // Update UI visibility
+            generatorContent.classList.remove('hidden');
+            chatContent.classList.add('hidden'); // Hide chat view
+            inspectorContent.classList.add('hidden');
+            critiqueContent.classList.add('hidden');
+
+            // Update tab active states
+            chatTabsContainer.querySelectorAll('.ai-chat-tab').forEach(tab => tab.classList.remove('active'));
+            generatorBtn.classList.add('active');
+
+            // Hide chat input when generator is active (optional, could be used for specific generator commands later)
+            // dom['ai-chat-form']?.classList.add('hidden');
+
+            // Update placeholder and description for Generator mode
+            updateModeDescription('generator');
+        });
+
+        // Add listener to the default chat tab (assuming it's the first one) to switch back
+        const defaultChatTab = chatTabsContainer.querySelector('.ai-chat-tab:first-child');
+        if (defaultChatTab) {
+            defaultChatTab.addEventListener('click', () => {
+                // This logic assumes switching back to the 'master' mode represented by the first chat tab
+                currentMode = 'master';
+                generatorContent.classList.add('hidden');
+                chatContent.classList.remove('hidden'); // Show chat view
+                inspectorContent.classList.add('hidden');
+                critiqueContent.classList.add('hidden');
+                dom['ai-chat-form']?.classList.remove('hidden'); // Ensure chat form is visible
+
+                chatTabsContainer.querySelectorAll('.ai-chat-tab').forEach(tab => tab.classList.remove('active'));
+                defaultChatTab.classList.add('active');
+
+                updateModeDescription('master');
+            });
+        }
+    } else {
+        console.warn("One or more elements required for Generator tab switching not found.");
+    }
+    // --- END: Generator Tab Logic ---
+
+
     loadSettings();
     loadKnowledgeBase();
 
@@ -620,8 +660,8 @@ function initAiAssistant() {
 */
 function createNewConversation(conversationName = null) {
     // Check if we're at the total tab limit.
-    if (Object.keys(conversations).length >= 6) {
-        showAlert("You can have a maximum of 6 active conversations.", "Tab Limit Reached");
+    if (Object.keys(conversations).length >= 3) {
+        showAlert("You can have a maximum of 3 active conversations.", "Tab Limit Reached");
         return;
     }
 
@@ -781,13 +821,27 @@ function getPlaceholderText(mode) {
 }
 
 /**
-* Updates the description box to show the master mode capabilities.
-* @param {string} mode - The mode (should always be 'master' now).
+* Updates the description box based on the current mode.
+* @param {string} mode - The current active mode ('master', 'generator', etc.).
 */
 function updateModeDescription(mode) {
     const descriptionText = dom['ai-mode-description-text'];
-    if (descriptionText) {
-        descriptionText.innerHTML = MASTER_MODE.description;
+    // This element doesn't exist in the provided HTML, maybe remove or add it?
+    // For now, let's just update the placeholder based on mode.
+    // if (!descriptionText) return;
+
+    let description = MASTER_MODE.description; // Default to master mode description
+    let placeholder = MASTER_MODE.placeholder;
+
+    if (mode === 'generator') {
+        description = 'Generative Shading mode. Select a wall, describe a pattern, set parameters, or run optimization.';
+        placeholder = 'e.g., Generate Voronoi pattern for south wall...';
+    }
+    // Add cases for other modes if they become separate (inspector, critique, tutor)
+
+    // if (descriptionText) descriptionText.innerHTML = description;
+    if (dom['ai-chat-input']) {
+        dom['ai-chat-input'].placeholder = placeholder;
     }
 }
 
@@ -1574,6 +1628,42 @@ async function _handleSimulationTool(name, args) {
     }
 }
 
+async function _handleGeneratorTool(name, args) {
+    switch (name) {
+        case 'setShadingContext': {
+            const wallId = args.wall?.charAt(0).toLowerCase();
+            if (!['n', 's', 'e', 'w'].includes(wallId)) {
+                throw new Error(`Invalid wall specified: ${args.wall}. Must be one of 'north', 'south', 'east', or 'west'.`);
+            }
+            setActiveGeneratorWall(wallId);
+            return { success: true, message: `Set generative shading context to the ${args.wall} wall.` };
+        }
+        case 'createShadingPattern': {
+            const { targetWall, patternType, parameters } = args;
+            const wallDir = targetWall?.charAt(0).toLowerCase();
+            if (!['n', 's', 'e', 'w'].includes(wallDir)) {
+                throw new Error(`Invalid targetWall: ${targetWall}`);
+            }
+
+            // 1. Set the shading state for the wall to 'generative'
+            setShadingState(wallDir, { enabled: true, type: 'generative' });
+
+            // 2. Store the pattern type and parameters in the project state
+            storeGenerativeParams(wallDir, patternType, parameters);
+
+            // 3. Update the UI to show the correct controls with the specified values
+            updateGeneratorControls(patternType, parameters);
+            
+            // 4. Set the context for the generator UI in case it wasn't set before
+            setActiveGeneratorWall(wallDir);
+
+            return { success: true, message: `Created a '${patternType}' shading pattern on the ${targetWall} wall with the specified parameters.` };
+        }
+        default:
+            throw new Error(`Unknown generator tool: ${name}`);
+    }
+}
+
 async function _handleUITool(name, args) {
     switch (name) {
         case 'toggleUIPanel': {
@@ -1729,6 +1819,10 @@ const toolHandlers = {
     // Tutor tools
     'startWalkthrough': (args) => _handleTutorTool('startWalkthrough', args),
     'endWalkthrough': (args) => _handleTutorTool('endWalkthrough', args),
+
+    // Generator tools
+    'setShadingContext': (args) => _handleGeneratorTool('setShadingContext', args),
+    'createShadingPattern': (args) => _handleGeneratorTool('createShadingPattern', args),
 
     // Special tools (handled directly)
     'runDesignInspector': async (args) => {
@@ -2872,12 +2966,12 @@ async function _getFileFromElectron(filePath) {
     if (!window.electronAPI?.readFile || !project.dirPath) {
         throw new Error("File access requires Electron app and saved project.");
     }
-    
+
     const { content, name } = await window.electronAPI.readFile({
         projectPath: project.dirPath,
         filePath: filePath
     });
-    
+
     const buffer = new Uint8Array(content.data).buffer;
     const blob = new Blob([buffer]);
     return new File([blob], name, { type: 'application/octet-stream' });

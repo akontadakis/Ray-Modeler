@@ -22,6 +22,7 @@ const ids = [
     'left-toolbar', 'left-controls-container', 'toggle-panel-project-btn', 'toggle-panel-dimensions-btn', 
     'toggle-panel-aperture-btn', 'toggle-panel-lighting-btn', 'toggle-panel-materials-btn',
     'toggle-panel-sensor-btn', 'toggle-panel-viewpoint-btn', 'toggle-panel-scene-btn',
+    'dock-left-sidebar-btn', 'dock-top-sidebar-btn',
     'view-controls', 'view-btn-persp', 'view-btn-ortho', 'view-btn-top', 'view-btn-front', 'view-btn-back', 'view-btn-left', 'view-btn-right', 'view-btn-quad',
     'viewport-main', 'viewport-top', 'viewport-front', 'viewport-side',
 
@@ -116,11 +117,16 @@ const ids = [
 
     // AI Assistant & Info Panel
     'info-button', 'panel-info', 'ai-assistant-button', 'ai-chat-messages',
-    'ai-chat-form', 'ai-chat-input', 'ai-chat-send', 'ai-mode-select', 'ai-mode-description-box', 
-    'ai-mode-description-text', 'ai-chat-tabs', 'ai-settings-btn', 'ai-settings-modal', 
-    'ai-settings-close-btn', 'ai-settings-form', 'ai-provider-select', 'ai-model-select',
-    'ai-secret-field', 'ai-custom-model-input', 'openrouter-info-box', 'chat-resize-handle', 'ai-chat-input-container',
-    'ai-info-btn', 'helios-capabilities-modal', 'helios-capabilities-close-btn',
+    'ai-chat-form', 'ai-chat-input', 'ai-chat-send', 'ai-mode-select',
+    'ai-mode-description-box', 'ai-mode-description-text', 'ai-settings-btn', 
+    'ai-settings-modal', 'ai-settings-close-btn', 'ai-settings-form',
+    'ai-provider-select', 'ai-model-select', 'ai-secret-field',
+    'ai-custom-model-input', 'openrouter-info-box', 'chat-resize-handle', 
+    'ai-chat-input-container', 'ai-info-btn', 'helios-capabilities-modal',
+    'helios-capabilities-close-btn', 'helios-panel-content', 'ai-chat-tabs',
+
+    'ai-inspector-results', 'run-inspector-btn', 'ai-critique-results',
+
 
     // Results Panel
     'results-file-input-a', 'results-file-name-a', 'compare-mode-toggle', 'comparison-file-loader',
@@ -176,6 +182,7 @@ const ids = [
     'light-rot-y', 'light-rot-z', 'grid-layout-inputs', 'grid-rows', 'grid-cols', 'grid-row-spacing', 'grid-col-spacing',
     'lighting-power-section', 'luminaire-wattage', 'lpd-display',
     'lighting-spec-section', 'maintenance-factor', 'maintenance-factor-val', 'light-source-ra', 'light-source-tcp',
+    
     // Daylighting Controls
     'daylighting-enabled-toggle', 'daylighting-controls-wrapper', 'daylighting-visualize-zones-toggle', 'daylighting-availability-schedule',
     'daylighting-control-type', 'daylighting-setpoint', 'daylight-continuous-params', 'daylighting-min-power-frac',
@@ -190,7 +197,8 @@ const ids = [
     'daylight-sensor2-z', 'daylight-sensor2-x-val', 'daylight-sensor2-y-val', 'daylight-sensor2-z-val',
     'daylight-sensor2-dir-x', 'daylight-sensor2-dir-y', 'daylight-sensor2-dir-z', 'daylight-sensor2-dir-x-val',
     'daylight-sensor2-dir-y-val', 'daylight-sensor2-dir-z-val', 'daylight-sensor2-percent', 'daylight-sensor2-percent-val',
-    'daylighting-zone-visualizer-container', 'daylighting-zone-canvas', 'daylight-sensor-placement-header'
+    'daylighting-zone-visualizer-container', 'daylighting-zone-canvas', 'daylight-sensor-placement-header',
+    'ai-new-chat-btn'
   ];
 
   const wallDirections = ['n', 's', 'e', 'w'];

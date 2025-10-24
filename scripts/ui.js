@@ -1,7 +1,10 @@
 // scripts/ui.js
 
+
 import { getDom } from './dom.js';
-import { updateScene, axesObject, updateSensorGridColors, roomObject, shadingObject, sensorMeshes, wallSelectionGroup, highlightWall, clearWallHighlights, updateHighlightColor, furnitureObject, addFurniture, updateFurnitureColor, resizeHandlesObject, contextObject, vegetationObject, addImportedAsset } from './geometry.js';
+import { initSidebar } from './sidebar.js'; // Changed import
+// Import bake function from geometry
+import { updateScene, axesObject, updateSensorGridColors, roomObject, shadingObject, sensorMeshes, wallSelectionGroup, highlightWall, clearWallHighlights, updateHighlightColor, furnitureObject, addFurniture, updateFurnitureColor, resizeHandlesObject, contextObject, vegetationObject, addImportedAsset, getWallGroupById } from './geometry.js';
 
 import { activeCamera, perspectiveCamera, orthoCamera, setActiveCamera, onWindowResize, controls, transformControls, sensorTransformControls, viewpointCamera, scene, updateLiveViewType, renderer, toggleFirstPersonView as sceneToggleFPV, isFirstPersonView as sceneIsFPV, fpvOrthoCamera, updateViewpointFromUI, setGizmoVisibility, setUpdatingFromSliders, isUpdatingCameraFromSliders, setGizmoMode } from './scene.js';
 import * as THREE from 'three';
@@ -12,7 +15,6 @@ export { generateAndStoreOccupancyCsv };
 import { resultsManager, palettes } from './resultsManager.js';
 import * as MESH from '../scripts/scene.js';
 import { initHdrViewer, openHdrViewer } from './hdrViewer.js';
-
 
 // --- SHORTCUTS ---
 // Centralized object to define all keyboard shortcut actions
@@ -133,6 +135,9 @@ function openShortcutHelp() {
 // --- MODULE STATE ---
 const dom = getDom(); // Get the cached dom from the new module
 
+let isLeftSidebarDocked = localStorage.getItem('isLeftSidebarDocked') === 'true'; // Load state
+let isTopSidebarDocked = localStorage.getItem('isTopSidebarDocked') === 'true'; // Load state for top sidebar
+
 let updateScheduled = false;
 let isResizeMode = false;
 let draggedHandle = null;
@@ -142,6 +147,7 @@ let intersectionPoint = new THREE.Vector3();
 let dragPlane = new THREE.Plane();
 export let selectedWallId = null;
 let isWallSelectionLocked = false;
+
 const suggestionMemory = new Set(); // Prevents spamming suggestions during a session
 let tableData = []; // Holds data for the interactive table
 let savedViews = []; // Holds the saved camera view "snapshots"
@@ -380,63 +386,6 @@ export function getNewZIndex() {
     return maxZ;
 }
 
-/**
- * Stores the AI-generated pattern type and parameters in the project state.
- * @param {string} wallDir - The wall direction ('n', 's', 'e', 'w').
- * @param {string} patternType - The name of the generated pattern (e.g., 'voronoi').
- * @param {object} allParams - The full parameter object provided by the AI.
- */
-export function storeGenerativeParams(wallDir, patternType, allParams) {
-    const dom = getDom();
-
-    // Store pattern type in hidden input for retrieval by getAllShadingParams
-    const patternInput = dom[`shading-pattern-type-${wallDir}`];
-    if (patternInput) {
-        patternInput.value = patternType;
-    } else {
-        console.warn(`Hidden input 'shading-pattern-type-${wallDir}' not found.`);
-    }
-
-    // Store full params in project state
-    // Ensure the generativeShadingParams object exists on the project
-    if (!project.generativeShadingParams) {
-        project.generativeShadingParams = { n: null, s: null, e: null, w: null };
-    }
-    // Store the complete parameter set including patternType and specific params
-    project.generativeShadingParams[wallDir] = {
-        patternType: patternType,
-        parameters: { ...allParams } // Store a copy of the parameters object
-    };
-    console.log(`Stored generative params for wall ${wallDir}:`, project.generativeShadingParams[wallDir]);
-}
-
-/**
- * Updates the visible common generative shading sliders based on provided parameters.
- * @param {string} wallDir - The wall direction ('n', 's', 'e', 'w').
- * @param {object} commonParams - An object containing common parameters like { depth, spacingX, spacingY, elementWidth }.
- */
-export function setGenerativeSliderValues(wallDir, commonParams) {
-    const dom = getDom();
-
-    // Update visible sliders
-    const sliders = ['depth', 'spacing-x', 'spacing-y', 'element-width'];
-    sliders.forEach(sliderBaseName => {
-        const element = dom[`shading-generative-${sliderBaseName}-${wallDir}`];
-        const valueLabel = dom[`shading-generative-${sliderBaseName}-${wallDir}-val`];
-        // Check if the parameter exists in the input object
-        const paramKey = sliderBaseName.replace('-', ''); // Convert 'spacing-x' to 'spacingX' if needed by AI
-        const value = commonParams[paramKey] !== undefined ? commonParams[paramKey] : commonParams[sliderBaseName];
-
-        if (element && valueLabel && value !== undefined) {
-            element.value = value;
-            // Assuming 'm' unit for all common sliders for now
-            updateValueLabel(valueLabel, value, 'm', element.id);
-            // No dispatch needed here, as this is setting initial state from AI, not user input
-        } else if (element && valueLabel) {
-             console.warn(`Slider or parameter '${sliderBaseName}' not found or value missing for wall ${wallDir}`);
-        }
-    });
-}
 
 /**
  * Programmatically sets the shading state (enabled and type) for a specific wall.
@@ -914,6 +863,53 @@ function setupTaskAreaVisualizer() {
 export async function setupEventListeners() {
     const dom = getDom();
 
+    // Helios Mode Toggle
+    dom['helios-mode-toggle']?.addEventListener('change', (e) => {
+        const isGeneratorMode = e.target.checked;
+        const aiPanel = dom['panel-ai-assistant'];
+        const optimizationTab = dom['helios-optimization-tab-btn'];
+        const chatTab = dom['ai-chat-tab-1'];
+        const chatContent = dom['ai-chat-content-1'];
+        const optimizationContent = dom['helios-optimization-content'];
+
+        if (isGeneratorMode) {
+            aiPanel.classList.add('generator-mode');
+            aiPanel.classList.remove('helios-mode');
+            optimizationTab.classList.remove('hidden');
+        } else {
+            aiPanel.classList.remove('generator-mode');
+            aiPanel.classList.add('helios-mode');
+            optimizationTab.classList.add('hidden');
+
+            // If the optimization tab was active, switch back to the chat tab
+            if (optimizationTab.classList.contains('active')) {
+                optimizationTab.classList.remove('active');
+                chatTab.classList.add('active');
+                optimizationContent.classList.add('hidden');
+                chatContent.classList.remove('hidden');
+            }
+        }
+    });
+
+    // AI Panel Tab Switching
+    dom['ai-chat-tabs']?.addEventListener('click', (e) => {
+        const clickedTab = e.target.closest('.ai-chat-tab');
+        if (!clickedTab) return;
+
+        const tabId = clickedTab.dataset.tab;
+        const allTabs = dom['ai-chat-tabs'].querySelectorAll('.ai-chat-tab');
+        const allContent = dom['helios-panel-content'].querySelectorAll('.ai-chat-content');
+
+        allTabs.forEach(tab => tab.classList.remove('active'));
+        allContent.forEach(content => content.classList.add('hidden'));
+
+        clickedTab.classList.add('active');
+        const activeContent = dom[`ai-chat-content-${tabId}`] || dom[`helios-${tabId}-content`];
+        if (activeContent) {
+            activeContent.classList.remove('hidden');
+        }
+    });
+
     // Global listener for all keyboard shortcuts
     window.addEventListener('keydown', handleKeyDown);
 
@@ -1135,22 +1131,6 @@ export async function setupEventListeners() {
     dom['world-axes-toggle']?.addEventListener('change', scheduleUpdate);
 
 
-        ['depth', 'spacing-x', 'spacing-y', 'element-width'].forEach(param => {
-        wallDirections.forEach(dir => {
-            const slider = dom[`shading-generative-${param}-${dir}`];
-            const valueLabel = dom[`shading-generative-${param}-${dir}-val`];
-
-            if (slider && valueLabel) {
-                slider.addEventListener('input', () => {
-                    // Update the label in real-time
-                    updateValueLabel(valueLabel, slider.value, 'm', slider.id);
-                    // Debounce the scene update to avoid performance issues during rapid slider changes
-                    debouncedScheduleUpdate(`shading-generative-${param}-${dir}`);
-                });
-            }
-        });
-    });
-
     setupTaskAreaVisualizer(); // Initialize the new visualizer
     setupDaylightingZoneVisualizer(); // Initialize the new zone visualizer
 
@@ -1272,9 +1252,9 @@ export async function setupEventListeners() {
 
         resultsManager.updateColorScale(min, max, palette);
         updateResultsLegend();
-}
+    }
 
-// Add listeners for the material reflectance mode buttons
+    // Add listeners for the material reflectance mode buttons
     const materialTypes = ['wall', 'floor', 'ceiling']; // Expand this array to add spectral controls to other materials
         materialTypes.forEach(type => {
             const reflBtn = dom[`${type}-mode-refl`];
@@ -1326,7 +1306,7 @@ export async function setupEventListeners() {
     // --- Shortcut Help Modal Listeners ---
     dom['shortcut-help-btn']?.addEventListener('click', openShortcutHelp);
     dom['shortcut-modal-close-btn']?.addEventListener('click', () => {
-        dom['shortcut-help-modal']?.classList.replace('flex', 'hidden');
+    dom['shortcut-help-modal']?.classList.replace('flex', 'hidden');
     });
 
     // Listeners for the new transform sliders with real-time feedback
@@ -1471,96 +1451,96 @@ export async function setupEventListeners() {
 
         dom['legend-min-val'].textContent = Math.round(resultsManager.colorScale.min);
         dom['legend-max-val'].textContent = Math.round(resultsManager.colorScale.max);
-}
-
-/**
-* Renders a top-down 2D heatmap of the floor sensor grid.
-*/
-async function render2DHeatmap() {
-    const canvas = dom['heatmap-canvas'];
-    const sensorGroup = scene.getObjectByName('sensorPoints');
-    if (!canvas || !sensorGroup) {
-    return;
     }
 
-    // Determine which data to render based on the heatmap mode selector
-    const mode = dom['heatmap-mode-selector']?.value || 'illuminance';
-    let heatmapData;
-
-    if (mode === 'da' && resultsManager.hasAnnualData(resultsManager.activeView)) {
-    const threshold = parseFloat(dom['da-threshold-slider'].value);
-    heatmapData = await resultsManager.calculateDaylightAutonomy(threshold);
-    } else {
-    heatmapData = resultsManager.getActiveData();
-    }
-
-    if (!heatmapData || heatmapData.length === 0) {
-    const ctxClear = canvas.getContext('2d');
-    ctxClear.clearRect(0, 0, canvas.width, canvas.height);
-    return;
-    }
-
-    const ctx = canvas.getContext('2d');
-    const roomWidth = parseFloat(dom.width.value);
-    const roomLength = parseFloat(dom.length.value);
-
-    // Match canvas resolution to its display size for sharpness
-    canvas.width = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Find the bounding box of the floor points to calculate scaling
-    const floorPoints = [];
-    let dataIndex = 0;
-    sensorGroup.children.forEach(mesh => {
-        const tempMatrix = new THREE.Matrix4();
-        for (let i = 0; i < mesh.count; i++) {
-            mesh.getMatrixAt(i, tempMatrix);
-            const pos = new THREE.Vector3().setFromMatrixPosition(tempMatrix);
-
-            // We only want points near the floor (y ≈ 0 in room container space)
-            // Use a small tolerance for floating point inaccuracies
-            if (Math.abs(pos.y - parseFloat(dom['floor-grid-offset'].value)) < 0.01) {
-             floorPoints.push({
-                x: pos.x,
-                z: pos.z,
-                value: heatmapData[dataIndex]
-            });
+    /**
+    * Renders a top-down 2D heatmap of the floor sensor grid.
+    */
+    async function render2DHeatmap() {
+        const canvas = dom['heatmap-canvas'];
+        const sensorGroup = scene.getObjectByName('sensorPoints');
+        if (!canvas || !sensorGroup) {
+        return;
         }
-        dataIndex++;
+
+        // Determine which data to render based on the heatmap mode selector
+        const mode = dom['heatmap-mode-selector']?.value || 'illuminance';
+        let heatmapData;
+
+        if (mode === 'da' && resultsManager.hasAnnualData(resultsManager.activeView)) {
+        const threshold = parseFloat(dom['da-threshold-slider'].value);
+        heatmapData = await resultsManager.calculateDaylightAutonomy(threshold);
+        } else {
+        heatmapData = resultsManager.getActiveData();
         }
-    });
 
-    if (floorPoints.length === 0) return; // No floor points to draw
+        if (!heatmapData || heatmapData.length === 0) {
+        const ctxClear = canvas.getContext('2d');
+        ctxClear.clearRect(0, 0, canvas.width, canvas.height);
+        return;
+        }
 
-    const padding = 20; // Padding in pixels
-    const canvasW = canvas.width - padding * 2;
-    const canvasH = canvas.height - padding * 2;
+        const ctx = canvas.getContext('2d');
+        const roomWidth = parseFloat(dom.width.value);
+        const roomLength = parseFloat(dom.length.value);
 
-    const scaleX = canvasW / roomWidth;
-    const scaleY = canvasH / roomLength;
-    const scale = Math.min(scaleX, scaleY);
+        // Match canvas resolution to its display size for sharpness
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
 
-    const offsetX = (canvas.width - roomWidth * scale) / 2;
-    const offsetY = (canvas.height - roomLength * scale) / 2;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const pointSize = parseFloat(dom['floor-grid-spacing'].value) * scale;
+        // Find the bounding box of the floor points to calculate scaling
+        const floorPoints = [];
+        let dataIndex = 0;
+        sensorGroup.children.forEach(mesh => {
+            const tempMatrix = new THREE.Matrix4();
+            for (let i = 0; i < mesh.count; i++) {
+                mesh.getMatrixAt(i, tempMatrix);
+                const pos = new THREE.Vector3().setFromMatrixPosition(tempMatrix);
 
-    floorPoints.forEach(point => {
-        const canvasX = offsetX + point.x * scale;
-        // Invert Z-axis because canvas Y is down, but room Z is forward
-        const canvasY = offsetY + (roomLength - point.z) * scale;
+                // We only want points near the floor (y ≈ 0 in room container space)
+                // Use a small tolerance for floating point inaccuracies
+                if (Math.abs(pos.y - parseFloat(dom['floor-grid-offset'].value)) < 0.01) {
+                floorPoints.push({
+                    x: pos.x,
+                    z: pos.z,
+                    value: heatmapData[dataIndex]
+                });
+            }
+            dataIndex++;
+            }
+        });
 
-        const color = (mode === 'da')
-            ? resultsManager.getColorForValue(point.value, 0, 100)
-            : resultsManager.getColorForValue(point.value);
+        if (floorPoints.length === 0) return; // No floor points to draw
 
-        ctx.fillStyle = color;
-        // Draw a rectangle centered on the point's location
-        ctx.fillRect(canvasX - pointSize / 2, canvasY - pointSize / 2, pointSize, pointSize);
-    });
-}
+        const padding = 20; // Padding in pixels
+        const canvasW = canvas.width - padding * 2;
+        const canvasH = canvas.height - padding * 2;
+
+        const scaleX = canvasW / roomWidth;
+        const scaleY = canvasH / roomLength;
+        const scale = Math.min(scaleX, scaleY);
+
+        const offsetX = (canvas.width - roomWidth * scale) / 2;
+        const offsetY = (canvas.height - roomLength * scale) / 2;
+
+        const pointSize = parseFloat(dom['floor-grid-spacing'].value) * scale;
+
+        floorPoints.forEach(point => {
+            const canvasX = offsetX + point.x * scale;
+            // Invert Z-axis because canvas Y is down, but room Z is forward
+            const canvasY = offsetY + (roomLength - point.z) * scale;
+
+            const color = (mode === 'da')
+                ? resultsManager.getColorForValue(point.value, 0, 100)
+                : resultsManager.getColorForValue(point.value);
+
+            ctx.fillStyle = color;
+            // Draw a rectangle centered on the point's location
+            ctx.fillRect(canvasX - pointSize / 2, canvasY - pointSize / 2, pointSize, pointSize);
+        });
+    }
 
     // Link interactive legend sliders// Link interactive legend sliders
     const scaleMinSlider = dom['scale-min-input'];
@@ -1751,23 +1731,36 @@ dom['view-bsdf-btn']?.addEventListener('click', openBsdfViewer);
         }
     });
 
+    initSidebar();
+
     // Add focus/blur handlers to the AI API key field to prevent password manager interference.
     // Some extensions are aggressive and cause errors even with autocomplete="off".
     // By changing the type, we make it look like a normal text field when not in use.
     const apiKeyInput = dom['ai-secret-field'];
     if (apiKeyInput) {
         apiKeyInput.addEventListener('focus', () => {
-            // Use a timeout to ensure this runs after the extension's own focus handlers
             setTimeout(() => { apiKeyInput.type = 'password'; }, 50);
         });
         apiKeyInput.addEventListener('blur', () => {
-            // Only change it back if the field is empty, for security.
             if (apiKeyInput.value === '') {
                 apiKeyInput.type = 'text';
             }
         });
     }
-}
+
+    // Initialize bounding box labels
+    const bboxLabelIds = ['min-x', 'max-x', 'min-y', 'max-y', 'min-z', 'max-z'];
+    bboxLabelIds.forEach(suffix => {
+        const sliderId = `gen-bbox-${suffix}`;
+        const labelId = `${sliderId}-val`;
+        if (dom[sliderId] && dom[labelId]) {
+            updateValueLabel(dom[labelId], dom[sliderId].value, 'm', sliderId);
+        }
+    });
+
+} // End of setupEventListeners
+
+
 
 // --- UI LOGIC & EVENT HANDLERS ---
 
@@ -2144,31 +2137,60 @@ export function setupFloatingWindows() {
 export function makeDraggable(element, handle) {
     let offsetX, offsetY;
     handle.onmousedown = e => {
+        // START: Add check for docked state and dock buttons
+        if (element.classList.contains('docked') || e.target.closest('#dock-left-sidebar-btn') || e.target.closest('#dock-top-sidebar-btn')) return;
+        // END: Add check for docked state and dock buttons
         if (e.target.closest('.window-controls') || e.target.classList.contains('resize-handle')) return;
         e.preventDefault();
 
-        const rect = element.getBoundingClientRect();
-        offsetX = e.clientX - rect.left;
-        offsetY = e.clientY - rect.top;
+        // Get initial position using computed style before making changes
+        const style = window.getComputedStyle(element);
+        const matrix = new DOMMatrix(style.transform);
+        const initialX = matrix.m41;
+        const initialY = matrix.m42;
+
+        // Calculate offset relative to the initial transformed position and page coordinates
+        offsetX = e.pageX - initialX;
+        offsetY = e.pageY - initialY;
+
+        // Ensure transform positioning is set from the start if not already
+        if (!element.dataset.transformPositioned) {
+            element.style.left = '0px';
+            element.style.top = '0px';
+            // If the element wasn't transform positioned, capture its current screen position
+            const rect = element.getBoundingClientRect();
+            element.style.transform = `translate3d(${rect.left}px, ${rect.top}px, 0)`;
+            // Recalculate offset based on this new transform
+            offsetX = e.pageX - rect.left;
+            offsetY = e.pageY - rect.top;
+            element.dataset.transformPositioned = 'true';
+       }
+
+        element.classList.add('is-dragging'); // Add dragging class
+        controls.enabled = false;
 
         // On the first drag, we switch the element to a pure transform-based positioning
-        // to neutralize any conflicting CSS classes (like top-1/2, left-1/2, etc.).
         if (!element.dataset.transformPositioned) {
              element.style.left = '0px';
              element.style.top = '0px';
              element.style.transform = `translate3d(${rect.left}px, ${rect.top}px, 0)`;
-             element.dataset.transformPositioned = 'true';
+        element.dataset.transformPositioned = 'true';
         }
 
         controls.enabled = false;
-        document.onmouseup = () => { document.onmouseup = null; document.onmousemove = null; controls.enabled = true; };
+        document.onmouseup = () => { 
+            document.onmouseup = null; 
+            document.onmousemove = null; 
+            controls.enabled = true; 
+            element.classList.remove('is-dragging'); // Remove dragging class
+        };
         document.onmousemove = (e) => {
             e.preventDefault();
             if (element.classList.contains('maximized')) return;
 
-            // Calculate the new desired top-left position in viewport coordinates
-            let newX = e.clientX - offsetX;
-            let newY = e.clientY - offsetY;
+            // Calculate the new desired top-left position using page coordinates
+            let newX = e.pageX - offsetX;
+            let newY = e.pageY - offsetY;
 
             // Constrain the element within the viewport for smooth dragging
             const elementWidth = element.offsetWidth;
@@ -3034,11 +3056,24 @@ export function getAllShadingParams() {
                 irTrans: parseFloat(dom[`roller-ir-trans-${dir}`]?.value || 0),
                 thickness: parseFloat(dom[`roller-thickness-${dir}`]?.value || 0.001),
                 conductivity: parseFloat(dom[`roller-conductivity-${dir}`]?.value || 0),
-            };
+        };
+        } else if (type === 'generative') {
+            // Retrieve the stored generative pattern type, its parameters, and bounding box
+            if (project.generativeShadingParams && project.generativeShadingParams[dir]) {
+                // Make sure to retrieve both procedural parameters and bounding box info
+                shadeParams.generative = {
+                    patternType: project.generativeShadingParams[dir].patternType,
+                    parameters: project.generativeShadingParams[dir].parameters || {},
+                    boundingBox: project.generativeShadingParams[dir].boundingBox || {} // Add bounding box
+                };
+            } else {
+                // If nothing stored, maybe initialize default bbox here? Or handle in generate method.
+                shadeParams.generative = { patternType: 'fins', parameters: {}, boundingBox: {} }; // Default if nothing is stored
+            }
         }
 
         params[dir.toUpperCase()] = shadeParams;
-    
+
     });
     
     return params;
@@ -4427,20 +4462,28 @@ function onSceneClick(event) {
 /**
 * Manages the logic for selecting a new wall.
 * @param {THREE.Group} wallGroup - The group object of the wall that was clicked.
+* @param {boolean} [resetLock=true] - Whether this selection should reset the lock state.
 */
 function handleWallSelection(wallGroup, resetLock = true) {
+    // Set the selected wall ID
     selectedWallId = wallGroup.userData.canonicalId;
+
+    // Find the actual mesh within the group to highlight
     // The geometry function `highlightWall` will clear any previous highlight.
     const wallMesh = wallGroup.children.find(c => c.isMesh && c.userData.isSelectableWall);
     if (wallMesh) {
+        // Highlight the selected wall mesh in the 3D view
         highlightWall(wallMesh);
     }
+
+    // Show the specific aperture/shading controls for the selected wall
     showApertureControlsFor(selectedWallId);
 
-    // Only reset the lock state if instructed to do so
+    // Only reset the lock state if instructed to do so (e.g., manual click)
+    // AI actions might pass false here to prevent unlocking
     if (resetLock) {
-        isWallSelectionLocked = false;
-        updateLockIcon();
+        isWallSelectionLocked = false; // Unlock selection
+        updateLockIcon(); // Update the lock icon in the UI
     }
 }
 
@@ -5944,11 +5987,20 @@ function handleSceneClick(event) {
     } else if (massingIntersect) {
         selectTransformableObject(massingIntersect.object);
     } else if (wallIntersect) {
-        transformControls.detach();
-        handleWallInteraction(wallIntersect);
-    } else {
-        handleDeselection();
+    transformControls.detach(); // Detach from any other object
+    handleWallInteraction(wallIntersect);
+    // --- ADD THIS NEW LOGIC ---
+    // Ensure the wall group exists and get its ID
+    let targetGroup = wallIntersect.object.parent;
+    while (targetGroup && !targetGroup.userData.canonicalId) {
+        targetGroup = targetGroup.parent;
     }
+    if (targetGroup && targetGroup.userData.canonicalId && !isWallSelectionLocked) {
+        handleWallSelection(targetGroup, true);
+    }
+} else {
+    handleDeselection();
+}
 }
 
 /**
