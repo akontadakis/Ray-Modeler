@@ -86,9 +86,49 @@ class Project {
         const ui = await import('./ui.js');
         const dom = ui.getDom();
 
-        this.projectName = dom['project-name'].value || 'default-project';
-        const getValue = (id, parser = val => val) => (dom[id] ? parser(dom[id].value) : null);
-        const getChecked = (id) => (dom[id] ? dom[id].checked : null);
+        const getValue = (id, parser = val => val) => {
+            if (!dom[id]) {
+                console.warn(`DOM element with id '${id}' not found`);
+                return null;
+            }
+            const value = dom[id].value;
+            if (value === undefined || value === null || value === '') return null;
+            try {
+                const parsed = parser(value);
+                // Check if parseFloat returned NaN
+                if (parser === parseFloat && isNaN(parsed)) {
+                    console.warn(`Failed to parse numeric value for '${id}': "${value}"`);
+                    return null;
+                }
+                return parsed;
+            } catch (error) {
+                console.error(`Error parsing value for '${id}':`, error);
+                return null;
+            }
+        };
+        const getChecked = (id) => {
+            if (!dom[id]) {
+                console.warn(`DOM element with id '${id}' not found`);
+                return null;
+            }
+            return dom[id].checked;
+        };
+        const getTextContent = (id) => {
+            if (!dom[id]) {
+                console.warn(`DOM element with id '${id}' not found`);
+                return null;
+            }
+            return dom[id].textContent;
+        };
+        const getClassListContains = (id, className) => {
+            if (!dom[id]) {
+                console.warn(`DOM element with id '${id}' not found`);
+                return false;
+            }
+            return dom[id].classList.contains(className);
+        };
+
+        this.projectName = getValue('project-name') || 'default-project';
 
         // Import helper functions from UI module
         const { getAllWindowParams, getAllShadingParams, getSavedViews } = ui;
@@ -101,7 +141,7 @@ class Project {
                 'radiance-path': getValue('radiance-path'),
                 'latitude': getValue('latitude'),
                 'longitude': getValue('longitude'),
-                epwFileName: this.epwFileContent ? (dom['epw-file-name'].textContent || 'climate.epw') : null,
+                epwFileName: this.epwFileContent ? (getTextContent('epw-file-name') || 'climate.epw') : null,
             },
             geometry: {
                 room: {
@@ -179,7 +219,6 @@ class Project {
                             reflectance: getValue(`${type}-refl`, parseFloat),
                             specularity: getValue(`${type}-spec`, parseFloat),
                             roughness: getValue(`${type}-rough`, parseFloat),
-                            color: getValue(`${type}-color`),
                             srdFile: null
                         };
                         if (mode === 'srd' && this.simulationFiles[`${type}-srd-file`]) {
@@ -195,8 +234,8 @@ class Project {
                         wall: getMaterialData('wall'),
                         floor: getMaterialData('floor'),
                         ceiling: getMaterialData('ceiling'),
-                        frame: { type: getValue('frame-mat-type'), reflectance: getValue('frame-refl', parseFloat), specularity: getValue('frame-spec', parseFloat), roughness: getValue('frame-rough', parseFloat), color: getValue('frame-color') },
-                        shading: { type: getValue('shading-mat-type'), reflectance: getValue('shading-refl', parseFloat), specularity: getValue('shading-spec', parseFloat), roughness: getValue('shading-rough', parseFloat), color: getValue('shading-color') },
+                        frame: { type: getValue('frame-mat-type'), reflectance: getValue('frame-refl', parseFloat), specularity: getValue('frame-spec', parseFloat), roughness: getValue('frame-rough', parseFloat) },
+                        shading: { type: getValue('shading-mat-type'), reflectance: getValue('shading-refl', parseFloat), specularity: getValue('shading-spec', parseFloat), roughness: getValue('shading-rough', parseFloat) },
                         furniture: { type: getValue('furniture-mat-type'), reflectance: getValue('furniture-refl', parseFloat), specularity: getValue('furniture-spec', parseFloat), roughness: getValue('furniture-rough', parseFloat) },
                         glazing: {
                             transmittance: getValue('glazing-trans', parseFloat),
@@ -457,6 +496,7 @@ class Project {
             const { materials, geometry } = await generateRadFileContent(projectData);
             const viewpointContent = generateViewpointFileContent(projectData.viewpoint, projectData.geometry.room);
             const fisheyeVpData = { ...projectData.viewpoint, 'view-type': 'h' };
+            const fisheyeContent = generateViewpointFileContent(fisheyeVpData, projectData.geometry.room);
             const allPtsContent = await this._generateSensorPointsContent('all');
             const taskPtsContent = await this._generateSensorPointsContent('task');
             const surroundingPtsContent = await this._generateSensorPointsContent('surrounding');
@@ -606,10 +646,20 @@ class Project {
         const { getDom, showAlert, getSensorGridParams } = await import('./ui.js');
         const dom = getDom();
         const points = [];
-        const W = parseFloat(dom.width.value);
-        const L = parseFloat(dom.length.value);
-        const H = parseFloat(dom.height.value);
-        const alphaRad = THREE.MathUtils.degToRad(parseFloat(dom['room-orientation'].value));
+
+        // Safely get dimension values
+        const getDimension = (id) => {
+            if (!dom[id]) {
+                console.warn(`DOM element with id '${id}' not found`);
+                return 0;
+            }
+            const value = parseFloat(dom[id].value);
+            return isNaN(value) ? 0 : value;
+        };
+        const W = getDimension('width');
+        const L = getDimension('length');
+        const H = getDimension('height');
+        const alphaRad = THREE.MathUtils.degToRad(getDimension('room-orientation'));
         const cosA = Math.cos(alphaRad);
         const sinA = Math.sin(alphaRad);
 
@@ -639,8 +689,9 @@ class Project {
 
         if (gridType === 'task') {
             if (!enGridParams?.isTaskArea) return null;
-            const spacing = parseFloat(dom['floor-grid-spacing'].value);
-            const offset = parseFloat(dom['floor-grid-offset'].value);
+            const spacing = getDimension('floor-grid-spacing');
+            const offset = getDimension('floor-grid-offset');
+            if (spacing <= 0) return null;
             const { x, z, width, depth } = enGridParams.task;
 
             const taskPoints = generatePointsInRect(x, z, width, depth, spacing);
@@ -655,8 +706,9 @@ class Project {
         } else if (gridType === 'surrounding') {
             if (!enGridParams?.isTaskArea || !enGridParams?.hasSurrounding) return null;
 
-            const spacing = parseFloat(dom['floor-grid-spacing'].value);
-            const offset = parseFloat(dom['floor-grid-offset'].value);
+            const spacing = getDimension('floor-grid-spacing');
+            const offset = getDimension('floor-grid-offset');
+            if (spacing <= 0) return null;
             const task = enGridParams.task;
             const bandWidth = enGridParams.surroundingWidth;
 
@@ -700,16 +752,16 @@ class Project {
                 if (!enabled) return;
                 let spacing, offset, points1, points2, positionFunc, normalVector;
                 if (name === 'floor' || name === 'ceiling') {
-                    spacing = parseFloat(dom[`${name}-grid-spacing`].value);
-                    offset = parseFloat(dom[`${name}-grid-offset`].value);
+                    spacing = getDimension(`${name}-grid-spacing`);
+                    offset = getDimension(`${name}-grid-offset`);
                     points1 = generateCenteredPoints(W, spacing);
                     points2 = generateCenteredPoints(L, spacing);
                     // CORRECTED: Define normals in Three.js coordinate system (Y-up)
                     normalVector = (name === 'floor') ? [0, 1, 0] : [0, -1, 0];
                     positionFunc = (p1, p2) => [p1, name === 'floor' ? offset : H + offset, p2]; // Y is height
                 } else {
-                    spacing = parseFloat(dom['wall-grid-spacing'].value);
-                    offset = parseFloat(dom['wall-grid-offset'].value);
+                    spacing = getDimension('wall-grid-spacing');
+                    offset = getDimension('wall-grid-offset');
                     points2 = generateCenteredPoints(H, spacing); // Height is vertical span
                     const wallLength = (name === 'north' || name === 'south') ? W : L;
                     points1 = generateCenteredPoints(wallLength, spacing); // Width/Length is horizontal span
@@ -750,9 +802,19 @@ class Project {
 
         const { getDom } = await import('./ui.js');
         const dom = getDom();
-        const W = parseFloat(dom.width.value);
-        const L = parseFloat(dom.length.value);
-        const rotationY = parseFloat(dom['room-orientation'].value);
+
+        // Safely get dimension values
+        const getDimension = (id) => {
+            if (!dom[id]) {
+                console.warn(`DOM element with id '${id}' not found`);
+                return 0;
+            }
+            const value = parseFloat(dom[id].value);
+            return isNaN(value) ? 0 : value;
+        };
+        const W = getDimension('width');
+        const L = getDimension('length');
+        const rotationY = getDimension('room-orientation');
         const alphaRad = THREE.MathUtils.degToRad(rotationY);
         const cosA = Math.cos(alphaRad);
         const sinA = Math.sin(alphaRad);
@@ -963,7 +1025,6 @@ class Project {
                 if(mat.type) setValue(`${type}-mat-type`, mat.type);
                 if(mat.reflectance) setValue(`${type}-refl`, mat.reflectance);
                 if(mat.specularity) setValue(`${type}-spec`, mat.specularity);
-                if(mat.color) setValue(`${type}-color`, mat.color);
                 if ((type === 'wall' || type === 'floor' || type === 'ceiling') && mat.mode === 'srd') {
                     dom[`${type}-mode-srd`]?.click();
                     if (mat.srdFile?.name && dom[`${type}-srd-file`]) {

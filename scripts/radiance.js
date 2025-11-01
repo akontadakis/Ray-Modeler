@@ -396,13 +396,21 @@ export async function generateRadFileContent(options = {}) {
 
   // --- Material Generation ---
  function getMaterialDef(type) {
-    const matType = dom[`${type}-mat-type`].value.toLowerCase();
-    const spec = parseFloat(dom[`${type}-spec`].value);
-    const rough = parseFloat(dom[`${type}-rough`].value);
     const matName = `${type}_mat`;
+    
+    // Check if the main material type selector exists, use default if not
+    const matTypeElement = dom[`${type}-mat-type`];
+    const matType = matTypeElement ? matTypeElement.value.toLowerCase() : 'plastic';
+    
+    // Safely get spec and rough values with defaults
+    const specElement = dom[`${type}-spec`];
+    const roughElement = dom[`${type}-rough`];
+    const spec = specElement ? parseFloat(specElement.value) : 0;
+    const rough = roughElement ? parseFloat(roughElement.value) : 0;
 
     // Dynamically check for spectral mode for the given material type
-    const mode = dom[`${type}-mode-srd`]?.classList.contains('active') ? 'srd' : 'refl';
+    const modeElement = dom[`${type}-mode-srd`];
+    const mode = modeElement?.classList.contains('active') ? 'srd' : 'refl';
     const spectralFileKey = `${type}-srd-file`;
     const spectralFile = project.simulationFiles[spectralFileKey];
 
@@ -425,8 +433,10 @@ export async function generateRadFileContent(options = {}) {
         }
     }
 
-    // Fallback to original simple reflectance behavior
-    const refl = parseFloat(dom[`${type}-refl`].value);
+    // Fallback to original simple reflectance behavior with null check
+    const reflElement = dom[`${type}-refl`];
+    const refl = reflElement ? parseFloat(reflElement.value) : 0.5;
+    
     switch (matType) {
       case 'plastic': return `void plastic ${matName}\n0\n0\n5 ${refl} ${refl} ${refl} ${spec} ${rough}\n`;
       case 'glass':   return `void glass ${matName}\n0\n0\n3 ${refl} ${refl} ${refl}\n`;

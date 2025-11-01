@@ -163,7 +163,8 @@ function _traceAndBounceRay(startPosition, startDirection, raycaster, allObjects
     let isInside = false; 
     let interiorBounces = 0; const segments = [];
 
-    // Allow for a few external reflections before giving up on a ray const maxSegments = maxBounces + 5;
+    // Allow for a few external reflections before giving up on a ray
+    const maxSegments = maxBounces + 5;
 
     for (let segment = 0; segment < maxSegments; segment++) { if (interiorBounces >= maxBounces) break;
 

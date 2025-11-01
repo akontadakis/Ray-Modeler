@@ -56,6 +56,7 @@ const ids = [
     'wall-spec', 'wall-spec-val', 'floor-spec', 'floor-spec-val', 'ceiling-spec', 'ceiling-spec-val', 'furniture-spec', 'furniture-spec-val',
     'wall-rough', 'wall-rough-val', 'floor-rough', 'floor-rough-val', 'ceiling-rough', 'ceiling-rough-val', 'furniture-rough', 'furniture-rough-val',
     'frame-refl', 'frame-refl-val', 'frame-spec', 'frame-spec-val', 'frame-rough', 'frame-rough-val',
+    'shading-refl', 'shading-refl-val', 'shading-spec', 'shading-spec-val', 'shading-rough',
     'shading-rough-val', 'wall-color', 'floor-color', 'ceiling-color', 'frame-color', 'shading-color',
     'wall-mode-refl', 'wall-mode-srd', 'wall-refl-controls', 'wall-srd-controls', 'wall-srd-file',
     'floor-mode-refl', 'floor-mode-srd', 'floor-refl-controls', 'floor-srd-controls', 'floor-srd-file',
