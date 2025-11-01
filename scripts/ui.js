@@ -1760,8 +1760,6 @@ dom['view-bsdf-btn']?.addEventListener('click', openBsdfViewer);
 
 } // End of setupEventListeners
 
-
-
 // --- UI LOGIC & EVENT HANDLERS ---
 
 /**
@@ -2155,11 +2153,13 @@ export function makeDraggable(element, handle) {
 
         // Ensure transform positioning is set from the start if not already
         if (!element.dataset.transformPositioned) {
+            // If the element wasn't transform positioned, capture its current screen position FIRST
+            const rect = element.getBoundingClientRect();
+
             element.style.left = '0px';
             element.style.top = '0px';
-            // If the element wasn't transform positioned, capture its current screen position
-            const rect = element.getBoundingClientRect();
-            element.style.transform = `translate3d(${rect.left}px, ${rect.top}px, 0)`;
+            element.style.transform = `translate3d(${rect.left}px, ${rect.top}px, 0)`; // Set transform to its ORIGINAL position
+
             // Recalculate offset based on this new transform
             offsetX = e.pageX - rect.left;
             offsetY = e.pageY - rect.top;
