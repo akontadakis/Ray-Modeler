@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import { scene } from './scene.js';
-import { roomObject, shadingObject, wallSelectionGroup } from './geometry.js';
+import { roomObject, shadingObject, wallSelectionGroup, furnitureObject, vegetationObject } from './geometry.js';
 import { project } from './project.js';
 import { getDom } from './dom.js';
 
@@ -33,21 +33,44 @@ const RAY_COLORS = [
 function _createSunPositionHelper(sunVector) {
     const existingHelper = scene.getObjectByName('SunPositionHelper');
     if (existingHelper) {
-        scene.remove(existingHelper);
+        existingHelper.removeFromParent();
         if (existingHelper.geometry) existingHelper.geometry.dispose();
         if (existingHelper.material) existingHelper.material.dispose();
     }
-    if (!sunVector) return;
+    if (!sunVector) return null; // Return null if no vector
 
     const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
     const sunGeometry = new THREE.SphereGeometry(0.5, 32, 32);
     const sunHelper = new THREE.Mesh(sunGeometry, sunMaterial);
     sunHelper.name = 'SunPositionHelper';
     sunHelper.position.copy(sunVector).multiplyScalar(20);
-    scene.add(sunHelper);
+    return sunHelper; // Return the helper
 }
 
-// scripts/sunTracer.js
+/**
+ * Finds all glazing panels, calculates their area, and the total area.
+ * @returns {{panels: Array<{object: THREE.Mesh, area: number}>, totalArea: number}}
+ * @private
+ */
+function _findGlazingPanels() {
+    const glazingPanels = [];
+    let totalGlazingArea = 1e-6; // Avoid division by zero
+
+    wallSelectionGroup.traverse((object) => {
+        if (object.isMesh && object.userData.surfaceType === 'GLAZING') {
+            if (object.geometry.parameters && object.geometry.parameters.width && object.geometry.parameters.height) {
+                const worldScale = new THREE.Vector3();
+                object.getWorldScale(worldScale);
+                const area = object.geometry.parameters.width * object.geometry.parameters.height * worldScale.x * worldScale.y;
+                if (area > 0) {
+                    glazingPanels.push({ object, area });
+                    totalGlazingArea += area;
+                }
+            }
+        }
+    });
+    return { panels: glazingPanels, totalArea: totalGlazingArea };
+}
 
 /**
  * The main function to orchestrate the ray tracing visualization.
@@ -70,27 +93,15 @@ export function traceSunRays(params) {
 
     // 1. Calculate Sun Position and create the visual helper
     const { sunVector } = _calculateSunVector(sunParams);
-    _createSunPositionHelper(sunVector);
+    const sunHelper = _createSunPositionHelper(sunVector);
+    if (sunHelper) {
+        scene.add(sunHelper);
+    }
 
     // Find all glazing surfaces and calculate total area
-    const glazingPanels = [];
-    let totalGlazingArea = 1e-6; // Avoid division by zero
+    const { panels: glazingPanels, totalArea: totalGlazingArea } = _findGlazingPanels();
 
-    wallSelectionGroup.traverse((object) => {
-        if (object.isMesh && object.userData.surfaceType === 'GLAZING') {
-            if (object.geometry.parameters && object.geometry.parameters.width && object.geometry.parameters.height) {
-                const worldScale = new THREE.Vector3();
-                object.getWorldScale(worldScale);
-                const area = object.geometry.parameters.width * object.geometry.parameters.height * worldScale.x * worldScale.y;
-                if (area > 0) {
-                    glazingPanels.push({ object, area });
-                    totalGlazingArea += area;
-                }
-            }
-        }
-    });
-
-    if (glazingPanels.length === 0) {
+if (glazingPanels.length === 0) {
         console.warn("Could not find any glazing surfaces to trace rays through.");
         return;
     }
@@ -118,65 +129,93 @@ export function traceSunRays(params) {
                 const targetPoint = localPoint.clone().applyMatrix4(matrix);
 
                 // --- Unified Ray Tracing and Bouncing Simulation ---
-                const originPoint = targetPoint.clone().addScaledVector(sunDirection, -50);
-                let currentPosition = originPoint.clone();
-                let currentDirection = sunDirection.clone();
-                let isInside = false;
-                let interiorBounces = 0;
+                // Start the ray from 50 units "behind" the glazing, pointing along the sun direction
+            const originPoint = targetPoint.clone().addScaledVector(sunDirection, -50);
 
-                // Allow for a few external reflections before giving up on a ray
-                const maxSegments = params.maxBounces + 5;
+            const raySegments = _traceAndBounceRay(
+                originPoint,
+                sunDirection.clone(),
+                raycaster,
+                allObjects,
+                params.maxBounces
+            );
 
-                for (let segment = 0; segment < maxSegments; segment++) {
-                    if (interiorBounces >= params.maxBounces) break;
-
-                    raycaster.set(currentPosition.clone().addScaledVector(currentDirection, 0.001), currentDirection);
-                    const intersects = raycaster.intersectObjects(allObjects, true);
-                    const hit = intersects.find(h => h.object.isMesh && h.distance > 0.001);
-
-                    if (!hit) break; // Ray escaped to infinity
-
-                    const nextPosition = hit.point;
-                    const hitObject = hit.object;
-
-                    // Draw the current ray segment
-                    const colorIndex = isInside ? interiorBounces + 1 : 0;
-                    const material = new THREE.LineBasicMaterial({
-                        color: RAY_COLORS[Math.min(colorIndex, RAY_COLORS.length - 1)],
-                        linewidth: 2
-                    });
-                    const geometry = new THREE.BufferGeometry().setFromPoints([currentPosition, nextPosition]);
-                    rayGroup.add(new THREE.Line(geometry, material));
-
-                    // Update state for the NEXT segment
-                    currentPosition = nextPosition.clone();
-
-                    if (hitObject.userData.surfaceType === 'GLAZING') {
-                        isInside = !isInside; // Toggle state: ray passes through
-                        // By continuing, we skip the reflection logic below for this segment.
-                        // The next raycast will start from the glazing surface with an unchanged direction.
-                        continue;
-                    }
-
-                    // --- This block now only executes for OPAQUE surfaces ---
-
-                    // If a ray hits the window frame from outside, terminate it to reduce visual clutter.
-                    // This prevents the visualization of direct reflections from the frame itself.
-                    if (hitObject.userData.surfaceType === 'FRAME' && !isInside) {
-                        break; // Stop tracing this ray's path completely.
-                    }
-
-                    if (isInside) {
-                        interiorBounces++;
-                    }
-                    // Reflect the ray off any other opaque surface (wall, ceiling, shading device)
-                    const normal = hit.face.normal.clone();
-                    normal.transformDirection(hitObject.matrixWorld);
-                    currentDirection.reflect(normal);
-                }
+                // Add the resulting line segments to the main group
+                raySegments.forEach(line => rayGroup.add(line));
             }
         }
     });
+}
+
+/**
+* Traces a single ray and its bounces, returning the line segments.
+* @param {THREE.Vector3} startPosition - The starting point of the ray.
+* @param {THREE.Vector3} startDirection - The initial direction of the ray.
+* @param {THREE.Raycaster} raycaster - The raycaster instance to use.
+* @param {Array<THREE.Object3D>} allObjects - Objects to test for intersection.
+* @param {number} maxBounces - Maximum number of interior bounces.
+* @returns {Array<THREE.Line>} An array of line segments representing the ray path.
+* @private 
+*/ 
+function _traceAndBounceRay(startPosition, startDirection, raycaster, allObjects, maxBounces) { 
+    let currentPosition = startPosition.clone(); 
+    let currentDirection = startDirection.clone(); 
+    let isInside = false; 
+    let interiorBounces = 0; const segments = [];
+
+    // Allow for a few external reflections before giving up on a ray const maxSegments = maxBounces + 5;
+
+    for (let segment = 0; segment < maxSegments; segment++) { if (interiorBounces >= maxBounces) break;
+
+    // Start raycast slightly offset to avoid self-intersection
+    raycaster.set(currentPosition.clone().addScaledVector(currentDirection, 0.001), currentDirection);
+    const intersects = raycaster.intersectObjects(allObjects, true);
+    
+    // Find the first valid mesh hit
+    const hit = intersects.find(h => h.object.isMesh && h.distance > 0.001);
+
+    if (!hit) break; // Ray escaped to infinity
+
+    const nextPosition = hit.point;
+    const hitObject = hit.object;
+
+    // Create the visual line segment
+    const colorIndex = isInside ? interiorBounces + 1 : 0;
+    const material = new THREE.LineBasicMaterial({
+        color: RAY_COLORS[Math.min(colorIndex, RAY_COLORS.length - 1)],
+        linewidth: 2 // Note: linewidth > 1 has no effect in WebGL.
+    });
+
+    const geometry = new THREE.BufferGeometry().setFromPoints([currentPosition, nextPosition]);
+    segments.push(new THREE.Line(geometry, material));
+
+    // Update state for the NEXT segment
+    currentPosition = nextPosition.clone();
+
+    if (hitObject.userData.surfaceType === 'GLAZING') {
+        isInside = !isInside; // Toggle state: ray passes through
+        // Continue with the same direction from the new position
+        continue;
+    }
+
+    // --- This block now only executes for OPAQUE surfaces ---
+
+    // If a ray hits the window frame from outside, terminate it.
+    if (hitObject.userData.surfaceType === 'FRAME' && !isInside) {
+        break; // Stop tracing this ray's path completely.
+    }
+
+    if (isInside) {
+        interiorBounces++;
+    }
+
+    // Reflect the ray off any other opaque surface
+    const normal = hit.face.normal.clone();
+    normal.transformDirection(hitObject.matrixWorld);
+    currentDirection.reflect(normal);
+    } 
+    
+    return segments;
 }
 
 // --- UNCHANGED HELPER FUNCTIONS ---

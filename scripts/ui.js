@@ -1,6 +1,5 @@
 // scripts/ui.js
 
-
 import { getDom } from './dom.js';
 import { initSidebar } from './sidebar.js'; // Changed import
 // Import bake function from geometry
@@ -11,7 +10,7 @@ import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { project } from './project.js';
 // The generateAndStoreOccupancyCsv function needs to be available to other modules like project.js
-export { generateAndStoreOccupancyCsv };
+export { generateAndStoreOccupancyCsv, getDom };
 import { resultsManager, palettes } from './resultsManager.js';
 import * as MESH from '../scripts/scene.js';
 import { initHdrViewer, openHdrViewer } from './hdrViewer.js';
@@ -1143,13 +1142,10 @@ export async function setupEventListeners() {
     renderer.domElement.addEventListener('contextmenu', onSensorRightClick, false);
     window.addEventListener('click', () => dom['sensor-context-menu']?.classList.add('hidden'));
     dom['set-viewpoint-here-btn']?.addEventListener('click', onSetViewpointHere);
+    dom['show-annual-profile-btn']?.addEventListener('click', onShowAnnualProfile);
 
     // --- Annual Glare Listeners ---
     dom['glare-rose-btn']?.addEventListener('click', async () => {
-        const { openGlareRoseDiagram } = await import('./annualDashboard.js');
-        openGlareRoseDiagram();
-    });
-    dom['glare-rose-threshold']?.addEventListener('input', async (e) => {
         if (dom['glare-rose-threshold-val']) {
             dom['glare-rose-threshold-val'].textContent = parseFloat(e.target.value).toFixed(2);
         }
@@ -4081,18 +4077,36 @@ function onSensorRightClick(event) {
     const intersects = raycaster.intersectObjects(sensorMeshes);
 
     if (intersects.length > 0) {
-    // Use the closest intersection, which is standard practice.
-    // intersects[0] is the object closest to the camera that was hit by the ray.
-    const intersection = intersects[0];
-    const menu = dom['sensor-context-menu'];
+        const intersection = intersects[0];
+        const mesh = intersection.object;
+        const instanceId = intersection.instanceId;
 
-    // Store the exact world coordinate of the click on the sensor
-    menu.dataset.point = JSON.stringify(intersection.point);
+        // Calculate the global index of the clicked sensor
+        let baseIndex = 0;
+        for (const sensorMesh of sensorMeshes) {
+            if (sensorMesh === mesh) {
+                break;
+            }
+            baseIndex += sensorMesh.count;
+        }
+        const finalIndex = baseIndex + instanceId;
 
-    // Position and show the menu
-    menu.style.left = `${event.clientX}px`;
-    menu.style.top = `${event.clientY}px`;
-    menu.classList.remove('hidden');
+        // Check if this point has annual data
+        const hasAnnual = resultsManager.getAnnualDataForPoint(resultsManager.activeView, finalIndex) !== null;
+
+        const menu = dom['sensor-context-menu'];
+
+        // Store both point and index
+        menu.dataset.point = JSON.stringify(intersection.point);
+        menu.dataset.pointIndex = finalIndex;
+
+        // Show/hide the annual profile button based on data availability
+        dom['show-annual-profile-btn'].classList.toggle('hidden', !hasAnnual);
+
+        // Position and show the menu
+        menu.style.left = `${event.clientX}px`;
+        menu.style.top = `${event.clientY}px`;
+        menu.classList.remove('hidden');
     }
 }
 
@@ -4192,9 +4206,118 @@ function onSetViewpointHere() {
     }
 }
 
-/**
+let pointProfileChart = null; // Module-level variable to hold the chart instance
 
-Sets up the welcome screen with interactive visual effects that can be cycled through.
+/**
+ * Renders or updates the point-specific annual profile chart.
+ * @param {string} key - The dataset key ('a' or 'b').
+ * @param {number} pointIndex - The index of the sensor point.
+ */
+function updatePointAnnualProfileChart(key, pointIndex) {
+    const dom = getDom();
+    if (!dom['point-annual-profile-chart']) return;
+
+    const annualData = resultsManager.getAnnualDataForPoint(key, pointIndex);
+    if (!annualData) {
+        // Hide or clear the chart if no data
+        dom['annual-profile-point-id'].textContent = 'select point';
+        if (pointProfileChart) {
+            pointProfileChart.destroy();
+            pointProfileChart = null;
+        }
+        return;
+    }
+
+    dom['annual-profile-point-id'].textContent = `#${pointIndex}`;
+
+    const ctx = dom['point-annual-profile-chart'].getContext('2d');
+    const labels = Array.from({ length: 8760 }, (_, i) => i);
+
+    if (pointProfileChart) {
+        pointProfileChart.data.labels = labels;
+        pointProfileChart.data.datasets[0].data = annualData;
+        pointProfileChart.data.datasets[0].label = `Illuminance (lux) - Point #${pointIndex}`;
+        pointProfileChart.update('none'); // Update without animation
+    } else {
+        pointProfileChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: `Illuminance (lux) - Point #${pointIndex}`,
+                    data: annualData,
+                    borderColor: 'var(--highlight-color, #3B82F6)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    borderWidth: 1,
+                    pointRadius: 0,
+                    fill: true,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Illuminance (lux)' },
+                        ticks: { color: 'var(--text-secondary, #6B7280)' },
+                        grid: { color: 'var(--grid-color, #E5E7EB)' }
+                    },
+                    x: {
+                        type: 'linear', // Use linear scale for 8760 hours
+                        title: { display: true, text: 'Hour of Year' },
+                        ticks: { color: 'var(--text-secondary, #6B7280)', maxTicksLimit: 12 },
+                        grid: { display: false }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            title: function(tooltipItems) {
+                                const hour = tooltipItems[0].parsed.x;
+                                const day = Math.floor(hour / 24) + 1;
+                                const hourOfDay = hour % 24;
+                                return `Day ${day}, Hour ${hourOfDay}`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+/**
+* Handles the click event for the "Show Annual Profile" button in the context menu.
+*/
+function onShowAnnualProfile() {
+    const dom = getDom();
+    const menu = dom['sensor-context-menu'];
+    if (!menu.dataset.pointIndex) return;
+
+    const pointIndex = parseInt(menu.dataset.pointIndex, 10);
+    const activeKey = resultsManager.activeView;
+
+    // Open the results analysis panel if it's hidden
+    const resultsPanel = dom['results-analysis-panel'];
+    if (resultsPanel && resultsPanel.classList.contains('hidden')) {
+        resultsPanel.classList.remove('hidden');
+        resultsPanel.style.zIndex = getNewZIndex();
+        ensureWindowInView(resultsPanel);
+        // We must update the whole panel to initialize the histogram, etc.
+        updateResultsAnalysisPanel();
+    }
+
+    updatePointAnnualProfileChart(activeKey, pointIndex);
+    menu.classList.add('hidden'); // Hide the menu
+}
+
+/**
+* Sets up the welcome screen with interactive visual effects that can be cycled through.
 */
 export function setupWelcomeScreen() {
     const dom = getDom();

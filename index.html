@@ -134,7 +134,10 @@
             pointer-events: none;
             z-index: 1;
         }
-        body.top-sidebar-docked .viewport-label {
+
+        /* Only move the top-row viewport labels down when the top bar is docked */
+        body.top-sidebar-docked #viewport-main .viewport-label,
+        body.top-sidebar-docked #viewport-top .viewport-label {
             top: 56px; /* Adjust to be below the docked top toolbar */
         }
     </style>
@@ -2213,270 +2216,399 @@
                     Ray Modeler is a web-based graphical user interface for the Radiance Lighting Simulation Suite, with an integrated AI Assistant to automate workflows and provide expert guidance. It streamlines the entire daylighting and electric lighting analysis workflow, from parametric 3D modeling to simulation script generation and advanced results visualization.
                 </p>
                 <p class="mb-4">
-                    Ray Modeler provides an intuitive, interactive environment to model, simulate, and analyze lighting performance in single-zone spaces without needing to write Radiance code manually.
-                </p>
-                <img src="./Pictures/welcome_screen.png" alt="Ray Modeler Welcome Screen" class="w-full rounded-md my-4 border border-[--grid-color]">
+                Ray Modeler is a desktop application providing a graphical user interface (GUI) for the Radiance Lighting Simulation Suite. Integrated with an AI Assistant, it streamlines daylighting and electric lighting analysis, from 3D modeling to simulation and results visualization.
+            </p>
 
-                <h2><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v.01h-.001a6 6 0 01-5.84-7.38L6.75 8.25a.75.75 0 01.75-.75h7.5a.75.75 0 01.75.75l2.84 6.12zM12 12l.001.001M12 12l-.001.001M12 12l.001-.001M12 12l-.001-.001M12 6a.75.75 0 01.75-.75h.008a.75.75 0 01.75.75v.008a.75.75 0 01-.75.75h-.008A.75.75 0 0112 6zM12 3.75a.75.75 0 01.75-.75h.008a.75.75 0 01.75.75v.008a.75.75 0 01-.75.75h-.008a.75.75 0 01-.75-.75V3.75zM12 15a.75.75 0 01.75-.75h.008a.75.75 0 01.75.75v.008a.75.75 0 01-.75.75h-.008A.75.75 0 0112 15z" /></svg>Getting Started</h2>
-                <p>To use Ray Modeler, you will need a modern web browser and a local installation of the Radiance Lighting Simulation Suite. The desktop version provides the most seamless experience.</p>
-                <ol class="list-decimal list-inside space-y-2 my-4">
-                    <li><strong>Install Radiance</strong>:
-                        Download and install <a href="https://www.radiance-online.org/" target="_blank" class="text-[--text-secondary] underline">Radiance</a> from the official website or the <a href="https://github.com/NREL/Radiance" target="_blank" class="text-[--text-secondary] underline">NREL GitHub repository</a>. Ensure the Radiance <code>bin</code> directory is in your system's PATH.
-                    </li>
-                    <li><strong>Download Ray Modeler</strong>:
-                        Download the latest release for your operating system (macOS or Windows) from the project's Releases page.
-                    </li>
-                    <li><strong>Run the Application</strong>:
-                        <ul class="list-disc list-inside ml-4">
-                            <li><em>Windows</em>: Run the <code>Ray Modeler Setup X.X.X.exe</code> installer.</li>
-                            <li><em>macOS</em>: Open the <code>Ray Modeler-X.X.X.dmg</code> and drag the application to your Applications folder.</li>
-                        </ul>
-                    </li>
-                </ol>
-                <h4 class="font-semibold text-sm uppercase text-[--text-secondary] mt-4">Security Warnings on First Launch</h4>
-                <p>Because the application is not yet code-signed, your operating system will likely show a security warning. When a user on a Mac downloads and tries to open the unsigned app, they will be stopped by Gatekeeper, which will show a message like "Ray Modeler cannot be opened because the developer cannot be verified."</p>
-                <ul class="list-disc list-inside ml-4 mt-2">
-                    <li><strong>On Windows (SmartScreen)</strong>: Click "<strong>More info</strong>", then click "<strong>Run anyway</strong>".</li>
-                    <li><strong>On macOS (Gatekeeper)</strong>: <strong>Right-click</strong> (or Control-click) the app icon, select "<strong>Open</strong>" from the menu. A new dialog box will appear that is similar to the first one, but this time it will include an "<strong>Open</strong>" button. Clicking this will run the app. You only need to do this once. After the first successful launch, the app can be opened normally by double-clicking it.</li>
-                </ul>
+            <img src="./Pictures/welcome_screen.png" alt="Ray Modeler Welcome Screen" class="w-full rounded-md my-4 border border-[--grid-color]">
 
-                <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Core Capabilities</h2>
-                <p>Ray Modeler is packed with features that automate and enhance the Radiance workflow:</p>
-                <ul class="list-disc list-inside space-y-1 my-4">
-                    <li><strong>Parametric Scene Modeling</strong>: Visually define room dimensions, orientation, window-to-wall ratios (WWR), and complex shading devices like overhangs, light shelves, louvers, and roller shades.</li>
-                    <li><strong>Geometry Importer</strong>: Import complex models from <code>.obj</code> files, with an interactive UI to tag surfaces (walls, floors, glazing) for accurate simulation setup.</li>
-                    <li><strong>Context & Site Modeling</strong>: Improve simulation accuracy by adding surrounding context, either through simple massing tools, topography from heightmaps, or by automatically fetching building data from OpenStreetMaps.</li>
-                    <li><strong>Interior Furniture Library</strong>: Place simple furniture and partition objects from a pre-built library via drag-and-drop to create more realistic interior scenes.</li>
-                    <li><strong>Radiance Material Editor</strong>: Configure standard Radiance materials (<code>plastic</code>, <code>metal</code>, <code>glass</code>) by adjusting properties like reflectance, specularity, and roughness. It also supports spectral data (<code>.dat</code>) files for advanced material definitions.</li>
-                    <li><strong>Advanced Glazing Systems</strong>: Model glazing using simple transmittance values or incorporate complex fenestration data via Bidirectional Scattering Distribution Function (BSDF) <code>.xml</code> files. The application correctly converts intuitive transmittance to physically-based transmissivity for simulations.</li>
-                    <li><strong>Interactive BSDF Viewer</strong>: Demystify complex glazing by providing immediate visual feedback. When a BSDF <code>.xml</code> file is loaded, the application can parse the Klems matrix and render an interactive 2D polar plot showing the angular distribution of transmitted light for any incident angle.</li>
-                    <li><strong>Electric Lighting Design</strong>: Place and configure multiple Radiance light source types (light, spotlight, glow, illum) or import real-world luminaire data using IES photometric files in individual or grid-based layouts.</li>
-                    <li><strong>Advanced IES Photometry Viewer</strong>: In addition to a 2D polar plot, visualize luminaire distributions with an interactive 3D photometric web and view key metadata like lumens and wattage directly from the <code>.ies</code> file.</li>
-                    <li><strong>Daylighting Controls</strong>: Simulate energy savings by implementing photosensor-controlled lighting systems with continuous, stepped, or off modes.</li>
-                    <li><strong>Daylighting Control Zone Visualization</strong>: Instantly visualize which luminaires are controlled by which photosensors with color-coded 3D gizmos, providing immediate feedback on the daylighting strategy.</li>
-                    <li><strong>Automated Radiance Workflow</strong>: Generates a complete, organized project folder structure (e.g., 01_geometry, 04_skies, 07_scripts) and populates it with geometry files, material definitions, sensor points, and executable run scripts for both Windows (<code>.bat</code>) and macOS/Linux (<code>.sh</code>).</li>
-                    <li><strong>First-Person View (FPV) Mode</strong>: Enter the Radiance viewpoint camera directly to preview the exact perspective, fisheye, or parallel view that will be rendered for analysis.</li>
-                    <li><strong>Saved Camera Views ("Snapshots")</strong>: Save and load specific camera positions and angles, complete with thumbnails, to quickly return to key perspectives during analysis.</li>
-                    <li><strong>Advanced Annual Analysis</strong>: Generate and view temporal heatmaps, glare rose diagrams, and combined daylight/glare scatter plots to deeply understand annual performance.</li>
-                    <li><strong>Recipe-Based Simulation Engine</strong>: Automate complex Radiance workflows with pre-configured "recipes." The application generates all necessary geometry files, material definitions, and executable run scripts (<code>.sh</code>, <code>.bat</code>) in a standardized project folder.</li>
-                    <li><strong>Advanced Annual Methods</strong>: Support for industry-standard annual simulation methods, including 3-Phase and 5-Phase Daylight Analysis.</li>
-                    <li><strong>Spectral Lighting Analysis</strong>: A full implementation of the Lark methodology to run multi-channel simulations and calculate non-visual lighting metrics like melanopic and neuropic illuminance.</li>
-                    <li><strong>Automated Compliance Workflows</strong>: Specialized recipes for checking compliance with major industry standards, including <code>IES LM-83 (sDA/ASE)</code>, <code>EN 17037 (Daylight in Buildings)</code>, and <code>EN 12464-1 (Light and lighting of work places)</code>.</li>
-                    <li><strong>Interactive HDR Image Analysis</strong>: View High-Dynamic Range (HDR) renderings with exposure controls, toggle false-color luminance mode, and use a mouse-over probe to get exact cd/m² values. Detected glare sources can be overlaid directly onto the image for verification.</li>
-                    <li><strong>Live Sun Ray Tracing</strong>: Visualize direct sun penetration in real-time. Trace a grid of rays from the sun's current position (calculated from the EPW file for any date/time) through glazing surfaces and see how they bounce around the interior, helping to quickly identify potential glare spots or assess daylight distribution.</li>
-                    <li><strong>File System Integration</strong>: Using the File System Access API (or Electron's APIs), Ray Modeler can directly read from and save to a local project folder, enabling a seamless desktop-like experience.</li>
-                    <li><strong>AI Assistant</strong>: An integrated, context-aware AI chat powered by generative AI (Google Gemini or models via OpenRouter) that can answer questions and directly manipulate the scene, run simulations, and control the UI using natural language commands.</li>
-                    <li><strong>Automated Report Generation</strong>: Generate comprehensive HTML reports with a single click. The report includes project details, a 3D scene snapshot, key performance metrics (sDA, ASE, DGP), and all generated dashboard charts (UDI, Glare Rose), ready for printing or saving as a PDF.</li>
-                    <li><strong>Interactive Data Table</strong>: Inspect raw simulation data in a sortable, filterable table. Click on any row to instantly highlight the corresponding sensor point in the 3D model, linking numerical data directly to its spatial context.</li>
-                    <li><strong>Daylight Autonomy Heatmaps</strong>: Visualize annual performance not just as point-in-time illuminance, but also as Daylight Autonomy (DA), showing the percentage of occupied hours that each sensor point meets a specific illuminance threshold.</li>
-                    <li><strong>Climate Data Analysis</strong>: Generate an interactive dashboard from the loaded EPW file, including a wind rose, solar radiation charts, and temperature profiles to better understand the site context.</li>
-                    <li><strong>Advanced Circadian Health Dashboard</strong>: Analyze results from spectral simulations to calculate and visualize key circadian lighting metrics like Circadian Stimulus (CS), Equivalent Melanopic Lux (EML), and check for compliance with WELL building standards.</li>
-                    <li><strong>Advanced IES Photometry Viewer</strong>: In addition to a 2D polar plot, visualize luminaire distributions with an interactive 3D photometric web and view key metadata like lumens and wattage directly from the <code>.ies</code> file.</li>
-                    <li><strong>Interactive 3D Room Resizing</strong>: A "Resize Mode" that allows you to directly manipulate the room's dimensions in the 3D viewport by dragging its exterior faces, providing immediate tactile feedback.</li>
-                    <li><strong>Keyboard Shortcuts</strong>: Accelerate your workflow with keyboard shortcuts for common actions, such as <code>T</code> for Top View, <code>P</code> for Perspective, and <code>Ctrl+S</code> to save the project. A help modal (<code>?</code>) displays all available shortcuts.</li>
-                    <li><strong>Multi-View Layout (Quad View)</strong>: Split the main viewport into four synchronized cameras (Perspective, Top, Front, Side) for comprehensive spatial awareness and precise object placement, a standard in professional 3D software.</li>
-                    <li><strong>Vegetation & Tree Modeling</strong>: Add simple procedural trees and bushes from the Scene Elements library to your site. The vegetation canopy uses a Radiance <code>trans</code> material to accurately simulate its light-filtering effects, improving the realism of site-specific analyses.</li>
-                </ul>
+            <h2><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v.01h-.001a6 6 0 01-5.84-7.38L6.75 8.25a.75.75 0 01.75-.75h7.5a.75.75 0 01.75.75l2.84 6.12zM12 12l.001.001M12 12l-.001.001M12 12l.001-.001M12 12l-.001-.001M12 6a.75.75 0 01.75-.75h.008a.75.75 0 01.75.75v.008a.75.75 0 01-.75.75h-.008A.75.75 0 0112 6zM12 3.75a.75.75 0 01.75-.75h.008a.75.75 0 01.75.75v.008a.75.75 0 01-.75.75h-.008a.75.75 0 01-.75-.75V3.75zM12 15a.75.75 0 01.75-.75h.008a.75.75 0 01.75.75v.008a.75.75 0 01-.75.75h-.008A.75.75 0 0112 15z" /></svg>Getting Started 🚀</h2>
+            <p class="mb-4">To use Ray Modeler, you need a modern web browser and a local installation of the Radiance Lighting Simulation Suite. The desktop version (recommended) offers the best experience.</p>
+            <ol class="list-decimal list-inside space-y-2 my-4">
+                <li><strong>Install Radiance</strong>:
+                    Download and install <a href="https://www.radiance-online.org/" target="_blank" class="text-[--text-secondary] underline">Radiance</a> from the official website or the <a href="https://github.com/NREL/Radiance" target="_blank" class="text-[--text-secondary] underline">NREL</a> GitHub repository. Ensure the Radiance <code>bin</code> directory is in your system's PATH.
+                </li>
+                <li><strong>Download Ray Modeler</strong>:
+                    Download the latest release for your operating system (macOS or Windows) from the project's Releases page.
+                </li>
+                <li><strong>Run the Application</strong>:
+                    <ul class="list-disc list-inside ml-4">
+                        <li><em>Windows</em>: Run the Ray Modeler Setup <code>.exe</code> installer.</li>
+                        <li><em>macOS</em>: Open the Ray Modeler <code>.dmg</code> and drag the application to your Applications folder.</li>
+                    </ul>
+                </li>
+            </ol>
+            <h4 class="font-semibold text-sm uppercase text-[--text-secondary] mt-4">Security Warnings on First Launch</h4>
+            <p class="mb-4">Because the app isn't code-signed, your OS might show a security warning. When a user on a Mac downloads and tries to open the unsigned app, they will be stopped by Gatekeeper, which will show a message like "Ray Modeler cannot be opened because the developer cannot be verified."</p>
+            <ul class="list-disc list-inside ml-4 mt-2 space-y-1">
+                <li><strong>On Windows (SmartScreen)</strong>: Click "<strong>More info</strong>", then click "<strong>Run anyway</strong>".</li>
+                <li><strong>On macOS (Gatekeeper)</strong>: <strong>Right-click</strong> (or Control-click) the app icon, select "<strong>Open</strong>" from the menu. A new dialog box will appear that is similar to the first one, but this time it will include an "<strong>Open</strong>" button. Clicking this will run the app. You only need to do this once. After the first successful launch, the app can be opened normally by double-clicking it.</li>
+            </ul>
 
-                <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.311a15.045 15.045 0 01-7.5 0C4.508 17.311 2.25 15.122 2.25 12c0-3.122 2.258-5.311 4.75-5.965M12 18a2.25 2.25 0 01-2.25-2.25V6.75A2.25 2.25 0 0112 4.5h.75a2.25 2.25 0 012.25 2.25v5.25a2.25 2.25 0 01-2.25 2.25h-.75z" /></svg>AI Assistant</h2>
-                <p>The AI Assistant panel provides a chat interface to help you with your workflow. It understands the application's current state and can perform actions on your behalf using natural language commands.</p>
+            <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Core Capabilities ✨</h2>
+            <p class="mb-4">Ray Modeler is packed with features that automate and enhance the Radiance workflow:</p>
+            <ul class="list-disc list-inside space-y-1 my-4">
+                <li><strong>Parametric Scene Modeling</strong>: Define room dimensions, orientation, window-to-wall ratios (WWR), and shading devices like overhangs, light shelves, louvers, and roller shades.</li>
+                <li><strong>Geometry Importer</strong>: Import <code>.obj</code> models, with an interactive UI to tag surfaces (walls, floors, glazing) for simulation setup.</li>
+                <li><strong>Context & Site Modeling</strong>: Adding surrounding context, either through simple massing tools, topography from heightmaps, or by automatically fetching building data from OpenStreetMaps.</li>
+                <li><strong>Interior Furniture Library</strong>: Place simple furniture and partition objects from a pre-built library via drag-and-drop or import custom <code>.obj</code> assets..</li>
+                <li><strong>Radiance Material Editor</strong>: Configure standard Radiance materials (<code>plastic</code>, <code>metal</code>, <code>glass</code>) by adjusting properties like reflectance, specularity, and roughness. It also supports spectral data (<code>.dat</code>) files for advanced material definitions.</li>
+                <li><strong>Advanced Glazing Systems</strong>: Model glazing using simple transmittance values or incorporate complex fenestration data via Bidirectional Scattering Distribution Function (BSDF) <code>.xml</code> files. The application converts intuitive transmittance to physically-based transmissivity for simulations.</li>
+                <li><strong>Interactive BSDF Viewer</strong>: When a BSDF <code>.xml</code> file is loaded, the application can parse the Klems matrix and render an interactive 2D polar plot showing the angular distribution of transmitted light for any incident angle.</li>
+                <li><strong>Electric Lighting Design</strong>: Place and configure Radiance light source types (light, spotlight, glow, illum) or import luminaire data using <code>.ies</code> photometric files in individual or grid-based layouts.</li>
+                <li><strong>IES Photometry Viewer</strong>: In addition to a 2D polar plot, visualize luminaire distributions with an interactive 3D photometric web and view key metadata like lumens and wattage directly from the <code>.ies</code> file.</li>
+                <li><strong>Daylighting Controls</strong>: Simulate energy savings by implementing photosensor-controlled lighting systems with continuous, stepped, or off modes.</li>
+                <li><strong>Daylighting Control Zone Visualization</strong>: Instantly visualize which luminaires are controlled by which photosensors with color-coded 3D gizmos, providing immediate feedback on the daylighting strategy.</li>
+                <li><strong>Automated Radiance Workflow</strong>: Generates a complete, organized project folder structure (e.g., 01_geometry, 04_skies, 07_scripts) and populates it with geometry files, material definitions, sensor points, and executable run scripts for both Windows (<code>.bat</code>) and macOS/Linux (<code>.sh</code>).</li>
+                <li><strong>First-Person View (FPV) Mode</strong>: Enter the Radiance viewpoint camera directly to preview the exact perspective, fisheye, or parallel view that will be rendered for analysis.</li>
+                <li><strong>Saved Camera Views ("Snapshots")</strong>: Save and load specific camera positions and angles, complete with thumbnails, to quickly return to key perspectives during analysis.</li>
+                <li><strong>Advanced Annual Analysis</strong>: Generate and view temporal heatmaps, glare rose diagrams, and combined daylight/glare scatter plots to deeply understand annual performance.</li>
+                <li><strong>Recipe-Based Simulation Engine</strong>: Automate complex Radiance workflows with pre-configured "recipes." The application generates all necessary geometry files, material definitions, and executable run scripts (<code>.sh</code>, <code>.bat</code>) in a standardized project folder. Includes recipes for <code>IES LM-83 (sDA/ASE)</code>, <code>EN 17037</code>, and <code>EN 12464-1</code>.</li>
+                <li><strong>Advanced Annual Methods</strong>: Support for industry-standard annual simulation methods, including 3-Phase and 5-Phase Daylight Analysis.</li>
+                <li><strong>Spectral Lighting Analysis</strong>: A full implementation of the Lark methodology to run multi-channel simulations and calculate non-visual lighting metrics like melanopic and neuropic illuminance.</li>
+                <li><strong>Automated Compliance Workflows</strong>: Specialized recipes for checking compliance with major industry standards, including <code>IES LM-83 (sDA/ASE)</code>, <code>EN 17037 (Daylight in Buildings)</code>, and <code>EN 12464-1 (Light and lighting of work places)</code>.</li>
+                <li><strong>Interactive HDR Image Analysis</strong>: View High-Dynamic Range (HDR) renderings with exposure controls, toggle false-color luminance mode, and use a mouse-over probe to get exact cd/m² values. Detected glare sources can be overlaid directly onto the image for verification.</li>
+                <li><strong>Live Sun Ray Tracing</strong>: Visualize direct sun penetration in real-time. Trace a grid of rays from the sun's current position (calculated from the EPW file for any date/time) through glazing surfaces and see how they bounce around the interior, helping to quickly identify potential glare spots or assess daylight distribution.</li>
+                <li><strong>File System Integration</strong>: Using the File System Access API (or Electron's APIs), Ray Modeler can directly read from and save to a local project folder, enabling a seamless desktop-like experience.</li>
+                <li><strong>AI Assistant (Helios)</strong>: An integrated, context-aware AI chat powered by generative AI (Google Gemini, Anthropic, OpenAI, OpenRouter models) to help answer questions and directly manipulate the scene, run simulations, and control the UI using natural language commands.</li>
+                <li><strong>Automated Report Generation</strong>: Generate comprehensive HTML reports with a single click. The report includes project details, a 3D scene snapshot, key performance metrics (sDA, ASE, DGP), and all generated dashboard charts (UDI, Glare Rose), ready for printing or saving as a PDF.</li>
+                <li><strong>Interactive Data Table</strong>: Inspect raw simulation data in a sortable, filterable table. Click on any row to instantly highlight the corresponding sensor point in the 3D model, linking numerical data directly to its spatial context.</li>
+                <li><strong>Daylight Autonomy Heatmaps</strong>: Visualize annual performance not just as point-in-time illuminance, but also as Daylight Autonomy (DA), showing the percentage of occupied hours that each sensor point meets a specific illuminance threshold.</li>
+                <li><strong>Climate Data Analysis</strong>: Generate an interactive dashboard from the loaded EPW file, including a wind rose, solar radiation charts, and temperature profiles to better understand the site context.</li>
+                <li><strong>Advanced Circadian Health Dashboard</strong>: Analyze results from spectral simulations to calculate and visualize key circadian lighting metrics like Circadian Stimulus (CS), Equivalent Melanopic Lux (EML), and check for compliance with WELL building standards.</li>
+                <li><strong>Keyboard Shortcuts</strong>: Accelerate your workflow with keyboard shortcuts for common actions, such as <code>T</code> for Top View, <code>P</code> for Perspective, and <code>Ctrl+S</code> to save the project. A help modal (<code>?</code>) displays all available shortcuts.</li>
+                <li><strong>Multi-View Layout (Quad View)</strong>: Split the main viewport into four synchronized cameras (Perspective, Top, Front, Side) for comprehensive spatial awareness and precise object placement, a standard in professional 3D software.</li>
+                <li><strong>Vegetation & Tree Modeling</strong>: Add simple procedural trees and bushes from the Scene Elements library to your site. The vegetation canopy uses a Radiance <code>trans</code> material to accurately simulate its light-filtering effects, improving the realism of site-specific analyses.</li>
+            </ul>
 
-                <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>AI-Powered Actions (Tool Use)</h3>
-                <p>Beyond answering questions, the assistant can directly manipulate the UI and query project data. This allows for a powerful natural language workflow. Its capabilities include:</p>
-                <ul class="list-disc list-inside space-y-1 my-4">
-                    <li><strong>Project Validation</strong>: Ask it to <code>"validate my project for an annual glare simulation"</code> and it will check for common setup errors, such as a missing weather file or an incorrect viewpoint type, and report back any issues.</li>
-                    <li><strong>Advanced Scene Manipulation</strong>:
-                        <ul class="list-disc list-inside ml-4">
-                            <li><strong>Shading</strong>: <code>"Add a 0.5 meter deep overhang to the south wall."</code></li>
-                            <li><strong>Sensor Grids</strong>: <code>"Enable a sensor grid on the floor with 0.75m spacing."</code></li>
-                            <li><strong>Daylighting</strong>: <code>"Enable continuous daylighting controls with a setpoint of 500 lux."</code></li>
-                        </ul>
-                    </li>
-                    <li><strong>Simulation & Recipe Control</strong>:
-                        <ul class="list-disc list-inside ml-4">
-                            <li><strong>Global Parameters</strong>: <code>"Set the global ambient bounces to 5."</code></li>
-                            <li><strong>Recipe Configuration</strong>: <code>"In the open illuminance recipe, change the time to 9:00 AM."</code></li>
-                        </ul>
-                    </li>
-                    <li><strong>Conversational Data Exploration & Comparison</strong>:
-                        <ul class="list-disc list-inside ml-4">
-                            <li><strong>Data Query</strong>: <code>"What is the average illuminance for the current results?"</code> or <code>"How many points are above 500 lux?"</code></li>
-                            <li><strong>Time Scrubbing</strong>: <code>"Show me the results for the winter solstice at noon."</code></li>
-                            <li><strong>Dashboard Control</strong>: <code>"Open the glare rose diagram."</code></li>
-                            <li><strong>Comparative Analysis</strong>: <code>"Which of my two designs has better daylight uniformity?"</code> or <code>"Compare the sDA for both designs."</code></li>
-                        </ul>
-                    </li>
-                    <li><strong>File Management</strong>:
-                        <ul class="list-disc list-inside ml-4">
-                            <li><strong>Load Results</strong>: <code>"Load a results file into dataset A."</code></li>
-                            <li><strong>Clear Results</strong>: <code>"Clear all loaded results data."</code></li>
-                        </ul>
-                    </li>
-                </ul>
+            <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.311a15.045 15.045 0 01-7.5 0C4.508 17.311 2.25 15.122 2.25 12c0-3.122 2.258-5.311 4.75-5.965M12 18a2.25 2.25 0 01-2.25-2.25V6.75A2.25 2.25 0 0112 4.5h.75a2.25 2.25 0 012.25 2.25v5.25a2.25 2.25 0 01-2.25 2.25h-.75z" /></svg>AI Assistant (Helios) 🤖</h2>
+            <p class="mb-4">The AI Assistant panel provides a chat interface to help you with your workflow. It understands the application's current state and can perform actions on your behalf using natural language commands.</p>
 
-                <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Design Inspector</h3>
-                <p>The AI analyzes the entire project state to identify conflicting or suboptimal combinations of settings, explains the potential consequences, and offers a one-click fix.</p>
-                <div class="info-box my-4">
-                    <strong>AI Analysis:</strong> "I've reviewed your project. Your wall reflectance is quite low (0.2), and you're only using 2 ambient bounces. This combination will likely result in an unrealistically dark rendering with noticeable splotches. I recommend increasing ambient bounces to 4 and wall reflectance to 0.5."
-                    <br>
-                    <button class="btn btn-xs btn-secondary mt-2">[Apply Fixes]</button>
-                </div>
+            <hr class="my-6 border-[--grid-color]">
 
-                <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Results Critique</h3>
-                <p>After a simulation completes, the AI can analyze the results, identify problems, and suggest specific, actionable design changes.</p>
-                <div class="info-box my-4">
-                    <strong>AI Analysis:</strong> "The Daylight Glare Probability (DGP) is 0.47, which is considered 'Intolerable'. This is caused by low-angle sun from the west-facing window. To fix this, I suggest adding vertical louvers."
-                    <br>
-                    <button class="btn btn-xs btn-secondary mt-2">[Add Vertical Louvers]</button>
-                </div>
+            <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>AI-Powered Actions (Tool Use)</h3>
+            <p class="mb-4">Beyond answering questions, the assistant can directly manipulate the UI and query project data. This allows for a powerful natural language workflow. Its capabilities include:</p>
+            <ul class="list-disc list-inside space-y-1 my-4">
+                <li><strong>Project Validation</strong>: Ask it to <code>"validate my project for an annual glare simulation"</code> and it will check for common setup errors, such as a missing weather file or an incorrect viewpoint type, and report back any issues.</li>
+                <li><strong>Advanced Scene Manipulation</strong>:
+                    <ul class="list-disc list-inside ml-4">
+                        <li><strong>Shading</strong>: <code>"Add a 0.5 meter deep overhang to the south wall."</code></li>
+                        <li><strong>Sensor Grids</strong>: <code>"Enable a sensor grid on the floor with 0.75m spacing."</code></li>
+                        <li><strong>Daylighting</strong>: <code>"Enable continuous daylighting controls with a setpoint of 500 lux."</code></li>
+                    </ul>
+                </li>
+                <li><strong>Simulation & Recipe Control</strong>:
+                    <ul class="list-disc list-inside ml-4">
+                        <li><strong>Global Parameters</strong>: <code>"Set the global ambient bounces to 5."</code></li>
+                        <li><strong>Recipe Configuration</strong>: <code>"In the open illuminance recipe, change the time to 9:00 AM."</code></li>
+                    </ul>
+                </li>
+                <li><strong>Conversational Data Exploration & Comparison</strong>:
+                    <ul class="list-disc list-inside ml-4">
+                        <li><strong>Data Query</strong>: <code>"What is the average illuminance for the current results?"</code> or <code>"How many points are above 500 lux?"</code></li>
+                        <li><strong>Time Scrubbing</strong>: <code>"Show me the results for the winter solstice at noon."</code></li>
+                        <li><strong>Dashboard Control</strong>: <code>"Open the glare rose diagram."</code></li>
+                        <li><strong>Comparative Analysis</strong>: <code>"Which of my two designs has better daylight uniformity?"</code> or <code>"Compare the sDA for both designs."</code></li>
+                    </ul>
+                </li>
+                <li><strong>File Management</strong>:
+                    <ul class="list-disc list-inside ml-4">
+                        <li><strong>Load Results</strong>: <code>"Load a results file into dataset A."</code></li>
+                        <li><strong>Clear Results</strong>: <code>"Clear all loaded results data."</code></li>
+                    </ul>
+                </li>
+            </ul>
 
-                <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Interactive Tutor</h3>
-                <p>The AI can act as a tutor to guide new users through complex simulation workflows step-by-step, teaching them the process as they go.</p>
-                <div class="info-box my-4">
-                    <p><strong>User</strong>: "How do I run a glare simulation?"</p>
-                    <p><strong>AI</strong>: "Of course! To calculate DGP, we need a 180° fisheye view. Your current viewpoint is set to Perspective. Would you like me to change it for you?"</p>
-                    <p><strong>User</strong>: "Yes"</p>
-                    <p><strong>AI</strong>: <em>(Changes viewpoint)</em> "Great. Next, I'll open the DGP recipe panel for you." <em>(Opens recipe)</em> "Now you just need to click 'Generate Package' and run the simulation."</p>
-                </div>
-                <h4 class="font-semibold text-sm uppercase text-[--text-secondary] mt-4">Proactive Suggestions</h4>
-                <p>The AI Assistant monitors user actions and provides contextual, non-intrusive suggestions to guide the workflow and prevent common errors. These suggestions appear as dismissible chips in the UI. For example:</p>
-                <ul class="list-disc list-inside space-y-1 my-4">
-                    <li>After loading an <strong>EPW weather file</strong>, it will suggest opening an annual simulation recipe.</li>
-                    <li>If a material's <strong>reflectance is set to an unusually high or low value</strong>, it will warn that this may be physically unrealistic.</li>
-                    <li>If the user enables a <strong>View Grid</strong>, it will suggest opening the Imageless Annual Glare recipe.</li>
-                    <li>If the <strong>DGP recipe is open but the viewpoint is not set to fisheye</strong>, it will offer to correct the setting.</li>
-                </ul>
+            <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Design Inspector</h3>
+            <p class="mb-4">The AI analyzes the entire project state to identify conflicting or suboptimal combinations of settings, explains the potential consequences, and offers a one-click fix.</p>
+            <div class="info-box my-4">
+                <strong>AI Analysis:</strong> "I've reviewed your project. Your wall reflectance is quite low (0.2), and you're only using 2 ambient bounces. This combination will likely result in an unrealistically dark rendering with noticeable splotches. I recommend increasing ambient bounces to 4 and wall reflectance to 0.5."
+                <br>
+                <button class="btn btn-xs btn-secondary mt-2">[Apply Fixes]</button>
+            </div>
 
-                <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Generative Design</h3>
-                <p>Leverage the AI to perform automated, multi-step design tasks.</p>
-                <ul class="list-disc list-inside space-y-1 my-4">
-                    <li><strong>Scene Creation from Natural Language</strong>: Instead of manually adjusting sliders, describe the space you want to build in plain English.
-                        <div class="info-box !text-sm my-2">
-                            "Create a long office, 12 meters deep by 5 meters wide, with a 3-meter high ceiling. Put a large, continuous window across the entire south wall with a sill height of 0.8 meters. Add a 1-meter deep overhang above it and place two desks in the middle of the room."
-                        </div>
-                    </li>
-                    <li><strong>Design Optimization</strong>: Define a goal, constraints, and a design variable, and the assistant will orchestrate the entire workflow to find the best solution. For example:
-                        <div class="info-box !text-sm my-2">
-                            "Find an overhang depth for the south wall between 0.5m and 2.0m that maximizes sDA while keeping ASE below 10%."
-                        </div>
-                    </li>
-                </ul>
+            <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Results Critique</h3>
+            <p class="mb-4">After a simulation completes, the AI can analyze the results, identify problems, and suggest specific, actionable design changes.</p>
+            <div class="info-box my-4">
+                <strong>AI Analysis:</strong> "The Daylight Glare Probability (DGP) is 0.47, which is considered 'Intolerable'. This is caused by low-angle sun from the west-facing window. To fix this, I suggest adding vertical louvers."
+                <br>
+                <button class="btn btn-xs btn-secondary mt-2">[Add Vertical Louvers]</button>
+            </div>
 
-                <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>API Key Configuration</h3>
-                <p>The integrated AI Assistant requires an API key to function. It supports multiple providers for greater flexibility.</p>
-                <ul class="list-disc list-inside space-y-1 my-4">
-                    <li><strong>Expanded Provider Support</strong>: Select between <strong>OpenRouter</strong>, <strong>OpenAI</strong>, <strong>Google Gemini</strong>, and <strong>Anthropic</strong>.</li>
-                    <li><strong>Provider-Specific Keys</strong>: The application saves a separate API key for each provider, so you can switch between models without re-entering credentials.</li>
-                    <li><strong>AI Configuration</strong>: A settings modal (⚙️ icon) allows you to select your preferred provider, choose from a list of popular models (e.g., Gemini 1.5 Pro, GPT-4o, Claude 3.5 Sonnet), and enter your API key.</li>
-                </ul>
+            <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Interactive Tutor</h3>
+            <p class="mb-4">The AI can act as a tutor to guide new users through complex simulation workflows step-by-step, teaching them the process as they go.</p>
+            <div class="info-box my-4">
+                <p><strong>User</strong>: "How do I run a glare simulation?"</p>
+                <p><strong>AI</strong>: "Of course! To calculate DGP, we need a 180° fisheye view. Your current viewpoint is set to Perspective. Would you like me to change it for you?"</p>
+                <p><strong>User</strong>: "Yes"</p>
+                <p><strong>AI</strong>: <em>(Changes viewpoint)</em> "Great. Next, I'll open the DGP recipe panel for you." <em>(Opens recipe)</em> "Now you just need to click 'Generate Package' and run the simulation."</p>
+            </div>
 
-                <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Getting Your API Key</h3>
-                <h4 class="font-semibold text-sm uppercase text-[--text-secondary] mt-4">Google Gemini API Key 🔑</h4>
-                <p>You can get a free API key for the Gemini family of models from <a href="https://aistudio.google.com/prompts/new_chat" target="_blank" class="text-[--text-secondary] underline">Google AI Studio</a>.</p>
-                <ol class="list-decimal list-inside space-y-1 my-2 ml-4">
-                    <li>Go to the Google AI Studio website.</li>
-                    <li>Sign in with your Google account.</li>
-                    <li>Click the "<code>Get API key</code>" button, usually located in the top-left or top-right corner of the page.</li>
-                    <li>A dialog will appear. Click "<code>Create API key</code>".</li>
-                    <li>Your new API key will be generated and displayed.</li>
-                    <li>Copy this key and paste it into the API Key field in the Ray Modeler AI settings.</li>
-                </ol>
-                <p class="text-xs text-[--text-secondary]"><em>Note: The Gemini API has a free tier with usage limits. Be sure to review Google's current pricing and terms of service.</em></p>
+            <h4 class="font-semibold text-sm uppercase text-[--text-secondary] mt-4">Proactive Suggestions</h4>
+            <p class="mb-4">The AI Assistant monitors user actions and provides contextual, non-intrusive suggestions to guide the workflow and prevent common errors. These suggestions appear as dismissible chips in the UI. For example:</p>
+            <ul class="list-disc list-inside space-y-1 my-4">
+                <li>After loading an <strong>EPW weather file</strong>, it will suggest opening an annual simulation recipe.</li>
+                <li>If a material's <strong>reflectance is set to an unusually high or low value</strong>, it will warn that this may be physically unrealistic.</li>
+                <li>If the user enables a <strong>View Grid</strong>, it will suggest opening the Imageless Annual Glare recipe.</li>
+                <li>If the <strong>DGP recipe is open but the viewpoint is not set to fisheye</strong>, it will offer to correct the setting.</li>
+            </ul>
 
-                <h4 class="font-semibold text-sm uppercase text-[--text-secondary] mt-4">OpenRouter API Key 🔑</h4>
-                <p>OpenRouter provides access to a wide variety of models from different providers through a single API.</p>
-                <ol class="list-decimal list-inside space-y-1 my-2 ml-4">
-                    <li>Go to the <a href="https://openrouter.ai/" target="_blank" class="text-[--text-secondary] underline">OpenRouter.ai</a> website and log in.</li>
-                    <li>Click on your account icon in the top-right corner and select "<code>Keys</code>" from the dropdown menu.</li>
-                    <li>Click the "<code>+ Create Key</code>" button. Give your key a name (e.g., "RayModeler") and click "<code>Create</code>".Your new API key will be generated.</li>
-                    <li>Copy this key and paste it into the API Key field in the Ray Modeler AI settings.</li>
-                </ol>
-                <p class="text-xs text-[--text-secondary]"><em>Note: OpenRouter is a paid service. You will need to add credits to your account to use most models. To use some of the free models, you may need to adjust your privacy settings to allow your data to be used for model improvement.</em></p>
+            <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Generative Design</h3>
+            <p class="mb-4">Leverage the AI to perform automated, multi-step design tasks.</p>
+            <ul class="list-disc list-inside space-y-1 my-4">
+                <li><strong>Scene Creation from Natural Language</strong>: Instead of manually adjusting sliders, describe the space you want to build in plain English.
+                    <div class="info-box !text-sm my-2">
+                        "Create a long office, 12 meters deep by 5 meters wide, with a 3-meter high ceiling. Put a large, continuous window across the entire south wall with a sill height of 0.8 meters. Add a 1-meter deep overhang above it and place two desks in the middle of the room."
+                    </div>
+                </li>
+                <li><strong>Design Optimization</strong>: Define a goal, constraints, and a design variable, and the assistant will orchestrate the entire workflow to find the best solution. For example:
+                    <div class="info-box !text-sm my-2">
+                        "Find an overhang depth for the south wall between 0.5m and 2.0m that maximizes sDA while keeping ASE below 10%."
+                    </div>
+                </li>
+            </ul>
 
-                <h4 class="font-semibold text-sm uppercase text-[--text-secondary] mt-4">OpenAI API Key 🔑</h4>
-                <ol class="list-decimal list-inside space-y-1 my-2 ml-4">
-                    <li>Go to the <a href="https://platform.openai.com/api-keys" target="_blank" class="text-[--text-secondary] underline">OpenAI API keys</a> page and log in.</li>
-                    <li>Click the "<code>+ Create new secret key</code>" button.</li>
-                    <li>Give your key a name (e.g., "RayModeler") and click "<code>Create secret key</code>".</li>
-                    <li>Copy the generated key immediately and paste it into the API Key field in the Ray Modeler AI settings. You will not be able to view it again.</li>
-                </ol>
+            <hr class="my-6 border-[--grid-color]">
 
-                <h4 class="font-semibold text-sm uppercase text-[--text-secondary] mt-4">Anthropic API Key 🔑</h4>
-                <ol class="list-decimal list-inside space-y-1 my-2 ml-4">
-                    <li>Go to the <a href="https://console.anthropic.com/" target="_blank" class="text-[--text-secondary] underline">Anthropic Console</a> and log in.</li>
-                    <li>Navigate to the "API Keys" section in your account settings.</li>
-                    <li>Click the "<code>Create Key</code>" button.</li>
-                    <li>Give the key a name and click "<code>Create Key</code>".</li>
-                    <li>Copy the key and paste it into the API Key field in the Ray Modeler AI settings.</li>
-                </ol>
-                <p class="info-box my-4"><strong>Important</strong>: Treat your API keys like passwords. Do not share them publicly or commit them to version control.</p>
+            <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>API Key Configuration</h3>
+            <p class="mb-4">The integrated AI Assistant requires an API key to function. It supports multiple providers for greater flexibility.</p>
+            <ul class="list-disc list-inside space-y-1 my-4">
+                <li><strong>Expanded Provider Support</strong>: Select between <strong>OpenRouter</strong>, <strong>OpenAI</strong>, <strong>Google Gemini</strong>, and <strong>Anthropic</strong>.</li>
+                <li><strong>Provider-Specific Keys</strong>: The application saves a separate API key for each provider, so you can switch between models without re-entering credentials.</li>
+                <li><strong>AI Configuration</strong>: A settings modal (⚙️ icon) allows you to select your preferred provider, choose from a list of popular models (e.g., Gemini 1.5 Pro, GPT-4o, Claude 3.5 Sonnet), and enter your API key.</li>
+            </ul>
 
-                <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 6.75C6.75 5.64543 7.64543 4.75 8.75 4.75H15.25C16.3546 4.75 17.25 5.64543 17.25 6.75V19.25L12 14.75L6.75 19.25V6.75Z" /></svg>UI Walkthrough 💻</h2>
-                <p>The interface is designed around a logical workflow, guiding the user from setup to analysis.</p>
-                <img src="./Pictures/main_ui.png" alt="Ray Modeler Main UI" class="w-full rounded-md my-4 border border-[--grid-color]">
-                <img src="./Pictures/main_ui_quad.png" alt="Ray Modeler Main UI in Quad View" class="w-full rounded-md my-4 border border-[--grid-color]">
-                <img src="./Pictures/panels_ui.png" alt="Ray Modeler Panels" class="w-full rounded-md my-4 border border-[--grid-color]">
-                <ul class="list-disc list-inside space-y-1 my-4">
-                    <li><strong>3D Viewport (Center)</strong>: This is the main interactive area where your 3D scene is displayed. You can navigate using standard orbit controls (mouse drag, scroll). The viewport can also be split into a <strong>Quad View</strong> layout, showing synchronized Perspective, Top, Front, and Side cameras for comprehensive spatial awareness.</li>
-                    <li><strong>Left Toolbar</strong>: This is the primary command center for building your scene. It contains buttons to open floating panels for defining all aspects of the physical model, from <strong>Project Setup</strong> and <strong>Dimensions</strong> to <strong>Simulation</strong> and <strong>Analysis</strong> modules.</li>
-                    <li><strong>Top View Controls</strong>: A quick-access toolbar to instantly switch between standard orthographic (Top, Front, etc.) and perspective camera views. It also includes the button to toggle the <strong>Quad View</strong> layout.</li>
-                    <li><strong>Bottom Toolbar (Bottom-Left)</strong>: Provides quick access to global actions like saving/loading project files, viewing application information and keyboard shortcuts, and launching the AI Assistant.</li>
-                    <li><strong>Floating Panels</strong>: All scene definition, simulation, and analysis tools open as independent floating windows. These panels can be dragged, resized, collapsed, and arranged anywhere on the screen, allowing you to create a workspace tailored to your needs.</li>
-                    <li><strong>AI Assistant Sidebar (Right)</strong>: A dedicated, resizable sidebar that houses the conversational AI Assistant. This keeps the AI's powerful capabilities accessible without cluttering your modeling and analysis workflow.</li>
-                </ul>
+            <hr class="my-6 border-[--grid-color]">
 
-                <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>In-Depth Feature Guide</h2>
+            <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Getting Your API Key</h3>
 
-                <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Scene Definition Panels</h3>
-                <p>The panels on the left toolbar are used to define the scene.</p>
-                <ul class="list-disc list-inside space-y-1 my-4">
-                    <li><strong>Project Setup</strong>: This is the starting point. Define project metadata, set the building's geographic location using an interactive map, or by uploading an <code>.epw</code> weather file which auto-populates location data. This panel also contains controls for the 3D Sun Path visualization and a tool for generating annual occupancy schedules.</li>
-                    <li><strong>Dimensions</strong>: Set the foundational geometry: <strong>width (X-axis)</strong>, <strong>length (Z-axis)</strong>, and <strong>height (Y-axis)</strong>. The <strong>Orientation</strong> slider rotates the entire room, affecting its solar exposure.</li>
-                    <li><strong>Apertures & Shading</strong>: Control openings on each wall. Work parametrically using <strong>Window-to-Wall Ratio (WWR)</strong> or switch to <strong>Manual</strong> mode for precise control. Each wall can have its own complex shading system, including <code>Overhangs</code>, <code>Light Shelves</code>, <code>Louvers</code>, and <code>Roller Shades</code>.</li>
-                    <li><strong>Artificial Lighting</strong>: Add electric lighting. Choose from Radiance primitives like <code>light</code>, <code>spotlight</code>, and <code>glow</code>, or upload an <code>.ies</code> file for a specific luminaire. Lights can be placed individually or arranged in a grid.</li>
-                    <li><strong>Material Properties</strong>: Define surface characteristics. For each element, select a Radiance material and adjust its <strong>reflectance</strong>, <strong>specularity</strong>, and <strong>roughness</strong>. The app correctly converts the intuitive 'Transmittance' value for glazing into the physically-based 'Transmissivity' required by the Radiance <code>glass</code> material. Advanced optics can be modeled via BSDF <code>.xml</code> files.</li>
-                    <li><strong>Sensor Grid</strong>: Create measurement points for simulations. The <strong>Illuminance Grid</strong> generates a <code>.pts</code> file for `rtrace` and is visualized as spheres. The <strong>View Grid</strong> generates a <code>.ray</code> file for imageless glare analysis (`rcontrib`) and is visualized as arrows indicating view directions.</li>
-                    <li><strong>Viewpoint</strong>: This panel controls the specific camera view used by Radiance for generating renderings (<code>rpict</code>) or glare images (<code>evalglare</code>). It defines the camera's position (<code>-vp</code>), direction (<code>-vd</code>), and view type. You can manipulate this camera with a 3D gizmo or enter a <strong>First-Person View (FPV)</strong> to see exactly what Radiance will render.</li>
-                    <li><strong>Scene Elements</strong>: Add and manage non-architectural objects in the scene. Includes an <strong>Interior Furniture Library</strong> (drag-and-drop), <strong>Context & Site Modeling</strong> tools (Simple Massing, Topography Import, OpenStreetMaps Integration).</li>
-                </ul>
+            <h4 class="font-semibold text-sm uppercase text-[--text-secondary] mt-4">Google Gemini API Key 🔑</h4>
+            <p class="mb-4">You can get a free API key for the Gemini family of models from <a href="https://aistudio.google.com/prompts/new_chat" target="_blank" class="text-[--text-secondary] underline">Google AI Studio</a>.</p>
+            <ol class="list-decimal list-inside space-y-1 my-2 ml-4">
+                <li>Go to the Google AI Studio website.</li>
+                <li>Sign in with your Google account.</li>
+                <li>Click the "<code>Get API key</code>" button, usually located in the top-left or top-right corner of the page.</li>
+                <li>A dialog will appear. Click "<code>Create API key</code>".</li>
+                <li>Your new API key will be generated and displayed.</li>
+                <li>Copy this key and paste it into the API Key field in the Ray Modeler AI settings.</li>
+            </ol>
+            <p class="text-xs text-[--text-secondary]"><em>Note: The Gemini API has a free tier with usage limits. Be sure to review Google's current pricing and terms of service.</em></p>
 
-                <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Simulation Modules (Recipes)</h3>
-                <p>Each recipe automates a specific Radiance workflow by generating scripts that call core commands. Global simulation parameters (<code>-ab</code>, <code>-ad</code>) can be set once and overridden per recipe.</p>
-                <ul class="list-disc list-inside space-y-1 my-4">
-                    <li><strong>Global Simulation Parameters</strong>: Sets default Radiance parameters inherited by all recipes.</li>
-                    <li><strong>Illuminance Map</strong>: A point-in-time calculation for sensor grid illuminance.</li>
-                    <li><strong>Photorealistic Rendering</strong>: Creates an HDR image from the Viewpoint.</li>
-                    <li><strong>Daylight Glare Probability (DGP)</strong>: Renders a 180° fisheye image and analyzes it for glare.</li>
-                    <li><strong>Daylight Factor (DF)</strong>: Calculates internal/external illuminance ratio under a CIE overcast sky.</li>
-                    <li><strong>Annual Daylight (3-Phase & 5-Phase)</strong>: Generates scripts for advanced matrix-based annual simulations.</li>
-                    <li><strong>Imageless Annual Glare</strong>: Uses <code>rcontrib</code> and <code>dcglare</code> for an 8760-hour DGP profile.</li>
-                    <li><strong>Spectral Analysis (Lark)</strong>: Implements the Lark methodology for multi-channel spectral simulations.</li>
-                    <li><strong>Compliance Recipes</strong>: Specialized recipes for <code>IES LM-83 (sDA/ASE)</code>, <code>EN 17037</code>, and <code>EN 12464-1</code>.</li>
-                    <li><strong>Lighting Energy Analysis</strong>: Runs an annual simulation with daylighting controls to estimate energy use.</li>
-                    <li><strong>Façade Irradiation Analysis</strong>: Calculates total annual solar irradiation on an exterior façade.</li>
-                    <li><strong>Annual Solar Radiation Maps</strong>: Calculates cumulative solar radiation on interior surfaces.</li>
-                </ul>
+            <h4 class="font-semibold text-sm uppercase text-[--text-secondary] mt-4">OpenRouter API Key 🔑</h4>
+            <p class="mb-4">OpenRouter provides access to a wide variety of models from different providers through a single API.</p>
+            <ol class="list-decimal list-inside space-y-1 my-2 ml-4">
+                <li>Go to the <a href="https://openrouter.ai/" target="_blank" class="text-[--text-secondary] underline">OpenRouter.ai</a> website and log in.</li>
+                <li>Click on your account icon in the top-right corner and select "<code>Keys</code>" from the dropdown menu.</li>
+                <li>Click the "<code>+ Create Key</code>" button. Give your key a name (e.g., "RayModeler") and click "<code>Create</code>".Your new API key will be generated.</li>
+                <li>Copy this key and paste it into the API Key field in the Ray Modeler AI settings.</li>
+            </ol>
+            <p class="text-xs text-[--text-secondary]"><em>Note: OpenRouter is a paid service. You will need to add credits to your account to use most models. To use some of the free models, you may need to adjust your privacy settings to allow your data to be used for model improvement.</em></p>
 
-                <h2><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>Analysis 📊</h2>
-                <p>The Analysis Sidebar uses a background Web Worker to parse various Radiance result files without freezing the interface. The application automatically detects the file type and enables the relevant visualization tools.</p>
-                <ul class="list-disc list-inside space-y-1 my-4">
-                    <li><strong>3D Visualization</strong>: Illuminance data is mapped as a false-color grid onto the 3D model, with a customizable color scale and support for comparing two datasets.</li>
-                    <li><strong>Annual Metrics Dashboard</strong>: For annual <code>.ill</code> files, this dashboard visualizes key metrics like sDA, ASE, and UDI.</li>
-                    <li><strong>Climate Analysis Dashboard</strong>: When an EPW file is loaded, this dashboard provides interactive visualizations of the climate data.</li>
-                    <li><strong>Temporal Map</strong>: After loading annual results, clicking on any sensor point generates a 24x365 heatmap for that specific point.</li>
-                    <li><strong>Glare Rose Diagram</strong>: For annual <code>.dgp</code> files, this generates a polar chart showing glare frequency by sun position.</li>
-                    <li><strong>Combined Daylight vs. Glare Plot</strong>: A scatter plot showing the trade-off between useful daylight and glare hours for each sensor.</li>
-                    <li><strong>HDR Viewer</strong>: Loads <code>.hdr</code> images with exposure controls, false-color mode, and a luminance probe.</li>
-                    <li><strong>Advanced Circadian Health Dashboard</strong>: Visualizes metrics like CS, EML, and checks for WELL compliance.</li>
-                    <li><strong>Automated Report Generation</strong>: Compiles all project information, metrics, and charts into a single HTML report.</li>
-                </ul>
-                <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Desktop Integration (Electron)</h3>
-                <p>Ray Modeler operates as an Electron-based desktop application, enabling direct interaction with your file system.</p>
-                <ul class="list-disc list-inside space-y-1 my-4">
-                    <li><strong>Standardized Project Folder</strong>: When you save a project, the application creates a complete, organized folder structure on your local machine.</li>
-                    <li><strong>Simulation Console</strong>: A built-in console window appears when you run a simulation, showing the live output from the Radiance processes and reporting the final exit code (success or failure).</li>
-                </ul>
-            </div> 
+            <h4 class="font-semibold text-sm uppercase text-[--text-secondary] mt-4">OpenAI API Key 🔑</h4>
+            <ol class="list-decimal list-inside space-y-1 my-2 ml-4">
+                <li>Go to the <a href="https://platform.openai.com/api-keys" target="_blank" class="text-[--text-secondary] underline">OpenAI API keys</a> page and log in.</li>
+                <li>Click the "<code>+ Create new secret key</code>" button.</li>
+                <li>Give your key a name (e.g., "RayModeler") and click "<code>Create secret key</code>".</li>
+                <li>Copy the generated key immediately and paste it into the API Key field in the Ray Modeler AI settings. You will not be able to view it again.</li>
+            </ol>
+
+            <h4 class="font-semibold text-sm uppercase text-[--text-secondary] mt-4">Anthropic API Key 🔑</h4>
+            <ol class="list-decimal list-inside space-y-1 my-2 ml-4">
+                <li>Go to the <a href="https://console.anthropic.com/" target="_blank" class="text-[--text-secondary] underline">Anthropic Console</a> and log in.</li>
+                <li>Navigate to the "API Keys" section in your account settings.</li>
+                <li>Click the "<code>Create Key</code>" button.</li>
+                <li>Give the key a name and click "<code>Create Key</code>".</li>
+                <li>Copy the key and paste it into the API Key field in the Ray Modeler AI settings.</li>
+            </ol>
+            <p class="info-box my-4"><strong>Important</strong>: Treat your API keys like passwords. Do not share them publicly or commit them to version control.</p>
+
+            <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 6.75C6.75 5.64543 7.64543 4.75 8.75 4.75H15.25C16.3546 4.75 17.25 5.64543 17.25 6.75V19.25L12 14.75L6.75 19.25V6.75Z" /></svg>UI Walkthrough 💻</h2>
+            <p class="mb-4">The interface is designed around a logical workflow, guiding the user from setup to analysis.</p>
+            <img src="./Pictures/main_ui.png" alt="Ray Modeler Main UI" class="w-full rounded-md my-4 border border-[--grid-color]">
+            <img src="./Pictures/main_ui_quad.png" alt="Ray Modeler Main UI in Quad View" class="w-full rounded-md my-4 border border-[--grid-color]">
+            <img src="./Pictures/panels_ui.png" alt="Ray Modeler Panels" class="w-full rounded-md my-4 border border-[--grid-color]">
+            <ul class="list-disc list-inside space-y-1 my-4">
+                <li><strong>3D Viewport (Center)</strong>: This is the main interactive area where your 3D scene is displayed. You can navigate using standard orbit controls (mouse drag, scroll). The viewport can also be split into a <strong>Quad View</strong> layout, showing synchronized Perspective, Top, Front, and Side cameras for comprehensive spatial awareness.</li>
+                <li><strong>Left Toolbar</strong>: This is the primary command center for building your scene. It contains buttons to open floating panels for defining all aspects of the physical model, from <strong>Project Setup</strong> and <strong>Dimensions</strong> to <strong>Simulation</strong> and <strong>Analysis</strong> modules.</li>
+                <li><strong>Top View Controls</strong>: A quick-access toolbar to instantly switch between standard orthographic (Top, Front, etc.) and perspective camera views. It also includes the button to toggle the <strong>Quad View</strong> layout.</li>
+                <li><strong>Bottom Toolbar (Bottom-Left)</strong>: Provides quick access to global actions like saving/loading project files, viewing application information and keyboard shortcuts, and launching the AI Assistant.</li>
+                <li><strong>Floating Panels</strong>: All scene definition, simulation, and analysis tools open as independent floating windows. These panels can be dragged, resized, collapsed, and arranged anywhere on the screen, allowing you to create a workspace tailored to your needs.</li>
+                <li><strong>AI Assistant Sidebar (Right)</strong>: A dedicated, resizable sidebar that houses the conversational AI Assistant. This keeps the AI's powerful capabilities accessible without cluttering your modeling and analysis workflow.</li>
+            </ul>
+
+            <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>In-Depth Feature Guide 📖</h2>
+
+            <h3><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9 6V6.75a.75.75 0 00-.75-.75H7.5a.75.75 0 00-.75.75v10.5a.75.75 0 00.75.75h9.75a.75.75 0 00.75-.75V6.75h-3.75z" /></svg>Scene Definition Panels 📋</h3>
+            <p class="mb-4">The panels on the left toolbar are used to define the scene.</p>
+            <ul class="list-disc list-inside space-y-1 my-4">
+                <li><strong>Project Setup</strong>: This is the starting point for any analysis.
+                    <ul class="list-disc list-inside ml-4">
+                        <li><em>Project Details</em>: Define project name, description, and building type.</li>
+                        <li><em>Radiance Path</em>: Specify the local installation path for the Radiance binaries. The application provides a helpful reminder and defaults based on your OS.</li>
+                        <li><em>Climate & Location</em>: Upload an (<code>.epw</code>) weather file to auto-populate location data or set latitude/longitude manually using an interactive map.</li>
+                        <li><em>Occupancy Schedule</em>: A utility to generate an 8760-hour occupancy schedule file (<code>.csv</code>) based on selected days of the week and occupied hours. This file can be used in annual glare and daylighting control simulations.</li>
+                    </ul>
+                </li>
+                <li><strong>Dimensions</strong>: Set the foundational geometry of the room.
+                    <ul class="list-disc list-inside ml-4">
+                        <li><em>Geometry Mode</em>: Choose between <strong>Parametric</strong> (for the simple box model) or <strong>Imported</strong> (for complex models).</li>
+                        <li><em>Parametric Controls</em>: Set the <strong>Width (X), Length (Z), Height (Y)</strong> and rotate the entire room with the <strong>Orientation</strong> slider.</li>
+                        <li><em>Geometry Importer</em>: Import <code>.obj</code> models. Includes tools for automatic scaling and centering. After import, a <strong>Surface Tagger</strong> UI appears, allowing you to assign Radiance-relevant surface types (wall, floor, glazing, etc.) to each material from the original file.</li>
+                    </ul>
+                </li>
+                <li><strong>Apertures & Shading</strong>: Control openings and shading systems on a per-wall basis.
+                    <ul class="list-disc list-inside ml-4">
+                        <li><em>Wall Selection</em>: Click on a wall in the 3D view to select it for editing. The selection can be locked to prevent accidental changes.</li>
+                        <li><em>Aperture Mode</em>: Define windows using either Window-to-Wall Ratio (WWR) or a Manual mode for precise control over width, height, and sill height.</li>
+                        <li><em>Shading Devices</em>: Each wall can have its own complex shading system, including:
+                            <ul class="list-disc list-inside ml-4">
+                                <li>Overhangs, Light Shelves, Louvers, and Roller Shades with detailed parametric controls.</li>
+                                <li><strong>Imported OBJ</strong>: Import a custom shading device from an <code>.obj</code> file, with in-scene controls for position, rotation, and scale.</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+                <li><em>Interactive Sun Ray Tracer</em>: Integrated directly into the wall selection workflow, this tool allows you to trace a specified number of rays from the sun's position for any date and time. It provides immediate visual feedback on sun penetration and internal reflections.</li>
+                <li><strong>Artificial Lighting</strong>: Add and configure electric light sources.
+                    <ul class="list-disc list-inside ml-4">
+                        <li><em>Light Source Types</em>: Choose from standard Radiance primitives or upload an <code>.ies</code> file.</li>
+                        <li><em>Interactive IES Photometry Viewer</em>: When an <code>.ies</code> file is loaded, the application generates an interactive 2D polar plot and a <strong>3D Photometric Web</strong> to visualize the luminaire's distribution. Key data like total lumens, wattage, and efficacy are also displayed.</li>
+                        <li><em>Daylighting Controls</em>: Define up to two photosensors with 3D position and direction vectors to create distinct control zones.</li>
+                        <li><em>Interactive Control Zone Visualization</em>: A "Visualize Control Zones" toggle color-codes the 3D luminaire gizmos based on their assigned sensor, providing immediate feedback on the daylighting strategy.</li>
+                    </ul>
+                </li>
+                <li><strong>Material Properties</strong>: Define the surface characteristics of the room's parametric or imported geometry.</li>
+                <li><strong>Sensor Grid</strong>: Create measurement points for simulations.</li>
+                <li><strong>Viewpoint</strong>: Controls the specific camera view used by Radiance for generating renderings.
+                    <ul class="list-disc list-inside ml-4">
+                        <li><em>FPV Mode</em>: Enter a first-person view to see exactly what Radiance will render.</li>
+                        <li><em>3D Gizmo</em>: A transform gizmo allows you to visually manipulate the camera's position and rotation.</li>
+                        <li><em>Saved Views ("Snapshots")</em>: A "Save Current View" button captures the camera's state. The UI displays a list of saved views with thumbnails, which can be clicked to instantly restore a perspective.</li>
+                    </ul>
+                </li>
+                <li><strong>Scene Elements</strong>: Add and manage non-architectural objects in the scene.
+                    <ul class="list-disc list-inside ml-4">
+                        <li><em>Interior Furniture Library</em>: A panel with pre-built, low-polygon assets (desks, chairs, partitions) that can be dragged and dropped into the 3D scene.</li>
+                        <li><em>Context & Site Modeling</em>: Tools to model the surrounding environment for more accurate simulations.
+                            <ul class="list-disc list-inside ml-4">
+                                <li><strong>Simple Massing Tools</strong>: Create and place simple 3D shapes (boxes, cylinders) to represent surrounding buildings.</li>
+                                <li><strong>Topography Import</strong>: Generate a ground plane with topography from a grayscale heightmap image.</li>
+                                <li><strong>OpenStreetMaps Integration</strong>: Automatically fetch building footprints and height data for a given location to generate a basic urban context.</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+
+            <h3><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6A2.25 2.25 0 008.25 8.25v3.75a2.25 2.25 0 002.25 2.25h3a2.25 2.25 0 002.25-2.25V8.25a2.25 2.25 0 00-2.25-2.25h-3zM3.75 6A2.25 2.25 0 001.5 8.25v10.5A2.25 2.25 0 003.75 21h10.5A2.25 2.25 0 0016.5 18.75V16.5m-12.75-3h3.75m-3.75 0h3.75m-3.75 0v3.75m0-3.75h3.75M15 12a.75.75 0 01.75-.75h.008a.75.75 0 01.75.75v.008a.75.75 0 01-.75.75h-.008A.75.75 0 0115 12zm2.25 0a.75.75 0 01.75-.75h.008a.75.75 0 01.75.75v.008a.75.75 0 01-.75.75h-.008a.75.75 0 01-.75-.75zM15 15a.75.75 0 01.75-.75h.008a.75.75 0 01.75.75v.008a.75.75 0 01-.75.75h-.008A.75.75 0 0115 15zm2.25 0a.75.75 0 01.75-.75h.008a.75.75 0 01.75.75v.008a.75.75 0 01-.75.75h-.008a.75.75 0 01-.75-.75zM15 18a.75.75 0 01.75-.75h.008a.75.75 0 01.75.75v.008a.75.75 0 01-.75.75h-.008A.75.75 0 0115 18zm2.25 0a.75.75 0 01.75-.75h.008a.75.75 0 01.75.75v.008a.75.75 0 01-.75.75h-.008a.75.75 0 01-.75-.75z" /></svg>Simulation Modules (Recipes) 📜</h3>
+            <p class="mb-4">Each recipe in the Simulation Sidebar automates a specific Radiance workflow by generating scripts that call core commands like <code>oconv</code>, <code>rpict</code>, <code>rcontrib</code>, and <code>evalglare</code>. Global simulation parameters (<code>-ab</code>, <code>-ad</code>) can be set once and overridden per recipe.</p>
+            <ul class="list-disc list-inside space-y-1 my-4">
+                <li><strong>Global Simulation Parameters</strong>: Sets default Radiance parameters (e.g., <code>-ab</code>, <code>-ad</code>, <code>-aa</code>) that are inherited by all other recipes, ensuring consistency.</li>
+                <li><strong>Illuminance Map</strong>: A point-in-time calculation that produces illuminance (lux) values for each point in your sensor grid.</li>
+                <li><strong>Photorealistic Rendering</strong>: Creates a high-dynamic-range (HDR) image from the specified Viewpoint.</li>
+                <li><strong>Daylight Glare Probability (DGP)</strong>: Renders a 180° fisheye image and analyzes it for glare using <code>evalglare</code>.</li>
+                <li><strong>Daylight Factor (DF)</strong>: Calculates the ratio of internal to external illuminance under a standard CIE overcast sky.</li>
+                <li><strong>Annual Daylight (3-Phase & 5-Phase)</strong>: Generates scripts for advanced annual simulations using matrix-based methods.</li>
+                <li><strong>Imageless Annual Glare</strong>: An advanced recipe using <code>rcontrib</code> and <code>dcglare</code> to efficiently calculate an 8760-hour DGP profile.</li>
+                <li><strong>Spectral Analysis (Lark)</strong>: Implements the Lark methodology for multi-channel spectral simulations to calculate non-visual lighting metrics.</li>
+                <li><strong>Compliance Recipes</strong>: A suite of specialized recipes for checking compliance with major industry standards:
+                    <ul class="list-disc list-inside ml-4">
+                        <li><code>IES LM-83 (sDA/ASE)</code></li>
+                        <li><code>EN 17037 (Daylight in Buildings)</code></li>
+                        <li><code>EN 12464-1 (Illuminance & UGR for Work Places)</code></li>
+                    </ul>
+                </li>
+                <li><strong>Lighting Energy Analysis</strong>: Runs an annual simulation with daylighting controls to estimate energy consumption (kWh/year) and savings.</li>
+                <li><strong>Façade Irradiation Analysis</strong>: A recipe to calculate the total annual solar irradiation (in kWh/m²/year) on an exterior façade, essential for envelope design and assessing potential for building-integrated photovoltaics (BIPV).</li>
+                <li><strong>Annual Solar Radiation Maps</strong>: An annual simulation that calculates the cumulative solar radiation on interior surfaces, visualized as a heatmap. This is critical for understanding passive solar heating potential and predicting long-term material degradation.</li>
+            </ul>
+
+            <h2><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>Analysis Modules 📊</h2>
+            <p class="mb-4">The Analysis Sidebar uses a background Web Worker to parse various Radiance result files without freezing the interface. The application automatically detects the file type and enables the relevant visualization tools.</p>
+            <ul class="list-disc list-inside space-y-1 my-4">
+                <li><strong>3D Visualization</strong>: Illuminance data is mapped as a false-color grid onto the 3D model, with a customizable color scale and support for comparing two datasets.</li>
+                <li><strong>Annual Metrics Dashboard</strong>: For annual <code>.ill</code> files, this dashboard visualizes key metrics like Spatial Daylight Autonomy (sDA), Annual Sunlight Exposure (ASE), and Useful Daylight Illuminance (UDI).</li>
+                <li><strong>Climate Analysis Dashboard</strong>: When an EPW file is loaded, this dashboard provides interactive visualizations of the climate data, including a Wind Rose, Solar Radiation chart, and Annual Temperature chart.</li>
+                <li><strong>Temporal Map</strong>: After loading annual results, clicking on any sensor point in the 3D view generates a 24x365 heatmap showing the hour-by-hour illuminance profile for that specific point.</li>
+                <li><strong>Glare Rose Diagram</strong>: For annual <code>.dgp</code> files, this generates a polar chart showing the number of occupied hours that exceed a DGP threshold, organized by the sun's position.</li>
+                <li><strong>Combined Daylight vs. Glare Plot</strong>: When both annual illuminance and glare files are loaded, this scatter plot is available. Each point represents a sensor, plotting its percentage of useful daylight hours against its percentage of glare hours.</li>
+                <li><strong>HDR Viewer</strong>: Loads and displays rendered <code>.hdr</code> images with exposure controls, a false-color luminance mode, and a mouse-over probe to get exact cd/m² values.</li>
+                <li><strong>Advanced Circadian Health Dashboard</strong>: Visualizes results from spectral simulations, including key metrics like Circadian Stimulus (CS), Equivalent Melanopic Lux (EML), and checks for compliance with WELL building standards.</li>
+                <li><strong>Automated Report Generation</strong>: A "Generate Report" button compiles all project information, a 3D snapshot, key metrics, and all dashboard charts into a single, self-contained HTML file for printing or saving as a PDF.</li>
+            </ul>
+
+            <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Desktop Integration (Electron)</h3>
+            <p class="mb-4">Ray Modeler operates as an Electron-based desktop application, enabling direct interaction with your file system.</p>
+            <ul class="list-disc list-inside space-y-1 my-4">
+                <li><strong>Standardized Project Folder</strong>: When you save a project, the application creates a complete, organized folder structure on your local machine.</li>
+                <li><strong>Simulation Console</strong>: A built-in console window appears when you run a simulation, showing the live output from the Radiance processes and reporting the final exit code (success or failure).</li>
+            </ul>
+
+            <h2><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.15 20.898A2.577 2.577 0 0021.487 18.07m-8.632-8.632l-5.17-5.17m-1.745 6.917c-.36 0-.69-.14-.94-.39l-2.06-2.06c-.25-.25-.39-.58-.39-.94s.14-.69.39-.94l2.06-2.06c.25-.25.58-.39.94-.39s.69.14.94.39l2.06 2.06c.25.25.39.58.39.94s-.14.69-.39.94l-2.06 2.06c-.25.25-.58.39-.94.39zM17.657 8.343l-5.17-5.17m5.17 5.17l5.17 5.17M12 12c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm0 0l-5.17-5.17m5.17 5.17l5.17 5.17" /></svg>For Developers: Building from Source 🛠️</h2>
+            <p class="mb-4">You can run the application in a local development environment or build a distributable, single-click installer for macOS and Windows using <code>electron-builder</code>.</p>
+            
+            <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Prerequisites</h3>
+            <p class="mb-4">Before you begin, ensure you have the following installed on your system:</p>
+            <ul class="list-disc list-inside space-y-1 my-4">
+                <li><strong>Node.js and npm</strong>: <a href="https://nodejs.org/en" target="_blank" class="text-[--text-secondary] underline">Download & Install Node.js</a> (npm is included).</li>
+                <li><strong>Git</strong>: <a href="https://git-scm.com/" target="_blank" class="text-[--text-secondary] underline">Download & Install Git</a>.</li>
+            </ul>
+
+            <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Setup and Development</h3>
+            <h4 class="font-semibold text-sm uppercase text-[--text-secondary] mt-4">1. Clone the Repository and Install Dependencies</h4>
+            <pre class="bg-[--color-base-900] text-gray-200 p-4 rounded-md my-4 overflow-x-auto"><code class="language-bash"># Clone the repository
+git clone [https://github.com/your-username/ray-modeler.git](https://github.com/your-username/ray-modeler.git)
+
+# Navigate into the project directory
+cd ray-modeler
+
+# Install the necessary npm packages
+npm install
+
+# Update the npm packages
+npm update</code></pre>
+
+            <h4 class="font-semibold text-sm uppercase text-[--text-secondary] mt-4">2. Run the App in Development Mode</h4>
+            <p class="mb-4">To run the full Electron application with all features (including file system access and simulation execution), use the start script:</p>
+            <pre class="bg-[--color-base-900] text-gray-200 p-4 rounded-md my-4 overflow-x-auto"><code class="language-bash">npm start</code></pre>
+            <p class="mb-4">This will launch the application in a development window with access to developer tools.</p>
+
+            <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Building for Distribution</h3>
+            <p class="mb-4">The following commands use <code>electron-builder</code> to package the application into a distributable format. The final installer/application files will be located in the <code>dist/</code> directory.</p>
+            
+            <h4 class="font-semibold text-sm uppercase text-[--text-secondary] mt-4">Build for macOS 🍎</h4>
+            <p class="mb-4">This command bundles the application into a standard <code>.dmg</code> disk image for macOS.</p>
+            <pre class="bg-[--color-base-900] text-gray-200 p-4 rounded-md my-4 overflow-x-auto"><code class="language-bash">npm run build:mac</code></pre>
+            
+            <h4 class="font-semibold text-sm uppercase text-[--text-secondary] mt-4">Build for Windows 💻 (from any platform)</h4>
+            <p class="mb-4">This command creates NSIS installers (<code>.exe</code>) for both <strong>x64</strong> and <strong>arm64</strong> Windows architectures.</p>
+            <p class="mb-4"><strong>Prerequisite for macOS/Linux users</strong>: To build a Windows app on a non-Windows machine, you must have <a href="https://www.winehq.org/" target="_blank" class="text-[--text-secondary] underline">Wine</a> installed. You can install it easily with Homebrew:</p>
+            <pre class="bg-[--color-base-900] text-gray-200 p-4 rounded-md my-4 overflow-x-auto"><code class="language-bash">brew install --cask wine-stable</code></pre>
+            <p class="mb-4">Once Wine is installed, run the build script:</p>
+            <pre class="bg-[--color-base-900] text-gray-200 p-4 rounded-md my-4 overflow-x-auto"><code class="language-bash">npm run build:win</code></pre>
+            <p class="mb-4">This will generate two installers in the dist/ folder, for example: Ray Modeler Setup 1.1.0-x64.exe and Ray Modeler Setup 1.1.0-arm64.exe.</p>
+
+            <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.5 21.75l-.398-1.178a3.375 3.375 0 00-2.456-2.456L12.5 18l1.178-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 002.456 2.456L20.5 18l-1.178.398a3.375 3.375 0 00-2.456 2.456z" /></svg>Cross-Platform Building</h3>
+            <p class="mb-4">While it's recommended to build for a specific platform on that platform (e.g., build for Windows on a Windows machine), <code>electron-builder</code> supports cross-platform compilation with some setup:</p>
+            <ul class="list-disc list-inside space-y-1 my-4">
+                <li><strong>Building for Windows on macOS/Linux</strong>: Requires installing <strong>Wine</strong>.</li>
+                <li><strong>Building for macOS on Windows/Linux</strong>: Requires a macOS machine for code signing, so it's not practically feasible.</li>
+                <li><strong>Building for Linux on macOS/Windows</strong>: Can be done directly.</li>
+            </ul>
+            <p class="mb-4">For detailed instructions on cross-platform builds, please refer to the <a href="https://www.electron.build/multi-platform-build" target="_blank" class="text-[--text-secondary] underline">electron-builder documentation</a>.</p>
+
+            <h2><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.15 20.898A2.577 2.577 0 0021.487 18.07m-8.632-8.632l-5.17-5.17m-1.745 6.917c-.36 0-.69-.14-.94-.39l-2.06-2.06c-.25-.25-.39-.58-.39-.94s.14-.69.39-.94l2.06-2.06c.25-.25.58-.39.94-.39s.69.14.94.39l2.06 2.06c.25.25.39.58.39.94s-.14.69-.39.94l-2.06 2.06c-.25.25-.58.39-.94.39zM17.657 8.343l-5.17-5.17m5.17 5.17l5.17 5.17M12 12c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm0 0l-5.17-5.17m5.17 5.17l5.17 5.17" /></svg>Technology Stack 🛠️</h2>
+            <ul class="list-disc list-inside space-y-1 my-4">
+                <li><strong>3D Rendering</strong>: <a href="https://threejs.org/" target="_blank" class="text-[--text-secondary] underline">Three.js</a></li>
+                <li><strong>Lighting Simulation Engine</strong>: <a href="https://www.radiance-online.org/" target="_blank" class="text-[--text-secondary] underline">Radiance</a></li>
+                <li><strong>Data Visualization</strong>: <a href="https://www.chartjs.org/" target="_blank" class="text-[--text-secondary] underline">Chart.js</a></li>
+                <li><strong>Mapping</strong>: <a href="https://leafletjs.com/" target="_blank" class="text-[--text-secondary] underline">Leaflet</a></li>
+                <li><strong>UI Framework</strong>: <a href="http://vanilla-js.com/" target="_blank" class="text-[--text-secondary] underline">Vanilla JS</a>, HTML5, <a href="https://tailwindcss.com/" target="_blank" class="text-[--text-secondary] underline">CSS3 with TailwindCSS utilities</a></li>
+                <li><strong>Desktop App</strong>: <a href="https://www.electronjs.org/" target="_blank" class="text-[--text-secondary] underline">Electron</a> (optional, for direct script execution)</li>
+            </ul>
+
+            <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>License 📄</h2>
+            <p class="mb-4">This project is licensed under the <a href="https://opensource.org/license/mit" target="_blank" class="text-[--text-secondary] underline">MIT</a> License - also see the LICENSE file for details.</p>
+        </div>
             <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
             </div> <div id="simulation-console-panel" class="floating-window ui-panel hidden" style="width: 700px; height: 450px;">
               <div class="window-header">
@@ -2528,16 +2660,11 @@
             </div>
         </div>
         <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div>
-        
-        
-        
-        
-        
-        
-        <div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
-</div>
 
- <div id="panel-simulation-modules" class="floating-window ui-panel hidden">
+        <div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+        </div>
+
+        <div id="panel-simulation-modules" class="floating-window ui-panel hidden">
           <div class="window-header">
               <span>Simulation</span>
               <div class="window-controls">
@@ -2982,11 +3109,16 @@
                     </div>
                     <div class="mt-2 aspect-square bg-[--grid-color] rounded overflow-hidden">
                         <canvas id="heatmap-canvas" class="w-full h-full"></canvas>
-                    </div>
                 </div>
-                </div>
+            </div>
 
-                <div id="annual-time-series-explorer" class="hidden space-y-5 pt-4 border-t border-dashed border-[--grid-color]">
+            <div class="param-section pt-4 border-t border-dashed border-[--grid-color]">
+                <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Point Annual Profile (<span id="annual-profile-point-id">select point</span>)</h4>
+                <p class="info-box !text-xs !py-2 !px-3">Right-click a sensor point in the 3D view and select "Show Annual Profile" to populate this chart.</p>
+                <div class="mt-2 h-64 relative"><canvas id="point-annual-profile-chart"></canvas></div>
+            </div>
+
+            <div id="annual-time-series-explorer" class="hidden space-y-5 pt-4 border-t border-dashed border-[--grid-color]">
                     <h4 class="font-semibold text-xs uppercase text-[--text-secondary]">Time-Series Explorer</h4>
                     <div class="pt-2">
                         <h5 class="font-semibold text-sm text-center">Space-Averaged Illuminance</h5>
@@ -3029,6 +3161,7 @@
 
   <div id="sensor-context-menu" class="hidden absolute z-[1000] ui-panel !p-1">
      <button id="set-viewpoint-here-btn" class="btn btn-secondary !py-2 !px-4 !text-sm">Set Viewpoint Here</button>
+     <button id="show-annual-profile-btn" class="btn btn-secondary !py-2 !px-4 !text-sm mt-1 hidden">Show Annual Profile</button>
   </div>
 
   <div id="data-table-panel" class="floating-window ui-panel hidden" style="width: 400px; height: 500px;">

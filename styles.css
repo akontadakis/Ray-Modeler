@@ -2163,6 +2163,11 @@ body.left-sidebar-docked #bottom-left-controls { /* Keep bottom-left moving only
     opacity: 1; /* Always show fully when docked */
 }
 
+/* Add base transition for smooth docking/undocking */
+#view-controls {
+    transition: top 0.3s ease-in-out, opacity 0.3s ease-in-out;
+}
+
 /* --- Top Sidebar Docking --- */
 
 #view-controls.docked {
@@ -2170,13 +2175,14 @@ body.left-sidebar-docked #bottom-left-controls { /* Keep bottom-left moving only
     top: 0;
     left: 0; /* Default: starts at left edge */
     width: 100%; /* Default: spans full width */
-    transform: none !important;
+    transform: none; /* REMOVED !important */
     z-index: 100;
     padding: 0.5rem 1rem;
     background-color: var(--docked-panel-bg);
     border-radius: 0;
     justify-content: center;
-    transition: width 0.4s ease-in-out, left 0.4s ease-in-out; /* Match AI sidebar transition */
+    /* REMOVED transition property to prevent horizontal sliding. */
+    /* The base #view-controls rule now handles the vertical 'top' transition. */
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     cursor: default !important;

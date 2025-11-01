@@ -143,6 +143,7 @@ const ids = [
     'stats-uniformity-val', 'highlight-min-btn', 'highlight-max-btn', 'clear-highlights-btn', 'heatmap-canvas',
     'heatmap-controls-container', 'heatmap-mode-selector', 'da-threshold-controls', 'da-threshold-slider', 'da-threshold-val',
     'illuminance-histogram', 'interactive-legend', 'legend-min-val', 'legend-max-val', 'scale-min-input', 'scale-max-input', 'scale-min-input-num', 'scale-max-input-num',
+    'point-annual-profile-chart', 'annual-profile-point-id',
 
     // Annual Dashboards
     'annual-metrics-dashboard', 'sda-gauge', 'ase-gauge', 'udi-chart', 'sda-value', 'ase-value',
@@ -154,16 +155,17 @@ const ids = [
     'temporal-map-panel', 'temporal-map-point-id', 'temporal-map-canvas',
     'climate-analysis-controls', 'climate-dashboard-btn', 'climate-analysis-panel', 'wind-rose-canvas', 'solar-radiation-canvas', 'temperature-chart-canvas', 'humidity-chart-canvas', 'sun-path-canvas',
     'lighting-energy-dashboard', 'lpd-val', 'energy-val', 'energy-savings-val', 'lpd-gauge', 'energy-gauge', 'energy-savings-gauge',
-    'circadian-metrics-dashboard', 'cs-gauge', 'cs-value', 'eml-value', 'cct-value', 'well-compliance-checklist',
-    'spectral-metrics-dashboard', 'metric-photopic-val', 'metric-melanopic-val', 'metric-neuropic-val',
-    'metric-selector-container', 'metric-selector',
+    'circadian-metrics-dashboard', 'cs-gauge', 'cs-value', 'eml-value', 'cct-value', 'well-compliance-checklist', 'spectral-metrics-dashboard', 'metric-photopic-val', 
+    'metric-melanopic-val', 'metric-neuropic-val', 'metric-selector-container', 
+    'metric-selector',
 
     // Other
-    'sensor-context-menu', 'set-viewpoint-here-btn', 'wall-select-lock-btn', 'lock-icon-unlocked', 'lock-icon-locked', 'selected-wall-display',
-    'sun-ray-trace-section', 'sun-ray-date', 'sun-ray-time', 'sun-ray-count', 'sun-ray-count-val', 'sun-ray-bounces', 'sun-ray-bounces-val', 'sun-rays-visibility-toggle', 'trace-sun-rays-btn',
-    'sun-ray-info-display', 'sun-altitude-val', 'sun-azimuth-val', 'sun-dni-val', 'sun-dhi-val',
-    'save-view-btn', 'saved-views-list', 'recipe-guides-btn', 'panel-recipe-guides', 'guide-selector', 'guide-content',
-    'custom-asset-importer',
+    'sensor-context-menu', 'set-viewpoint-here-btn', 'show-annual-profile-btn', 'wall-select-lock-btn', 'lock-icon-unlocked', 'lock-icon-locked', 'selected-wall-display', 'sun-ray-trace-section', 'sun-ray-date', 'sun-ray-time', 
+    'sun-ray-count', 'sun-ray-count-val', 'sun-ray-bounces', 'sun-ray-bounces-val', 
+    'sun-rays-visibility-toggle', 'trace-sun-rays-btn', 'sun-ray-info-display', 
+    'sun-altitude-val', 'sun-azimuth-val', 'sun-dni-val', 'sun-dhi-val',
+    'save-view-btn', 'saved-views-list', 'recipe-guides-btn', 'panel-recipe-guides', 
+    'guide-selector', 'guide-content', 'custom-asset-importer',
 
     // Lighting Panel
     'lighting-enabled-toggle', 'lighting-controls-wrapper', 'light-type-selector', 'light-geometry-section',
@@ -240,6 +242,7 @@ ids.forEach(id => {
             `roller-ir-trans-${dir}`, `roller-ir-trans-${dir}-val`,
             `roller-thickness-${dir}`, `roller-thickness-${dir}-val`,
             `roller-conductivity-${dir}`, `roller-conductivity-${dir}-val`,
+            `sun-ray-tracing-toggle-${dir}`,
             `solar-params-${dir}`, `solar-quality-${dir}`, `solar-threshold-${dir}`, `solar-threshold-val-${dir}`,
             `solar-epw-file-${dir}`, `solar-analyze-btn-${dir}`, `solar-progress-${dir}`, `solar-progress-fill-${dir}`,
             `solar-progress-text-${dir}`, `solar-results-${dir}`, `solar-high-hours-${dir}`, `solar-peak-alt-${dir}`,

@@ -748,7 +748,8 @@ class Project {
             return null; // No sensors to write
         }
 
-        const { dom } = await import('./ui.js');
+        const { getDom } = await import('./ui.js');
+        const dom = getDom();
         const W = parseFloat(dom.width.value);
         const L = parseFloat(dom.length.value);
         const rotationY = parseFloat(dom['room-orientation'].value);
@@ -869,7 +870,8 @@ class Project {
             await this.applySettings(settings, showAlert);
 
             // Hide the initial prompt since a directory is now successfully loaded.
-            const { dom } = await import('./ui.js');
+            const { getDom } = await import('./ui.js');
+            const dom = getDom();
             dom['project-access-prompt']?.classList.add('hidden');
 
         } catch (error) {
