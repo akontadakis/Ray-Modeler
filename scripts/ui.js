@@ -859,7 +859,10 @@ function setupTaskAreaVisualizer() {
 
 // --- END: New functions for Task Area Visualizer ---
 
-export async function setupEventListeners() {
+/**
+ * Sets up event listeners for the Helios/AI Assistant panel.
+ */
+function setupHeliosPanel() {
     const dom = getDom();
 
     // Helios Mode Toggle
@@ -895,6 +898,11 @@ export async function setupEventListeners() {
         const clickedTab = e.target.closest('.ai-chat-tab');
         if (!clickedTab) return;
 
+        // --- FIX: Defer to ai-assistant.js for optimization tab logic ---
+        if (clickedTab.id === 'helios-optimization-tab-btn') {
+            return; 
+        }
+
         const tabId = clickedTab.dataset.tab;
         const allTabs = dom['ai-chat-tabs'].querySelectorAll('.ai-chat-tab');
         const allContent = dom['helios-panel-content'].querySelectorAll('.ai-chat-content');
@@ -908,6 +916,12 @@ export async function setupEventListeners() {
             activeContent.classList.remove('hidden');
         }
     });
+}
+
+export async function setupEventListeners() {
+    const dom = getDom();
+
+    setupHeliosPanel();
 
     // Global listener for all keyboard shortcuts
     window.addEventListener('keydown', handleKeyDown);
@@ -967,6 +981,7 @@ export async function setupEventListeners() {
     dom['epw-modal-close']?.addEventListener('click', () => dom['epw-upload-modal'].classList.replace('flex', 'hidden'));
 
     setupPanelToggleButtons();
+    setupHeliosPanel();
     dom['view-btn-persp']?.addEventListener('click', () => setCameraView('persp'));
     dom['view-btn-ortho']?.addEventListener('click', () => setCameraView('ortho'));
     dom['view-btn-top']?.addEventListener('click', () => setCameraView('top'));
@@ -1643,13 +1658,13 @@ setupRecipeGuidesPanel();
 
 promptForProjectDirectory();
 
-// Defer initial state settings until the 3D scene is fully initialized.
+    // Defer initial state settings until the 3D scene is fully initialized.
 dom['render-container'].addEventListener('sceneReady', () => {
         // Set the camera helper's visibility based on the default checkbox state.
         setGizmoVisibility(dom['gizmo-toggle'].checked);
         }, { once: true }); // The event should only fire once.
 
-        // --- Electron-Specific Listeners ---
+// --- Electron-Specific Listeners ---
         // Listen for the 'run-simulation-button' which is dynamically created
         document.body.addEventListener('click', async (event) => {
         const button = event.target.closest('[data-action="run"]');
@@ -1755,6 +1770,30 @@ dom['view-bsdf-btn']?.addEventListener('click', openBsdfViewer);
     });
 
 } // End of setupEventListeners
+
+/**
+* Programmatically sets the value of a UI element and dispatches events.
+* @param {string} id - The base ID of the element (e.g., 'overhang-depth-s').
+* @param {string|number|boolean} value - The new value to set.
+*/
+export function setUiValue(id, value) {
+    const element = dom[id] || document.getElementById(id);
+    if (!element) {
+        console.warn(`[setUiValue] Element '${id}' not found`);
+        return false;
+    }
+
+    if (element.type === 'checkbox') {
+        element.checked = !!value;
+    } else {
+        element.value = value;
+    }
+    
+    // Dispatch events to ensure labels and other listeners update
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+}
 
 // --- UI LOGIC & EVENT HANDLERS ---
 

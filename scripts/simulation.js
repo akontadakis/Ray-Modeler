@@ -161,6 +161,20 @@ export function recreateSimulationPanels(simSettings, loadedFiles, ui) {
  * @returns {HTMLElement|null} The panel element if found, otherwise null.
  */
 export async function openRecipePanelByType(templateId) {
+    // Handle recipe templates that now use dropdown selection
+    if (templateId.startsWith('template-recipe-')) {
+        const recipeSelector = document.getElementById('recipe-selector');
+        if (recipeSelector) {
+            recipeSelector.value = templateId;
+            recipeSelector.dispatchEvent(new Event('change', { bubbles: true }));
+            await new Promise(resolve => setTimeout(resolve, 200)); // Wait for container to populate
+            return document.getElementById('recipe-parameters-container');
+        }
+        console.error(`Recipe selector not found for template ${templateId}`);
+        return null;
+    }
+
+    // Handle other templates (like global) with the original button-based logic
     const moduleList = document.getElementById('simulation-module-list');
     const button = moduleList?.querySelector(`[data-template="${templateId}"]`);
 
@@ -204,7 +218,8 @@ export async function openRecipePanelByType(templateId) {
  * @returns {Promise<object|null>} The result from the project's package generation.
  */
 export async function programmaticallyGeneratePackage(panel) {
-    const generateBtn = panel.querySelector('[data-action="generate"]');
+    // Find buttons in panel or globally (for container case)
+    const generateBtn = panel.querySelector('[data-action="generate"]') || document.querySelector('[data-action="generate"]');
     if (!generateBtn) return null;
 
     generateBtn.textContent = 'Generating...';
@@ -214,21 +229,22 @@ export async function programmaticallyGeneratePackage(panel) {
         const result = await project.generateSimulationPackage(panel);
         if (!result) throw new Error("Script generation failed or was aborted.");
 
-        const commandCenter = panel.querySelector('.command-center');
+        // Find command center in panel or globally
+        const commandCenter = panel.querySelector('.command-center') || document.querySelector('.command-center');
         const scriptTextArea = commandCenter?.querySelector('textarea');
 
         if (result.content && scriptTextArea && commandCenter) {
             scriptTextArea.value = result.content;
             commandCenter.classList.remove('hidden');
             showAlert('Simulation package generated successfully!', 'Success');
-            const runBtn = panel.querySelector('[data-action="run"]');
+            const runBtn = panel.querySelector('[data-action="run"]') || document.querySelector('[data-action="run"]');
             if (runBtn) runBtn.disabled = false;
         }
         return result; // Return the generated script info
     } catch (error) {
         console.error('Error generating simulation package:', error);
         showAlert(`Failed to generate simulation package: ${error.message}`, 'Error');
-        const runBtn = panel.querySelector('[data-action="run"]');
+        const runBtn = panel.querySelector('[data-action="run"]') || document.querySelector('[data-action="run"]');
         if (runBtn) runBtn.disabled = true;
         return null;
     } finally {

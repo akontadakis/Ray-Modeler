@@ -3,15 +3,17 @@
 import { loadKnowledgeBase, searchKnowledgeBase } from './knowledgeBase.js';
 import { project } from './project.js';
 import { resultsManager } from './resultsManager.js';
-import { showAlert, getNewZIndex, togglePanelVisibility, highlightSensorPoint, clearSensorHighlights, clearAllResultsDisplay, getSensorGridParams, setCameraView, scheduleUpdate, setShadingState } from './ui.js';
+import { showAlert, getNewZIndex, togglePanelVisibility, highlightSensorPoint, clearSensorHighlights, clearAllResultsDisplay, getSensorGridParams, setCameraView, scheduleUpdate, setShadingState, setUiValue, generateAndStoreOccupancyCsv } from './ui.js';
 import { getDom } from './dom.js';
 import { openGlareRoseDiagram, openCombinedAnalysisPanel } from './annualDashboard.js';
 import { openRecipePanelByType, programmaticallyGeneratePackage } from './simulation.js';
 import { addFurniture, addVegetation, getWallGroupById, highlightWall } from './geometry.js';
 import * as THREE from 'three';
+import { initOptimizationUI } from './optimizationOrchestrator.js';
 
 // Module-level cache for DOM elements
 let dom;
+let chatContainer;
 
 // State management for tabbed conversations
 let conversations = {};
@@ -452,6 +454,52 @@ const availableTools = [
                     },
                     "required": ["enable"]
                 }
+            },
+            {
+                "name": "openOptimizationPanel",
+                "description": "Opens the generative shading optimization panel to set up an optimization study.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "wall": {
+                            "type": "STRING",
+                            "description": "The wall to optimize: 'north', 'south', 'east', or 'west'."
+                        },
+                        "shadingType": {
+                            "type": "STRING",
+                            "description": "The shading device type: 'overhang', 'louver', or 'lightshelf'."
+                        }
+                    }
+                }
+            },
+            {
+                "name": "configureOptimization",
+                "description": "Pre-configures optimization settings in the panel before the user starts the run. Does not start the optimization.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "parameters": {
+                            "type": "OBJECT",
+                            "description": "Parameter names and their min/max ranges, e.g., {\'depth\': [0.5, 2.0], \'tilt\': [0, 30]}"
+                        },
+                        "goal": {
+                            "type": "STRING",
+                            "description": "The optimization goal metric, e.g., 'maximize_sDA' or 'minimize_ASE'"
+                        },
+                        "constraint": {
+                            "type": "STRING",
+                            "description": "Optional constraint, e.g., 'ASE < 10' or '> 300'"
+                        },
+                        "populationSize": {
+                            "type": "NUMBER",
+                            "description": "Number of designs per generation (recommended 4-50)"
+                        },
+                        "generations": {
+                            "type": "NUMBER",
+                            "description": "Number of generations to run (recommended 2-20)"
+                        }
+                    }
+                }
             }
         ]
     }
@@ -555,101 +603,103 @@ const modelsByProvider = {
 Initializes the AI Assistant, setting up all necessary event listeners.
 */
 function initAiAssistant() {
-    dom = getDom(); // Cache the dom object from ui.js
+    dom = getDom();
+    chatContainer = dom['ai-chat-messages']?.parentElement;
 
-    // Exit if the main button doesn't exist in the HTML
-    if (!dom['ai-assistant-button']) {
-    console.warn('AI Assistant button not found, feature disabled.');
-    return;
-    }
-
-    dom['ai-chat-form']?.addEventListener('submit', handleSendMessage);
-    dom['ai-settings-btn']?.addEventListener('click', openSettingsModal);
+    // --- Settings Modal ---
+    dom['ai-settings-btn']?.addEventListener('click', () => {
+        loadSettings(); // Populate modal with saved settings
+        openSettingsModal();
+    });
     dom['ai-settings-close-btn']?.addEventListener('click', closeSettingsModal);
     dom['ai-settings-form']?.addEventListener('submit', saveSettings);
+
+    // Update model options and API key field when provider changes
+    dom['ai-provider-select']?.addEventListener('change', (e) => {
+        const provider = e.target.value;
+        updateModelOptions(provider);
+        toggleProviderInfo(provider);
+        const storageKey = `ai_api_key_${provider}`;
+        if(dom['ai-secret-field']) {
+            dom['ai-secret-field'].value = localStorage.getItem(storageKey) || '';
+        }
+    });
+
+    // --- Info/Capabilities Modal ---
     dom['ai-info-btn']?.addEventListener('click', openCapabilitiesModal);
     dom['helios-capabilities-close-btn']?.addEventListener('click', closeCapabilitiesModal);
-    dom['ai-new-chat-btn']?.addEventListener('click', () => createNewConversation());
 
-    dom['ai-provider-select']?.addEventListener('change', (e) => {
-    const provider = e.target.value;
-    updateModelOptions(provider);
-    toggleProviderInfo(provider);
-    updateApiKeyInput(provider);
+    // --- New Chat Button ---
+    dom['ai-new-chat-btn']?.addEventListener('click', () => {
+        createNewConversation();
     });
 
-    // Add auto-resizing functionality to the chat input
-    dom['ai-chat-input']?.addEventListener('input', () => {
-        const input = dom['ai-chat-input'];
-        input.style.height = 'auto';
-        input.style.height = `${input.scrollHeight}px`;
-    });
+    if (!dom['ai-assistant-button']) {
+        console.warn('AI Assistant button not found, feature disabled.');
+        return;
+    }
 
-    dom['run-inspector-btn']?.addEventListener('click', handleRunInspector);
+    // --- Chat Form Submission ---
+    dom['ai-chat-form']?.addEventListener('submit', handleSendMessage);
+
+    // --- Inspector & Critique Action Buttons ---
     dom['ai-inspector-results']?.addEventListener('click', handleInspectorActionClick);
-
-    dom['run-critique-btn']?.addEventListener('click', handleRunCritique);
     dom['ai-critique-results']?.addEventListener('click', handleCritiqueActionClick);
 
-    // --- START: Generator Tab Logic ---
-    const generatorBtn = dom['helios-mode-generator-btn'];
-    const generatorContent = dom['helios-generator-content'];
-    const chatContent = dom['ai-chat-messages']; // Assuming this is the main chat view
-    const inspectorContent = dom['ai-inspector-results'];
-    const critiqueContent = dom['ai-critique-results'];
-    const chatTabsContainer = dom['ai-chat-tabs'];
+    // --- Event listener for the Optimization tab ---
+    const optTab = dom['helios-optimization-tab-btn'];
+    if (optTab) {
+        optTab.addEventListener('click', (e) => {
+            // Get all tabs
+            const tabs = e.target.parentElement.querySelectorAll('.ai-chat-tab');
+            if (!chatContainer) return;
 
-    if (generatorBtn && generatorContent && chatContent && inspectorContent && critiqueContent && chatTabsContainer) {
-        generatorBtn.addEventListener('click', () => {
-            // Update internal state
-            currentMode = 'generator';
+            // --- FIX: Get all content panels to hide them ---
+            const contents = [
+                dom['ai-chat-messages'],
+                dom['ai-inspector-results'],
+                dom['ai-critique-results'],
+                chatContainer?.querySelector('#helios-optimization-content')
+            ];
 
-            // Update UI visibility
-            generatorContent.classList.remove('hidden');
-            chatContent.classList.add('hidden'); // Hide chat view
-            inspectorContent.classList.add('hidden');
-            critiqueContent.classList.add('hidden');
+            // Deactivate all tabs and hide all content
+            tabs.forEach(t => t.classList.remove('active'));
+            contents.forEach(c => c?.classList.add('hidden'));
 
-            // Update tab active states
-            chatTabsContainer.querySelectorAll('.ai-chat-tab').forEach(tab => tab.classList.remove('active'));
-            generatorBtn.classList.add('active');
+            // Activate this tab
+            optTab.classList.add('active');
+            
+            // Show optimization panel (create it if it doesn't exist)
+            let optPanel = chatContainer?.querySelector('#helios-optimization-content');
+            if (!optPanel) {
+                const template = document.getElementById('template-optimization-panel');
+                if (template) {
+                    const clone = template.content.cloneNode(true);
+                    chatContainer?.appendChild(clone);
+                    optPanel = chatContainer?.querySelector('#helios-optimization-content');
+                }
+            }
+            
+            if (optPanel) {
+                optPanel.classList.remove('hidden');
+            // Initialize UI listeners if this is the first time
+            if (!optPanel.dataset.initialized) {
+                initOptimizationUI(optPanel); // Pass the panel to the function
+                optPanel.dataset.initialized = 'true';
+                }
+            }
 
-            // Hide chat input when generator is active (optional, could be used for specific generator commands later)
-            // dom['ai-chat-form']?.classList.add('hidden');
-
-            // Update placeholder and description for Generator mode
-            updateModeDescription('generator');
+            // Hide the chat input container when optimization tab is active
+            if (dom['ai-chat-input-container']) {
+                dom['ai-chat-input-container'].classList.add('hidden');
+            }
         });
-
-        // Add listener to the default chat tab (assuming it's the first one) to switch back
-        const defaultChatTab = chatTabsContainer.querySelector('.ai-chat-tab:first-child');
-        if (defaultChatTab) {
-            defaultChatTab.addEventListener('click', () => {
-                // This logic assumes switching back to the 'master' mode represented by the first chat tab
-                currentMode = 'master';
-                generatorContent.classList.add('hidden');
-                chatContent.classList.remove('hidden'); // Show chat view
-                inspectorContent.classList.add('hidden');
-                critiqueContent.classList.add('hidden');
-                dom['ai-chat-form']?.classList.remove('hidden'); // Ensure chat form is visible
-
-                chatTabsContainer.querySelectorAll('.ai-chat-tab').forEach(tab => tab.classList.remove('active'));
-                defaultChatTab.classList.add('active');
-
-                updateModeDescription('master');
-            });
-        }
-    } else {
-        console.warn("One or more elements required for Generator tab switching not found.");
     }
-    // --- END: Generator Tab Logic ---
 
-
-    loadSettings();
-    loadKnowledgeBase();
-
-    // Start with a default master mode conversation
-    createNewConversation();
+    // Initialize with first conversation if none exist
+    if (Object.keys(conversations).length === 0) {
+        createNewConversation('Chat 1');
+    }
 }
 
 // --- START: Tabbed Conversation Management ---
@@ -740,29 +790,53 @@ function closeConversation(event, conversationId) {
 */
 function renderTabs() {
     const tabsContainer = dom['ai-chat-tabs'];
-    
+
     if (!tabsContainer) return;
+
+    // Preserve the Optimization tab (static element)
+    const optTab = dom['helios-optimization-tab-btn'];
+    let optTabWasActive = false;
+    if (optTab) {
+        optTabWasActive = optTab.classList.contains('active');
+        // Temporarily remove it from the container
+        if (optTab.parentNode === tabsContainer) {
+            tabsContainer.removeChild(optTab);
+        }
+    }
+
+    // Clear all conversation tabs
     tabsContainer.innerHTML = '';
 
+    // Add conversation tabs
     Object.values(conversations).forEach(conv => {
-    const tab = document.createElement('button');
-    tab.className = 'ai-chat-tab';
-    tab.textContent = conv.title;
-    if (conv.isActive) {
-    tab.classList.add('active');
-    }
-    
-    tab.onclick = () => switchConversation(conv.id);
+        const tab = document.createElement('button');
+        tab.className = 'ai-chat-tab';
+        tab.textContent = conv.title;
+        if (conv.isActive) {
+            tab.classList.add('active');
+        }
 
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'ai-tab-close-btn';
-    closeBtn.innerHTML = '&times;';
-    closeBtn.ariaLabel = `Close ${conv.title}`;
-    closeBtn.onclick = (e) => closeConversation(e, conv.id);
+        tab.onclick = () => switchConversation(conv.id);
 
-    tab.appendChild(closeBtn);
-    tabsContainer.appendChild(tab);
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'ai-tab-close-btn';
+        closeBtn.innerHTML = '&times;';
+        closeBtn.ariaLabel = `Close ${conv.title}`;
+        closeBtn.onclick = (e) => closeConversation(e, conv.id);
+
+        tab.appendChild(closeBtn);
+        tabsContainer.appendChild(tab);
     });
+
+    // Re-add the Optimization tab at the end
+    if (optTab) {
+        if (optTabWasActive) {
+            optTab.classList.add('active');
+        } else {
+            optTab.classList.remove('active');
+        }
+        tabsContainer.appendChild(optTab);
+    }
 }
 
 /**
@@ -788,6 +862,14 @@ function renderActiveConversation() {
     dom['run-inspector-btn']?.classList.add('hidden');
     dom['ai-critique-results']?.classList.add('hidden');
     dom['run-critique-btn']?.classList.add('hidden');
+    // Hide the optimization panel if it exists
+    // Hide the optimization panel if it exists
+    chatContainer?.querySelector('#helios-optimization-content')?.classList.add('hidden');
+
+    // Show the chat input container when a chat tab is active
+    if (dom['ai-chat-input-container']) {
+        dom['ai-chat-input-container'].classList.remove('hidden');
+    }
 
     updateModeDescription('master');
 
@@ -1824,6 +1906,143 @@ const toolHandlers = {
     'setShadingContext': (args) => _handleGeneratorTool('setShadingContext', args),
     'createShadingPattern': (args) => _handleGeneratorTool('createShadingPattern', args),
 
+                'openOptimizationPanel': async (args) => {
+                    // Open AI assistant panel if not open
+                    if (dom['ai-assistant-panel'].classList.contains('hidden')) {
+                        dom['ai-assistant-button']?.click();
+                    }
+    
+                    // Switch to optimization tab
+                    const optTab = dom['helios-optimization-tab-btn'];
+                    if (optTab) {
+                        optTab.classList.remove('hidden');
+                        optTab.click();
+                    }
+    
+                    // Wait for the panel to be created and initialized, as it's done asynchronously
+                    await new Promise(resolve => setTimeout(resolve, 100));
+    
+                    // Find the newly created/shown panel. It's the one that is not hidden.
+                    const optPanel = document.querySelector('#helios-optimization-content:not(.hidden)');
+                    if (!optPanel) {
+                        // Fallback for the initial case where it might not have the class yet
+                        const newlyCreatedPanel = document.querySelector('#helios-optimization-content');
+                        if (!newlyCreatedPanel) {
+                            return { success: false, message: 'Could not find the optimization panel.' };
+                        }
+                         if (args.wall) {
+                            const wallSelect = newlyCreatedPanel.querySelector('#opt-target-wall');
+                            if (wallSelect) {
+                                wallSelect.value = args.wall.charAt(0).toLowerCase();
+                                wallSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                            }
+                        }
+                        if (args.shadingType) {
+                            const shadingSelect = newlyCreatedPanel.querySelector('#opt-shading-type');
+                            if (shadingSelect) {
+                                shadingSelect.value = args.shadingType;
+                                // This is the important part to trigger the parameter update
+                                shadingSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                            }
+                        }
+                    } else {
+                         if (args.wall) {
+                            const wallSelect = optPanel.querySelector('#opt-target-wall');
+                            if (wallSelect) {
+                                wallSelect.value = args.wall.charAt(0).toLowerCase();
+                                wallSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                            }
+                        }
+                        if (args.shadingType) {
+                            const shadingSelect = optPanel.querySelector('#opt-shading-type');
+                            if (shadingSelect) {
+                                shadingSelect.value = args.shadingType;
+                                // This is the important part to trigger the parameter update
+                                shadingSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                            }
+                        }
+                    }
+    
+                    return {
+                        success: true,
+                        message: `Opened the optimization panel for ${args.shadingType || 'shading'} on the ${args.wall || 'selected'} wall. Please review the parameters and click 'Start Optimization' when ready.`
+                    };
+                },
+    'configureOptimization': async (args) => {
+        const { parameters, goal, constraint, populationSize, generations } = args;
+        let messages = ['Optimization configured:'];
+
+        // Set goal and constraint
+        if (goal) {
+            // Parse goal to auto-select recipe
+            const recipeMap = {
+                'sDA': 'sda-ase',
+                'ASE': 'sda-ase',
+                'avg': 'illuminance',
+                'dgp': 'dgp'
+            };
+            const metricKey = goal.split('_')[1]; // e.g., "sDA" from "maximize_sDA"
+            const recipe = recipeMap[metricKey] || 'sda-ase';
+            
+            setUiValue('opt-simulation-recipe', recipe);
+            // Trigger metric update
+            dom['opt-simulation-recipe']?.dispatchEvent(new Event('change', { bubbles: true }));
+            
+            // Wait for metrics to populate
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            setUiValue('opt-goal-metric', goal);
+            messages.push(`- Goal set to ${goal}`);
+        }
+        if (constraint) {
+            setUiValue('opt-constraint', constraint);
+            messages.push(`- Constraint set to ${constraint}`);
+        }
+
+        // Set population and generations
+        if (populationSize) {
+            setUiValue('opt-population-size', Math.min(50, Math.max(4, populationSize)));
+            messages.push(`- Population size set to ${populationSize}`);
+        }
+        if (generations) {
+            setUiValue('opt-generations', Math.min(20, Math.max(2, generations)));
+            messages.push(`- Generations set to ${generations}`);
+        }
+
+        // Configure parameters
+        if (parameters) {
+            const container = dom['opt-params-container'];
+            if (!container) return { success: false, message: 'Parameter container not found.' };
+
+            for (const [paramName, range] of Object.entries(parameters)) {
+            const item = container.querySelector(`[data-param-id="${paramName}"]`);
+            if (item) {
+                const toggle = item.querySelector('.opt-param-toggle');
+                const minInput = item.querySelector('.opt-param-min');
+                const maxInput = item.querySelector('.opt-param-max');
+                // Step input is not configured by this tool, it uses the default
+
+                toggle.checked = true;
+                    // Trigger controls to show
+                    toggle.dispatchEvent(new Event('change', { bubbles: true })); 
+                    
+                    if (Array.isArray(range) && range.length === 2) {
+                        minInput.value = range[0];
+                        maxInput.value = range[1];
+                    }
+                    messages.push(`- Parameter ${paramName} enabled with range [${range[0]}, ${range[1]}]`);
+                } else {
+                    messages.push(`- Warning: Parameter ${paramName} not found for current shading type.`);
+                }
+            }
+        }
+        
+        return {
+            success: true,
+            message: messages.length > 1 ? messages.join('\n') : 'No settings provided to configure.'
+        };
+    },
+
     // Special tools (handled directly)
     'runDesignInspector': async (args) => {
         // These are handled by their own top-level functions, not this executor
@@ -2322,7 +2541,7 @@ export function triggerProactiveSuggestion(context) {
     }).catch(err => console.error("Failed to display proactive suggestion:", err));
 }
 
-export { initAiAssistant };
+export { createNewConversation, getDom, initAiAssistant };
 
 /**
  * Updates a message bubble in the chat UI with new content.
