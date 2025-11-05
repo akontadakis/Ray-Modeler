@@ -9,7 +9,7 @@ import { openGlareRoseDiagram, openCombinedAnalysisPanel } from './annualDashboa
 import { openRecipePanelByType, programmaticallyGeneratePackage } from './simulation.js';
 import { addFurniture, addVegetation, getWallGroupById, highlightWall } from './geometry.js';
 import * as THREE from 'three';
-import { initOptimizationUI } from './optimizationOrchestrator.js';
+import { initOptimizationUI, startOptimization as runOptimizer } from './optimizationOrchestrator.js';
 
 // Module-level cache for DOM elements
 let dom;
@@ -499,6 +499,33 @@ const availableTools = [
                             "description": "Number of generations to run (recommended 2-20)"
                         }
                     }
+                }
+            },
+            {
+                "name": "startOptimization",
+                "description": "Starts the generative optimization process. Can be run in 'full' mode using the user-defined settings, or 'quick' mode for a faster, more limited run.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "mode": {
+                            "type": "STRING",
+                            "description": "The optimization mode. Must be one of 'full' or 'quick'. Defaults to 'full'."
+                        }
+                    }
+                }
+            },
+            {
+                "name": "applyOptimizationPreset",
+                "description": "Applies a pre-configured optimization profile (e.g., 'Maximize Daylight') to the optimization panel.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "profileName": {
+                            "type": "STRING",
+                            "description": "The name of the preset to apply. Must be one of 'maximize-daylight', 'minimize-glare', 'balanced-performance', or 'custom'."
+                        }
+                    },
+                    "required": ["profileName"]
                 }
             }
         ]
@@ -1906,68 +1933,69 @@ const toolHandlers = {
     'setShadingContext': (args) => _handleGeneratorTool('setShadingContext', args),
     'createShadingPattern': (args) => _handleGeneratorTool('createShadingPattern', args),
 
-                'openOptimizationPanel': async (args) => {
-                    // Open AI assistant panel if not open
-                    if (dom['ai-assistant-panel'].classList.contains('hidden')) {
-                        dom['ai-assistant-button']?.click();
-                    }
-    
-                    // Switch to optimization tab
-                    const optTab = dom['helios-optimization-tab-btn'];
-                    if (optTab) {
-                        optTab.classList.remove('hidden');
-                        optTab.click();
-                    }
-    
-                    // Wait for the panel to be created and initialized, as it's done asynchronously
-                    await new Promise(resolve => setTimeout(resolve, 100));
-    
-                    // Find the newly created/shown panel. It's the one that is not hidden.
-                    const optPanel = document.querySelector('#helios-optimization-content:not(.hidden)');
-                    if (!optPanel) {
-                        // Fallback for the initial case where it might not have the class yet
-                        const newlyCreatedPanel = document.querySelector('#helios-optimization-content');
-                        if (!newlyCreatedPanel) {
-                            return { success: false, message: 'Could not find the optimization panel.' };
-                        }
-                         if (args.wall) {
-                            const wallSelect = newlyCreatedPanel.querySelector('#opt-target-wall');
-                            if (wallSelect) {
-                                wallSelect.value = args.wall.charAt(0).toLowerCase();
-                                wallSelect.dispatchEvent(new Event('change', { bubbles: true }));
-                            }
-                        }
-                        if (args.shadingType) {
-                            const shadingSelect = newlyCreatedPanel.querySelector('#opt-shading-type');
-                            if (shadingSelect) {
-                                shadingSelect.value = args.shadingType;
-                                // This is the important part to trigger the parameter update
-                                shadingSelect.dispatchEvent(new Event('change', { bubbles: true }));
-                            }
-                        }
-                    } else {
-                         if (args.wall) {
-                            const wallSelect = optPanel.querySelector('#opt-target-wall');
-                            if (wallSelect) {
-                                wallSelect.value = args.wall.charAt(0).toLowerCase();
-                                wallSelect.dispatchEvent(new Event('change', { bubbles: true }));
-                            }
-                        }
-                        if (args.shadingType) {
-                            const shadingSelect = optPanel.querySelector('#opt-shading-type');
-                            if (shadingSelect) {
-                                shadingSelect.value = args.shadingType;
-                                // This is the important part to trigger the parameter update
-                                shadingSelect.dispatchEvent(new Event('change', { bubbles: true }));
-                            }
-                        }
-                    }
-    
-                    return {
-                        success: true,
-                        message: `Opened the optimization panel for ${args.shadingType || 'shading'} on the ${args.wall || 'selected'} wall. Please review the parameters and click 'Start Optimization' when ready.`
-                    };
-                },
+    // Optimization tools
+    'openOptimizationPanel': async (args) => {
+        // Open AI assistant panel if not open
+        if (dom['ai-assistant-panel'].classList.contains('hidden')) {
+            dom['ai-assistant-button']?.click();
+        }
+
+        // Switch to optimization tab
+        const optTab = dom['helios-optimization-tab-btn'];
+        if (optTab) {
+            optTab.classList.remove('hidden');
+            optTab.click();
+        }
+
+        // Wait for the panel to be created and initialized, as it's done asynchronously
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Find the newly created/shown panel. It's the one that is not hidden.
+        const optPanel = document.querySelector('#helios-optimization-content:not(.hidden)');
+        if (!optPanel) {
+            // Fallback for the initial case where it might not have the class yet
+            const newlyCreatedPanel = document.querySelector('#helios-optimization-content');
+            if (!newlyCreatedPanel) {
+                return { success: false, message: 'Could not find the optimization panel.' };
+            }
+             if (args.wall) {
+                const wallSelect = newlyCreatedPanel.querySelector('#opt-target-wall');
+                if (wallSelect) {
+                    wallSelect.value = args.wall.charAt(0).toLowerCase();
+                    wallSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
+            if (args.shadingType) {
+                const shadingSelect = newlyCreatedPanel.querySelector('#opt-shading-type');
+                if (shadingSelect) {
+                    shadingSelect.value = args.shadingType;
+                    // This is the important part to trigger the parameter update
+                    shadingSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
+        } else {
+             if (args.wall) {
+                const wallSelect = optPanel.querySelector('#opt-target-wall');
+                if (wallSelect) {
+                    wallSelect.value = args.wall.charAt(0).toLowerCase();
+                    wallSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
+            if (args.shadingType) {
+                const shadingSelect = optPanel.querySelector('#opt-shading-type');
+                if (shadingSelect) {
+                    shadingSelect.value = args.shadingType;
+                    // This is the important part to trigger the parameter update
+                    shadingSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
+        }
+
+        return {
+            success: true,
+            message: `Opened the optimization panel for ${args.shadingType || 'shading'} on the ${args.wall || 'selected'} wall. Please review the parameters and click 'Start Optimization' when ready.`
+        };
+    },
     'configureOptimization': async (args) => {
         const { parameters, goal, constraint, populationSize, generations } = args;
         let messages = ['Optimization configured:'];
@@ -2041,6 +2069,46 @@ const toolHandlers = {
             success: true,
             message: messages.length > 1 ? messages.join('\n') : 'No settings provided to configure.'
         };
+    },
+    'startOptimization': async (args) => {
+        const mode = args.mode || 'full';
+        if (!['full', 'quick'].includes(mode)) {
+            throw new Error(`Invalid optimization mode: ${mode}. Must be 'full' or 'quick'.`);
+        }
+        
+        await runOptimizer(mode);
+
+        return { success: true, message: `Starting ${mode} optimization.` };
+    },
+    'applyOptimizationPreset': async (args) => {
+        const { profileName } = args;
+        const validProfiles = ['custom', 'maximize-daylight', 'minimize-glare', 'balanced-performance'];
+        if (!validProfiles.includes(profileName)) {
+            throw new Error(`Invalid profile name: ${profileName}.`);
+        }
+
+        // Ensure the optimization panel is open
+        const optTab = dom['helios-optimization-tab-btn'];
+        if (optTab) {
+            optTab.click();
+            // Wait for panel to appear
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        const optPanel = document.querySelector('#helios-optimization-content:not(.hidden)') || document.querySelector('#helios-optimization-content');
+        if (!optPanel) {
+            throw new Error('Could not find the optimization panel.');
+        }
+
+        const selector = optPanel.querySelector('#optimization-profile-selector');
+        if (!selector) {
+            throw new Error('Could not find the optimization profile selector dropdown.');
+        }
+
+        selector.value = profileName;
+        selector.dispatchEvent(new Event('change', { bubbles: true }));
+
+        return { success: true, message: `Applied the '${profileName}' optimization profile.` };
     },
 
     // Special tools (handled directly)

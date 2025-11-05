@@ -66,6 +66,42 @@ const SHADING_PARAMETERS = {
     ]
 };
 
+const PRESET_PROFILES = {
+    "maximize-daylight": {
+        recipe: "sda-ase",
+        goal: "maximize_sDA",
+        constraints: "ASE < 10",
+        targetWall: "s", // South
+        shadingType: "overhang",
+        params: [
+            { id: "depth", min: 0.1, max: 1.5, step: 0.1 },
+            { id: "dist-above", min: 0.0, max: 0.5, step: 0.05 }
+        ]
+    },
+    "minimize-glare": {
+        recipe: "dgp",
+        goal: "minimize_dgp",
+        constraints: "DGP < 0.40",
+        targetWall: "s", // South
+        shadingType: "louver",
+        params: [
+            { id: "slat-angle", min: -45, max: 45, step: 5 }
+        ]
+    },
+    "balanced-performance": {
+        recipe: "sda-ase",
+        goal: "maximize_sDA",
+        constraints: "ASE < 15",
+        targetWall: "s", // South
+        shadingType: "lightshelf",
+        params: [
+            { id: "depth", min: 0.2, max: 1.2, step: 0.1 },
+            { id: "tilt", min: 0, max: 30, step: 5 }
+        ]
+    }
+};
+
+
 // ==================== PUBLIC API ====================
 
 /**
@@ -80,7 +116,9 @@ const SHADING_PARAMETERS = {
     // Get elements scoped to the correct panel
     const optShadingType = optimizationPanel.querySelector('#opt-shading-type');
     const optSimulationRecipe = optimizationPanel.querySelector('#opt-simulation-recipe');
+    const optimizationProfileSelector = optimizationPanel.querySelector('#optimization-profile-selector');
     const startOptimizationBtn = optimizationPanel.querySelector('#start-optimization-btn');
+    const quickOptimizeBtn = optimizationPanel.querySelector('#quick-optimize-btn');
     const resumeOptimizationBtn = optimizationPanel.querySelector('#resume-optimization-btn');
     const cancelOptimizationBtn = optimizationPanel.querySelector('#cancel-optimization-btn');
 
@@ -95,13 +133,87 @@ const SHADING_PARAMETERS = {
         console.error('[initOptimizationUI] CRITICAL: #opt-shading-type dropdown not found.');
     }
     optSimulationRecipe?.addEventListener('change', updateGoalMetrics);
-    startOptimizationBtn?.addEventListener('click', () => startOptimization(false));
-    resumeOptimizationBtn?.addEventListener('click', () => startOptimization(true));
+    startOptimizationBtn?.addEventListener('click', () => startOptimization('full'));
+    quickOptimizeBtn?.addEventListener('click', () => startOptimization('quick'));
+    resumeOptimizationBtn?.addEventListener('click', () => startOptimization('resume'));
     cancelOptimizationBtn?.addEventListener('click', cancelOptimization);
+    optimizationProfileSelector?.addEventListener('change', applyPresetProfile);
 
     // Initial population
     populateParameters();
     updateGoalMetrics();
+}
+
+function applyPresetProfile() {
+    if (!optimizationPanel) return;
+
+    const profileId = optimizationPanel.querySelector('#optimization-profile-selector').value;
+    
+    const allControls = getOptControls();
+    allControls.forEach(control => control.disabled = false);
+
+    if (profileId === 'custom') {
+        return;
+    }
+
+    const profile = PRESET_PROFILES[profileId];
+    if (!profile) return;
+
+    // --- Handle Preset Profile ---
+
+    // 1. Set high-level dropdowns
+    const optTargetWall = optimizationPanel.querySelector('#opt-target-wall');
+    const optShadingType = optimizationPanel.querySelector('#opt-shading-type');
+    const optSimulationRecipe = optimizationPanel.querySelector('#opt-simulation-recipe');
+    const optConstraint = optimizationPanel.querySelector('#opt-constraint');
+
+    if (optTargetWall) optTargetWall.value = profile.targetWall;
+    if (optShadingType) {
+        optShadingType.value = profile.shadingType;
+        optShadingType.dispatchEvent(new Event('change')); // This re-populates parameters
+    }
+    if (optSimulationRecipe) {
+        optSimulationRecipe.value = profile.recipe;
+        optSimulationRecipe.dispatchEvent(new Event('change')); // This re-populates goals
+    }
+    if (optConstraint) optConstraint.value = profile.constraints;
+
+    // 2. Use timeouts to wait for UI to update from the dispatched events
+    setTimeout(() => {
+        // Set goal metric
+        const optGoalMetric = optimizationPanel.querySelector('#opt-goal-metric');
+        if (optGoalMetric) {
+            optGoalMetric.value = profile.goal;
+        }
+    }, 150); // For goal to populate
+
+    setTimeout(() => {
+        const optParamsContainer = optimizationPanel.querySelector('#opt-params-container');
+        if (!optParamsContainer) return;
+
+        // Uncheck all parameters first
+        optParamsContainer.querySelectorAll('.opt-param-toggle').forEach(toggle => {
+            if (toggle.checked) toggle.click();
+        });
+
+        // Check and configure the ones in the profile
+        profile.params.forEach(param => {
+            const paramItem = optParamsContainer.querySelector(`[data-param-id="${param.id}"]`);
+            if (paramItem) {
+                const toggle = paramItem.querySelector('.opt-param-toggle');
+                if (toggle && !toggle.checked) {
+                    toggle.click();
+                }
+                const minInput = paramItem.querySelector('.opt-param-min');
+                if (minInput) minInput.value = param.min;
+                const maxInput = paramItem.querySelector('.opt-param-max');
+                if (maxInput) maxInput.value = param.max;
+                const stepInput = paramItem.querySelector('.opt-param-step');
+                if (stepInput) stepInput.value = param.step;
+            }
+        });
+
+    }, 300); // For parameters to populate
 }
 
 // ==================== UI MANAGEMENT ====================
@@ -254,18 +366,20 @@ function cancelOptimization() {
     }
 }
 
-async function startOptimization(resume = false) {
+export async function startOptimization(mode = 'full') {
     if (isOptimizing) {
         showAlert('Optimization already running', 'Error');
         return;
     }
+
+    const resume = mode === 'resume';
 
     try {
         setControlsLocked(true);
         if (!resume) clearLog();
 
         // 1. Gather settings
-        const settings = gatherSettings();
+        const settings = gatherSettings(mode);
         log(`Starting optimization: ${settings.goalId}`);
         log(`  Wall: ${settings.wall.toUpperCase()}, Type: ${settings.shadingType}`);
         log(`  Params: ${settings.parameters.map(p => p.name).join(', ')}`);
@@ -364,7 +478,7 @@ async function startOptimization(resume = false) {
 
 // ==================== HELPER FUNCTIONS ====================
 
-function gatherSettings() {
+function gatherSettings(mode = 'full') {
     if (!optimizationPanel) throw new Error("Optimization panel is not initialized.");
 
     const optParamsContainer = optimizationPanel.querySelector('#opt-params-container');
@@ -406,6 +520,16 @@ function gatherSettings() {
     });
     }
 
+    let populationSize = parseInt(optPopulationSize?.value || '10');
+    let generations = parseInt(optGenerations?.value || '5');
+
+    if (mode === 'quick') {
+        populationSize = 5;
+        generations = 3;
+        log('?? Using Quick Optimize settings: 5 population, 3 generations.');
+    }
+
+
     if (selectedParams.length === 0) {
         throw new Error('No parameters selected. Please check at least one parameter to optimize.');
     }
@@ -419,8 +543,8 @@ function gatherSettings() {
         recipe: optSimulationRecipe?.value || 'sda-ase',
         goalId: optGoalMetric?.value || 'maximize_sDA',
         constraint: optConstraint?.value.trim() || '',
-        populationSize: parseInt(optPopulationSize?.value || '10'),
-        generations: parseInt(optGenerations?.value || '5'),
+        populationSize: populationSize,
+        generations: generations,
         quality: optQuality?.value || 'medium',
         parameters: selectedParams
     };
