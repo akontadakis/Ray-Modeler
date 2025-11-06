@@ -63,7 +63,16 @@ Because the app isn't code-signed, your OS might show a security warning. When a
 
 - **On Windows (SmartScreen)**: Click "**More info**", then click "**Run anyway**".
 
-- **On macOS (Gatekeeper)**: **Right-click** (or Control-click) the app icon, select "**Open**" from the menu. A new dialog box will appear that is similar to the first one, but this time it will include an "**Open**" button. Clicking this will run the app. You only need to do this once. After the first successful launch, the app can be opened normally by double-clicking it.
+- **On macOS (Gatekeeper)**: **Right-click** (or Control-click) the app icon, select "**Open**" from the menu. A new dialog box will appear that is similar to the first one, but this time it will include an "**Open**" button. Clicking this will run the app. You only need to do this once. After the first successful launch, the app can be opened normally by double-clicking it. Or After you drag Ray Modeler.app to the Applications folder, do the following:
+
+- Open the Terminal app.
+- Copy and paste the following command exactly, then press Enter:
+
+```bash
+xattr -cr /Applications/Ray\ Modeler.app
+```
+
+---
 
 ## ✨ Core Capabilities
 

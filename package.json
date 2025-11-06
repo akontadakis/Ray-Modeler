@@ -22,7 +22,7 @@
     "electron-builder": "^24.9.1"
   },
   "build": {
-    "appId": "com.example.raymodeler",
+    "appId": "io.github.akontadakis.raymodeler",
     "productName": "Ray Modeler",
     "files": [
       "**/*",
@@ -40,8 +40,10 @@
     },
     "mac": {
       "target": "dmg",
-      "icon": "assets/icon.icns"
-    },
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.graphics-design",
+      "gatekeeperAssess": false
+  },
     "win": {
       "icon": "assets/icon.ico",
       "target": [
