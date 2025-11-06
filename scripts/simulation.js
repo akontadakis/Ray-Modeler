@@ -215,9 +215,10 @@ export async function openRecipePanelByType(templateId) {
 /**
  * Programmatically triggers the 'Generate Package' process for a given recipe panel.
  * @param {HTMLElement} panel - The recipe panel DOM element.
+ * @param {string} [uniqueId=null] - An optional unique ID for this simulation run.
  * @returns {Promise<object|null>} The result from the project's package generation.
  */
-export async function programmaticallyGeneratePackage(panel) {
+export async function programmaticallyGeneratePackage(panel, uniqueId = null) {
     // Find buttons in panel or globally (for container case)
     const generateBtn = panel.querySelector('[data-action="generate"]') || document.querySelector('[data-action="generate"]');
     if (!generateBtn) return null;
@@ -226,7 +227,7 @@ export async function programmaticallyGeneratePackage(panel) {
     generateBtn.disabled = true;
 
     try {
-        const result = await project.generateSimulationPackage(panel);
+        const result = await project.generateSimulationPackage(panel, uniqueId);
         if (!result) throw new Error("Script generation failed or was aborted.");
 
         // Find command center in panel or globally

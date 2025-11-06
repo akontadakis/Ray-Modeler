@@ -3516,15 +3516,123 @@
         </button>
         <span class="tooltip" role="tooltip">Shortcuts (?)</span>
     </div>
+    </div>
+</div>
+
+<div id="optimization-info-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[10002] hidden items-center justify-center">
+    <div class="ui-panel p-6 w-full max-w-3xl mx-auto bg-[--bg-main] relative" style="max-height: 80vh; display: flex; flex-direction: column;">
+        <button id="opt-info-modal-close-btn" class="absolute top-3 right-3 text-[--text-secondary] hover:text-[--text-primary]" aria-label="Close Optimization Info">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+        <h3 class="text-lg font-bold mb-4">About Generative Optimization</h3>
+        <div class="window-content prose" style="max-height: 100%; overflow-y: auto;">
+            <p>This panel uses a <strong>Genetic Algorithm (GA)</strong> to automatically find high-performing shading designs. You define the goals and constraints, and the algorithm "evolves" solutions over time by running many simulations in the background.</p>
+
+            <h2>Optimization Methodology: Genetic Algorithm (GA)</h2>
+            <p>Genetic Algorithms are optimization techniques inspired by Charles Darwin's theory of natural selection. This tool uses a specific type called a <strong>Steady-State Genetic Algorithm (SSGA)</strong>, which is efficient for this kind of problem.</p>
+            <p>Here is the step-by-step process:</p>
+            <ol>
+                <li><strong>Initialization:</strong> The algorithm begins by creating an initial "population" (e.g., 10) of random designs based on your selected parameters and ranges.</li>
+                <li><strong>Evaluation (Fitness):</strong> Each of these designs is "evaluated" by running a full, headless Radiance simulation. Its performance on your <strong>Goal Metric</strong> (e.g., sDA score) becomes its "fitness."</li>
+                <li><strong>Selection:</strong> The algorithm selects two "parent" designs from the population using <strong>Tournament Selection</strong>. It randomly picks 3 designs, and the one with the best fitness from that group "wins" and becomes a parent. This is done twice.</li>
+                <li><strong>Crossover (Breeding):</strong> The two parents are combined to create two new "child" designs.
+                    <ul>
+                        <li><strong>Continuous Parameters</strong> (like `depth` or `tilt`): Use <strong>Blended Crossover (BLX-α)</strong>. The child's value is a random point within the range defined by its two parents.</li>
+                        <li><strong>Discrete Parameters</strong> (like `placement`): Use <strong>Uniform Crossover</strong>. The child has a 50/50 chance of inheriting the value from either parent.</li>
+                    </ul>
+                </li>
+                <li><strong>Mutation:</strong> To introduce new ideas and prevent stagnation, the children's "genes" (parameters) are randomly mutated based on the `mutationRate`.
+                    <ul>
+                        <li><strong>Continuous:</strong> A random value, up to 20% of the parameter's total range, is added or subtracted. The result is then "snapped" to the nearest valid `step`.</li>
+                        <li><strong>Discrete:</strong> A new option is chosen at random from the list of possibilities (e.g., `ext` might be mutated to `int`).</li>
+                    </ul>
+                </li>
+                <li><strong>Replacement:</strong> The two new children are evaluated (simulated). They are then added to the population, and the two <strong>worst-performing</strong> designs are removed. This ensures the population's overall quality continuously improves.</li>
+                <li><strong>Repeat:</strong> This "select, breed, mutate, evaluate, replace" loop repeats until the total <strong>Max Evaluations</strong> is reached.</li>
+            </ol>
+
+            <h3>Key Feature: Fitness Caching</h3>
+            <p>The optimizer is smart. If it creates a design it has already simulated (e.g., <code>{"depth": 0.5, "tilt": 10}</code>), it will retrieve the score from its memory (the `fitnessCache`) instead of running a new simulation. This dramatically speeds up the process, especially with smaller parameter ranges.</p>
+
+            <h2>Configuration Options Explained</h2>
+
+            <h3>Optimization Profile</h3>
+            <p>These are presets that automatically fill in all the settings for a common use case. 'Custom' allows you to set everything yourself.</p>
+            <ul>
+                <li><strong>Maximize Daylight:</strong> Aims for the highest sDA while keeping ASE below 10%, using a south-facing overhang.</li>
+                <li><strong>Minimize Glare:</strong> Aims to reduce DGP using louvers.</li>
+                <li><strong>Balanced Performance:</strong> Aims for high sDA while keeping ASE below 15%, using a lightshelf.</li>
+            </ul>
+
+            <h3>Shading & Parameters</h3>
+            <ul>
+                <li><strong>Target Wall:</strong> The wall (`N`, `S`, `E`, `W`) where the shading device will be attached for testing. The algorithm will only modify the shading on this one wall.</li>
+                <li><strong>Shading Type:</strong> The type of device to optimize. The available parameters to optimize will change depending on your selection.
+                    <ul>
+                        <li><code>overhang</code></li>
+                        <li><code>lightshelf</code></li>
+                        <li><code>louver</code></li>
+                        <li><code>roller</code></li>
+                    </ul>
+                </li>
+                <li><strong>Parameters to Optimize:</strong> These are the "genes" for the algorithm. You must select at least one parameter (up to 3) and define the `min`, `max`, and `step` values the algorithm is allowed to test. This creates the "search space" for the optimizer.</li>
+            </ul>
+
+            <h3>Goal & Constraints</h3>
+            <ul>
+                <li><strong>Optimization Goal (Recipe & Metric):</strong> This is the "fitness function"—the single metric the algorithm is trying to improve.
+                    <ul>
+                        <li><strong>Recipe:</strong> Selects the simulation type to run for each evaluation (e.g., `sda-ase`, `illuminance`, `dgp`).</li>
+                        <li><strong>Metric:</strong> Selects the specific result from that recipe to use as the fitness score (e.g., `Maximize sDA`, `Minimize ASE`, `Minimize DGP`).</li>
+                    </ul>
+                </li>
+                <li><strong>Constraint (Optional):</strong> A pass/fail rule (e.g., <code>ASE < 10</code> or <code>DGP < 0.40</code>). Any design that fails this constraint is given an "infinitely bad" fitness score (<code>-Infinity</code>) and will be immediately removed from the population.</li>
+            </ul>
+
+            <h3>Settings</h3>
+            <ul>
+                <li><strong>Population:</strong> The number of designs to keep in the "gene pool" at any given time. A larger size (e.g., 20) requires more initial simulations.</li>
+                <li><strong>Max Evaluations:</strong> This is the <strong>total number of simulations</strong> the algorithm will run before stopping. This (not generations) is your primary control for runtime. (e.g., Population 10, Max Evals 50 = 10 initial sims + 40 "child" sims).</li>
+                <li><strong>Quality:</strong> The Radiance preset to use for each simulation (<code>draft</code>, <code>medium</code>, <code>high</code>). <code>Draft</code> is very fast but inaccurate. <code>Medium</code> is recommended for a balance. <code>High</code> is very accurate but will be extremely slow.</li>
+            </ul>
+
+            <h2>Benefits & Limitations</h2>
+            <ul>
+                <li><strong>Benefit:</strong> Automates the tedious task of iterating on a design. It can find non-obvious, high-performing combinations of parameters.</li>
+                <li><strong>Benefit:</strong> The SSGA model provides faster feedback by showing new "best" designs as they are found, rather than waiting for a whole generation to finish.</li>
+                <li><strong>Limitation:</strong> This is a stochastic (random) process. It is not <em>guaranteed</em> to find the absolute single best solution in the world, but it is very good at finding "globally good" solutions.</li>
+                <li><strong>Limitation:</strong> The process is computationally expensive. A run of 50 evaluations can still take a significant amount of time, depending on the `Quality` setting and scene complexity.</li>
+                <li><strong>Limitation:</strong> The optimizer can only control parameters defined in this panel. It cannot invent new shading types or modify other parts of the building.</li>
+            </ul>
+
+            <h2>What Happens When You Click "Start"</h2>
+            <p>The <code>evaluateDesignHeadless</code> function orchestrates the entire process for each design:</p>
+            <ol>
+                <li>Applies the new design parameters (e.g., `depth: 0.7`) to the 3D scene.</li>
+                <li>Programmatically generates a new simulation package (geometry, scripts, etc.) with a unique ID.</li>
+                <li>Runs the simulation script headlessly in the background using the Electron API.</li>
+                <li>Waits for the script to finish, then reads the unique result files (e.g., `_sDA_final.ill`).</li>
+                <li>Parses the results, calculates the fitness score, and checks it against the constraint.</li>
+                <li>Returns this score to the optimizer, which then repeats the loop.</li>
+            </ol>
+
+            <p class="mt-4"><strong>Final Result:</strong> When the process is complete, the single best design that was found and met your constraints is automatically applied to the 3D scene. You can then see the winning parameters in the log and in the main UI panels.</p>
+        </div>
+    </div>
 </div>
 
         <div id="templates" class="hidden">
-<template id="template-optimization-panel">
-    <div id="helios-optimization-content" class="flex-grow p-4 space-y-4 overflow-y-auto">
-        <p class="text-sm text-[--text-secondary]">
-            Configure and run generative optimization for shading devices.
-        </p>
-        
+    <template id="template-optimization-panel">
+        <div id="helios-optimization-content" class="flex-grow p-4 space-y-4 overflow-y-auto">
+        <div class="flex justify-between items-center mb-2">
+            <p class="text-sm text-[--text-secondary] mb-0">
+                Configure generative optimization for shading devices.
+            </p>
+            <button id="opt-info-btn" class="btn btn-icon" aria-label="Optimization Info">
+            <svg width="20" height="20" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg" fill="var(--highlight-color)"><path d="M25.39 25.45a1 1 0 0 0-1.38.29c-1.41 2.16-4 4.81-6.31 5.7s-4.12.57-4.84 0c-.31-.27-1.12-1-.43-3.49.46-1.66 3.32-9.48 4-11.38l-2.18.28c-.69 1.86-3.29 8.84-3.76 10.58-.68 2.49-.34 4.3 1.09 5.56A5.6 5.6 0 0 0 15 34a9.5 9.5 0 0 0 3.45-.7c2.79-1.09 5.72-4.12 7.26-6.47a1 1 0 0 0-.32-1.38"/><path d="M19.3 11a4.5 4.5 0 1 0-4.5-4.5 4.5 4.5 0 0 0 4.5 4.5m0-7a2.5 2.5 0 1 1-2.5 2.5A2.5 2.5 0 0 1 19.3 4"/><path d="M11.81 15c.06 0 6.27-.82 7.73-1 .65-.1 1.14 0 1.3.15s.21.8-.07 1.68c-.61 1.86-3.69 11-4.59 13.71a8 8 0 0 0 1.29-.38 7.3 7.3 0 0 0 1.15-.6c1.23-3.56 3.53-10.46 4.05-12.04s.39-2.78-.3-3.6a3.16 3.16 0 0 0-3.08-.83c-1.43.15-7.47.94-7.73 1a1 1 0 0 0 .26 2Z"/><path fill="none" d="M0 0h36v36H0z"/></svg>
+        </button>
+    </div>
+
         <div class="form-grid">
             <div>
                 <label for="opt-target-wall" class="label">Target Wall</label>
@@ -3587,10 +3695,10 @@
                 <div>
                     <label for="opt-population-size" class="label text-xs">Population</label>
                     <input type="number" id="opt-population-size" value="10" min="4" max="50" class="w-full">
-                </div>
+            </div>
                 <div>
-                    <label for="opt-generations" class="label text-xs">Generations</label>
-                    <input type="number" id="opt-generations" value="5" min="2" max="20" class="w-full">
+                    <label for="opt-generations" class="label text-xs">Max Evaluations</label>
+                    <input type="number" id="opt-generations" value="50" min="10" max="500" class="w-full">
                 </div>
                 <div>
                     <label for="opt-quality" class="label text-xs">Quality</label>

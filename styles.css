@@ -1911,7 +1911,19 @@ color: var(--text-primary);
 }
 
 .ai-tab-close-btn:hover {
-background-color: var(--grid-color);
+    background-color: var(--grid-color);
+}
+
+/* --- Optimization Info Button --- */
+#opt-info-btn {
+    padding: 0.25rem; /* 4px */
+    width: 24px;
+    height: 24px;
+    color: var(--text-secondary);
+}
+#opt-info-btn:hover {
+    color: var(--text-primary);
+    background-color: var(--btn-secondary-bg);
 }
 
 /* --- Resizable Chat Input --- */

@@ -228,7 +228,10 @@ const ids = [
     'daylight-sensor2-dir-x', 'daylight-sensor2-dir-y', 'daylight-sensor2-dir-z', 'daylight-sensor2-dir-x-val',
     'daylight-sensor2-dir-y-val', 'daylight-sensor2-dir-z-val', 'daylight-sensor2-percent', 'daylight-sensor2-percent-val',
     'daylighting-zone-visualizer-container', 'daylighting-zone-canvas', 'daylight-sensor-placement-header',
-    'ai-new-chat-btn'
+    'ai-new-chat-btn',
+    
+    // Optimization Info Modal
+    'opt-info-btn', 'optimization-info-modal', 'opt-info-modal-close-btn'
   ];
 
   const wallDirections = ['n', 's', 'e', 'w'];

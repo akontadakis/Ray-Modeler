@@ -205,6 +205,23 @@ Leverage the AI to perform automated, multi-step design tasks.
 
     > "Find an overhang depth for the south wall between 0.5m and 2.0m that maximizes sDA while keeping ASE below 10%."
 
+- **Design Optimization (Genetic Algorithm)**: This major feature is now accessible via a new "Optimization" tab in the Helios panel. It uses a **Genetic Algorithm** to automatically find high-performing shading designs by running numerous headless simulations in the background.
+
+The UI allows you to:
+
+- Select a **Target Wall** and **Shading Type** (Overhang, Louver, etc.).
+- Choose up to 3 **Parameters** to optimize (e.g., `depth`, `tilt`).
+- Define a **Goal** (e.g., `Maximize sDA`, `Minimize DGP`).
+- Set an optional **Constraint** (e.g., `ASE < 10`).
+- Apply **Preset Profiles** like "Maximize Daylight" or "Minimize Glare".
+  
+The AI Assistant can fully control this workflow with commands:
+
+- `"Open the optimization panel for the south wall overhang"`
+- `"Apply the 'minimize-glare' profile"`
+- `"Configure the optimization to maximize sDA with a constraint of ASE < 10"`
+- `"Start a 'quick' optimization run"`
+
 ---
 
 ### API Key Configuration
@@ -213,7 +230,7 @@ The integrated AI Assistant requires an API key to function. It supports multipl
 
 - **Expanded Provider Support**: Select between **OpenRouter**, **OpenAI**, **Google Gemini**, and **Anthropic**.
 - **Provider-Specific Keys**: The application saves a separate API key for each provider, so you can switch between models without re-entering credentials.
-- **AI Configuration**: A settings modal (⚙️ icon) allows you to select your preferred provider, choose from a list of popular models (e.g., Gemini 1.5 Pro, GPT-4o, Claude 3.5 Sonnet), and enter your API key.
+- **AI Configuration**: A settings modal allows you to select your preferred provider, choose from a list of popular models (e.g., **Gemini 2.5 Pro**, **GPT-5**, **Claude 4.5 Sonnet**), or enter a custom model ID. The app also supports many free and lite models available through OpenRouter.
 
 ---
 

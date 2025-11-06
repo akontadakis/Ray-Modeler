@@ -352,7 +352,7 @@ class Project {
 		}
 	}
 
-    async generateSimulationPackage(panelElement) {
+    async generateSimulationPackage(panelElement, uniqueId = null) {
         const { showAlert } = await import('./ui.js');
         const { generateRadFileContent, generateRayFileContent } = await import('./radiance.js');
     
@@ -391,6 +391,12 @@ class Project {
         }
     
         projectData.mergedSimParams = { ...globalParams, ...recipeOverrides };
+        
+        // --- Add uniqueId to projectData for generateScripts ---
+        if (uniqueId) {
+            projectData.uniqueId = uniqueId;
+        }
+        // --- End of addition ---
 
         // Generate all necessary input files in memory first.
         const { materials, geometry } = await generateRadFileContent(projectData);

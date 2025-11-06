@@ -1320,6 +1320,11 @@ export async function setupEventListeners() {
     dom['shortcut-help-modal']?.classList.replace('flex', 'hidden');
     });
 
+    // Listener for the new optimization info modal
+    dom['opt-info-modal-close-btn']?.addEventListener('click', () => {
+        dom['optimization-info-modal']?.classList.replace('flex', 'hidden');
+    });
+
     // Listeners for the new transform sliders with real-time feedback
     const transformSliders = ['obj-pos-x', 'obj-pos-y', 'obj-pos-z', 'obj-rot-y', 'obj-scale-uniform'];
     transformSliders.forEach(id => {

@@ -15,10 +15,10 @@ function _snapToStep(value, min, max, step) {
 export class GeneticOptimizer {
     constructor(options) {
         this.populationSize = options.populationSize || 20;
-        this.generations = options.generations || 10;
+        this.maxEvaluations = options.maxEvaluations || 50; // Changed from generations
         this.mutationRate = options.mutationRate || 0.1;
         this.parameterConstraints = options.parameterConstraints || [];
-        this.currentGeneration = 0;
+        this.evaluationsCompleted = 0; // Changed from currentGeneration
         this.population = [];
         this.bestDesign = null;
         this.shouldStop = false; // For cancellation
@@ -40,6 +40,19 @@ export class GeneticOptimizer {
             });
             this.population.push({ params: design, fitness: 0 });
         }
+    }
+
+    _selectOneParent(populationWithFitness) {
+        // Tournament selection (size 3)
+        let best = null;
+        for (let j = 0; j < 3; j++) {
+            const idx = Math.floor(Math.random() * populationWithFitness.length);
+            const candidate = populationWithFitness[idx];
+            if (!best || candidate.fitness > best.fitness) {
+                best = candidate;
+            }
+        }
+        return best;
     }
 
     selection(populationWithFitness) {
@@ -99,69 +112,90 @@ export class GeneticOptimizer {
         });
         return mutated;
     }
-    // This was the extra closing brace that was removed
+
+    _insertAndCull(newChildren, populationWithFitness) {
+        // Add new children to the population
+        const combined = [...populationWithFitness, ...newChildren];
+
+        // Sort by fitness (highest first)
+        combined.sort((a, b) => b.fitness - a.fitness);
+
+        // Cull the worst, returning a population of the original size
+        return combined.slice(0, this.populationSize);
+    }
 
     stop() {
         this.shouldStop = true;
     }
 
     async run(fitnessFunction, progressCallback) {
-        this.shouldStop = false;
-        
-        // Only initialize if not resuming (population is empty)
-        if (this.population.length === 0) {
-            this.initializePopulation();
-        }
+    this.shouldStop = false;
+    let populationWithFitness = [];
 
-        for (let gen = this.currentGeneration; gen < this.generations; gen++) {
-            if (this.shouldStop) {
-                throw new Error("Optimization cancelled by user");
-            }
-            this.currentGeneration = gen;
-
-            // Evaluate fitness for entire population
-            const populationWithFitness = await fitnessFunction(this.population);
-
-            // Find best
-            this.bestDesign = populationWithFitness.reduce((best, current) =>
-                current.fitness > best.fitness ? current : best
-            );
-
-            // Report progress
-            if (progressCallback) {
-                await progressCallback(gen, this.bestDesign, populationWithFitness);
-            }
-
-            // Create next generation (skip on last iteration)
-            if (gen < this.generations - 1 && !this.shouldStop) {
-                const selected = this.selection(populationWithFitness);
-                const nextPopulation = [];
-                for (let i = 0; i < this.populationSize; i += 2) {
-                    const parentA = selected[i];
-                    const parentB = selected[Math.min(i + 1, selected.length - 1)];
-                    const childA = this.crossover(parentA, parentB);
-                    const childB = this.crossover(parentB, parentA);
-                    nextPopulation.push(
-                        { params: this.mutate(childA), fitness: 0 },
-                        { params: this.mutate(childB), fitness: 0 }
-                    );
-                }
-                this.population = nextPopulation.slice(0, this.populationSize);
-            }
-        }
-        return this.bestDesign;
+    // 1. Initialize and evaluate initial population if this is a new run
+    if (this.evaluationsCompleted === 0) {
+        this.initializePopulation();
+        // Evaluate all individuals in the initial population
+        const initialPromises = this.population.map(design => fitnessFunction(design.params));
+        populationWithFitness = await Promise.all(initialPromises);
+        this.evaluationsCompleted = this.populationSize;
+    } else {
+        // Resuming: population is already loaded with fitness values
+        populationWithFitness = this.population;
     }
 
+    // 2. Find initial best and report progress
+    this.bestDesign = populationWithFitness.reduce((best, current) =>
+        (current.fitness > best.fitness) ? current : best, populationWithFitness[0]
+    );
+    this.population = populationWithFitness; // Ensure internal population has fitness
+    if (progressCallback) {
+        await progressCallback(this.evaluationsCompleted, this.bestDesign);
+    }
+
+    // 3. Start steady-state evaluation loop
+    while (this.evaluationsCompleted < this.maxEvaluations && !this.shouldStop) {
+        // Select 2 parents
+        const parentA = this._selectOneParent(populationWithFitness);
+        const parentB = this._selectOneParent(populationWithFitness);
+
+        // Create 2 children
+        const childAParams = this.mutate(this.crossover(parentA, parentB));
+        const childBParams = this.mutate(this.crossover(parentB, parentA));
+
+        // Evaluate 2 new children
+        const newChildren = await Promise.all([
+            fitnessFunction(childAParams),
+            fitnessFunction(childBParams)
+        ]);
+        this.evaluationsCompleted += 2;
+
+        // Insert new children and cull the worst
+        populationWithFitness = this._insertAndCull(newChildren, populationWithFitness);
+        this.population = populationWithFitness; // Update internal population state for checkpointing
+
+        // Update best design (it's always the first one after sorting)
+        this.bestDesign = populationWithFitness[0]; 
+
+        // Report progress
+        if (progressCallback) {
+            await progressCallback(this.evaluationsCompleted, this.bestDesign);
+        }
+    }
+
+    return this.bestDesign;
+}
+
     getState() {
-        return {
-            currentGeneration: this.currentGeneration,
-            population: JSON.parse(JSON.stringify(this.population)), // Deep copy
-            bestDesign: this.bestDesign ? JSON.parse(JSON.stringify(this.bestDesign)) : null
+    return {
+        evaluationsCompleted: this.evaluationsCompleted,
+        population: JSON.parse(JSON.stringify(this.population)), // Deep copy
+        bestDesign: this.bestDesign ? JSON.parse(JSON.stringify(this.bestDesign)) : null
         };
     }
 
     loadState(state) {
-        this.currentGeneration = state.currentGeneration;
+        this.evaluationsCompleted = state.evaluationsCompleted;
         this.population = state.population;
         this.bestDesign = state.bestDesign;
     }
