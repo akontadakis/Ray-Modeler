@@ -3672,12 +3672,29 @@
                         <option value="sda-ase">sDA & ASE</option>
                         <option value="illuminance">Illuminance</option>
                         <option value="dgp">DGP</option>
+                        <option value="imageless-glare">Imageless Annual Glare</option>
+                        <option value="spectral-lark">Spectral Analysis (Lark)</option>
+                        <option value="en17037">EN 17037 Compliance</option>
                     </select>
                 </div>
                 <div>
                     <label for="opt-goal-metric" class="label">Metric</label>
                     <select id="opt-goal-metric" class="w-full">
-                        </select>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-2">
+                <div>
+                    <label for="opt-goal-type" class="label">Goal Type</label>
+                    <select id="opt-goal-type" class="w-full">
+                        <option value="maximize" selected>Maximize</option>
+                        <option value="minimize">Minimize</option>
+                        <option value="set-target">Set Target Value</option>
+                    </select>
+                </div>
+                <div id="opt-target-value-container" class="hidden">
+                    <label for="opt-goal-target-value" class="label">Target Value</label>
+                    <input type="number" id="opt-goal-target-value" value="55" step="0.1" class="w-full">
                 </div>
             </div>
             <div class="mt-2">
@@ -3687,7 +3704,12 @@
                        placeholder="e.g., ASE < 10"
                        class="w-full">
             </div>
-        </div>
+
+            <div id="opt-warning-annual-sim" class="info-box-warning !text-xs !py-2 !px-3 mt-4 hidden" style="display: flex; align-items: flex-start; gap: 8px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0" style="margin-top: 2px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                <span><strong>Performance Warning:</strong> Annual simulations (Imageless Glare, Lark, EN 17037) are computationally expensive. A "Full Optimization" run may take several hours. Please use the **Quick Optimize** button for a faster, less accurate initial study.</span>
+            </div>
+            </div>
         
         <div class="border-t border-[--grid-color] pt-4">
             <h4 class="label mb-2">Settings</h4>

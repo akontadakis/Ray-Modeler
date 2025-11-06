@@ -21,6 +21,19 @@ The UI is designed around a system of floating panels that can be dragged, resiz
     *   **`scripts/project.js`**: Handles the logic for saving and loading the entire project state. It gathers all parameters from the DOM, bundles them into a single `.json` file, and can also restore the application state from such a file.
     *   **`scripts/simulation.js`**: Implements a "recipe-based" engine. It dynamically creates UI panels for different simulation types (e.g., illuminance, glare) and generates the corresponding Radiance shell scripts.
     *   **`scripts/ai-assistant.js`**: Powers the integrated AI chat. It defines a set of "tools" (functions) that the AI can call to interact with the application, such as modifying scene parameters, running simulations, or querying results.
+    *   **`scripts/annualDashboard.js`**: Manages the creation and updates of various charts and dashboards for annual simulations.
+    *   **`scripts/hdrViewer.js`**: Provides a viewer for High Dynamic Range (HDR) images, with exposure and false color controls.
+    *   **`scripts/knowledgeBase.js`**: Loads and searches a local knowledge base for the AI assistant.
+    *   **`scripts/lighting.js`**: Manages the artificial lighting systems, including IES file parsing and visualization.
+    *   **`scripts/optimizationEngine.js`**: Contains the core genetic algorithm for optimization tasks.
+    *   **`scripts/optimizationOrchestrator.js`**: Manages the optimization process, linking the UI, the genetic algorithm, and the simulation runs.
+    *   **`scripts/parsingWorker.js`**: A web worker for parsing large simulation result files without blocking the main UI thread.
+    *   **`scripts/radiance.js`**: Contains functions to generate Radiance-specific file content (`.rad`, `.vf`, etc.).
+    *   **`scripts/reportGenerator.js`**: Generates a self-contained HTML report of the project and simulation results.
+    *   **`scripts/resultsManager.js`**: Manages loading, processing, and statistical analysis of simulation results.
+    *   **`scripts/scriptGenerator.js`**: Generates the shell scripts (`.sh`, `.bat`) for running Radiance simulations.
+    *   **`scripts/sidebar.js`**: Manages the docking and undocking behavior of the sidebars.
+    *   **`scripts/sunTracer.js`**: Implements the sun ray tracing visualization.
 
 ## Building and Running
 

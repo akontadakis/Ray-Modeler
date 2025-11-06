@@ -193,6 +193,7 @@ The AI Assistant monitors user actions and provides contextual, non-intrusive su
 - If a material's **reflectance is set to an unusually high or low value**, it will warn that this may be physically unrealistic.
 - If the user enables a **View Grid**, it will suggest opening the Imageless Annual Glare recipe.
 - If the **DGP recipe is open but the viewpoint is not set to fisheye**, it will offer to correct the setting.
+- If **Global Ambient Bounces (`-ab`) are set below 2**, it will warn that this can lead to unrealistic, dark, or splotchy results.
 
 ### Generative Design
 
@@ -211,15 +212,18 @@ The UI allows you to:
 
 - Select a **Target Wall** and **Shading Type** (Overhang, Louver, etc.).
 - Choose up to 3 **Parameters** to optimize (e.g., `depth`, `tilt`).
-- Define a **Goal** (e.g., `Maximize sDA`, `Minimize DGP`).
+- Define a **Goal** by selecting a **Recipe** (e.g., `sDA & ASE`, `Imageless Annual Glare`, `Spectral Analysis (Lark)`) and a **Metric** (e.g., `Maximize sDA`, `Minimize Annual DGP Avg`, `Maximize Circadian Stimulus`).
+- Set a **Goal Type**: `Maximize`, `Minimize`, or `Set Target Value` (e.g., set sDA to exactly 55%).
 - Set an optional **Constraint** (e.g., `ASE < 10`).
 - Apply **Preset Profiles** like "Maximize Daylight" or "Minimize Glare".
+- Receive a **Performance Warning** when selecting computationally expensive annual recipes, recommending the "Quick Optimize" mode.
   
 The AI Assistant can fully control this workflow with commands:
 
 - `"Open the optimization panel for the south wall overhang"`
 - `"Apply the 'minimize-glare' profile"`
 - `"Configure the optimization to maximize sDA with a constraint of ASE < 10"`
+- `"Configure optimization to set sDA to a target value of 55%."`
 - `"Start a 'quick' optimization run"`
 
 ---

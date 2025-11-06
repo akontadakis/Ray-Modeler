@@ -487,10 +487,18 @@ const availableTools = [
                             "description": "The optimization goal metric, e.g., 'maximize_sDA' or 'minimize_ASE'"
                         },
                         "constraint": {
-                            "type": "STRING",
-                            "description": "Optional constraint, e.g., 'ASE < 10' or '> 300'"
-                        },
-                        "populationSize": {
+                        "type": "STRING",
+                        "description": "Optional constraint, e.g., 'ASE < 10' or '> 300'"
+                    },
+                    "goalType": {
+                        "type": "STRING",
+                        "description": "The optimization objective: 'maximize', 'minimize', or 'set-target'."
+                    },
+                    "targetValue": {
+                        "type": "NUMBER",
+                        "description": "The numerical target value. Only used if goalType is 'set-target'."
+                    },
+                    "populationSize": {
                             "type": "NUMBER",
                             "description": "Number of designs per generation (recommended 4-50)"
                         },
@@ -542,7 +550,10 @@ const recipeMap = {
     'sda-ase': 'template-recipe-sda-ase',
     'annual-5ph': 'template-recipe-annual-5ph',
     'imageless-glare': 'template-recipe-imageless-glare',
-    'spectral-lark': 'template-recipe-spectral-lark'
+    'spectral-lark': 'template-recipe-spectral-lark',
+    'en17037': 'template-recipe-en17037', // ADDED
+    'en-illuminance': 'template-recipe-en-illuminance', // ADDED
+    'en-ugr': 'template-recipe-en-ugr' // ADDED
 };
 
 // Define the available models for each provider
@@ -1997,7 +2008,7 @@ const toolHandlers = {
         };
     },
     'configureOptimization': async (args) => {
-        const { parameters, goal, constraint, populationSize, generations } = args;
+        const { parameters, goal, constraint, populationSize, generations, goalType, targetValue } = args;
         let messages = ['Optimization configured:'];
 
         // Set goal and constraint
@@ -2033,11 +2044,21 @@ const toolHandlers = {
             messages.push(`- Population size set to ${populationSize}`);
         }
         if (generations) {
-            setUiValue('opt-generations', Math.min(20, Math.max(2, generations)));
-            messages.push(`- Generations set to ${generations}`);
-        }
+        setUiValue('opt-generations', Math.min(20, Math.max(2, generations)));
+        messages.push(`- Generations set to ${generations}`);
+    }
 
-        // Configure parameters
+    if (goalType) {
+        setUiValue('opt-goal-type', goalType);
+        dom['opt-goal-type']?.dispatchEvent(new Event('change', { bubbles: true })); // Trigger show/hide
+        messages.push(`- Goal type set to ${goalType}`);
+    }
+    if (targetValue !== undefined && goalType === 'set-target') {
+        setUiValue('opt-goal-target-value', targetValue);
+        messages.push(`- Target value set to ${targetValue}`);
+    }
+
+    // Configure parameters
         if (parameters) {
             const container = dom['opt-params-container'];
             if (!container) return { success: false, message: 'Parameter container not found.' };

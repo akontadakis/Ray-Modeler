@@ -23,6 +23,19 @@ const RECIPE_METRICS = {
     ],
     'dgp': [
         { id: 'minimize_dgp', name: 'Minimize DGP', file: '_DGP.txt' }
+    ],
+    'imageless-glare': [
+        { id: 'minimize_Annual_DGP_Avg', name: 'Minimize Annual Avg DGP', file: '.dgp' },
+        { id: 'maximize_Glare_Autonomy_Avg', name: 'Maximize Glare Autonomy (Avg)', file: '.ga' },
+        { id: 'maximize_sGA', name: 'Maximize sGA (Spatial Glare Autonomy)', file: '_sGA.txt' }
+    ],
+    'spectral-lark': [
+        { id: 'maximize_CS_avg', name: 'Maximize Circadian Stimulus (CS)', file: 'circadian_summary.json' },
+        { id: 'maximize_EML_avg', name: 'Maximize Melanopic Lux (EML)', file: 'circadian_summary.json' }
+    ],
+    'en17037': [
+        { id: 'maximize_EN17037_sDA', name: 'Maximize EN 17037 Daylight Provision', file: 'EN17037_Daylight_Summary.json' },
+        { id: 'minimize_EN17037_Glare_Hours', name: 'Minimize EN 17037 Glare Hours', file: 'EN17037_Glare_Summary.json' }
     ]
 };
 
@@ -148,7 +161,18 @@ const PRESET_PROFILES = {
         }
     });
 
-    optSimulationRecipe?.addEventListener('change', updateGoalMetrics);
+    optSimulationRecipe?.addEventListener('change', () => {
+    updateGoalMetrics();
+
+    // Show/hide performance warning for expensive simulations
+    const annualSimWarning = optimizationPanel.querySelector('#opt-warning-annual-sim');
+    if (annualSimWarning) {
+        const selectedRecipe = optSimulationRecipe.value;
+        const isExpensive = ['imageless-glare', 'spectral-lark', 'en17037'].includes(selectedRecipe);
+        annualSimWarning.classList.toggle('hidden', !isExpensive);
+        }
+    });
+    
     startOptimizationBtn?.addEventListener('click', () => startOptimization('full'));
     quickOptimizeBtn?.addEventListener('click', () => startOptimization('quick'));
     resumeOptimizationBtn?.addEventListener('click', () => startOptimization('resume'));
@@ -167,6 +191,15 @@ const PRESET_PROFILES = {
         modal.style.zIndex = getNewZIndex();
         // We don't need initializePanelControls since it's a simple info modal
         }
+    });
+
+    // Listener for new Goal Type dropdown
+    const optGoalType = optimizationPanel.querySelector('#opt-goal-type');
+    const optTargetValueContainer = optimizationPanel.querySelector('#opt-target-value-container');
+
+    optGoalType?.addEventListener('change', () => {
+        const isTargetMode = optGoalType.value === 'set-target';
+        optTargetValueContainer?.classList.toggle('hidden', !isTargetMode);
     });
 }
 
@@ -604,13 +637,18 @@ function gatherSettings(mode = 'full') {
         throw new Error('Maximum 3 parameters allowed for optimization.');
     }
 
-    return {
-        wall: optTargetWall?.value || 's',
-        shadingType: optShadingType?.value || 'overhang',
-        recipe: optSimulationRecipe?.value || 'sda-ase',
-        goalId: optGoalMetric?.value || 'maximize_sDA',
-        constraint: optConstraint?.value.trim() || '',
-        populationSize: populationSize,
+    const optGoalType = optimizationPanel.querySelector('#opt-goal-type');
+    const optGoalTargetValue = optimizationPanel.querySelector('#opt-goal-target-value');
+
+return {
+    wall: optTargetWall?.value || 's',
+    shadingType: optShadingType?.value || 'overhang',
+    recipe: optSimulationRecipe?.value || 'sda-ase',
+    goalId: optGoalMetric?.value || 'maximize_sDA',
+    goalType: optGoalType?.value || 'maximize', // NEW
+    targetValue: parseFloat(optGoalTargetValue?.value || '0'), // NEW
+    constraint: optConstraint?.value.trim() || '',
+    populationSize: populationSize,
         maxEvaluations: maxEvaluations, // Changed from generations
         quality: optQuality?.value || 'medium',
         parameters: selectedParams
@@ -664,13 +702,19 @@ async function runSimulation(settings) {
     // Dynamically import simulation functions to avoid circular dependencies
     const { openRecipePanelByType, programmaticallyGeneratePackage } = await import('./simulation.js');
 
-    // Map recipe ID to template ID
-    const recipeTemplates = {
+    // Map optimization recipe IDs to their full template IDs from simulation.js
+    const recipeTemplateMap = {
         'sda-ase': 'template-recipe-sda-ase',
         'illuminance': 'template-recipe-illuminance',
-        'dgp': 'template-recipe-dgp'
+        'dgp': 'template-recipe-dgp',
+        'imageless-glare': 'template-recipe-imageless-glare',
+        'spectral-lark': 'template-recipe-spectral-lark',
+        'en17037': 'template-recipe-en17037'
+        // 'en-illuminance' is excluded as it's not for shading optimization
     };
-    const templateId = recipeTemplates[settings.recipe];
+
+    const templateId = recipeTemplateMap[recipe];
+
     if (!templateId) throw new Error(`Unknown recipe: ${settings.recipe}`);
 
     // Open panel if needed (it may be hidden)
@@ -908,70 +952,154 @@ async function _getFileFromElectron(filePath) {
  * @returns {Promise<object>} An object with score, metricValue, and unit.
  * @private
  */
-async function _parseSimulationResult(recipe, goalId, constraint, uniqueId) {
+async function _parseSimulationResult(recipe, goalId, constraint, uniqueId, goalType, targetValue) {
     const projectName = project.projectName || 'scene';
     const metrics = RECIPE_METRICS[recipe];
     const goalMetric = metrics.find(m => m.id === goalId);
     if (!goalMetric) throw new Error(`Unknown goal: ${goalId}`);
 
-    // Construct the unique result file name
-    // Assumes generateScripts appends the uniqueId *before* the recipe-specific suffix
-    const resultFileName = `${projectName}_${uniqueId}${goalMetric.file}`;
-    const filePath = `08_results/${resultFileName}`;
+    // --- 1. Construct the correct file path ---
+    let resultFileName, filePath;
+    const baseName = `${projectName}_${uniqueId}`;
+
+    switch (recipe) {
+        case 'sda-ase':
+            resultFileName = `${baseName}${goalMetric.file}`; // e.g., _sDA_final.ill
+            filePath = `08_results/${resultFileName}`;
+            break;
+        case 'illuminance':
+            resultFileName = `${baseName}${goalMetric.file}`; // e.g., _illuminance.txt
+            filePath = `08_results/${resultFileName}`;
+            break;
+        case 'dgp':
+            resultFileName = `${baseName}${goalMetric.file}`; // e.g., _DGP.txt
+            filePath = `08_results/${resultFileName}`;
+            break;
+        case 'imageless-glare':
+            if (goalId === 'maximize_sGA') {
+                resultFileName = `${baseName}_sGA.txt`; // Assumes script outputs this
+            } else if (goalId === 'maximize_Glare_Autonomy_Avg') {
+                resultFileName = `${baseName}.ga`; // This is a per-point file
+            } else {
+                resultFileName = `${baseName}.dgp`; // This is a per-point, per-hour file
+            }
+            filePath = `08_results/${resultFileName}`;
+            break;
+        case 'spectral-lark':
+            // This recipe outputs a JSON summary
+            resultFileName = `circadian_summary.json`; // This file name is static from the recipe
+            filePath = `08_results/spectral_9ch/${baseName}/${resultFileName}`;
+            break;
+        case 'en17037':
+            // This recipe outputs multiple JSON summaries
+            if (goalId.includes('Daylight')) {
+                resultFileName = `EN17037_Daylight_Summary.json`;
+            } else {
+                resultFileName = `EN17037_Glare_Summary.json`;
+            }
+            filePath = `08_results/${baseName}/${resultFileName}`;
+            break;
+        default:
+            throw new Error(`Fitness calculation not implemented for recipe: ${recipe}`);
+    }
 
     try {
         const file = await _getFileFromElectron(filePath);
+        const textContent = await file.text();
 
-        // Load data into results manager using slot 'a'
-        await resultsManager.loadAndProcessFile(file, 'a');
-
-        // Calculate metric value based on recipe
-        let value, unit, constraintValue;
-        let constraintMet = true;
-
-        if (recipe === 'sda-ase') {
-            const annualMetrics = resultsManager.calculateAnnualMetrics('a', {});
-            if (goalId.includes('sDA')) {
-                value = annualMetrics.sDA;
-            } else { // Assumes ASE
-                value = annualMetrics.ASE;
-            }
-            unit = '%';
-
-            // Check constraint if it exists
-            if (constraint) {
-                const constraintMetricId = constraint.split(' ')[0].toUpperCase();
-                constraintValue = (constraintMetricId === 'ASE') ? annualMetrics.ASE : annualMetrics.sDA;
-                constraintMet = checkConstraint(constraintValue, constraint);
-            }
-
-        } else if (recipe === 'illuminance') {
-            const stats = resultsManager.getActiveStats();
-            if (goalId.includes('avg')) {
-                value = stats.avg;
-                unit = ' lux';
-            } else if (goalId === 'maximize_uniformity') {
-                value = (stats.min > 0 && stats.avg > 0) ? (stats.min / stats.avg) : 0;
-                unit = ' (U0)';
-            }
-            if (constraint) constraintMet = checkConstraint(value, constraint);
-
-        } else if (recipe === 'dgp') {
-            const text = await file.text();
-            const match = text.match(/DGP:\s*([\d.]+)/); // Simple parser
-            value = match ? parseFloat(match[1]) : 0;
-            unit = '';
-            if (constraint) constraintMet = checkConstraint(value, constraint);
-        } else {
-            throw new Error(`Fitness calculation not implemented for recipe: ${recipe}`);
+        // Load .ill data into results manager for sDA/ASE
+        if (goalMetric.file.endsWith('.ill')) {
+            await resultsManager.loadAndProcessFile(file, 'a');
         }
 
-        // Calculate score (negate for minimize goals)
-        let score = goalId.startsWith('minimize') ? -value : value;
+        // --- 2. Calculate metric value ---
+        let value, unit, constraintValue, constraintMet = true;
 
-        // Apply constraint penalty
+        switch (recipe) {
+            case 'sda-ase': {
+                const annualMetrics = resultsManager.calculateAnnualMetrics('a', {});
+                value = goalId.includes('sDA') ? annualMetrics.sDA : annualMetrics.ASE;
+                unit = '%';
+                if (constraint) {
+                    const constMetricId = constraint.split(' ')[0].toUpperCase();
+                    constraintValue = (constMetricId === 'ASE') ? annualMetrics.ASE : annualMetrics.sDA;
+                    constraintMet = checkConstraint(constraintValue, constraint);
+                }
+                break;
+            }
+            case 'illuminance': {
+                // .txt files are loaded as .ill
+                const stats = resultsManager.getActiveStats();
+                if (goalId.includes('avg')) {
+                    value = stats.avg; unit = ' lux';
+                } else { // uniformity
+                    value = (stats.min > 0 && stats.avg > 0) ? (stats.min / stats.avg) : 0; unit = ' (U0)';
+                }
+                if (constraint) constraintMet = checkConstraint(value, constraint);
+                break;
+            }
+            case 'dgp': {
+                const match = textContent.match(/DGP:\s*([\d.]+)/);
+                value = match ? parseFloat(match[1]) : 0; unit = '';
+                if (constraint) constraintMet = checkConstraint(value, constraint);
+                break;
+            }
+            case 'imageless-glare': {
+                // This is complex. We need to parse different files.
+                // This requires the .ga and .dgp files to be simple text files with one value per line.
+                const data = textContent.split('\n').map(parseFloat).filter(v => !isNaN(v));
+                if (data.length === 0) throw new Error('Empty results file for imageless glare.');
+
+                if (goalId === 'maximize_sGA') {
+                    value = parseFloat(textContent.trim()); // sGA.txt is just one number
+                    unit = '%';
+                } else {
+                    // For Avg DGP or Avg GA, we take the average of all points
+                    value = data.reduce((a, b) => a + b, 0) / data.length;
+                    unit = goalId.includes('DGP') ? '' : '%';
+                }
+                if (constraint) constraintMet = checkConstraint(value, constraint);
+                break;
+            }
+            case 'spectral-lark': {
+                const data = JSON.parse(textContent);
+                value = (goalId === 'maximize_CS_avg') ? data.space_average.CS : data.space_average.EML;
+                unit = (goalId === 'maximize_CS_avg') ? '' : ' m-EDI lux';
+                if (constraint) {
+                    const constMetricId = constraint.split(' ')[0].toUpperCase();
+                    constraintValue = (constMetricId === 'CS') ? data.space_average.CS : data.space_average.EML;
+                    constraintMet = checkConstraint(constraintValue, constraint);
+                }
+                break;
+            }
+            case 'en17037': {
+                const data = JSON.parse(textContent);
+                if (goalId.includes('Daylight')) {
+                    value = data.metrics.percent_area_passed_target; // e.g., 95.0
+                    unit = '%';
+                } else { // Glare
+                    value = data.metrics.percent_time_failed; // e.g., 4.5
+                    unit = '% time';
+                }
+                if (constraint) constraintMet = checkConstraint(value, constraint);
+                break;
+            }
+            default:
+                throw new Error(`Value parsing not implemented for recipe: ${recipe}`);
+        }
+
+        // --- 3. Calculate final score based on NEW Goal Type ---
+        let score;
+        if (goalType === 'maximize') {
+            score = value;
+        } else if (goalType === 'minimize') {
+            score = -value;
+        } else { // 'set-target'
+            score = -Math.abs(value - targetValue); // Fitness is maximized when difference is 0
+        }
+
         if (!constraintMet) {
-            score = -Infinity; // Heavy penalty for failing constraint
+            score = -Infinity; // Heavy penalty
             log(`    → Constraint FAILED (${constraint})`);
         }
 
@@ -979,7 +1107,7 @@ async function _parseSimulationResult(recipe, goalId, constraint, uniqueId) {
 
     } catch (error) {
         console.error(`Failed to parse simulation results from ${filePath}:`, error);
-        return { score: -Infinity, value: 0, unit: '' };
+        return { score: -Infinity, value: 0, unit: '' }; // Return worst fitness
     }
 }
 
@@ -1092,9 +1220,9 @@ async function evaluateDesignHeadless(designParams, settings) {
 
     // 4. Parse the results and calculate fitness
     // Use the uniqueId to find the correct result file
-    const fitness = await _parseSimulationResult(recipe, goalId, constraint, uniqueId);
+    const fitness = await _parseSimulationResult(recipe, goalId, constraint, uniqueId, settings.goalType, settings.targetValue);
 
-    // --- Caching Logic ---
+// --- Caching Logic ---
     fitnessCache.set(designKey, fitness); // Store the new result
     // --- End Caching Logic ---
 
