@@ -582,7 +582,8 @@ export async function startOptimization(mode = 'full') {
                 const designKey = JSON.stringify(designParams);
                 if (fitnessCache.has(designKey)) {
                     log(`    → (Cache HIT) ${designKey}`);
-                    return fitnessCache.get(designKey);
+                    // Return the pre-calculated ssgaResult for the optimizer
+                    return fitnessCache.get(designKey).ssgaResult;
                 }
 
                 log(`  Spawning eval for: ${designKey}`);
@@ -595,9 +596,12 @@ export async function startOptimization(mode = 'full') {
                     metricValue: fitness.value,
                     unit: fitness.unit
                 };
-                fitnessCache.set(designKey, result);
+
+                // Store BOTH the raw metrics (for AI analysis) and the processed result (for the SSGA)
+                fitnessCache.set(designKey, { rawMetrics: metrics, ssgaResult: result });
+
                 log(`    → Fitness: ${fitness.score.toFixed(2)} (${fitness.value.toFixed(2)}${fitness.unit})`);
-                return result;
+                return result; // Return the processed result to the optimizer
             };
 
             const progressCallback = async (evalsCompleted, bestDesign) => {
@@ -641,14 +645,18 @@ export async function startOptimization(mode = 'full') {
                 const designKey = JSON.stringify(designParams);
                 if (fitnessCache.has(designKey)) {
                     log(`    → (Cache HIT) ${designKey}`);
-                    return fitnessCache.get(designKey);
+                    // Return the raw metrics for the MOGA optimizer
+                    return fitnessCache.get(designKey).rawMetrics;
                 }
 
                 log(`  Spawning eval for: ${designKey}`);
                 const metrics = await evaluateDesignHeadless(designParams, settings);
-                fitnessCache.set(designKey, metrics);
+
+                // Store the raw metrics in the consistent cache structure
+                fitnessCache.set(designKey, { rawMetrics: metrics });
+
                 log(`    → Metrics: ${JSON.stringify(metrics)}`);
-                return metrics;
+                return metrics; // Return raw metrics to the MOGA optimizer
             };
 
             const progressCallback = async (generation, paretoFront) => {

@@ -226,6 +226,20 @@ The AI Assistant can fully control this workflow with commands:
 - `"Configure optimization to set sDA to a target value of 55%."`
 - `"Start a 'quick' optimization run"`
 
+- **AI-Suggested Parameter Ranges**: Before running a full optimization, ask Helios to find the most effective range for a parameter (e.g., `"suggest a good range for overhang depth"`). It runs a quick analysis to find the "sweet spot," helping you avoid testing ineffective values.
+
+- **AI-Powered Trend Analysis**: After a run, ask Helios to `"analyze the optimization results"`. It will analyze the *entire* dataset (not just the best results) to provide high-level insights on parameter sensitivity and key performance trends.
+  
+The AI Assistant can fully control this workflow with commands:
+
+- `"Open the optimization panel for the south wall overhang"`
+- `"Apply the 'minimize-glare' profile"`
+- `"Configure the optimization to maximize sDA with a constraint of ASE < 10"`
+- `"Configure a multi-objective optimization to maximize sDA and minimize ASE"`
+- `"Start a 'quick' optimization run"`
+- `"Suggest a good range for louver slat angle"`
+- `"Analyze the optimization results"`
+
 ---
 
 ### API Key Configuration

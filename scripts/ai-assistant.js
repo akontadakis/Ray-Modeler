@@ -558,6 +558,11 @@ const availableTools = [
                 }
             },
             {
+                "name": "analyzeOptimizationResults",
+                "description": "Analyzes the complete set of evaluations from the most recent optimization run. Use this tool *after* an optimization is complete to get trend analysis and parameter insights.",
+                "parameters": { "type": "OBJECT", "properties": {} }
+            },
+            {
                 "name": "suggestOptimizationRanges",
                 "description": "Runs a quick, preliminary analysis on a single parameter to find its most effective range, helping to avoid diminishing returns. This should be offered *before* a full optimization.",
                 "parameters": {
@@ -1361,6 +1366,13 @@ async function _createContextualSystemPrompt(userMessage) {
 - Compare metrics between datasets
 - Filter and highlight points based on conditions
 - Generate statistical summaries and insights
+
+### 🚀 Optimization Analysis
+- After an optimization run, if the user asks for analysis, use the 'analyzeOptimizationResults' tool to get the data from *all* evaluations.
+- Your job is to analyze this array of results to provide a high-level summary of *why* the best designs performed well.
+- Identify key **trends** (e.g., "sDA improved as 'depth' increased, but dropped off after 1.5m").
+- Identify **sensitive parameters** (e.g., "'Slat Angle' was the most critical driver of performance") and **insensitive parameters** (e.g., "'Slat Width' had almost no impact, so it can be chosen based on cost or aesthetics").
+- This analysis is more valuable than just stating the single best result.
 
 ### 👨‍🏫 Interactive Tutor
 - Provide step-by-step guidance through complex workflows
@@ -2421,8 +2433,50 @@ const toolHandlers = {
             };
         },
 
+        'analyzeOptimizationResults': async (args) => {
+        const cache = getFitnessCache();
+        if (cache.size === 0) {
+            return { success: false, message: "No optimization data found. Please run an optimization before analyzing results." };
+        }
+
+        const allEvaluations = [];
+        let paramKeys = new Set();
+
+        for (const [key, value] of cache.entries()) {
+            try {
+                // Ensure the evaluation has raw metrics to analyze
+                if (value && value.rawMetrics) {
+                    const params = JSON.parse(key);
+                    allEvaluations.push({
+                        params: params,
+                        metrics: value.rawMetrics
+                    });
+                    // Collect all parameter names
+                    Object.keys(params).forEach(pKey => paramKeys.add(pKey));
+                }
+            } catch (e) {
+                console.warn("Could not parse cache entry:", key, e);
+            }
+            }
+
+            if (allEvaluations.length === 0) {
+                return { success: false, message: "Found optimization data, but could not parse any valid evaluation results for analysis." };
+            }
+
+            return { 
+                success: true, 
+                message: `Successfully retrieved ${allEvaluations.length} evaluation results.`, 
+                // Send the AI the list of parameters and all results
+                results: {
+                    parametersAnalyzed: Array.from(paramKeys),
+                    evaluations: allEvaluations
+                }
+            };
+        },
+
         // Special tools (handled directly)
         'runDesignInspector': async (args) => {
+
         // These are handled by their own top-level functions, not this executor
         return { success: true, message: "Inspector/Critique initiated." };
         },
