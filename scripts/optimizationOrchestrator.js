@@ -3,12 +3,15 @@ import { setUiValue, showAlert, setShadingState, getNewZIndex } from './ui.js';
 import { project } from './project.js';
 import { resultsManager } from './resultsManager.js';
 import { GeneticOptimizer } from './optimizationEngine.js';
+import { MultiObjectiveOptimizer } from './mogaOptimizer.js'; // ADDED
 import { programmaticallyGeneratePackage } from './simulation.js';
 
-let optimizer = null;
+let optimizer = null; // Can be instance of GeneticOptimizer or MultiObjectiveOptimizer
 let isOptimizing = false;
 let optimizationPanel = null; // This will store the reference to the correct panel
-let fitnessCache = new Map();
+let fitnessCache = new Map(); // Cache evaluations: designKey -> metrics object
+let selectedDesignParams = null; // Store params of the clicked-on result
+
 
 // --- Configuration maps ---
 const RECIPE_METRICS = {
@@ -123,84 +126,210 @@ const PRESET_PROFILES = {
  * This is called by ai-assistant.js once the panel is in the DOM.
  * @param {HTMLElement} optPanel The specific panel element for this optimization instance.
  */
-    export function initOptimizationUI(optPanel) {
+export function initOptimizationUI(optPanel) {
     console.log('[initOptimizationUI] Initializing optimization panel UI.');
     optimizationPanel = optPanel; // Store the panel reference
 
     // Get elements scoped to the correct panel
-    const optShadingType = optimizationPanel.querySelector('#opt-shading-type');
-    const optSimulationRecipe = optimizationPanel.querySelector('#opt-simulation-recipe');
-    const optimizationProfileSelector = optimizationPanel.querySelector('#optimization-profile-selector');
-    const startOptimizationBtn = optimizationPanel.querySelector('#start-optimization-btn');
-    const quickOptimizeBtn = optimizationPanel.querySelector('#quick-optimize-btn');
-    const resumeOptimizationBtn = optimizationPanel.querySelector('#resume-optimization-btn');
-    const cancelOptimizationBtn = optimizationPanel.querySelector('#cancel-optimization-btn');
-    const infoBtn = optimizationPanel.querySelector('#opt-info-btn');
+    const dom = getDom(); // Get all GLOBAL DOM elements (though we don't use it here)
 
-    // Setup event listeners
+    // --- Get all controls ---
+    // These elements are INSIDE the optPanel, so we must query it.
+    const optType = optPanel.querySelector('#opt-type');
+    const singleObjectiveControls = optPanel.querySelector('#opt-single-objective-controls');
+    const multiObjectiveControls = optPanel.querySelector('#opt-multi-objective-controls');
+
+    const optShadingType = optPanel.querySelector('#opt-shading-type');
+    const optSimulationRecipe = optPanel.querySelector('#opt-simulation-recipe'); // SSGA recipe
+    const optRecipe1 = optPanel.querySelector('#opt-recipe-1'); // MOGA recipe 1
+    const optRecipe2 = optPanel.querySelector('#opt-recipe-2'); // MOGA recipe 2
+    const optGoal1 = optPanel.querySelector('#opt-goal-1');
+const optGoal2 = optPanel.querySelector('#opt-goal-2');
+const optGoalMetric = optPanel.querySelector('#opt-goal-metric'); // SSGA metric
+
+const optimizationProfileSelector = optPanel.querySelector('#optimization-profile-selector');
+    const startOptimizationBtn = optPanel.querySelector('#start-optimization-btn');
+    const quickOptimizeBtn = optPanel.querySelector('#quick-optimize-btn');
+    const resumeOptimizationBtn = optPanel.querySelector('#resume-optimization-btn');
+    const cancelOptimizationBtn = optPanel.querySelector('#cancel-optimization-btn');
+    const infoBtn = optPanel.querySelector('#opt-info-btn');
+    const applyBestDesignBtn = optPanel.querySelector('#apply-best-design-btn');
+    const summaryList = optPanel.querySelector('#optimization-summary-list');
+
+    // --- Attach Event Listeners ---
+
+    // Main optimizer type selector
+    optType?.addEventListener('change', () => {
+        const isMOGA = optType.value === 'moga';
+        singleObjectiveControls?.classList.toggle('hidden', isMOGA);
+        multiObjectiveControls?.classList.toggle('hidden', !isMOGA);
+
+        // Update the "Max Evals / Gens" label
+        const generationsLabel = optimizationPanel.querySelector('label[for="opt-generations"]');
+        if (generationsLabel) {
+            generationsLabel.textContent = isMOGA ? 'Max Generations' : 'Max Evaluations';
+        }
+    });
+
+    // Shading type selector
     if (optShadingType) {
-        console.log('[initOptimizationUI] Found #opt-shading-type dropdown. Attaching listener.');
         optShadingType.addEventListener('change', () => {
-            console.log('[#opt-shading-type change event] Dropdown changed!');
             populateParameters();
         });
-    } else {
-        console.error('[initOptimizationUI] CRITICAL: #opt-shading-type dropdown not found.');
     }
 
-    // In initOptimizationUI(optPanel)
-    const applyBestDesignBtn = optimizationPanel.querySelector('#apply-best-design-btn');
-    applyBestDesignBtn?.addEventListener('click', () => {
-        if (optimizer && optimizer.bestDesign) {
-            log('Applying best design from last run...');
-            const settings = gatherSettings('full'); // Gather current settings to get wall/type
-            applyDesignToScene(optimizer.bestDesign.params, settings);
-            showAlert('Best design applied to scene.', 'Success');
-        } else {
-            showAlert('No best design found to apply.', 'Error');
-        }
-    });
+    // --- Recipe/Goal Selectors ---
 
+    // Helper to populate a goal dropdown based on a recipe dropdown
+    const populateGoals = (recipeSelect, goalSelect) => {
+        const recipe = recipeSelect.value;
+        goalSelect.innerHTML = '';
+        const metrics = RECIPE_METRICS[recipe] || [];
+        metrics.forEach(metric => {
+            const option = document.createElement('option');
+            option.value = metric.id;
+            option.textContent = metric.name;
+            goalSelect.appendChild(option);
+        });
+    };
+
+    /// Populate all recipe dropdowns
+[optSimulationRecipe, optRecipe1, optRecipe2].forEach(recipeSelect => {
+    if (!recipeSelect) return;
+
+    recipeSelect.innerHTML = ''; // Clear
+
+    // Add placeholder ONLY for recipe 2
+    if (recipeSelect.id === 'opt-recipe-2') {
+        const placeholder = document.createElement('option');
+        placeholder.value = "";
+        placeholder.textContent = "(Same as Objective 1)";
+        recipeSelect.appendChild(placeholder);
+    }
+
+    Object.keys(RECIPE_METRICS).forEach(recipeId => {
+        const option = document.createElement('option');
+        option.value = recipeId;
+        option.textContent = recipeId.replace(/-/g, ' ').replace('sda ase', 'sDA/ASE');
+
+        // Set default for SSGA and MOGA-1
+        if(recipeId === 'sda-ase' && recipeSelect.id !== 'opt-recipe-2') {
+            option.selected = true;
+        }
+        recipeSelect.appendChild(option);
+    });
+});
+
+    // Add listeners to recipe dropdowns
     optSimulationRecipe?.addEventListener('change', () => {
-    updateGoalMetrics();
-
-    // Show/hide performance warning for expensive simulations
-    const annualSimWarning = optimizationPanel.querySelector('#opt-warning-annual-sim');
-    if (annualSimWarning) {
-        const selectedRecipe = optSimulationRecipe.value;
-        const isExpensive = ['imageless-glare', 'spectral-lark', 'en17037'].includes(selectedRecipe);
-        annualSimWarning.classList.toggle('hidden', !isExpensive);
-        }
+        populateGoals(optSimulationRecipe, optGoalMetric);
+        updateAnnualSimWarning(optSimulationRecipe.value);
     });
-    
+
+    optRecipe1?.addEventListener('change', () => {
+        populateGoals(optRecipe1, optGoal1);
+        // Sync recipe 2 dropdown if its value is "" (placeholder)
+        if (optRecipe2 && optRecipe2.value === "") {
+            optRecipe2.dispatchEvent(new Event('change')); // Trigger goal 2 update
+        }
+        updateAnnualSimWarning(optRecipe1.value);
+    });
+
+    optRecipe2?.addEventListener('change', () => {
+        // If placeholder is selected, use recipe 1's value. Otherwise, use its own value.
+        const recipeToUse = (optRecipe2.value === "") ? optRecipe1 : optRecipe2;
+        populateGoals(recipeToUse, optGoal2);
+    });
+
+    // --- Initial Population of UI ---
     startOptimizationBtn?.addEventListener('click', () => startOptimization('full'));
     quickOptimizeBtn?.addEventListener('click', () => startOptimization('quick'));
     resumeOptimizationBtn?.addEventListener('click', () => startOptimization('resume'));
     cancelOptimizationBtn?.addEventListener('click', cancelOptimization);
     optimizationProfileSelector?.addEventListener('change', applyPresetProfile);
 
-    // Initial population
-    populateParameters();
-    updateGoalMetrics();
+    // --- Results List Listeners ---
+    summaryList?.addEventListener('click', (e) => {
+        const li = e.target.closest('li[data-params]');
+        if (li) {
+            // Remove 'active' from all others
+            summaryList.querySelectorAll('li').forEach(item => item.classList.remove('active-result'));
+            // Add 'active' to clicked
+            li.classList.add('active-result');
+            // Store the params
+            selectedDesignParams = JSON.parse(li.dataset.params);
+            applyBestDesignBtn?.classList.remove('hidden');
+            }
+    });
 
-    // Listener for the new info button
-    infoBtn?.addEventListener('click', () => {
-        const modal = document.getElementById('optimization-info-modal');
-    if (modal) {
-        modal.classList.replace('hidden', 'flex'); // Use replace to set display:flex
-        modal.style.zIndex = getNewZIndex();
-        // We don't need initializePanelControls since it's a simple info modal
+    applyBestDesignBtn?.addEventListener('click', () => {
+        if (selectedDesignParams) {
+            log('Applying selected design...');
+            const settings = gatherSettings('full'); // Gather current settings just to get wall/type
+            applyDesignToScene(selectedDesignParams, settings);
+            showAlert('Selected design applied to scene.', 'Success');
+        } else {
+            showAlert('No design selected from the list.', 'Error');
         }
     });
 
-    // Listener for new Goal Type dropdown
+    // --- Info Button ---
+    infoBtn?.addEventListener('click', () => {
+        const modal = document.getElementById('optimization-info-modal');
+        if (modal) {
+            modal.classList.replace('hidden', 'flex');
+            modal.style.zIndex = getNewZIndex();
+        }
+    });
+
+    // --- Goal Type Dropdown (SSGA) ---
     const optGoalType = optimizationPanel.querySelector('#opt-goal-type');
     const optTargetValueContainer = optimizationPanel.querySelector('#opt-target-value-container');
-
     optGoalType?.addEventListener('change', () => {
         const isTargetMode = optGoalType.value === 'set-target';
         optTargetValueContainer?.classList.toggle('hidden', !isTargetMode);
     });
+
+    // --- Initial Population of UI ---
+    populateParameters();
+    if (optSimulationRecipe && optGoalMetric) {
+        populateGoals(optSimulationRecipe, optGoalMetric);
+    }
+    if (optRecipe1 && optGoal1) {
+        populateGoals(optRecipe1, optGoal1);
+    }
+    if (optRecipe1 && optRecipe2 && optGoal2) {
+    // Set default for Recipe 2 to match Recipe 1
+    optRecipe2.value = optRecipe1.value; 
+
+    // Populate Goal 2 based on Recipe 1 (since Recipe 2 is now synced)
+    populateGoals(optRecipe1, optGoal2); 
+
+    // Set default for Obj 2
+    if (optGoal2.options.length > 1) {
+        // Try to set a different default than obj 1
+        if (optGoal1 && optGoal1.value === 'maximize_sDA' && optGoal2.querySelector('[value="minimize_ASE"]')) {
+             optGoal2.value = 'minimize_ASE';
+        } else if (optGoal1 && optGoal1.value === 'minimize_ASE' && optGoal2.querySelector('[value="maximize_sDA"]')) {
+             optGoal2.value = 'maximize_sDA';
+        } else {
+            // fallback
+            optGoal2.selectedIndex = Math.min(1, optGoal2.options.length - 1);
+        }
+    }
+    }
+}
+
+/**
+ * Helper to show/hide the annual sim performance warning
+ */
+function updateAnnualSimWarning(recipeId) {
+    if (!optimizationPanel) return;
+    const annualSimWarning = optimizationPanel.querySelector('#opt-warning-annual-sim');
+    if (annualSimWarning) {
+        const isExpensive = ['imageless-glare', 'spectral-lark', 'en17037'].includes(recipeId);
+        annualSimWarning.classList.toggle('hidden', !isExpensive);
+    }
 }
 
 function applyPresetProfile() {
@@ -366,58 +495,6 @@ function populateParameters() {
     });
 }
 
-function updateGoalMetrics() {
-    if (!optimizationPanel) return; // Guard clause
-    const optSimulationRecipe = optimizationPanel.querySelector('#opt-simulation-recipe');
-    const optGoalMetric = optimizationPanel.querySelector('#opt-goal-metric');
-
-    if (!optSimulationRecipe || !optGoalMetric) return;
-
-    const recipe = optSimulationRecipe.value;
-    optGoalMetric.innerHTML = '';
-
-    const metrics = RECIPE_METRICS[recipe] || [];
-    metrics.forEach(metric => {
-        const option = document.createElement('option');
-        option.value = metric.id;
-        option.textContent = metric.name;
-        optGoalMetric.appendChild(option);
-    });
-}
-
-function setControlsLocked(locked) {
-    isOptimizing = locked;
-    if (!optimizationPanel) return;
-
-    const startBtn = optimizationPanel.querySelector('#start-optimization-btn');
-    const resumeBtn = optimizationPanel.querySelector('#resume-optimization-btn');
-    const quickBtn = optimizationPanel.querySelector('#quick-optimize-btn'); // Get quick optimize btn
-    const cancelBtn = optimizationPanel.querySelector('#cancel-optimization-btn');
-    const applyBtn = optimizationPanel.querySelector('#apply-best-design-btn'); // Get new apply btn
-
-    startBtn?.classList.toggle('hidden', locked);
-    resumeBtn?.classList.toggle('hidden', locked);
-    quickBtn?.classList.toggle('hidden', locked); // Hide quick optimize btn during run
-    cancelBtn?.classList.toggle('hidden', !locked);
-
-    // Only show the "Apply Best" button after a run is finished (locked=false) AND a best design exists
-    applyBtn?.classList.toggle('hidden', locked || !optimizer?.bestDesign);
-
-    [
-        'opt-target-wall', 'opt-shading-type', 'opt-simulation-recipe',
-        'opt-goal-metric', 'opt-constraint', 'opt-population-size',
-        'opt-generations', 'opt-quality'
-    ].forEach(id => {
-        const element = optimizationPanel.querySelector(`#${id}`);
-        if (element) element.disabled = locked;
-    });
-
-    // Disable parameter checkboxes and inputs
-    optimizationPanel.querySelectorAll('.opt-param-item input').forEach(input => {
-        input.disabled = locked;
-    });
-}
-
 // ==================== LOGGING ====================
 
 function log(message) {
@@ -460,99 +537,133 @@ export async function startOptimization(mode = 'full') {
     }
 
     const resume = mode === 'resume';
+    if (resume && !optimizer) {
+        showAlert('No previous optimization run found to resume.', 'Error');
+        return;
+    }
+
+    // Clear previous results list
+    const summaryList = optimizationPanel.querySelector('#optimization-summary-list');
+    const placeholder = optimizationPanel.querySelector('#opt-summary-placeholder');
+    if (summaryList) summaryList.innerHTML = '';
+    if (placeholder) placeholder.style.display = 'block';
+    optimizationPanel.dataset.lastBestFitness = -Infinity;
+    selectedDesignParams = null;
+    dom['apply-best-design-btn']?.classList.add('hidden');
 
     try {
         setControlsLocked(true);
         if (!resume) {
             clearLog();
-            fitnessCache.clear(); // Clear cache at the start of a new run
+            fitnessCache.clear();
         }
 
         // 1. Gather settings
         const settings = gatherSettings(mode);
-        log(`Starting optimization: ${settings.goalId}`);
-        log(`  Wall: ${settings.wall.toUpperCase()}, Type: ${settings.shadingType}`);
-        log(`  Params: ${settings.parameters.map(p => p.name).join(', ')}`);
-        log(`  Population: ${settings.populationSize}, Max Evals: ${settings.maxEvaluations}`);
 
-        // 2. Create optimizer
-        optimizer = new GeneticOptimizer({
-            populationSize: settings.populationSize,
-            maxEvaluations: settings.maxEvaluations, // Changed from generations
-            mutationRate: 0.1,
-            parameterConstraints: settings.parameters
-        });
+        if (settings.type === 'ssga') {
+            // --- SINGLE-OBJECTIVE (SSGA) WORKFLOW ---
+            log(`Starting Single-Objective (SSGA) optimization: ${settings.goalId}`);
+            log(`  Wall: ${settings.wall.toUpperCase()}, Type: ${settings.shadingType}`);
+            log(`  Params: ${settings.parameters.map(p => p.name).join(', ')}`);
+            log(`  Population: ${settings.populationSize}, Max Evals: ${settings.maxEvaluations}`);
 
-        // 3. Handle resume
-        if (resume) {
-            await loadCheckpoint();
-        }
+            optimizer = new GeneticOptimizer({
+                populationSize: settings.populationSize,
+                maxEvaluations: settings.maxEvaluations,
+                mutationRate: 0.1,
+                parameterConstraints: settings.parameters
+            });
 
-        // 4. Define fitness function (evaluates ONE design)
-        const fitnessFunction = async (designParams) => {
-            if (optimizer.shouldStop) throw new Error('Optimization cancelled');
+            if (resume) await loadCheckpoint();
 
-            log(`  Spawning evaluation for: ${JSON.stringify(designParams)}`);
+            const fitnessFunction = async (designParams) => {
+                if (optimizer.shouldStop) throw new Error('Optimization cancelled');
+                const designKey = JSON.stringify(designParams);
+                if (fitnessCache.has(designKey)) {
+                    log(`    → (Cache HIT) ${designKey}`);
+                    return fitnessCache.get(designKey);
+                }
 
-            try {
-                // evaluateDesignHeadless is our cached, headless function
-                const fitness = await evaluateDesignHeadless(designParams, settings);
-                // Return the full design object, including fitness and metric value
-                const design = {
+                log(`  Spawning eval for: ${designKey}`);
+                const metrics = await evaluateDesignHeadless(designParams, settings);
+                const fitness = _calculateSingleFitness(metrics, settings);
+
+                const result = {
                     params: designParams,
                     fitness: fitness.score,
                     metricValue: fitness.value,
                     unit: fitness.unit
                 };
+                fitnessCache.set(designKey, result);
                 log(`    → Fitness: ${fitness.score.toFixed(2)} (${fitness.value.toFixed(2)}${fitness.unit})`);
-                return design;
-            } catch (err) {
-                log(`    → FAILED: ${JSON.stringify(designParams)}: ${err.message}`);
-                return {
-                    params: designParams,
-                    fitness: -Infinity, // Penalize failed designs
-                    metricValue: 0,
-                    unit: ''
-                };
-            }
-        };
+                return result;
+            };
 
-        // 5. Progress callback
-        const progressCallback = async (evalsCompleted, bestDesign) => {
-            const summaryList = optimizationPanel.querySelector('#optimization-summary-list');
-            const placeholder = optimizationPanel.querySelector('#opt-summary-placeholder');
-            if (placeholder) placeholder.style.display = 'none';
+            const progressCallback = async (evalsCompleted, bestDesign) => {
+                populateParetoFront([bestDesign], 'ssga'); // Use same display for single best
+                log(`✓ Evals ${evalsCompleted}/${settings.maxEvaluations}. Best: ${bestDesign.metricValue.toFixed(2)}${bestDesign.unit}`);
+                await saveCheckpoint();
+            };
 
-            // Only update the summary list if this is a new best
-            const lastBestFitness = parseFloat(optimizationPanel.dataset.lastBestFitness || -Infinity);
+            const result = await optimizer.run(fitnessFunction, progressCallback);
 
-            if (bestDesign.fitness > lastBestFitness) {
-                const li = document.createElement('li');
-                li.className = 'p-2 bg-[--grid-color] rounded';
-                li.innerHTML = `<strong>Eval #${evalsCompleted}:</strong> New Best: ${bestDesign.metricValue.toFixed(2)}${bestDesign.unit} (Params: ${JSON.stringify(bestDesign.params)})`;
-                summaryList.appendChild(li);
-                summaryList.scrollTop = summaryList.scrollHeight; // Auto-scroll
-                optimizationPanel.dataset.lastBestFitness = bestDesign.fitness;
+            if (isOptimizing) { // Check if it finished, not cancelled
+                log(`\n🎉 Optimization complete!`);
+                log(`\nBest design:`);
+                Object.entries(result.params).forEach(([key, val]) => log(`  ${key}: ${val.toFixed(3)}`));
+                log(`  Final score: ${result.metricValue.toFixed(2)}${result.unit}`);
+
+                await applyDesignToScene(result.params, settings);
+                showAlert('Optimization complete! Best design applied to scene.', 'Success');
+                dom['apply-best-design-btn']?.classList.add('hidden'); // No need to re-apply
             }
 
-            log(`✓ Evals ${evalsCompleted}/${settings.maxEvaluations}. Best fitness: ${bestDesign.fitness.toFixed(2)}`);
-            await saveCheckpoint();
-        };
+        } else {
+            // --- MULTI-OBJECTIVE (MOGA) WORKFLOW ---
+            log(`Starting Multi-Objective (MOGA) optimization...`);
+            log(`  Objectives: ${settings.objectives.map(o => o.id).join(', ')}`);
+            log(`  Params: ${settings.parameters.map(p => p.name).join(', ')}`);
+            log(`  Population: ${settings.populationSize}, Max Gens: ${settings.maxGenerations}`);
 
-        // 6. Run optimization
-        const result = await optimizer.run(fitnessFunction, progressCallback);
-
-        if (isOptimizing) { // Check if it finished, not cancelled
-            log(`\n🎉 Optimization complete!`);
-            log(`\nBest design:`);
-            Object.entries(result.params).forEach(([key, val]) => {
-                log(`  ${key}: ${val.toFixed(3)}`);
+            optimizer = new MultiObjectiveOptimizer({
+                populationSize: settings.populationSize,
+                maxGenerations: settings.maxGenerations,
+                mutationRate: 0.1,
+                parameterConstraints: settings.parameters,
+                objectives: settings.objectives
             });
-            log(`  Final score: ${result.metricValue.toFixed(2)}`);
-            
-            // Apply best design
-            await applyDesignToScene(result.params, settings);
-            showAlert('Optimization complete! Best design applied to scene.', 'Success');
+
+            if (resume) await loadCheckpoint();
+
+            const fitnessFunction = async (designParams) => {
+                if (optimizer.shouldStop) throw new Error('Optimization cancelled');
+                const designKey = JSON.stringify(designParams);
+                if (fitnessCache.has(designKey)) {
+                    log(`    → (Cache HIT) ${designKey}`);
+                    return fitnessCache.get(designKey);
+                }
+
+                log(`  Spawning eval for: ${designKey}`);
+                const metrics = await evaluateDesignHeadless(designParams, settings);
+                fitnessCache.set(designKey, metrics);
+                log(`    → Metrics: ${JSON.stringify(metrics)}`);
+                return metrics;
+            };
+
+            const progressCallback = async (generation, paretoFront) => {
+                populateParetoFront(paretoFront, 'moga', settings.objectives);
+                log(`✓ Gen ${generation}/${settings.maxGenerations}. Pareto front size: ${paretoFront.length}`);
+                await saveCheckpoint();
+            };
+
+            const finalParetoFront = await optimizer.run(fitnessFunction, progressCallback);
+
+            if (isOptimizing) { // Check if it finished, not cancelled
+                log(`\n🎉 Optimization complete!`);
+                log(`Found ${finalParetoFront.length} non-dominated solutions (trade-offs).`);
+                showAlert('Optimization complete! Select a solution from the Results list to apply it.', 'Success');
+            }
         }
 
     } catch (err) {
@@ -572,7 +683,7 @@ export async function startOptimization(mode = 'full') {
             }
         }
         // Do not nullify optimizer here, so "Apply Best Design" can work
-        // optimizer = null;
+        isOptimizing = false; 
     }
 }
 
@@ -580,54 +691,50 @@ export async function startOptimization(mode = 'full') {
 
 function gatherSettings(mode = 'full') {
     if (!optimizationPanel) throw new Error("Optimization panel is not initialized.");
+    // const dom = getDom(); // <-- BUG: This uses the global cache
 
-    const optParamsContainer = optimizationPanel.querySelector('#opt-params-container');
+    // --- Common Settings ---
+    // Use optimizationPanel.querySelector to get dynamically loaded elements
     const optTargetWall = optimizationPanel.querySelector('#opt-target-wall');
     const optShadingType = optimizationPanel.querySelector('#opt-shading-type');
-    const optSimulationRecipe = optimizationPanel.querySelector('#opt-simulation-recipe');
-    const optGoalMetric = optimizationPanel.querySelector('#opt-goal-metric');
-    const optConstraint = optimizationPanel.querySelector('#opt-constraint');
     const optPopulationSize = optimizationPanel.querySelector('#opt-population-size');
-    const optGenerations = optimizationPanel.querySelector('#opt-generations');
+    const optGenerations = optimizationPanel.querySelector('#opt-generations'); // This ID now means "Max Evals / Gens"
     const optQuality = optimizationPanel.querySelector('#opt-quality');
+    const optParamsContainer = optimizationPanel.querySelector('#opt-params-container');
 
     const selectedParams = [];
     if (optParamsContainer) {
         const currentShadingType = optShadingType?.value || 'overhang';
+        const paramConfigs = SHADING_PARAMETERS[currentShadingType] || [];
+
         optParamsContainer.querySelectorAll('.opt-param-item').forEach(item => {
-        const toggle = item.querySelector('.opt-param-toggle');
-        if (toggle.checked) {
-            const paramId = item.dataset.paramId;
-            const paramConfig = SHADING_PARAMETERS[currentShadingType].find(p => p.id === paramId);
+            const toggle = item.querySelector('.opt-param-toggle');
+            if (toggle.checked) {
+                const paramId = item.dataset.paramId;
+                const paramConfig = paramConfigs.find(p => p.id === paramId);
 
-            if (paramConfig.type === 'continuous') {
-                selectedParams.push({
-                    name: paramId,
-                    type: 'continuous',
-                    min: parseFloat(item.querySelector('.opt-param-min').value),
-                    max: parseFloat(item.querySelector('.opt-param-max').value),
-                    step: parseFloat(item.querySelector('.opt-param-step').value)
-                });
-            } else if (paramConfig.type === 'discrete') {
-                // For discrete, we don't use min/max, we just pass the available options
-                selectedParams.push({
-                    name: paramId,
-                    type: 'discrete',
-                    options: paramConfig.options
-                });
+                if (!paramConfig) {
+                     console.warn(`Could not find config for param ${paramId}`);
+                     return;
+                }
+
+                if (paramConfig.type === 'continuous') {
+                    selectedParams.push({
+                        name: paramId,
+                        type: 'continuous',
+                        min: parseFloat(item.querySelector('.opt-param-min').value),
+                        max: parseFloat(item.querySelector('.opt-param-max').value),
+                        step: parseFloat(item.querySelector('.opt-param-step').value)
+                    });
+                } else if (paramConfig.type === 'discrete') {
+                    selectedParams.push({
+                        name: paramId,
+                        type: 'discrete',
+                        options: [...item.querySelector('.opt-param-options').options].map(o => o.value)
+                    });
+                }
             }
-        }
-    });
-    }
-
-    let populationSize = parseInt(optPopulationSize?.value || '10');
-    // Read "Max Evaluations" from the UI, which was formerly "Generations"
-    let maxEvaluations = parseInt(optGenerations?.value || '50');
-
-    if (mode === 'quick') {
-        populationSize = 8;
-        maxEvaluations = 20; // e.g., 8 initial + 6 pairs
-        log('?? Using Quick Optimize settings: 8 population, 20 max evaluations.');
+        });
     }
 
     if (selectedParams.length === 0) {
@@ -637,22 +744,69 @@ function gatherSettings(mode = 'full') {
         throw new Error('Maximum 3 parameters allowed for optimization.');
     }
 
-    const optGoalType = optimizationPanel.querySelector('#opt-goal-type');
-    const optGoalTargetValue = optimizationPanel.querySelector('#opt-goal-target-value');
+    const quality = (mode === 'quick') ? 'draft' : (optQuality?.value || 'medium');
+    let populationSize = parseInt(optPopulationSize?.value || '10');
+    let evaluations = parseInt(optGenerations?.value || '50'); // This is Evals for SSGA, Gens for MOGA
 
-return {
-    wall: optTargetWall?.value || 's',
-    shadingType: optShadingType?.value || 'overhang',
-    recipe: optSimulationRecipe?.value || 'sda-ase',
-    goalId: optGoalMetric?.value || 'maximize_sDA',
-    goalType: optGoalType?.value || 'maximize', // NEW
-    targetValue: parseFloat(optGoalTargetValue?.value || '0'), // NEW
-    constraint: optConstraint?.value.trim() || '',
-    populationSize: populationSize,
-        maxEvaluations: maxEvaluations, // Changed from generations
-        quality: optQuality?.value || 'medium',
-        parameters: selectedParams
-    };
+    // --- Type-Specific Settings ---
+    const optType = optimizationPanel.querySelector('#opt-type')?.value || 'ssga';
+
+    if (optType === 'ssga') {
+        if (mode === 'quick') {
+            populationSize = 8;
+            evaluations = 20; // Max Evaluations
+            log('... Using Quick Optimize settings: 8 population, 20 max evaluations.');
+        }
+
+        return {
+            type: 'ssga',
+            wall: optTargetWall?.value || 's',
+            shadingType: optShadingType?.value || 'overhang',
+            recipe: optimizationPanel.querySelector('#opt-simulation-recipe')?.value || 'sda-ase',
+            goalId: optimizationPanel.querySelector('#opt-goal-metric')?.value || 'maximize_sDA',
+            goalType: optimizationPanel.querySelector('#opt-goal-type')?.value || 'maximize',
+            targetValue: parseFloat(optimizationPanel.querySelector('#opt-goal-target-value')?.value || '0'),
+            constraint: optimizationPanel.querySelector('#opt-constraint')?.value.trim() || '',
+            populationSize: populationSize,
+            maxEvaluations: evaluations, // For SSGA, this is Max Evals
+            quality: quality,
+            parameters: selectedParams
+        };
+    } else { // 'moga'
+        if (mode === 'quick') {
+            populationSize = 12;
+            evaluations = 10; // Max Generations
+            log('... Using Quick Optimize settings: 12 population, 10 generations.');
+        }
+
+        const objective1 = {
+            id: optimizationPanel.querySelector('#opt-goal-1')?.value,
+            goal: optimizationPanel.querySelector('#opt-goal-type-1')?.value
+        };
+        const objective2 = {
+            id: optimizationPanel.querySelector('#opt-goal-2')?.value,
+            goal: optimizationPanel.querySelector('#opt-goal-type-2')?.value
+        };
+
+        if (!objective1.id || !objective2.id) {
+            throw new Error('Both Objective 1 and Objective 2 must be set for Multi-Objective Optimization.');
+        }
+        if (objective1.id === objective2.id) {
+            throw new Error('Objective 1 and Objective 2 must be different metrics.');
+        }
+
+        return {
+            type: 'moga',
+            wall: optTargetWall?.value || 's',
+            shadingType: optShadingType?.value || 'overhang',
+            recipe: optimizationPanel.querySelector('#opt-recipe-1')?.value || 'sda-ase', // Both objectives MUST come from the same recipe
+            objectives: [objective1, objective2],
+            populationSize: populationSize,
+            maxGenerations: evaluations, // For MOGA, this is Max Gens
+            quality: quality,
+            parameters: selectedParams
+        };
+    }
 }
 
 async function applyDesignToScene(params, settings) {
@@ -944,170 +1098,183 @@ async function _getFileFromElectron(filePath) {
 }
 
 /**
- * Parses simulation results and calculates fitness score.
- * @param {string} recipe - The recipe ID.
- * @param {string} goalId - The goal being optimized (e.g., 'maximize_sDA').
- * @param {string} constraint - Optional constraint string (e.g., "ASE < 10").
+ * Parses all relevant metrics from a simulation run and returns a metrics object.
+ * @param {object} settings - The optimization settings object.
  * @param {string} uniqueId - The unique ID for this simulation run.
- * @returns {Promise<object>} An object with score, metricValue, and unit.
+ * @returns {Promise<object>} An object with metric key-value pairs (e.g., { sda: 70.1, ase: 8.5 }).
  * @private
  */
-async function _parseSimulationResult(recipe, goalId, constraint, uniqueId, goalType, targetValue) {
+async function _parseSimulationResult(settings, uniqueId) {
+    const { recipe, type } = settings;
     const projectName = project.projectName || 'scene';
-    const metrics = RECIPE_METRICS[recipe];
-    const goalMetric = metrics.find(m => m.id === goalId);
-    if (!goalMetric) throw new Error(`Unknown goal: ${goalId}`);
-
-    // --- 1. Construct the correct file path ---
-    let resultFileName, filePath;
     const baseName = `${projectName}_${uniqueId}`;
+    const metricsToParse = (type === 'ssga') 
+        ? [settings.goalId] // SSGA only needs the goal metric
+        : settings.objectives.map(o => o.id); // MOGA needs all objectives
 
-    switch (recipe) {
-        case 'sda-ase':
-            resultFileName = `${baseName}${goalMetric.file}`; // e.g., _sDA_final.ill
-            filePath = `08_results/${resultFileName}`;
-            break;
-        case 'illuminance':
-            resultFileName = `${baseName}${goalMetric.file}`; // e.g., _illuminance.txt
-            filePath = `08_results/${resultFileName}`;
-            break;
-        case 'dgp':
-            resultFileName = `${baseName}${goalMetric.file}`; // e.g., _DGP.txt
-            filePath = `08_results/${resultFileName}`;
-            break;
-        case 'imageless-glare':
-            if (goalId === 'maximize_sGA') {
-                resultFileName = `${baseName}_sGA.txt`; // Assumes script outputs this
-            } else if (goalId === 'maximize_Glare_Autonomy_Avg') {
-                resultFileName = `${baseName}.ga`; // This is a per-point file
-            } else {
-                resultFileName = `${baseName}.dgp`; // This is a per-point, per-hour file
-            }
-            filePath = `08_results/${resultFileName}`;
-            break;
-        case 'spectral-lark':
-            // This recipe outputs a JSON summary
-            resultFileName = `circadian_summary.json`; // This file name is static from the recipe
-            filePath = `08_results/spectral_9ch/${baseName}/${resultFileName}`;
-            break;
-        case 'en17037':
-            // This recipe outputs multiple JSON summaries
-            if (goalId.includes('Daylight')) {
-                resultFileName = `EN17037_Daylight_Summary.json`;
-            } else {
-                resultFileName = `EN17037_Glare_Summary.json`;
-            }
-            filePath = `08_results/${baseName}/${resultFileName}`;
-            break;
-        default:
-            throw new Error(`Fitness calculation not implemented for recipe: ${recipe}`);
+    // If SSGA has a constraint, we need to parse that metric too.
+    if (type === 'ssga' && settings.constraint) {
+        const constraintMetricId = settings.constraint.split(' ')[0].toLowerCase(); // e.g., "ase"
+        // Find the full metric ID (e.g., "minimize_ASE")
+        const allMetrics = RECIPE_METRICS[recipe].map(m => m.id);
+        const fullConstraintMetric = allMetrics.find(m => m.toLowerCase().includes(`_${constraintMetricId}`));
+        if (fullConstraintMetric && !metricsToParse.includes(fullConstraintMetric)) {
+            metricsToParse.push(fullConstraintMetric);
+        }
     }
 
-    try {
+    const metrics = {};
+    let sdaMetrics = null; // Cache sDA/ASE calcs
+    let illumStats = null; // Cache illuminance stats
+
+    // Helper function to get stats for illuminance files
+    const getIllumStats = async (filePath) => {
+        if (illumStats) return illumStats;
         const file = await _getFileFromElectron(filePath);
-        const textContent = await file.text();
+        await resultsManager.loadAndProcessFile(file, 'a');
+        illumStats = resultsManager.getActiveStats();
+        return illumStats;
+    };
 
-        // Load .ill data into results manager for sDA/ASE
-        if (goalMetric.file.endsWith('.ill')) {
-            await resultsManager.loadAndProcessFile(file, 'a');
+    // Helper function to get metrics for sDA/ASE files
+    const getSdaMetrics = async (filePath) => {
+        if (sdaMetrics) return sdaMetrics;
+        const file = await _getFileFromElectron(filePath);
+        await resultsManager.loadAndProcessFile(file, 'a');
+        sdaMetrics = resultsManager.calculateAnnualMetrics('a', {});
+        return sdaMetrics;
+    };
+
+    for (const metricId of metricsToParse) {
+        const goalMetric = RECIPE_METRICS[recipe].find(m => m.id === metricId);
+        if (!goalMetric) {
+            console.warn(`Could not find config for metric ${metricId}`);
+            continue;
         }
 
-        // --- 2. Calculate metric value ---
-        let value, unit, constraintValue, constraintMet = true;
+        const metricKey = metricId.split('_')[1].toLowerCase(); // e.g., sda, ase, avg
+        const filePath = `08_results/${baseName}${goalMetric.file}`;
 
-        switch (recipe) {
-            case 'sda-ase': {
-                const annualMetrics = resultsManager.calculateAnnualMetrics('a', {});
-                value = goalId.includes('sDA') ? annualMetrics.sDA : annualMetrics.ASE;
-                unit = '%';
-                if (constraint) {
-                    const constMetricId = constraint.split(' ')[0].toUpperCase();
-                    constraintValue = (constMetricId === 'ASE') ? annualMetrics.ASE : annualMetrics.sDA;
-                    constraintMet = checkConstraint(constraintValue, constraint);
+        try {
+            if (recipe === 'sda-ase') {
+                const m = await getSdaMetrics(filePath);
+                metrics[metricKey] = (metricKey === 'sda') ? m.sDA : m.ASE;
+            } else if (recipe === 'illuminance') {
+                const stats = await getIllumStats(filePath);
+                if (metricKey === 'avg') {
+                    metrics.avg = stats.avg;
+                } else if (metricKey === 'uniformity') {
+                    metrics.uniformity = (stats.min > 0 && stats.avg > 0) ? (stats.min / stats.avg) : 0;
                 }
-                break;
-            }
-            case 'illuminance': {
-                // .txt files are loaded as .ill
-                const stats = resultsManager.getActiveStats();
-                if (goalId.includes('avg')) {
-                    value = stats.avg; unit = ' lux';
-                } else { // uniformity
-                    value = (stats.min > 0 && stats.avg > 0) ? (stats.min / stats.avg) : 0; unit = ' (U0)';
-                }
-                if (constraint) constraintMet = checkConstraint(value, constraint);
-                break;
-            }
-            case 'dgp': {
+            } else if (recipe === 'dgp') {
+                const file = await _getFileFromElectron(filePath);
+                const textContent = await file.text();
                 const match = textContent.match(/DGP:\s*([\d.]+)/);
-                value = match ? parseFloat(match[1]) : 0; unit = '';
-                if (constraint) constraintMet = checkConstraint(value, constraint);
-                break;
+                metrics.dgp = match ? parseFloat(match[1]) : 0;
             }
-            case 'imageless-glare': {
-                // This is complex. We need to parse different files.
-                // This requires the .ga and .dgp files to be simple text files with one value per line.
-                const data = textContent.split('\n').map(parseFloat).filter(v => !isNaN(v));
-                if (data.length === 0) throw new Error('Empty results file for imageless glare.');
-
-                if (goalId === 'maximize_sGA') {
-                    value = parseFloat(textContent.trim()); // sGA.txt is just one number
-                    unit = '%';
-                } else {
-                    // For Avg DGP or Avg GA, we take the average of all points
-                    value = data.reduce((a, b) => a + b, 0) / data.length;
-                    unit = goalId.includes('DGP') ? '' : '%';
-                }
-                if (constraint) constraintMet = checkConstraint(value, constraint);
-                break;
-            }
-            case 'spectral-lark': {
-                const data = JSON.parse(textContent);
-                value = (goalId === 'maximize_CS_avg') ? data.space_average.CS : data.space_average.EML;
-                unit = (goalId === 'maximize_CS_avg') ? '' : ' m-EDI lux';
-                if (constraint) {
-                    const constMetricId = constraint.split(' ')[0].toUpperCase();
-                    constraintValue = (constMetricId === 'CS') ? data.space_average.CS : data.space_average.EML;
-                    constraintMet = checkConstraint(constraintValue, constraint);
-                }
-                break;
-            }
-            case 'en17037': {
-                const data = JSON.parse(textContent);
-                if (goalId.includes('Daylight')) {
-                    value = data.metrics.percent_area_passed_target; // e.g., 95.0
-                    unit = '%';
-                } else { // Glare
-                    value = data.metrics.percent_time_failed; // e.g., 4.5
-                    unit = '% time';
-                }
-                if (constraint) constraintMet = checkConstraint(value, constraint);
-                break;
-            }
-            default:
-                throw new Error(`Value parsing not implemented for recipe: ${recipe}`);
+            // TODO: Add parsing logic for other MOGA-compatible recipes (imageless, spectral)
+        } catch (err) {
+            console.error(`Failed to parse metric ${metricId} from ${filePath}:`, err);
+            metrics[metricKey] = 0; // Assign 0 for failed parses
         }
+    }
 
-        // --- 3. Calculate final score based on NEW Goal Type ---
-        let score;
-        if (goalType === 'maximize') {
-            score = value;
-        } else if (goalType === 'minimize') {
-            score = -value;
-        } else { // 'set-target'
-            score = -Math.abs(value - targetValue); // Fitness is maximized when difference is 0
-        }
+    return metrics;
+}
 
-        if (!constraintMet) {
+/**
+ * Calculates a single fitness score from a metrics object for SSGA.
+ * @param {object} metrics - The metrics object (e.g., {sda: 70, ase: 15}).
+ * @param {object} settings - The SSGA settings object.
+ * @returns {object} An object with { score, value, unit }.
+ * @private
+ */
+function _calculateSingleFitness(metrics, settings) {
+    const { goalId, goalType, targetValue, constraint } = settings;
+
+    const metricKey = goalId.split('_')[1].toLowerCase(); // e.g., sda
+    const value = metrics[metricKey];
+    let unit = '';
+    if (metricKey === 'sda' || metricKey === 'ase') unit = '%';
+    if (metricKey === 'avg') unit = ' lux';
+    if (metricKey === 'uniformity') unit = ' (U0)';
+
+    let score;
+    if (goalType === 'maximize') {
+        score = value;
+    } else if (goalType === 'minimize') {
+        score = -value;
+    } else { // 'set-target'
+        score = -Math.abs(value - targetValue);
+    }
+
+    // Apply constraint penalty
+    if (constraint) {
+        const constraintKey = constraint.split(' ')[0].toLowerCase();
+        const constraintValue = metrics[constraintKey];
+        if (constraintValue === undefined) {
+            console.warn(`Constraint metric "${constraintKey}" not found in results. Skipping constraint.`);
+        } else if (!checkConstraint(constraintValue, constraint)) {
             score = -Infinity; // Heavy penalty
             log(`    → Constraint FAILED (${constraint})`);
         }
+    }
 
-        return { score, value, unit };
+    return { score, value, unit };
+}
 
-    } catch (error) {
-        console.error(`Failed to parse simulation results from ${filePath}:`, error);
-        return { score: -Infinity, value: 0, unit: '' }; // Return worst fitness
+/**
+ * Populates the results list UI with the Pareto front.
+ * @param {Array<object>} paretoFront - The array of best solutions.
+ * @param {string} type - 'ssga' or 'moga'.
+ * @param {Array<object>} [objectives] - The MOGA objectives array (for headers).
+ * @private
+ */
+function populateParetoFront(paretoFront, type, objectives = []) {
+    if (!optimizationPanel) return;
+    const summaryList = optimizationPanel.querySelector('#optimization-summary-list');
+    const placeholder = optimizationPanel.querySelector('#opt-summary-placeholder');
+    if (!summaryList || !placeholder) return;
+
+    placeholder.style.display = 'none';
+    summaryList.innerHTML = ''; // Clear list
+    selectedDesignParams = null; // Clear selection
+    dom['apply-best-design-btn']?.classList.add('hidden');
+
+    if (type === 'ssga') {
+        // --- Display single best for SSGA ---
+        const best = paretoFront[0];
+        if (!best) return;
+        const li = document.createElement('li');
+        li.className = 'p-2 bg-[--grid-color] rounded active-result'; // Auto-select the best
+        li.dataset.params = JSON.stringify(best.params);
+        li.innerHTML = `<strong>Best:</strong> ${best.metricValue.toFixed(2)}${best.unit} (Evals: ${optimizer.evaluationsCompleted}) <br> <span class="text-xs">${JSON.stringify(best.params)}</span>`;
+        summaryList.appendChild(li);
+        selectedDesignParams = best.params; // Pre-select it
+        dom['apply-best-design-btn']?.classList.remove('hidden'); // Show apply button
+
+    } else {
+        // --- Display Pareto front for MOGA ---
+        const obj1 = objectives[0];
+        const obj2 = objectives[1];
+
+        // Add header
+        const header = document.createElement('li');
+        header.className = 'p-2 text-[--text-secondary] sticky top-0 bg-[--panel-bg]';
+        header.innerHTML = `<strong class="w-1/3 inline-block">${obj1.id.split('_')[1].toUpperCase()}</strong> <strong class="w-1/3 inline-block">${obj2.id.split('_')[1].toUpperCase()}</strong> <strong>Params</strong>`;
+        summaryList.appendChild(header);
+
+        paretoFront.forEach(ind => {
+            const li = document.createElement('li');
+            li.className = 'p-2 hover:bg-[--grid-color] rounded cursor-pointer';
+            li.dataset.params = JSON.stringify(ind.params);
+            li.innerHTML = `
+                <span class="w-1/3 inline-block">${ind.metrics[obj1.id].toFixed(2)}</span>
+                <span class="w-1/3 inline-block">${ind.metrics[obj2.id].toFixed(2)}</span>
+                <span class="text-xs">${JSON.stringify(ind.params)}</span>
+            `;
+            summaryList.appendChild(li);
+        });
     }
 }
 
@@ -1123,38 +1290,53 @@ async function _generateQuickSimScript(recipe, quality, uniqueId) {
     const recipeTemplates = {
         'sda-ase': 'template-recipe-sda-ase',
         'illuminance': 'template-recipe-illuminance',
-        'dgp': 'template-recipe-dgp'
+        'dgp': 'template-recipe-dgp',
+        'imageless-glare': 'template-recipe-imageless-glare',
+        'spectral-lark': 'template-recipe-spectral-lark',
+        'en17037': 'template-recipe-en17037'
     };
     const templateId = recipeTemplates[recipe];
     if (!templateId) throw new Error(`Unknown recipe: ${recipe}`);
 
-    // Find the recipe panel. It must be open in the UI to be configured.
-    let panel = document.getElementById('recipe-parameters-container');
-    if (!panel || panel.dataset.activeRecipeTemplate !== templateId) {
-         // If not active in the main container, find its floating window
-         panel = document.querySelector(`.floating-window[data-template-id="${templateId}"]`);
-    }
-
+    // 1. Get the main simulation panel
+    const panel = document.getElementById('panel-simulation-modules');
     if (!panel) {
-        throw new Error(`Could not find an open recipe panel for ${recipe}. Please open it in the UI first.`);
+        throw new Error(`Could not find the main simulation panel (#panel-simulation-modules).`);
     }
 
-    // Set quality preset on the recipe panel
+    // 2. Find and set the recipe dropdown
+    const recipeSelector = document.getElementById('recipe-selector');
+    if (!recipeSelector) {
+        throw new Error(`Could not find the recipe selector (#recipe-selector).`);
+    }
+
+    if (recipeSelector.value !== templateId) {
+        recipeSelector.value = templateId;
+        // Dispatch 'change' event to populate the recipe-parameters-container
+        recipeSelector.dispatchEvent(new Event('change', { bubbles: true }));
+        // Wait for the UI to update with the new recipe's parameters
+        await new Promise(resolve => setTimeout(resolve, 200));
+    }
+
+    // 3. Set the quality preset
+    // The quality preset is in the main panel, not the recipe-specific container
     const qualitySelect = panel.querySelector(`[id^="quality-preset"]`);
     if (qualitySelect) {
         qualitySelect.value = quality;
+        // Dispatch 'change' to update global parameters (as defined in simulation.js)
         qualitySelect.dispatchEvent(new Event('change', { bubbles: true }));
     } else {
         console.warn(`Could not find quality preset selector on panel ${panel.id}`);
     }
 
-    // Generate package
+    // 4. Generate package using the main simulation panel
+    // programmaticallyGeneratePackage will read the active recipe from the container
     const scriptInfo = await programmaticallyGeneratePackage(panel, uniqueId);
     if (!scriptInfo || !scriptInfo.shFile) {
         throw new Error("Failed to generate simulation package or script info.");
     }
 
-    // Read the script file content
+    // 5. Read the script file content
     if (!window.electronAPI?.readFile) {
         throw new Error("Reading script files requires Electron API.");
     }
@@ -1182,25 +1364,16 @@ async function _generateQuickSimScript(recipe, quality, uniqueId) {
  * @returns {Promise<object>} An object with score, value, and unit.
  */
 async function evaluateDesignHeadless(designParams, settings) {
-    // --- Caching Logic ---
-    const designKey = JSON.stringify(designParams);
-    if (fitnessCache.has(designKey)) {
-        const cachedResult = fitnessCache.get(designKey);
-        log(`    → (Cache HIT) Design ${designKey}. Fitness: ${cachedResult.score.toFixed(2)}`);
-        return cachedResult;
-    }
-    // --- End Caching Logic ---
+    // Caching is now handled one level up in startOptimization's fitnessFunction
 
-    const { wall, shadingType, recipe, goalId, constraint, quality } = settings;
+    const { wall, shadingType, recipe, quality } = settings;
 
-    // 1. Apply the design parameters to the scene (for geometry generation)
-    // This function needs to update the UI sliders so that `programmaticallyGeneratePackage`
-    // can read the correct values to generate the geometry.
+    // 1. Apply the design parameters to the scene
+    // This function updates the UI sliders, which programmaticallyGeneratePackage reads
     await applyDesignToScene(designParams, settings);
 
     // 2. Generate the simulation script
-    // We need a unique ID for this simulation to prevent file collisions
-    const uniqueId = `opt_${optimizer.currentGeneration}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const uniqueId = `opt_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     const scriptContent = await _generateQuickSimScript(recipe, quality, uniqueId);
 
     if (!window.electronAPI?.runScriptHeadless || !project.dirPath) {
@@ -1218,13 +1391,16 @@ async function evaluateDesignHeadless(designParams, settings) {
         throw new Error(`Simulation run failed. See console for details.`);
     }
 
-    // 4. Parse the results and calculate fitness
-    // Use the uniqueId to find the correct result file
-    const fitness = await _parseSimulationResult(recipe, goalId, constraint, uniqueId, settings.goalType, settings.targetValue);
+    // 4. Parse the results and return the full metrics object
+    // This is the key change: evaluateDesignHeadless now returns the raw metrics.
+    const metrics = await _parseSimulationResult(settings, uniqueId);
+    return metrics;
+}
 
-// --- Caching Logic ---
-    fitnessCache.set(designKey, fitness); // Store the new result
-    // --- End Caching Logic ---
-
-    return fitness;
+/**
+ * Provides read-only access to the fitness cache.
+ * @returns {Map<string, object>} The fitness cache.
+ */
+export function getFitnessCache() {
+    return fitnessCache;
 }

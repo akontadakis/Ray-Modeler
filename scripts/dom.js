@@ -229,7 +229,13 @@ const ids = [
     'daylight-sensor2-dir-y-val', 'daylight-sensor2-dir-z-val', 'daylight-sensor2-percent', 'daylight-sensor2-percent-val',
     'daylighting-zone-visualizer-container', 'daylighting-zone-canvas', 'daylight-sensor-placement-header',
     'ai-new-chat-btn',
-    
+
+    // MOGA Controls
+    'opt-type', 'opt-single-objective-controls', 'opt-multi-objective-controls', 
+    'opt-recipe-1', 'opt-goal-1', 'opt-goal-type-1', 
+    'opt-recipe-2', 'opt-goal-2', 'opt-goal-type-2',
+    'optimization-summary-list', 'opt-summary-placeholder', 'apply-best-design-btn',
+
     // Optimization Info Modal
     'opt-info-btn', 'optimization-info-modal', 'opt-info-modal-close-btn'
   ];

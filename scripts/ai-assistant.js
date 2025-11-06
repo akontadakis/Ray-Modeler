@@ -9,7 +9,7 @@ import { openGlareRoseDiagram, openCombinedAnalysisPanel } from './annualDashboa
 import { openRecipePanelByType, programmaticallyGeneratePackage } from './simulation.js';
 import { addFurniture, addVegetation, getWallGroupById, highlightWall } from './geometry.js';
 import * as THREE from 'three';
-import { initOptimizationUI, startOptimization as runOptimizer } from './optimizationOrchestrator.js';
+import { initOptimizationUI, startOptimization as runOptimizer, getFitnessCache } from './optimizationOrchestrator.js';
 
 // Module-level cache for DOM elements
 let dom;
@@ -151,13 +151,17 @@ const availableTools = [
                         "enable": { "type": "BOOLEAN", "description": "Set to true to enable shading on this wall, or false to disable it." },
                         "deviceType": { "type": "STRING", "description": "The type of device to configure. E.g., 'overhang', 'louver', 'lightshelf'. Required if enabling or configuring." },
                         "depth": { "type": "NUMBER", "description": "The depth of the device in meters (e.g., for an overhang)." },
-                    "tilt": { "type": "NUMBER", "description": "The tilt angle in degrees (e.g., for an overhang)." }
-                },
-                "required": ["wall"]
+                        "tilt": { "type": "NUMBER", "description": "The tilt angle in degrees (e.g., for an overhang)." }
+                    },
+                    "required": ["wall"]
+                }
             }
-        },
-        {
-            "name": "setSensorGrid",
+        ]
+    },
+    {
+        "functionDeclarations": [
+            {
+                "name": "setSensorGrid",
             "description": "Configures parameters for the illuminance sensor grid on a specific surface.",
                 "parameters": {
                     "type": "OBJECT",
@@ -180,8 +184,8 @@ const availableTools = [
                         "value": { "type": "NUMBER", "description": "The numeric value for the parameter." }
                     },
                     "required": ["parameter", "value"]
-                },
-                },
+                }
+            },
             {
                 "name": "configureDaylightingSystem",
                 "description": "Configures the artificial lighting's daylighting control system.",
@@ -193,6 +197,22 @@ const availableTools = [
                         "setpoint": { "type": "NUMBER", "description": "The target illuminance in lux at the sensor." }
                     },
                     "required": ["enable"]
+                }
+            },
+            {
+                "name": "runOccupancyAnalysis",
+                "description": "Generates an occupancy CSV file based on a schedule and runs an analysis.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "weekdaysOnly": { "type": "BOOLEAN", "description": "If true, the schedule applies only to weekdays." },
+                        "occupancySchedule": {
+                            "type": "ARRAY",
+                            "description": "An array of 24 numbers (0 or 1) representing the hourly occupancy for a day.",
+                            "items": { "type": "NUMBER" }
+                        }
+                    },
+                    "required": ["weekdaysOnly", "occupancySchedule"]
                 }
             },
 
@@ -238,7 +258,7 @@ const availableTools = [
                         "properties": {
                             "dashboardType": { "type": "STRING", "description": "The dashboard to open. Must be one of 'glareRose' or 'combinedAnalysis'." }
                         },
-                    "required": ["dashboardType"]
+                        "required": ["dashboardType"]
                     }
                 },
                 {
@@ -295,9 +315,9 @@ const availableTools = [
                         "queryType": { "type": "STRING", "description": "The type of query to perform. Must be one of 'average', 'min', 'max', 'countBelow', 'countAbove'." },
                         "threshold": { "type": "NUMBER", "description": "The illuminance threshold in lux. Required only for 'countBelow' and 'countAbove' queries." }
                     },
-                "required": ["queryType"]
-                }
-            },
+                                    "required": ["queryType"]
+                                }
+                            },
             {
                 "name": "getDatasetStatistics",
                 "description": "Retrieves the summary statistics (min, max, average, count) for a specific dataset (A or B), regardless of which one is currently active in the UI.",
@@ -473,42 +493,43 @@ const availableTools = [
                 }
             },
             {
-                "name": "configureOptimization",
-                "description": "Pre-configures optimization settings in the panel before the user starts the run. Does not start the optimization.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "parameters": {
-                            "type": "OBJECT",
-                            "description": "Parameter names and their min/max ranges, e.g., {\'depth\': [0.5, 2.0], \'tilt\': [0, 30]}"
-                        },
-                        "goal": {
-                            "type": "STRING",
-                            "description": "The optimization goal metric, e.g., 'maximize_sDA' or 'minimize_ASE'"
-                        },
-                        "constraint": {
-                        "type": "STRING",
-                        "description": "Optional constraint, e.g., 'ASE < 10' or '> 300'"
-                    },
-                    "goalType": {
-                        "type": "STRING",
-                        "description": "The optimization objective: 'maximize', 'minimize', or 'set-target'."
-                    },
-                    "targetValue": {
-                        "type": "NUMBER",
-                        "description": "The numerical target value. Only used if goalType is 'set-target'."
-                    },
-                    "populationSize": {
-                            "type": "NUMBER",
-                            "description": "Number of designs per generation (recommended 4-50)"
-                        },
-                        "generations": {
-                            "type": "NUMBER",
-                            "description": "Number of generations to run (recommended 2-20)"
-                        }
-                    }
-                }
-            },
+              "name": "configureOptimization",
+              "description": "Pre-configures optimization settings. Does not start the run.",
+              "parameters": {
+                  "type": "OBJECT",
+                  "properties": {
+                      "optimizationType": {
+                          "type": "STRING",
+                          "description": "The type of optimization: 'ssga' (Single-Objective) or 'moga' (Multi-Objective)."
+                      },
+                      "parameters": {
+                          "type": "OBJECT",
+                          "description": "Parameter names and their min/max ranges, e.g., {\'depth\': [0.5, 2.0], \'tilt\': [0, 30]}"
+                      },
+                      "objective1": {
+                          "type": "STRING",
+                          "description": "The primary objective metric, e.g., 'maximize_sDA' or 'minimize_ASE'. For SSGA, this is the main goal."
+                      },
+                      "objective2": {
+                          "type": "STRING",
+                          "description": "The secondary objective for MOGA, e.g., 'minimize_ASE'. Ignored by SSGA."
+                      },
+                      "constraint": {
+                          "type": "STRING",
+                          "description": "Optional constraint for SSGA only, e.g., 'ASE < 10'."
+                      },
+                      "populationSize": {
+                          "type": "NUMBER",
+                          "description": "Number of designs in the population (e.g., 20)."
+                      },
+                      "evaluations": {
+                          "type": "NUMBER",
+                          "description": "Total evaluations (SSGA) or generations (MOGA) to run (e.g., 50)."
+                      }
+                  },
+                  "required": ["optimizationType", "objective1"]
+              }
+          },
             {
                 "name": "startOptimization",
                 "description": "Starts the generative optimization process. Can be run in 'full' mode using the user-defined settings, or 'quick' mode for a faster, more limited run.",
@@ -534,6 +555,20 @@ const availableTools = [
                         }
                     },
                     "required": ["profileName"]
+                }
+            },
+            {
+                "name": "suggestOptimizationRanges",
+                "description": "Runs a quick, preliminary analysis on a single parameter to find its most effective range, helping to avoid diminishing returns. This should be offered *before* a full optimization.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "wall": { "type": "STRING", "description": "The wall to test. Must be one of 'north', 'south', 'east', or 'west'." },
+                        "shadingType": { "type": "STRING", "description": "The shading device type to test. Must be one of 'overhang', 'louver', or 'lightshelf'." },
+                        "parameterName": { "type": "STRING", "description": "The single parameter to analyze. Must be a valid continuous parameter for the shading type, e.g., 'depth', 'tilt', 'slat-angle'." },
+                        "objectiveId": { "type": "STRING", "description": "The objective metric to test against, e.g., 'maximize_sDA' or 'minimize_ASE'." }
+                    },
+                    "required": ["wall", "shadingType", "parameterName", "objectiveId"]
                 }
             }
         ]
@@ -1357,6 +1392,8 @@ You have access to ${availableTools[0].functionDeclarations.length} different to
 - **Show Your Work**: When using tools, explain what you're doing and why
 - **Be Comprehensive**: Consider the full context of the user's project
 - **Offer Next Steps**: Suggest logical follow-up actions when appropriate
+- **Proactive Optimization Help**: When a user asks to run an optimization (e.g., 'optimize my shading', 'find the best overhang') or opens the optimization panel, check if they have specified a narrow parameter range. If not, you MUST proactively offer to run a preliminary analysis first by calling the 'suggestOptimizationRanges' tool.
+    - *Example Offer*: "I can run a full optimization. Before I do, would you like me to run a ~30-second preliminary analysis on the 'depth' parameter to find its most effective range first? This can save time and improve results."
 
 ## Current Context
 
@@ -1743,6 +1780,11 @@ async function _handleSimulationTool(name, args) {
             }
             return { success: true, message: `Daylighting system ${args.enable ? 'enabled and configured' : 'disabled'}.` };
         }
+        case 'runOccupancyAnalysis': {
+            const { weekdaysOnly, occupancySchedule } = args;
+            const filePath = await generateAndStoreOccupancyCsv(weekdaysOnly, occupancySchedule);
+            return { success: true, message: `Generated occupancy CSV file at ${filePath}` };
+        }
         default:
             throw new Error(`Unknown simulation tool: ${name}`);
     }
@@ -1887,6 +1929,119 @@ async function _handleTutorTool(name, args) {
     }
 }
 
+/**
+ * Processes the raw fitness cache into a sorted array for analysis.
+ * @param {Map<string, object>} cache - The fitnessCache from optimizationOrchestrator.
+ * @param {string} paramName - The name of the parameter that was tested (e.g., "depth").
+ * @returns {Array<object>} A sorted array, e.g., [{paramValue: 0.5, fitness: 80}, ...].
+ * @private
+ */
+function _processCache(cache, paramName) {
+    const results = [];
+    for (const [key, value] of cache.entries()) {
+        try {
+            const params = JSON.parse(key);
+            if (params.hasOwnProperty(paramName)) {
+                results.push({
+                    paramValue: params[paramName],
+                    fitness: value.fitness,
+                    metricValue: value.metricValue,
+                    unit: value.unit
+                });
+            }
+        } catch (e) {
+            console.error("Failed to parse cache key:", key, e);
+        }
+    }
+    // Sort by the parameter value
+    results.sort((a, b) => a.paramValue - b.paramValue);
+    return results;
+}
+
+/**
+ * Analyzes sorted cache results to find an optimal range, cutting off the "worst" 15%
+ * and the "diminishing returns" 5% tail.
+ * @param {Array<object>} results - Sorted array from _processCache.
+ * @param {string} objectiveId - The goal, e.g., "maximize_sDA".
+ * @returns {object} e.g., { suggestedMin: 0.4, suggestedMax: 1.2, bestSolution: {...} }
+ * @private
+ */
+function _analyzeCacheForOptimalRange(results, objectiveId) {
+    if (results.length < 5) { // Not enough data
+        return {
+            suggestedMin: results[0]?.paramValue,
+            suggestedMax: results[results.length - 1]?.paramValue,
+            bestSolution: results[0]
+        };
+    }
+
+    const isMaximize = objectiveId.startsWith('maximize');
+    let bestSolution = results[0];
+    let worstFitness = results[0].fitness;
+    let bestFitness = results[0].fitness;
+
+    for (const res of results) {
+        if (isMaximize) {
+            if (res.fitness > bestFitness) {
+                bestFitness = res.fitness;
+                bestSolution = res;
+            }
+            if (res.fitness < worstFitness) worstFitness = res.fitness;
+        } else { // minimize
+            if (res.fitness < bestFitness) {
+                bestFitness = res.fitness;
+                bestSolution = res;
+            }
+            if (res.fitness > worstFitness) worstFitness = res.fitness;
+        }
+    }
+
+    const fitnessRange = Math.abs(bestFitness - worstFitness);
+    if (fitnessRange === 0) { // All values are the same
+        return {
+            suggestedMin: results[0].paramValue,
+            suggestedMax: results[results.length - 1].paramValue,
+            bestSolution
+        };
+    }
+
+    // 1. Find suggestedMin: Cut off the "worst" 15%
+    const minFitnessThreshold = isMaximize 
+        ? worstFitness + (fitnessRange * 0.15)
+        : worstFitness - (fitnessRange * 0.15); // for minimize, worst is a large positive number
+
+    let suggestedMin = results[0].paramValue;
+    for (const res of results) {
+        if (isMaximize ? res.fitness >= minFitnessThreshold : res.fitness <= minFitnessThreshold) {
+            suggestedMin = res.paramValue;
+            break;
+        }
+    }
+
+    // 2. Find suggestedMax: Cut off the "diminishing returns" 5% tail
+    const maxFitnessThreshold = isMaximize
+        ? bestFitness - (fitnessRange * 0.05)
+        : bestFitness + (fitnessRange * 0.05); // for minimize, best is a small number
+
+    let suggestedMax = results[results.length - 1].paramValue;
+    // Iterate from the end
+    for (let i = results.length - 1; i >= 0; i--) {
+        const res = results[i];
+        if (isMaximize ? res.fitness >= maxFitnessThreshold : res.fitness <= maxFitnessThreshold) {
+            suggestedMax = res.paramValue;
+            break;
+        }
+    }
+
+    // Ensure min is less than max
+    if (suggestedMin > suggestedMax) {
+        [suggestedMin, suggestedMax] = [suggestedMax, suggestedMin];
+    }
+
+    return { suggestedMin, suggestedMax, bestSolution };
+}
+
+
 // Tool registry - maps tool names to their handler functions
 const toolHandlers = {
     // Scene tools
@@ -1920,6 +2075,7 @@ const toolHandlers = {
     'runSimulation': (args) => _handleSimulationTool('runSimulation', args),
     'setGlobalRadianceParameter': (args) => _handleSimulationTool('setGlobalRadianceParameter', args),
     'configureDaylightingSystem': (args) => _handleSimulationTool('configureDaylightingSystem', args),
+    'runOccupancyAnalysis': (args) => _handleSimulationTool('runOccupancyAnalysis', args),
 
     // UI tools
     'toggleUIPanel': (args) => _handleUITool('toggleUIPanel', args),
@@ -2008,89 +2164,112 @@ const toolHandlers = {
         };
     },
     'configureOptimization': async (args) => {
-        const { parameters, goal, constraint, populationSize, generations, goalType, targetValue } = args;
-        let messages = ['Optimization configured:'];
+      const { optimizationType, parameters, objective1, objective2, constraint, populationSize, evaluations } = args;
 
-        // Set goal and constraint
-        if (goal) {
-            // Parse goal to auto-select recipe
-            const recipeMap = {
-                'sDA': 'sda-ase',
-                'ASE': 'sda-ase',
-                'avg': 'illuminance',
-                'dgp': 'dgp'
-            };
-            const metricKey = goal.split('_')[1]; // e.g., "sDA" from "maximize_sDA"
-            const recipe = recipeMap[metricKey] || 'sda-ase';
-            
-            setUiValue('opt-simulation-recipe', recipe);
-            // Trigger metric update
-            dom['opt-simulation-recipe']?.dispatchEvent(new Event('change', { bubbles: true }));
-            
-            // Wait for metrics to populate
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
-            setUiValue('opt-goal-metric', goal);
-            messages.push(`- Goal set to ${goal}`);
-        }
-        if (constraint) {
-            setUiValue('opt-constraint', constraint);
-            messages.push(`- Constraint set to ${constraint}`);
-        }
+      let messages = [`Optimization type set to ${optimizationType}:`];
 
-        // Set population and generations
-        if (populationSize) {
-            setUiValue('opt-population-size', Math.min(50, Math.max(4, populationSize)));
-            messages.push(`- Population size set to ${populationSize}`);
-        }
-        if (generations) {
-        setUiValue('opt-generations', Math.min(20, Math.max(2, generations)));
-        messages.push(`- Generations set to ${generations}`);
-    }
+      // Ensure the optimization panel is open
+      const optTab = dom['helios-optimization-tab-btn'];
+      if (optTab && !optTab.classList.contains('active')) {
+          optTab.click();
+          await new Promise(resolve => setTimeout(resolve, 100)); // Wait for panel
+      }
 
-    if (goalType) {
-        setUiValue('opt-goal-type', goalType);
-        dom['opt-goal-type']?.dispatchEvent(new Event('change', { bubbles: true })); // Trigger show/hide
-        messages.push(`- Goal type set to ${goalType}`);
-    }
-    if (targetValue !== undefined && goalType === 'set-target') {
-        setUiValue('opt-goal-target-value', targetValue);
-        messages.push(`- Target value set to ${targetValue}`);
-    }
+      const optPanel = document.querySelector('#helios-optimization-content:not(.hidden)') || document.querySelector('#helios-optimization-content');
+      if (!optPanel) {
+          throw new Error('Could not find the optimization panel.');
+      }
 
-    // Configure parameters
-        if (parameters) {
-            const container = dom['opt-params-container'];
-            if (!container) return { success: false, message: 'Parameter container not found.' };
+      // Set optimization type
+      setUiValue('opt-type', optimizationType);
+      optPanel.querySelector('#opt-type')?.dispatchEvent(new Event('change', { bubbles: true }));
+      await new Promise(resolve => setTimeout(resolve, 100)); // Wait for panels to toggle
 
-            for (const [paramName, range] of Object.entries(parameters)) {
-            const item = container.querySelector(`[data-param-id="${paramName}"]`);
-            if (item) {
-                const toggle = item.querySelector('.opt-param-toggle');
-                const minInput = item.querySelector('.opt-param-min');
-                const maxInput = item.querySelector('.opt-param-max');
-                // Step input is not configured by this tool, it uses the default
+      if (optimizationType === 'ssga') {
+          // --- Configure Single-Objective ---
+          if (objective1) {
+              const [goalType, metricId] = objective1.split('_'); // e.g., "maximize_sDA"
+              const recipe = Object.keys(RECIPE_METRICS).find(r => RECIPE_METRICS[r].some(m => m.id === objective1));
 
-                toggle.checked = true;
-                    // Trigger controls to show
-                    toggle.dispatchEvent(new Event('change', { bubbles: true })); 
-                    
-                    if (Array.isArray(range) && range.length === 2) {
-                        minInput.value = range[0];
-                        maxInput.value = range[1];
-                    }
-                    messages.push(`- Parameter ${paramName} enabled with range [${range[0]}, ${range[1]}]`);
-                } else {
-                    messages.push(`- Warning: Parameter ${paramName} not found for current shading type.`);
-                }
-            }
-        }
-        
-        return {
-            success: true,
-            message: messages.length > 1 ? messages.join('\n') : 'No settings provided to configure.'
-        };
-    },
+              if (recipe) {
+                  setUiValue('opt-simulation-recipe', recipe);
+                  dom['opt-simulation-recipe']?.dispatchEvent(new Event('change', { bubbles: true }));
+                  await new Promise(resolve => setTimeout(resolve, 50));
+
+                  setUiValue('opt-goal-metric', objective1);
+                  setUiValue('opt-goal-type', goalType);
+                  messages.push(`- Goal set to ${objective1}`);
+              }
+          }
+          if (constraint) {
+              setUiValue('opt-constraint', constraint);
+              messages.push(`- Constraint set to ${constraint}`);
+          }
+
+      } else if (optimizationType === 'moga') {
+          // --- Configure Multi-Objective ---
+          const setupObjective = async (objStr, num) => {
+              if (!objStr) return;
+              const [goalType, metricId] = objStr.split('_');
+              const recipe = Object.keys(RECIPE_METRICS).find(r => RECIPE_METRICS[r].some(m => m.id === objStr));
+
+              if (recipe) {
+                  setUiValue(`opt-recipe-${num}`, recipe);
+                  dom[`opt-recipe-${num}`]?.dispatchEvent(new Event('change', { bubbles: true }));
+                  await new Promise(resolve => setTimeout(resolve, 50));
+
+                  setUiValue(`opt-goal-${num}`, objStr);
+                  setUiValue(`opt-goal-type-${num}`, goalType);
+                  messages.push(`- Objective ${num} set to ${objStr}`);
+              }
+          };
+          await setupObjective(objective1, 1);
+          await setupObjective(objective2, 2);
+      }
+
+      // --- Configure Common Parameters ---
+      if (populationSize) {
+          setUiValue('opt-population-size', populationSize);
+          messages.push(`- Population size set to ${populationSize}`);
+      }
+      if (evaluations) {
+          setUiValue('opt-generations', evaluations); // This ID maps to "Max Evals / Gens"
+          messages.push(`- Max Evals/Gens set to ${evaluations}`);
+      }
+
+      if (parameters) {
+          const container = dom['opt-params-container'];
+          if (!container) return { success: false, message: 'Parameter container not found.' };
+
+          // Wait for parameters to be populated by shading-type change if any
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+          for (const [paramName, range] of Object.entries(parameters)) {
+              const item = container.querySelector(`[data-param-id="${paramName}"]`);
+              if (item) {
+                  const toggle = item.querySelector('.opt-param-toggle');
+                  if (toggle && !toggle.checked) {
+                      toggle.checked = true;
+                      toggle.dispatchEvent(new Event('change', { bubbles: true })); 
+                  }
+                  if (Array.isArray(range) && range.length === 2) {
+                      const minInput = item.querySelector('.opt-param-min');
+                      const maxInput = item.querySelector('.opt-param-max');
+                      if (minInput) minInput.value = range[0];
+                      if (maxInput) maxInput.value = range[1];
+                  }
+                  messages.push(`- Parameter ${paramName} enabled with range [${range[0]}, ${range[1]}]`);
+              } else {
+                  messages.push(`- Warning: Parameter ${paramName} not found for current shading type.`);
+              }
+          }
+      }
+
+      return {
+          success: true,
+          message: messages.join('\n')
+      };
+  },
     'startOptimization': async (args) => {
         const mode = args.mode || 'full';
         if (!['full', 'quick'].includes(mode)) {
@@ -2131,16 +2310,126 @@ const toolHandlers = {
 
         return { success: true, message: `Applied the '${profileName}' optimization profile.` };
     },
+    'suggestOptimizationRanges': async (args) => {
+        const { wall, shadingType, parameterName, objectiveId } = args;
 
-    // Special tools (handled directly)
-    'runDesignInspector': async (args) => {
+        // 1. Define default wide ranges
+        const DEFAULT_WIDE_RANGES = {
+            'depth': [0.1, 3.0],
+            'tilt': [-90, 90],
+            'dist-above': [0.0, 1.5],
+            'dist-below': [0.0, 3.0],
+            'slat-angle': [-90, 90],
+            'slat-width': [0.01, 0.5],
+            'slat-sep': [0.01, 0.5],
+            // Add more as needed
+        };
+
+        const wideRange = DEFAULT_WIDE_RANGES[parameterName];
+        if (!wideRange) {
+            throw new Error(`Cannot suggest ranges for '${parameterName}'. No default wide range is defined.`);
+        }
+
+        // 2. Open and configure the optimization panel
+        const optTab = dom['helios-optimization-tab-btn'];
+        if (optTab && !optTab.classList.contains('active')) {
+            optTab.click();
+            await new Promise(resolve => setTimeout(resolve, 100)); // Wait for panel
+        }
+        const optPanel = document.querySelector('#helios-optimization-content:not(.hidden)') || document.querySelector('#helios-optimization-content');
+        if (!optPanel) {
+            throw new Error('Could not find the optimization panel.');
+        }
+
+        // 3. Configure for a single-parameter SSGA run
+        setUiValue('opt-type', 'ssga');
+        optPanel.querySelector('#opt-type')?.dispatchEvent(new Event('change', { bubbles: true }));
+
+        setUiValue('opt-target-wall', wall);
+        setUiValue('opt-shading-type', shadingType);
+        optPanel.querySelector('#opt-shading-type')?.dispatchEvent(new Event('change', { bubbles: true }));
+
+        // Wait for recipe/goals to populate
+        await new Promise(resolve => setTimeout(resolve, 150));
+
+        const [goalType, metricId] = objectiveId.split('_'); // e.g., "maximize_sDA"
+        const recipe = Object.keys(RECIPE_METRICS).find(r => RECIPE_METRICS[r].some(m => m.id === objectiveId));
+
+        if (!recipe) throw new Error(`Could not find a recipe for objective: ${objectiveId}`);
+
+        setUiValue('opt-simulation-recipe', recipe);
+        optPanel.querySelector('#opt-simulation-recipe')?.dispatchEvent(new Event('change', { bubbles: true }));
+
+        // Wait for metric to populate
+        await new Promise(resolve => setTimeout(resolve, 150));
+
+        setUiValue('opt-goal-metric', objectiveId);
+        setUiValue('opt-goal-type', goalType);
+        setUiValue('opt-constraint', ''); // Clear constraints for pre-analysis
+
+        // Wait for parameters to populate
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        const container = dom['opt-params-container'];
+        if (!container) throw new Error('Parameter container not found.');
+
+        // Uncheck all parameters first
+        container.querySelectorAll('.opt-param-toggle').forEach(toggle => {
+            if (toggle.checked) toggle.click();
+        });
+
+        // Check and configure only the target parameter
+        const item = container.querySelector(`[data-param-id="${parameterName}"]`);
+        if (!item) throw new Error(`Parameter '${parameterName}' not found for shading type '${shadingType}'.`);
+
+        const toggle = item.querySelector('.opt-param-toggle');
+        if (!toggle.checked) toggle.click();
+
+        const minInput = item.querySelector('.opt-param-min');
+        const maxInput = item.querySelector('.opt-param-max');
+        const stepInput = item.querySelector('.opt-param-step');
+
+        if (minInput) minInput.value = wideRange[0];
+        if (maxInput) maxInput.value = wideRange[1];
+        // Use a reasonable step count (e.g., 20 steps) for the analysis
+        if (stepInput) stepInput.value = (wideRange[1] - wideRange[0]) / 20;
+
+        // 4. Run the 'quick' optimization
+        addMessage('ai', `Running a quick preliminary analysis for '${parameterName}'...`);
+        await runOptimizer('quick');
+
+        // 5. Get and analyze the cache
+        const cache = getFitnessCache();
+        if (cache.size === 0) {
+            throw new Error('Preliminary analysis ran but produced no results.');
+        }
+
+        const results = _processCache(cache, parameterName);
+        const { suggestedMin, suggestedMax, bestSolution } = _analyzeCacheForOptimalRange(results, objectiveId);
+
+        const message = `Preliminary analysis complete for '${parameterName}' on the ${wall} wall.
+        The most effective range appears to be [${suggestedMin.toFixed(2)}, ${suggestedMax.toFixed(2)}].
+
+        The best single value found was ${bestSolution.paramValue.toFixed(2)}, which resulted in a ${bestSolution.metricValue.toFixed(2)}${bestSolution.unit} ${objectiveId.split('_')[1]}.
+
+        I recommend setting your optimization parameter range to [${suggestedMin.toFixed(2)}, ${suggestedMax.toFixed(2)}] for the full run.`;
+
+            return {
+                success: true,
+                message: message,
+                analysis: { suggestedMin, suggestedMax, bestSolution }
+            };
+        },
+
+        // Special tools (handled directly)
+        'runDesignInspector': async (args) => {
         // These are handled by their own top-level functions, not this executor
         return { success: true, message: "Inspector/Critique initiated." };
-    },
-    'runResultsCritique': async (args) => {
-        // These are handled by their own top-level functions, not this executor
-        return { success: true, message: "Inspector/Critique initiated." };
-    }
+        },
+        'runResultsCritique': async (args) => {
+            // These are handled by their own top-level functions, not this executor
+            return { success: true, message: "Inspector/Critique initiated." };
+        }
 };
 
 async function _executeToolCall(toolCall) {
