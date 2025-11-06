@@ -25,6 +25,7 @@ The UI is designed around a system of floating panels that can be dragged, resiz
     *   **`scripts/hdrViewer.js`**: Provides a viewer for High Dynamic Range (HDR) images, with exposure and false color controls.
     *   **`scripts/knowledgeBase.js`**: Loads and searches a local knowledge base for the AI assistant.
     *   **`scripts/lighting.js`**: Manages the artificial lighting systems, including IES file parsing and visualization.
+    *   **`scripts/mogaOptimizer.js`**: Implements a Multi-Objective Genetic Algorithm (NSGA-II) for optimization tasks.
     *   **`scripts/optimizationEngine.js`**: Contains the core genetic algorithm for optimization tasks.
     *   **`scripts/optimizationOrchestrator.js`**: Manages the optimization process, linking the UI, the genetic algorithm, and the simulation runs.
     *   **`scripts/parsingWorker.js`**: A web worker for parsing large simulation result files without blocking the main UI thread.
