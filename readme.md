@@ -20,6 +20,7 @@ Ray Modeler is a desktop application providing a graphical user interface (GUI) 
     - [Interactive Tutor](#interactive-tutor)
       - [Proactive Suggestions](#proactive-suggestions)
     - [Generative Design](#generative-design)
+      - [Guide for Performing the Optimization](#guide-for-performing-the-optimization)
     - [API Key Configuration](#api-key-configuration)
     - [Getting Your API Key](#getting-your-api-key)
       - [Google Gemini API Key 🔑](#google-gemini-api-key-)
@@ -239,6 +240,87 @@ The AI Assistant can fully control this workflow with commands:
 - `"Start a 'quick' optimization run"`
 - `"Suggest a good range for louver slat angle"`
 - `"Analyze the optimization results"`
+
+#### Guide for Performing the Optimization
+
+the "Optimization" tab in the Helios panel is a dedicated interface for running Generative Optimization studies.
+Its purpose is to automatically find the best possible shading design (like an overhang, louver, or lightshelf) by running many simulations in the background. You define the goals (e.g., "maximize daylight") and constraints (e.g., "keep glare low"), and the optimizer "evolves" solutions to find the best-performing design parameters.
+While the other tabs are for chatting with Helios, this tab provides a specific UI for this powerful feature. However, Helios (the AI) is deeply integrated to help you set up, run, and understand the results.
+Here is a guide on how to use it, covering both the manual process and how Helios can assist you.
+
+**First Step: The Info Panel**
+For a detailed guide built directly into the app, click the info button (ⓘ) at the top right of the Optimization panel. This will open the "About Generative Optimization" modal, which explains the entire process, including the AI-powered features.
+
+**How to Manually Run an Optimization**
+You can configure and run an optimization yourself by following these steps:
+
+1. **Set Context**:
+
+- **Target Wall**: Select the wall (e.g., "South") where you want to optimize the shading.
+- **Shading Type**: Choose the device you want to test (e.g., "Overhang").
+
+2. **Choose Optimization Type**:
+
+- **Single-Objective (SSGA)**: Use this to find the single best design for one goal (e.g., "Maximize sDA") while meeting an optional constraint (e.g., `ASE < 10`).
+- **Multi-Objective (MOGA)**: Use this to explore the trade-offs between two competing goals (e.g., "Maximize sDA" vs. "Minimize Glare"). This won't give you one "best" answer, but a set of optimal compromises (the "Pareto Front").
+
+3. **Define Parameters (The "Genes")**:
+
+- In the "Parameters to Optimize" section, check the box next to the parameters you want the algorithm to change (e.g., `depth`, `tilt`).
+- You must set a valid **Min** and **Max** range for each parameter you select. This defines the "search space" for the optimizer.
+
+4. **Define Your Goal(s)**:
+
+- Select the simulation **Recipe** (e.g., `sda-ase`).
+- Select the **Metric** you want to optimize (e.g., `maximize_sDA`).
+- If using SSGA, you can add a **Constraint** (e.g., `ASE < 10`) to filter out bad designs.
+
+5. **Configure Run Settings**:
+
+- **Population**: The number of designs to test in each "generation." (10-20 is typical).
+- **Max Evals / Gens**: The total number of simulations to run (for SSGA) or the number of generations to evolve (for MOGA). More evaluations take longer but can produce better results.
+- **Quality**: The simulation quality for each test. **Medium** is recommended for a balance of speed and accuracy.
+
+6. **Run and Analyze**:
+
+- Click **"Start Optimization."** The "Progress Log" will show the status.
+- The **"Results"** list will fill with the best-performing designs as they are found.
+- You can click any design in the list and then click **"Apply Selected Design"** to instantly see it in the 3D scene.
+
+✨ **How to Use Helios (The AI) for Optimization**
+This is the most powerful workflow. Instead of (or in addition to) using the manual form, you can use Helios in the **Chat** tab to assist you at every step.
+
+1. **AI-Powered Setup**
+    You can ask Helios to configure the entire optimization for you.
+
+    Go to the "Chat" tab and ask:
+    > "Helios, set up an optimization for the south wall. I want to find the best overhang depth and tilt to maximize sDA, but keep ASE below 10%."
+
+    Helios will use its `configureOptimization` tool to fill out the entire form in the Optimization tab for you. It will then ask you to review the settings and click "Start Optimization" when you are ready.
+2. **AI-Suggested Parameter Ranges (Most-Recommended)**
+    Not sure what **Min** and **Max** ranges to set for a parameter? Ask Helios to find out.
+
+    Go to the "Chat" tab and ask:
+    > "Before I run a full optimization, can you suggest a good range for the 'overhang depth' on the south wall to maximize sDA?"
+
+    Helios will use its `suggestOptimizationRanges` tool to:
+
+    - Run a special "quick optimize" on *only* that one parameter (e.g., `depth`) across a very wide default range (e.g., 0.1m to 3.0m).
+    - Analyze the results to find the "sweet spot," cutting off the worst-performing 15% and the 5% that give diminishing returns.
+    - It will then report back with a recommended range (e.g., "The most effective range appears to be `[0.4m, 1.3m]`. I recommend using this in your full optimization.").
+
+    This saves you from wasting hours testing ineffective parameter ranges.
+3. **AI-Powered Trend Analysis (After a Run)**
+    The "Results" list only shows you thes*best* designs. To understand *why* they performed well, you can ask Helios to analyze the full data from the run.
+
+    After your optimization is complete, go to the "Chat" tab and ask:
+    > "Helios, please analyze my last optimization run and tell me what you found."
+
+    Helios will use its `analyzeOptimizationResults` tool to get the data from *every single simulation it ran* (not just the best ones). It will then provide a high-level summary of trends and insights, such as:
+
+    - "I found that **'slat-angle' was the most critical parameter** for minimizing glare."
+    - "Performance for 'depth' improved up to 1.2m, but then had diminishing returns, so there is no benefit to making it larger."
+    - "'Slat-width' had almost no impact on performance, so you can choose that based on cost or aesthetics."
 
 ---
 

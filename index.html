@@ -3524,6 +3524,100 @@
         <button id="opt-info-modal-close-btn" class="absolute top-3 right-3 text-[--text-secondary] hover:text-[--text-primary]" aria-label="Close Optimization Info">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
+        <h3 class="text-lg font-bold mb-4">Generative Optimization</h3>
+      <div class="window-content prose" style="max-height: 100%; overflow-y: auto;">
+        <h3>Guide for Performing the Optimization</h3>
+        <p>The "Optimization" tab in the Helios panel is a dedicated interface for running<strong>Generative Optimization<strong>studies.
+        
+        Its purpose is to<strong>automatically find the best possible shading design<strong>(like an overhang, louver, or lightshelf) by running many simulations in the background. You define the goals (e.g., "maximize daylight") and constraints (e.g., "keep glare low"), and the optimizer "evolves" solutions to find the best-performing design parameters.
+        
+        While the other tabs are for chatting with Helios, this tab provides a specific UI for this powerful feature. However, Helios (the AI) is deeply integrated to help you set up, run, and understand the results.
+          
+        Here is a guide on how to use it, covering both the manual process and how Helios can assist you.</p>
+
+        <p><strong>First Step: The Info Panel</strong><br>
+        For a detailed guide built directly into the app, click the info button (ⓘ) at the top right of the Optimization panel. This will open the "About Generative Optimization" modal, which explains the entire process, including the AI-powered features.</p>
+
+        <p><strong>How to Manually Run an Optimization</strong><br>
+        You can configure and run an optimization yourself by following these steps:</p>
+
+        <ol>
+            <li><strong>Set Context</strong>:
+                <ul>
+                    <li><strong>Target Wall</strong>: Select the wall (e.g., "South") where you want to optimize the shading.</li>
+                    <li><strong>Shading Type</strong>: Choose the device you want to test (e.g., "Overhang").</li>
+                </ul>
+            </li>
+        <li><strong>Choose Optimization Type</strong>:
+            <ul>
+                <li><strong>Single-Objective (SSGA)</strong>: Use this to find the single best design for one goal (e.g., "Maximize sDA") while meeting an optional constraint (e.g., <code>ASE &lt; 10</code>).</li>
+                <li><strong>Multi-Objective (MOGA)</strong>: Use this to explore the trade-offs between two competing goals (e.g., "Maximize sDA" vs. "Minimize Glare"). This won't give you one "best" answer, but a set of optimal compromises (the "Pareto Front").</li>
+                </ul>
+            </li>
+              <li><strong>Define Parameters (The "Genes")</strong>:
+                  <ul>
+                      <li>In the "Parameters to Optimize" section, check the box next to the parameters you want the algorithm to change (e.g., <code>depth</code>, <code>tilt</code>).</li>
+                      <li>You must set a valid <strong>Min</strong> and <strong>Max</strong> range for each parameter you select. This defines the "search space" for the optimizer.</li>
+                  </ul>
+              </li>
+              <li><strong>Define Your Goal(s)</strong>:
+                  <ul>
+                      <li>Select the simulation <strong>Recipe</strong> (e.g.,<code>sda-ase</code>).</li>
+                      <li>Select the <strong>Metric</strong> you want to optimize (e.g., <code>maximize_sDA</code>).</li>
+                      <li>If using SSGA, you can add a <strong>Constraint</strong>s(e.g., <code>ASE &lt; 10</code>) to filter out bad designs.</li>
+                  </ul>
+              </li>
+              <li><strong>Configure Run Settings</strong>:
+                  <ul>
+                      <li><strong>Population</strong>: The number of designs to test in each "generation." (10-20 is typical).</li>
+                      <li><strong>Max Evals / Gens</strong>: The total number of simulations to run (for SSGA) or the number of generations to evolve (for MOGA). More evaluations take longer but can produce better results.</li>
+                      <li><strong>Quality</strong>:sThe simulation quality for each test. <strong>Medium</strong> is recommended for a balance of speed and accuracy.</li>
+                  </ul>
+              </li>
+              <li><strong>Run and Analyze</strong>:
+                  <ul>
+                      <li>Click <strong>"Start Optimization."</strong> The "Progress Log" will show the status.</li>
+                      <li>The <strong>"Results"</strong> list will fill with the best-performing designs as they are found.</li>
+                      <li>You can click any design in the list and then click <strong>"Apply Selected Design"</strong> to instantly see it in the 3D scene.</li>
+                  </ul>
+              </li>
+          </ol>
+
+          <h4>✨ How to Use Helios (The AI) for Optimization</h4>
+          <p>This is the most powerful workflow. Instead of (or in addition to) using the manual form, you can use Helios in the <strong>Chat</strong> tab to assist you at every step.</p>
+
+          <ol>
+              <li><strong>AI-Powered Setup</strong>
+                  <p>You can ask Helios to configure the entire optimization for you.</p>
+                  <p>Go to the "Chat" tab and ask:</p>
+                  <blockquote>"Helios, set up an optimization for the south wall. I want to find the best overhang depth and tilt to maximize sDA, but keep ASE below 10%."</blockquote>
+                  <p>Helios will use its <code>configureOptimization</code> tool to fill out the entire form in the Optimization tab for you. It will then ask you to review the settings and click "Start Optimization" when you are ready.</p>
+              </li>
+              <li><strong>AI-Suggested Parameter Ranges (Most-Recommended)</strong>
+                  <p>Not sure what <strong>Min</strong> and <strong>Max</strong> ranges to set for a parameter? Ask Helios to find out.</p>
+                  <p>Go to the "Chat" tab and ask:</p>
+                  <blockquote>"Before I run a full optimization, can you suggest a good range for the 'overhang depth' on the south wall to maximize sDA?"</blockquote>
+                  <p>Helios will use its <code>suggestOptimizationRanges</code> tool to:</p>
+                  <ul>
+                      <li>Run a special "quick optimize" on <em>only</em> that one parameter (e.g., <code>depth</code>) across a very wide default range (e.g., 0.1m to 3.0m).</li>
+                      <li>Analyze the results to find the "sweet spot," cutting off the worst-performing 15% and the 5% that give diminishing returns.</li>
+                      <li>It will then report back with a recommended range (e.g., "The most effective range appears to be <code>[0.4m, 1.3m]</code>. I recommend using this in your full optimization.").</li>
+                  </ul>
+                  <p>This saves you from wasting hours testing ineffective parameter ranges.</p>
+              </li>
+              <li><strong>AI-Powered Trend Analysis (After a Run)</strong>
+                  <p>The "Results" list only shows you thes<em>best</em>sdesigns. To understand <em>why</em> they performed well, you can ask Helios to analyze the full data from the run.</p>
+                  <p>After your optimization is complete, go to the "Chat" tab and ask:</p>
+                  <blockquote>"Helios, please analyze my last optimization run and tell me what you found."</blockquote>
+                  <p>Helios will use itss<code>analyzeOptimizationResults</code> tool to get the data from <em>every single simulation it ran</em> (not just the best ones). It will then provide a high-level summary of trends and insights, such as:</p>
+                  <ul>
+                      <li>"I found that <strong>'slat-angle' was the most critical parameter</strong> for minimizing glare."</li>
+                      <li>"Performance for 'depth' improved up to 1.2m, but then had diminishing returns, so there is no benefit to making it larger."</li>
+                      <li>"'Slat-width' had almost no impact on performance, so you can choose that based on cost or aesthetics."</li>
+                  </ul>
+              </li>
+          </ol>
+          <hr class="my-6 border-[--grid-color]">
         <h3 class="text-lg font-bold mb-4">About Generative Optimization</h3>
         <div class="window-content prose" style="max-height: 100%; overflow-y: auto;">
             <p>This panel uses <strong>Genetic Algorithms (GAs)</strong> to automatically find high-performing shading designs. You define the goals and constraints, and the algorithm "evolves" solutions over time by running many simulations in the background.</p>
