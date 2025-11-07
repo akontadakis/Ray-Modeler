@@ -11,6 +11,7 @@
   --text-primary-rgb: 52, 52, 52;
   --text-secondary-rgb: 133, 133, 133;
   --highlight-rgb: 59, 130, 246;
+  --line-color-rgb: 59, 130, 246; /* Using highlight color */
 
   /* Alpha Values */
   --panel-alpha: 1.00;
@@ -25,6 +26,7 @@
   --text-primary: rgba(var(--text-primary-rgb), 1);
   --text-secondary: rgba(var(--text-secondary-rgb), 1);
   --highlight-color: rgba(var(--highlight-rgb), 1);
+  --line-color: rgba(var(--line-color-rgb), 1);
   --grid-color: rgba(var(--grid-color-rgb), 1);
   --north-arrow-color: var(--text-primary);
   --btn-secondary-bg: #DDDEE3;
@@ -55,6 +57,7 @@ html[data-theme="dark"] {
   --text-primary-rgb: 224, 224, 224;
   --text-secondary-rgb: 136, 136, 136;
   --highlight-rgb: 245, 158, 11;
+  --line-color-rgb: 245, 158, 11; /* Using highlight color */
   --text-on-selection: #ffffff; /* White text on selection */
 
   /* Derived Colors (Alpha values are inherited from :root unless overridden) */
@@ -65,6 +68,7 @@ html[data-theme="dark"] {
   --text-primary: rgba(var(--text-primary-rgb), 1);
   --text-secondary: rgba(var(--text-secondary-rgb), 1);
   --highlight-color: rgba(var(--highlight-rgb), 1);
+  --line-color: rgba(var(--line-color-rgb), 1);
   --grid-color: rgba(var(--grid-color-rgb), 1);
   --north-arrow-color: var(--text-primary);
   --btn-secondary-bg: #3a3a3a;
