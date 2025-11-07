@@ -647,6 +647,7 @@ body.ai-sidebar-open #render-container {
     width: calc(100% - var(--ai-sidebar-width));
     transition: width 0.4s ease-in-out, margin-left 0.4s ease-in-out; /* Match sidebar transition */
 }
+
 /* If LEFT bar is docked, adjust margin and width accordingly */
 body.ai-sidebar-open.left-sidebar-docked #render-container {
     margin-left: 60px; /* Keep margin for left bar */
@@ -659,6 +660,7 @@ body.ai-sidebar-open:not(.top-sidebar-docked) #view-controls {
     left: calc((100% - var(--ai-sidebar-width)) / 2);
     width: auto; /* Allow natural width when floating */
 }
+
 /* Adjust recentering if LEFT is docked but TOP is floating */
 body.ai-sidebar-open:not(.top-sidebar-docked).left-sidebar-docked #view-controls {
     left: calc(60px + (100% - 60px - var(--ai-sidebar-width)) / 2);
@@ -670,8 +672,9 @@ body.ai-sidebar-open:not(.top-sidebar-docked) #view-controls {
     left: calc((100% - var(--ai-sidebar-width)) / 2); /* Center in remaining space */
     width: auto; /* Allow natural width */
     transform: translateX(-50%); /* Keep horizontal centering */
-    transition: left 0.4s ease-in-out; /* Match sidebar transition */
+    /* transition: left 0.4s ease-in-out; --- REMOVED to prevent horizontal slide */
 }
+
 /* Adjust FLOATING centering if LEFT is docked */
 body.ai-sidebar-open:not(.top-sidebar-docked).left-sidebar-docked #view-controls {
     left: calc(60px + (100% - 60px - var(--ai-sidebar-width)) / 2);
@@ -682,14 +685,15 @@ body.ai-sidebar-open.top-sidebar-docked:not(.left-sidebar-docked) #view-controls
     width: calc(100% - var(--ai-sidebar-width));
     left: 0;
     transform: none;
-    transition: width 0.4s ease-in-out, left 0.4s ease-in-out;
+    /* transition: width 0.4s ease-in-out, left 0.4s ease-in-out; --- REMOVED */
 }
+
 /* Adjust DOCKED view controls width when AI sidebar opens AND LEFT is docked */
 body.ai-sidebar-open.top-sidebar-docked.left-sidebar-docked #view-controls.docked {
     left: 60px; /* Start after left docked bar */
     width: calc(100% - 60px - var(--ai-sidebar-width)); /* Shrink by both */
     transform: none;
-    transition: width 0.4s ease-in-out, left 0.4s ease-in-out;
+    /* transition: width 0.4s ease-in-out, left 0.4s ease-in-out; --- REMOVED */
 }
 
 
