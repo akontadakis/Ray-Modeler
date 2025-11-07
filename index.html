@@ -3446,10 +3446,37 @@
             </div>
             <p class="text-xs text-[--text-secondary] mt-4 text-center">Shortcuts are disabled when typing in input fields.</p>
         </div>
+</div>
+
+<div id="add-opt-param-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[10002] hidden items-center justify-center">
+    <div class="ui-panel p-6 w-full max-w-md mx-auto bg-[--bg-main] relative">
+        <h3 class="text-lg font-bold mb-4">Add Parameter to Optimize</h3>
+        <div class="space-y-4">
+            <div>
+                <label for="opt-param-domain-select" class="label">1. Select Domain</label>
+                <select id="opt-param-domain-select" class="w-full">
+                    <option value="">Select Domain...</option>
+                </select>
+            </div>
+            <div>
+                <label for="opt-param-target-select" class="label">2. Select Target</label>
+                <select id="opt-param-target-select" class="w-full">
+                    <option value="">Select Target...</option>
+                </select>
+            </div>
+            <div>
+                <label for="opt-param-name-select" class="label">3. Select Parameter</label>
+                <select id="opt-param-name-select" class="w-full">
+                    <option value="">Select Parameter...</option>
+                </select>
+            </div>
+        </div>
+        <div class="flex justify-end gap-3 mt-6">
+            <button id="cancel-add-param-btn" class="btn btn-secondary">Cancel</button>
+            <button id="confirm-add-param-btn" class="btn btn-primary">Add Parameter</button>
+        </div>
     </div>
-
-
-
+</div>
 
 <div id="bottom-left-controls" class="fixed bottom-6 left-6 z-50 flex gap-4 items-center">
     <div id="theme-switcher-container" class="flex gap-2 items-center pointer-events-auto">
@@ -3525,237 +3552,211 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
         <h3 class="text-lg font-bold mb-4">Generative Optimization</h3>
-      <div class="window-content prose" style="max-height: 100%; overflow-y: auto;">
-        <h3>Guide for Performing the Optimization</h3>
-        <p>The "Optimization" tab in the Helios panel is a dedicated interface for running Generative Optimization studies.
-        
-        Its purpose is to automatically find the best possible shading design (like an overhang, louver, or lightshelf) by running many simulations in the background. You define the goals (e.g., "maximize daylight") and constraints (e.g., "keep glare low"), and the optimizer "evolves" solutions to find the best-performing design parameters.
-        
-        While the other tabs are for chatting with Helios, this tab provides a specific UI for this powerful feature. However, Helios (the AI) is deeply integrated to help you set up, run, and understand the results.
-          
-        Here is a guide on how to use it, covering both the manual process and how Helios can assist you.</p>
-
-        <p><strong>First Step: The Info Panel</strong><br>
-        For a detailed guide built directly into the app, click the info button (ⓘ) at the top right of the Optimization panel. This will open the "About Generative Optimization" modal, which explains the entire process, including the AI-powered features.</p>
-
-        <p><strong>How to Manually Run an Optimization</strong><br>
-        You can configure and run an optimization yourself by following these steps:</p>
-
-        <ol>
-            <li><strong>Set Context</strong>:
+            <div class="window-content prose" style="max-height: 100%; overflow-y: auto;">
+                <h2>Guide for Performing the Optimization</h2>
+                <p>The "Optimization" tab in the Helios panel is a dedicated interface for running Generative Optimization studies. Its purpose is to automatically find the best possible shading design (like an overhang, louver, or lightshelf) by running many simulations in the background. You define the goals (e.g., "maximize daylight") and constraints (e.g., "keep glare low"), and the optimizer "evolves" solutions to find the best-performing design parameters. While the other tabs are for chatting with Helios, this tab provides a specific UI for this powerful feature. However, Helios (the AI) is deeply integrated to help you set up, run, and understand the results. Here is a guide on how to use it, covering both the manual process and how Helios can assist you.</p>
+                <p><strong>First Step: The Info Panel</strong><br>For a detailed guide built directly into the app, click the info button (ⓘ) at the top right of the Optimization panel. This will open the "About Generative Optimization" modal, which explains the entire process, including the AI-powered features.</p>
+                <p><strong>How to Manually Run an Optimization</strong><br>You can configure and run an optimization yourself by following these steps:</p>
+                <ol>
+                    <li><strong>Set Context</strong>:
+                        <ul>
+                            <li><strong>Target Wall</strong>: Select the wall (e.g., "South") where you want to optimize the shading.</li>
+                            <li><strong>Shading Type</strong>: Choose the device you want to test (e.g., "Overhang").</li>
+                        </ul>
+                    </li>
+                    <li><strong>Choose Optimization Type</strong>:
+                        <ul>
+                            <li><strong>Single-Objective (SSGA)</strong>: Use this to find the single best design for one goal (e.g., "Maximize sDA") while meeting an optional constraint (e.g., <code>ASE &lt; 10</code>).</li>
+                            <li><strong>Multi-Objective (MOGA)</strong>: Use this to explore the trade-offs between two competing goals (e.g., "Maximize sDA" vs. "Minimize Glare"). This won't give you one "best" answer, but a set of optimal compromises (the "Pareto Front").</li>
+                        </ul>
+                    </li>
+                    <li><strong>Define Parameters (The "Genes")</strong>:
+                        <ul>
+                            <li>In the "Parameters to Optimize" section, check the box next to the parameters you want the algorithm to change (e.g., <code>depth</code>, <code>tilt</code>).</li>
+                            <li>You must set a valid <strong>Min</strong> and <strong>Max</strong> range for each parameter you select. This defines the "search space" for the optimizer.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Define Your Goal(s)</strong>:
+                        <ul>
+                            <li>Select the simulation <strong>Recipe</strong> (e.g.,<code>sda-ase</code>).</li>
+                            <li>Select the <strong>Metric</strong> you want to optimize (e.g., <code>maximize_sDA</code>).</li>
+                            <li>If using SSGA, you can add a <strong>Constraint</strong>s(e.g., <code>ASE &lt; 10</code>) to filter out bad designs.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Configure Run Settings</strong>:
+                        <ul>
+                            <li><strong>Population</strong>: The number of designs to test in each "generation." (10-20 is typical).</li>
+                            <li><strong>Max Evals / Gens</strong>: The total number of simulations to run (for SSGA) or the number of generations to evolve (for MOGA). More evaluations take longer but can produce better results.</li>
+                            <li><strong>Quality</strong>:sThe simulation quality for each test. <strong>Medium</strong> is recommended for a balance of speed and accuracy.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Run and Analyze</strong>:
+                        <ul>
+                            <li>Click <strong>"Start Optimization."</strong> The "Progress Log" will show the status.</li>
+                            <li>The <strong>"Results"</strong> list will fill with the best-performing designs as they are found.</li>
+                            <li>You can click any design in the list and then click <strong>"Apply Selected Design"</strong> to instantly see it in the 3D scene.</li>
+                        </ul>
+                    </li>
+                </ol>
+                <h4>✨ How to Use Helios (The AI) for Optimization</h4>
+                <p>This is the most powerful workflow. Instead of (or in addition to) using the manual form, you can use Helios in the <strong>Chat</strong> tab to assist you at every step.</p>
+                <ol>
+                    <li><strong>AI-Powered Setup</strong>
+                        <p>You can ask Helios to configure the entire optimization for you. Go to the "Chat" tab and ask:</p>
+                        <blockquote>"Helios, set up an optimization for the south wall. I want to find the best overhang depth and tilt to maximize sDA, but keep ASE below 10%."</blockquote>
+                        <p>Helios will use its <code>configureOptimization</code> tool to fill out the entire form in the Optimization tab for you. It will then ask you to review the settings and click "Start Optimization" when you are ready.</p>
+                    </li>
+                    <li><strong>AI-Suggested Parameter Ranges (Most-Recommended)</strong>
+                        <p>Not sure what <strong>Min</strong> and <strong>Max</strong> ranges to set for a parameter? Ask Helios to find out. Go to the "Chat" tab and ask:</p>
+                        <blockquote>"Before I run a full optimization, can you suggest a good range for the 'overhang depth' on the south wall to maximize sDA?"</blockquote>
+                        <p>Helios will use its <code>suggestOptimizationRanges</code> tool to:</p>
+                        <ul>
+                            <li>Run a special "quick optimize" on <em>only</em> that one parameter (e.g., <code>depth</code>) across a very wide default range (e.g., 0.1m to 3.0m).</li>
+                            <li>Analyze the results to find the "sweet spot," cutting off the worst-performing 15% and the 5% that give diminishing returns.</li>
+                            <li>It will then report back with a recommended range (e.g., "The most effective range appears to be <code>[0.4m, 1.3m]</code>. I recommend using this in your full optimization.").</li>
+                        </ul>
+                        <p>This saves you from wasting hours testing ineffective parameter ranges.</p>
+                    </li>
+                    <li><strong>AI-Powered Trend Analysis (After a Run)</strong>
+                        <p>The "Results" list only shows you thesbestdesigns. To understand <em>why</em> they performed well, you can ask Helios to analyze the full data from the run. After your optimization is complete, go to the "Chat" tab and ask:</p>
+                        <blockquote>"Helios, please analyze my last optimization run and tell me what you found."</blockquote>
+                        <p>Helios will use its <code>analyzeOptimizationResults</code> tool to get the data from <em>every single simulation it ran</em> (not just the best ones). It will then provide a high-level summary of trends and insights, such as:</p>
+                        <ul>
+                            <li>"I found that <strong>'slat-angle' was the most critical parameter</strong> for minimizing glare."</li>
+                            <li>"Performance for 'depth' improved up to 1.2m, but then had diminishing returns, so there is no benefit to making it larger."</li>
+                            <li>"'Slat-width' had almost no impact on performance, so you can choose that based on cost or aesthetics."</li>
+                        </ul>
+                    </li>
+                </ol>
+                    <hr class="my-6 border-[--grid-color]">
+                    <h2 class="text-lg font-bold mb-4">About Generative Optimization</h2>
+                    <p>This panel uses Genetic Algorithms (GAs) to automatically find high-performing shading designs. You define the goals and constraints, and the algorithm "evolves" solutions over time by running many simulations in the background.</p>
+                    <h2>How to Run an Optimization (Step-by-Step)</h2>
+                <ol>
+                    <li><strong>Set Optimization Context</strong>:
+                        <ul>
+                            <li><strong>Target Wall</strong>: Select the wall (N, S, E, W) where the shading will be optimized.</li>
+                            <li><strong>Shading Type</strong>: Choose the device to optimize (e.g., Overhang, Louver).</li>
+                        </ul>
+                    </li>
+                    <li><strong>Choose Optimization Type</strong>:
+                        <ul>
+                            <li><strong>Single-Objective (SSGA)</strong>: Finds the single "best" design for one specific goal (e.g., maximize sDA) while adhering to an optional constraint (e.g., ASE < 10).</li>
+                            <li><strong>Multi-Objective (MOGA)</strong>: Explores the "trade-offs" between two competing goals (e.g., maximizing sDA vs. minimizing glare). It returns a set of optimal compromises, known as the Pareto Front.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Define Parameters to Optimize</strong>:
+                        <ul>
+                            <li>Check the box next to the parameters you want the algorithm to change (the "genes").</li>
+                            <li>Set the <strong>Min</strong> and <strong>Max</strong> values to define the "search space" for each parameter.</li>
+                            <li><strong>Pro Tip:</strong> Not sure what range to set? Ask Helios to <strong>"suggest a good range for overhang depth"</strong>. It will run a quick analysis to find the most effective range.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Set Your Goal(s)</strong>:
+                        <ul>
+                            <li><strong>For SSGA:</strong> Select the <strong>Recipe</strong> (simulation type) and the <strong>Metric</strong> you want to optimize. Set the <strong>Goal Type</strong>(Maximize, Minimize, or Set Target). Add an optional <strong>Constraint</strong> to filter out bad designs (e.g., <code>ASE &lt; 10</code>).</li>
+                            <li><strong>For MOGA:</strong> Configure <strong>Objective 1</strong> and <strong>Objective 2</strong>. Both metrics must come from the same simulation recipe (e.g., sDA and ASE both come from the <code>sda-ase</code> recipe).</li>
+                        </ul>
+                    </li>
+                    <li><strong>Configure Run Settings</strong>:
+                        <ul>
+                            <li><strong>Population</strong>: Number of designs in each generation (e.g., 10-20).</li>
+                            <li><strong>Max Evals / Gens</strong>: The total number of simulations (for SSGA) or generations (for MOGA) to run. This controls the total runtime.</li>
+                            <li><strong>Quality</strong>: Simulation quality. <strong>Medium</strong> is recommended for a balance of speed and accuracy.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Run the Optimization</strong>:
+                        <ul>
+                            <li><strong>Start Optimization</strong>: Begins the full run.</li>
+                            <li><strong>Quick Optimize</strong>: Runs with smaller settings for a fast, preliminary result.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Analyze and Apply Results</strong>:
+                        <ul>
+                            <li>As the optimization runs, the <strong>Results</strong> list will fill with the best solutions found so far.</li>
+                            <li><strong>For MOGA</strong>, this list is the <strong>Pareto Front</strong>, showing the best trade-offs.</li>
+                            <li>Click any design in the list to select it.</li>
+                            <li>Click <strong>"Apply Selected Design"</strong> to apply its parameters to the 3D scene.</li>
+                            <li>After the run, ask Helios to <strong>"analyze the optimization results"</strong> for a high-level summary of parameter trends and insights.</li>
+                        </ul>
+                    </li>
+                </ol>
+                <h2>AI-Powered Assistance</h2>
+                <p>Helios is integrated with this panel to help you get better results, faster.</p>
+                <h3>1. AI-Suggested Parameter Ranges</h3>
+                <p>Before running a full, time-consuming optimization, you can ask Helios to find the most effective range for a single parameter.</p>
                 <ul>
-                    <li><strong>Target Wall</strong>: Select the wall (e.g., "South") where you want to optimize the shading.</li>
-                    <li><strong>Shading Type</strong>: Choose the device you want to test (e.g., "Overhang").</li>
+                    <li><strong>How it works:</strong> When you ask (e.g., "suggest a range for overhang depth"), Helios runs a 'quick optimize' on that one parameter across a very wide default range (e.g., 0.1m to 3.0m).</li>
+                    <li>It then analyzes the results to find the "sweet spot"—it cuts off the "worst" 15% of designs and the 5% "diminishing returns" tail.</li>
+                    <li><strong>Result:</strong> Helios will suggest an optimized range (e.g., "[0.4, 1.2]") for you to use in your full optimization, saving you from wasting time testing ineffective parameter values.</li>
                 </ul>
-            </li>
-        <li><strong>Choose Optimization Type</strong>:
-            <ul>
-                <li><strong>Single-Objective (SSGA)</strong>: Use this to find the single best design for one goal (e.g., "Maximize sDA") while meeting an optional constraint (e.g., <code>ASE &lt; 10</code>).</li>
-                <li><strong>Multi-Objective (MOGA)</strong>: Use this to explore the trade-offs between two competing goals (e.g., "Maximize sDA" vs. "Minimize Glare"). This won't give you one "best" answer, but a set of optimal compromises (the "Pareto Front").</li>
+                <h3>2. AI-Powered Trend Analysis</h3>
+                <p>After a run is complete, the results list only shows the <strong>best</strong> designs. To understand <em>why</em>they were the best, you can ask Helios to analyze the full dataset.</p>
+                <ul>
+                    <li><strong>How it works:</strong> When you ask (e.g., "analyze my optimization results"), Helios uses the <code>analyzeOptimizationResults</code> tool to get the data from <em>all</em> evaluations, not just the best ones.</li>
+                    <li>It then performs a trend analysis to provide a high-level summary.</li>
+                    <li><strong>Result:</strong> Helios will give you insights like:
+                        <ul>
+                            <li><strong>Key Trends:</strong> "sDA improved as 'depth' increased, but dropped off after 1.5m."</li>
+                            <li><strong>Parameter Sensitivity:</strong> "'Slat Angle' was the most critical driver of performance, while 'Slat Width' had almost no impact and can be chosen based on cost."</li>
+                        </ul>
+                    </li>
                 </ul>
-            </li>
-              <li><strong>Define Parameters (The "Genes")</strong>:
-                  <ul>
-                      <li>In the "Parameters to Optimize" section, check the box next to the parameters you want the algorithm to change (e.g., <code>depth</code>, <code>tilt</code>).</li>
-                      <li>You must set a valid <strong>Min</strong> and <strong>Max</strong> range for each parameter you select. This defines the "search space" for the optimizer.</li>
-                  </ul>
-              </li>
-              <li><strong>Define Your Goal(s)</strong>:
-                  <ul>
-                      <li>Select the simulation <strong>Recipe</strong> (e.g.,<code>sda-ase</code>).</li>
-                      <li>Select the <strong>Metric</strong> you want to optimize (e.g., <code>maximize_sDA</code>).</li>
-                      <li>If using SSGA, you can add a <strong>Constraint</strong>s(e.g., <code>ASE &lt; 10</code>) to filter out bad designs.</li>
-                  </ul>
-              </li>
-              <li><strong>Configure Run Settings</strong>:
-                  <ul>
-                      <li><strong>Population</strong>: The number of designs to test in each "generation." (10-20 is typical).</li>
-                      <li><strong>Max Evals / Gens</strong>: The total number of simulations to run (for SSGA) or the number of generations to evolve (for MOGA). More evaluations take longer but can produce better results.</li>
-                      <li><strong>Quality</strong>:sThe simulation quality for each test. <strong>Medium</strong> is recommended for a balance of speed and accuracy.</li>
-                  </ul>
-              </li>
-              <li><strong>Run and Analyze</strong>:
-                  <ul>
-                      <li>Click <strong>"Start Optimization."</strong> The "Progress Log" will show the status.</li>
-                      <li>The <strong>"Results"</strong> list will fill with the best-performing designs as they are found.</li>
-                      <li>You can click any design in the list and then click <strong>"Apply Selected Design"</strong> to instantly see it in the 3D scene.</li>
-                  </ul>
-              </li>
-          </ol>
-
-          <h4>✨ How to Use Helios (The AI) for Optimization</h4>
-          <p>This is the most powerful workflow. Instead of (or in addition to) using the manual form, you can use Helios in the <strong>Chat</strong> tab to assist you at every step.</p>
-
-          <ol>
-              <li><strong>AI-Powered Setup</strong>
-                  <p>You can ask Helios to configure the entire optimization for you.</p>
-                  <p>Go to the "Chat" tab and ask:</p>
-                  <blockquote>"Helios, set up an optimization for the south wall. I want to find the best overhang depth and tilt to maximize sDA, but keep ASE below 10%."</blockquote>
-                  <p>Helios will use its <code>configureOptimization</code> tool to fill out the entire form in the Optimization tab for you. It will then ask you to review the settings and click "Start Optimization" when you are ready.</p>
-              </li>
-              <li><strong>AI-Suggested Parameter Ranges (Most-Recommended)</strong>
-                  <p>Not sure what <strong>Min</strong> and <strong>Max</strong> ranges to set for a parameter? Ask Helios to find out.</p>
-                  <p>Go to the "Chat" tab and ask:</p>
-                  <blockquote>"Before I run a full optimization, can you suggest a good range for the 'overhang depth' on the south wall to maximize sDA?"</blockquote>
-                  <p>Helios will use its <code>suggestOptimizationRanges</code> tool to:</p>
-                  <ul>
-                      <li>Run a special "quick optimize" on <em>only</em> that one parameter (e.g., <code>depth</code>) across a very wide default range (e.g., 0.1m to 3.0m).</li>
-                      <li>Analyze the results to find the "sweet spot," cutting off the worst-performing 15% and the 5% that give diminishing returns.</li>
-                      <li>It will then report back with a recommended range (e.g., "The most effective range appears to be <code>[0.4m, 1.3m]</code>. I recommend using this in your full optimization.").</li>
-                  </ul>
-                  <p>This saves you from wasting hours testing ineffective parameter ranges.</p>
-              </li>
-              <li><strong>AI-Powered Trend Analysis (After a Run)</strong>
-                  <p>The "Results" list only shows you thes<em>best</em>sdesigns. To understand <em>why</em> they performed well, you can ask Helios to analyze the full data from the run.</p>
-                  <p>After your optimization is complete, go to the "Chat" tab and ask:</p>
-                  <blockquote>"Helios, please analyze my last optimization run and tell me what you found."</blockquote>
-                  <p>Helios will use itss<code>analyzeOptimizationResults</code> tool to get the data from <em>every single simulation it ran</em> (not just the best ones). It will then provide a high-level summary of trends and insights, such as:</p>
-                  <ul>
-                      <li>"I found that <strong>'slat-angle' was the most critical parameter</strong> for minimizing glare."</li>
-                      <li>"Performance for 'depth' improved up to 1.2m, but then had diminishing returns, so there is no benefit to making it larger."</li>
-                      <li>"'Slat-width' had almost no impact on performance, so you can choose that based on cost or aesthetics."</li>
-                  </ul>
-              </li>
-          </ol>
-          <hr class="my-6 border-[--grid-color]">
-        <h3 class="text-lg font-bold mb-4">About Generative Optimization</h3>
-        <div class="window-content prose" style="max-height: 100%; overflow-y: auto;">
-            <p>This panel uses Genetic Algorithms (GAs) to automatically find high-performing shading designs. You define the goals and constraints, and the algorithm "evolves" solutions over time by running many simulations in the background.</p>
-
-            <h2>How to Run an Optimization (Step-by-Step)</h2>
-            <ol>
-                <li><strong>Set Optimization Context:</strong>
-                    <ul>
-                        <li><strong>Target Wall:</strong> Select the wall (N, S, E, W) where the shading will be optimized.</li>
-                        <li><strong>Shading Type:</strong> Choose the device to optimize (e.g., Overhang, Louver).</li>
-                    </ul>
-                </li>
-                <li><strong>Choose Optimization Type:</strong>
-                    <ul>
-                        <li><strong>Single-Objective (SSGA):</strong> Finds the single "best" design for one specific goal (e.g., maximize sDA) while adhering to an optional constraint (e.g., ASE < 10).</li>
-                        <li><strong>Multi-Objective (MOGA):</strong> Explores the "trade-offs" between two competing goals (e.g., maximizing sDA vs. minimizing glare). It returns a set of optimal compromises, known as the Pareto Front.</li>
-                    </ul>
-                </li>
-                <li><strong>Define Parameters to Optimize:</strong>
-                    <ul>
-                        <li>Check the box next to the parameters you want the algorithm to change (the "genes").</li>
-                        <li>Set the <strong>Min</strong> and <strong>Max</strong> values to define the "search space" for each parameter.</li>
-                        <li><strong>Pro Tip:</strong> Not sure what range to set? Ask Helios to <strong>"suggest a good range for overhang depth"</strong>. It will run a quick analysis to find the most effective range.</li>
-                    </ul>
-                </li>
-                <li><strong>Set Your Goal(s):</strong>
-                    <ul>
-                        <li><strong>For SSGA:</strong> Select the <strong>Recipe</strong> (simulation type) and the <strong>Metric</strong> you want to optimize. Set the <strong>Goal Type</strong> (Maximize, Minimize, or Set Target). Add an optional <strong>Constraint</strong> to filter out bad designs (e.g., <code>ASE < 10</code>).</li>
-                        <li><strong>For MOGA:</strong> Configure <strong>Objective 1</strong> and <strong>Objective 2</strong>. Both metrics must come from the same simulation recipe (e.g., sDA and ASE both come from the `sda-ase` recipe).</li>
-                    </ul>
-                </li>
-                <li><strong>Configure Run Settings:</strong>
-                    <ul>
-                        <li><strong>Population:</strong> Number of designs in each generation (e.g., 10-20).</li>
-                        <li><strong>Max Evals / Gens:</strong> The total number of simulations (for SSGA) or generations (for MOGA) to run. This controls the total runtime.</li>
-                        <li><strong>Quality:</strong> Simulation quality. <code>Medium</code> is recommended for a balance of speed and accuracy.</li>
-                    </ul>
-                </li>
-                <li><strong>Run the Optimization:</strong>
-                    <ul>
-                        <li><strong>Start Optimization:</strong> Begins the full run.</li>
-                        <li><strong>Quick Optimize:</strong> Runs with smaller settings for a fast, preliminary result.</li>
-                    </ul>
-                </li>
-                <li><strong>Analyze and Apply Results:</strong>
-                    <ul>
-                        <li>As the optimization runs, the <strong>Results</strong> list will fill with the best solutions found so far.</li>
-                        <li><strong>For MOGA</strong>, this list is the <strong>Pareto Front</strong>, showing the best trade-offs.</li>
-                        <li>Click any design in the list to select it.</li>
-                        <li>Click <strong>"Apply Selected Design"</strong> to apply its parameters to the 3D scene.</li>
-                        <li>After the run, ask Helios to <strong>"analyze the optimization results"</strong> for a high-level summary of parameter trends and insights.</li>
-                    </ul>
-                </li>
-            </ol>
-
-            <h2>AI-Powered Assistance</h2>
-            <p>Helios is integrated with this panel to help you get better results, faster.</p>
-            <h3>1. AI-Suggested Parameter Ranges</h3>
-            <p>Before running a full, time-consuming optimization, you can ask Helios to find the most effective range for a single parameter.</p>
-            <ul>
-                <li><strong>How it works:</strong> When you ask (e.g., "suggest a range for overhang depth"), Helios runs a 'quick optimize' on that one parameter across a very wide default range (e.g., 0.1m to 3.0m).</li>
-                <li>It then analyzes the results to find the "sweet spot"—it cuts off the "worst" 15% of designs and the 5% "diminishing returns" tail.</li>
-                <li><strong>Result:</strong> Helios will suggest an optimized range (e.g., "[0.4, 1.2]") for you to use in your full optimization, saving you from wasting time testing ineffective parameter values.</li>
-            </ul>
-
-            <h3>2. AI-Powered Trend Analysis</h3>
-            <p>After a run is complete, the results list only shows the *best* designs. To understand *why* they were the best, you can ask Helios to analyze the full dataset.</p>
-            <ul>
-                <li><strong>How it works:</strong> When you ask (e.g., "analyze my optimization results"), Helios uses the <code>analyzeOptimizationResults</code> tool to get the data from *all* evaluations, not just the best ones.</li>
-                <li>It then performs a trend analysis to provide a high-level summary.</li>
-                <li><strong>Result:</strong> Helios will give you insights like:
-                    <ul>
-                        <li><strong>Key Trends:</strong> "sDA improved as 'depth' increased, but dropped off after 1.5m."</li>
-                        <li><strong>Parameter Sensitivity:</strong> "'Slat Angle' was the most critical driver of performance, while 'Slat Width' had almost no impact and can be chosen based on cost."</li>
-                    </ul>
-                </li>
-            </ul>
-
-            <h2>Optimization Methodologies</h2>
-            <h3>Single-Objective (SSGA)</h3>
-            <p>This uses a <strong>Steady-State Genetic Algorithm (SSGA)</strong>. It is efficient for finding the single best solution for one goal.</p>
-            <ol>
-                <li><strong>Initialization:</strong> Creates an initial "population" (e.g., 10) of random designs.</li>
-                <li><strong>Evaluation (Fitness):</strong> Each design is simulated, and its performance on your <strong>Goal Metric</strong> (e.g., sDA score) becomes its "fitness."</li>
-                <li><strong>Selection:</strong> Selects two "parent" designs using <strong>Tournament Selection</strong> (the best of 3 random picks).</li>
-                <li><strong>Crossover & Mutation:</strong> The two parents are "bred" to create two new "child" designs, with a small chance of random mutation.</li>
-                <li><strong>Replacement:</strong> The two new children are evaluated (simulated). They are added to the population, and the two <strong>worst-performing</strong> designs are removed.</li>
-                <li><strong>Repeat:</strong> This "select, breed, evaluate, replace" loop repeats until the <strong>Max Evaluations</strong> is reached.</li>
-            </ol>
-            <h3>Multi-Objective (MOGA / NSGA-II)</h3>
-            <p>This uses a <strong>Non-dominated Sorting Genetic Algorithm II (NSGA-II)</strong>, a powerful method for finding a set of optimal trade-offs (the "Pareto Front").</p>
-            <ol>
-                <li><strong>Initialization:</strong> Creates and evaluates an initial N-sized population.</li>
-                <li><strong>Sorting:</strong> The population is sorted into "fronts" based on dominance. A design "dominates" another if it is better in at least one objective and not worse in any others. All non-dominated designs are on Rank 1 (the Pareto Front).</li>
-                <li><strong>Selection:</strong> Parents are selected using a <strong>Crowded-Tournament</strong>, which prefers designs with a better rank (lower is better) and, if ranks are equal, a higher "crowding distance" (more unique).</li>
-                <li><strong>Crossover & Mutation:</strong> Child designs (size N) are created from the selected parents.</li>
-                <li><strong>Combine & Re-Sort:</strong> The parent (N) and child (N) populations are combined into one 2N-sized group and evaluated. [</li>
-                <li><strong>Elitism (Replacement):</strong> A new N-sized population is built by taking all designs from Rank 1, then all from Rank 2, and so on, until the population is full.The last front is sorted by crowding distance to ensure diversity.</li>
-                <li><strong>Repeat:</strong> This loop repeats for a fixed number of <strong>Max Generations</strong>.</li>
-            </ol>
-
-            <h3>Key Feature: Fitness Caching</h3>
-            <p>If the algorithm generates a design it has already simulated, it retrieves the score from its memory (`fitnessCache`) instead of running a new simulation. This dramatically speeds up the process. This cache is also enhanced to store the raw metrics (e.g., <code>{sda: 80, ase: 5}</code>) for every run, which is what powers the AI Trend Analysis tool.</p>
-
-            <h2>Configuration Options Explained</h2>
-            <ul>
-                <li><strong>Optimization Type:</strong> Choose between finding a single best solution (SSGA) or a set of trade-offs (MOGA).</li>
-                <li><strong>Shading & Parameters:</strong> The "genes" for the algorithm. You must select at least one parameter (up to 3) and define the `min`, `max`, and `step` values.</li>
-                <li><strong>Goal & Constraints (SSGA):</strong> The "fitness function" the algorithm tries to improve, and a "pass/fail" rule (e.g., <code>ASE < 10</code>) to filter out bad designs.</li>
-                <li><strong>Objectives (MOGA):</strong> [The two competing goals (e.g., <code>maximize_sDA</code> and <code>minimize_ASE</code>) used to sort the population into fronts.</li>
-                <li><strong>Population:</strong> The number of designs in each generation.</li>
-                <li><strong>Max Evals / Gens:</strong> The total number of simulations (for SSGA) or generations (for MOGA) to run.</li>
-                <li><strong>Quality:</strong> The Radiance preset to use for each simulation (<code>draft</code>, <code>medium</code>, <code>high</code>). <code>Medium</code> is recommended.</li>
-            </ul>
-
-            <h2>Benefits & Limitations</h2>
-            <ul>
-                <li><strong>Benefit:</strong> Automates the tedious task of iterating on a design. It can find non-obvious, high-performing combinations of parameters.</li>
-                <li><strong>Benefit:</strong> MOGA allows you to explore the *trade-offs* between goals, rather than just finding one solution that might be good at one thing but terrible at another.</li>
-                <li><strong>Limitation:</strong> This is a stochastic (random) process. It is not <em>guaranteed</em> to find the absolute single best solution, but it is very good at finding globally "good" solutions.</li>
-                <li><strong>Limitation:</strong> The process is computationally expensive. A run of 50 evaluations can still take a significant amount of time.</li>
-            </ul>
-
-            <h2>What Happens When You Click "Start"</h2>
-            <p>The <code>evaluateDesignHeadless</code> function orchestrates the entire process for each design:</p>
-            <ol>
-                <li>Applies the new design parameters (e.g., `depth: 0.7`) to the 3D scene.</li>
-                <li>Programmatically generates a new simulation package (geometry, scripts, etc.) with a unique ID.</li>
-                <li>Runs the simulation script headlessly in the background.</li>
-                <li>Waits for the script to finish, then reads the unique result files (e.g., `_sDA_final.ill`).</li>
-                <li>Parses the results, calculates the fitness score(s), and checks against any constraints.</li>
-                <li>Returns this score to the optimizer, which then repeats the loop.</li>
-            </ol>
-            <p class="mt-4"><strong>Final Result:</strong> When the process is complete, the results list will show the best solution(s). For SSGA, the best design is automatically selected and can be applied. For MOGA, you can click on any of the trade-off solutions and click "Apply Selected Design" to see it in the 3D scene.</p>
+                <h2>Optimization Methodologies</h2>
+                <h3>Single-Objective (SSGA)</h3>
+                <p>This uses a <strong>Steady-State Genetic Algorithm (SSGA)</strong>. It is efficient for finding the single best solution for one goal.</p>
+                <ol>
+                    <li><strong>Initialization:</strong> Creates an initial "population" (e.g., 10) of random designs.</li>
+                    <li><strong>Evaluation (Fitness):</strong> Each design is simulated, and its performance on your <strong>Goal Metric</strong> (e.g., sDA score) becomes its "fitness."</li>
+                    <li><strong>Selection:</strong> Selects two "parent" designs using <strong>Tournament Selection</strong> (the best of 3 random picks).</li>
+                    <li><strong>Crossover & Mutation:</strong> The two parents are "bred" to create two new "child" designs, with a small chance of random mutation.</li>
+                    <li><strong>Replacement:</strong> The two new children are evaluated (simulated). They are added to the population, and the two <strong>worst-performing</strong> designs are removed.</li>
+                    <li><strong>Repeat:</strong> This "select, breed, evaluate, replace" loop repeats until the <strong>Max Evaluations</strong> is reached.</li>
+                </ol>
+                <h3>Multi-Objective (MOGA / NSGA-II)</h3>
+                <p>This uses a <strong>Non-dominated Sorting Genetic Algorithm II (NSGA-II)</strong>, a powerful method for finding a set of optimal trade-offs (the "Pareto Front").</p>
+                <ol>
+                    <li><strong>Initialization:</strong> Creates and evaluates an initial N-sized population.</li>
+                    <li><strong>Sorting:</strong> The population is sorted into "fronts" based on dominance. A design "dominates" another if it is better in at least one objective and not worse in any others. All non-dominated designs are on Rank 1 (the Pareto Front).</li>
+                    <li><strong>Selection:</strong> Parents are selected using a <strong>Crowded-Tournament</strong>, which prefers designs with a better rank (lower is better) and, if ranks are equal, a higher "crowding distance" (more unique).</li>
+                    <li><strong>Crossover & Mutation:</strong> Child designs (size N) are created from the selected parents.</li>
+                    <li><strong>Combine & Re-Sort:</strong> The parent (N) and child (N) populations are combined into one 2N-sized group and evaluated.</li>
+                    <li><strong>Elitism (Replacement):</strong> A new N-sized population is built by taking all designs from Rank 1, then all from Rank 2, and so on, until the population is full.The last front is sorted by crowding distance to ensure diversity.</li>
+                    <li><strong>Repeat:</strong> This loop repeats for a fixed number of <strong>Max Generations</strong>.</li>
+                </ol>
+                <h3>Key Feature: Fitness Caching</h3>
+                <p>If the algorithm generates a design it has already simulated, it retrieves the score from its memory (<code>fitnessCache</code>) instead of running a new simulation. This dramatically speeds up the process. This cache is also enhanced to store the raw metrics (e.g., <code>{sda: 80, ase: 5}</code>) for every run, which is what powers the AI Trend Analysis tool.</p>
+                <h2>Configuration Options Explained</h2>
+                <ul>
+                    <li><strong>Optimization Type:</strong> Choose between finding a single best solution (SSGA) or a set of trade-offs (MOGA).</li>
+                    <li><strong>Shading & Parameters:</strong> The "genes" for the algorithm. You must select at least one parameter (up to 3) and define the <code>min</code>, <code>max</code>, and <code>step</code> values.</li>
+                    <li><strong>Goal & Constraints (SSGA):</strong> The "fitness function" the algorithm tries to improve, and a "pass/fail" rule (e.g., <code>ASE &lt; 10</code>) to filter out bad designs.</li>
+                    <li><strong>Objectives (MOGA):</strong> [The two competing goals (e.g., <code>maximize_sDA</code> and <code>minimize_ASE</code>) used to sort the population into fronts.</li>
+                    <li><strong>Population:</strong> The number of designs in each generation.</li>
+                    <li><strong>Max Evals / Gens:</strong> The total number of simulations (for SSGA) or generations (for MOGA) to run.</li>
+                    <li><strong>Quality:</strong> The Radiance preset to use for each simulation (<code>draft</code>, <code>medium</code>, <code>high</code>). <code>Medium</code> is recommended.</li>
+                </ul>
+                <h2>Benefits & Limitations</h2>
+                <ul>
+                    <li><strong>Benefit:</strong> Automates the tedious task of iterating on a design. It can find non-obvious, high-performing combinations of parameters.</li>
+                    <li><strong>Benefit:</strong> MOGA allows you to explore the <em>trade-offs</em> between goals, rather than just finding one solution that might be good at one thing but terrible at another.</li>
+                    <li><strong>Limitation:</strong> This is a stochastic (random) process. It is not <em>guaranteed</em> to find the absolute single best solution, but it is very good at finding globally "good" solutions.</li>
+                    <li><strong>Limitation:</strong> The process is computationally expensive. A run of 50 evaluations can still take a significant amount of time.</li>
+                </ul>
+                <h2>What Happens When You Click "Start"</h2>
+                <p>The <code>evaluateDesignHeadless</code> function orchestrates the entire process for each design:</p>
+                <ol>
+                    <li>Applies the new design parameters (e.g., <code>depth: 0.7</code>) to the 3D scene.</li>
+                    <li>Programmatically generates a new simulation package (geometry, scripts, etc.) with a unique ID.</li>
+                    <li>Runs the simulation script headlessly in the background.</li>
+                    <li>Waits for the script to finish, then reads the unique result files (e.g., <code>_sDA_final.ill</code>).</li>
+                    <li>Parses the results, calculates the fitness score(s), and checks against any constraints.</li>
+                    <li>Returns this score to the optimizer, which then repeats the loop.</li>
+                </ol>
+                <p class="mt-4"><strong>Final Result:</strong> When the process is complete, the results list will show the best solution(s). For SSGA, the best design is automatically selected and can be applied. For MOGA, you can click on any of the trade-off solutions and click "Apply Selected Design" to see it in the 3D scene.</p>
+            </div>
         </div>
     </div>
-</div>
-
     <div id="templates" class="hidden">
     <template id="template-optimization-panel">
         <div id="helios-optimization-content" class="flex-grow p-4 space-y-4 overflow-y-auto">
@@ -3774,36 +3775,18 @@
                 <select id="opt-type" class="w-full">
                     <option value="ssga" selected>Single-Objective (Find Best)</option>
                     <option value="moga">Multi-Objective (Explore Trade-offs)</option>
-                </select>
-            </div>
-            <div>
-            <label for="opt-target-wall" class="label">Target Wall</label>
-                <select id="opt-target-wall" class="w-full">
-                    <option value="n">North</option>
-                    <option value="s" selected>South</option>
-                    <option value="e">East</option>
-                    <option value="w">West</option>
-                </select>
-            </div>
-            <div>
-                <label for="opt-shading-type" class="label">Shading Type</label>
-                <select id="opt-shading-type" class="w-full">
-                <option value="overhang">Overhang</option>
-                <option value="louver">Louver</option>
-                <option value="lightshelf">Light Shelf</option>
-                <option value="roller">Roller</option>
             </select>
         </div>
-        </div>
-        
-        <div class="border-t border-[--grid-color] pt-4">
-            <h4 class="label mb-2">Parameters to Optimize</h4>
-            <p class="text-xs text-[--text-secondary] mb-3">
-                Select up to 3 parameters and define their ranges.
-            </p>
-            <div id="opt-params-container" class="space-y-2">
-                </div>
-        </div>
+    </div>
+
+    <div class="border-t border-[--grid-color] pt-4">
+        <h4 class="label mb-2">Parameters to Optimize</h4>
+        <div id="dynamic-opt-params-list" class="space-y-2">
+            </div>
+        <button id="add-opt-param-btn" class="btn btn-secondary w-full mt-2">
+            + Add Parameter
+        </button>
+    </div>
         
         <div id="opt-single-objective-controls">
           <div class="border-t border-[--grid-color] pt-4">
@@ -3941,6 +3924,30 @@
         </div>
         </div>
     </template>
+
+    <template id="template-dynamic-opt-param">
+        <div class="dynamic-opt-param-item p-3 border border-[--grid-color] rounded" data-param-id="">
+            <div class="flex justify-between items-center mb-2">
+                <span class="dynamic-opt-param-name font-medium text-sm">Parameter Name</span>
+                <button class="remove-dynamic-opt-param-btn btn btn-xs btn-danger" aria-label="Remove parameter">×</button>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+                <div>
+                    <label class="label text-xs">Min</label>
+                    <input type="number" class="dynamic-opt-param-min w-full" step="0.1">
+                </div>
+                <div>
+                    <label class="label text-xs">Max</label>
+                    <input type="number" class="dynamic-opt-param-max w-full" step="0.1">
+                </div>
+                <div>
+                    <label class="label text-xs">Step</label>
+                    <input type="number" class="dynamic-opt-param-step w-full" step="0.01">
+                </div>
+            </div>
+        </div>
+    </template>
+
     <template id="template-opt-param">
     <div class="opt-param-item p-3 border border-[--grid-color] rounded" data-param-id="">
         <label class="flex items-center cursor-pointer">

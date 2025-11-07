@@ -172,7 +172,6 @@ Beyond answering questions, the assistant can directly manipulate the UI and que
 The AI analyzes the entire project state to identify conflicting or suboptimal combinations of settings, explains the potential consequences, and offers a one-click fix.
 
 > **AI Analysis:** "I've reviewed your project. Your wall reflectance is quite low (0.2), and you're only using 2 ambient bounces. This combination will likely result in an unrealistically dark rendering with noticeable splotches. I recommend increasing ambient bounces to 4 and wall reflectance to 0.5."
->
 > **[Apply Fixes]**
 
 ### Results Critique
@@ -180,7 +179,6 @@ The AI analyzes the entire project state to identify conflicting or suboptimal c
 After a simulation completes, the AI can analyze the results, identify problems, and suggest specific, actionable design changes.
 
 > **AI Analysis:** "The Daylight Glare Probability (DGP) is 0.47, which is considered 'Intolerable'. This is caused by low-angle sun from the west-facing window. To fix this, I suggest adding vertical louvers."
->
 > **[Add Vertical Louvers]**
 
 ### Interactive Tutor
@@ -188,11 +186,11 @@ After a simulation completes, the AI can analyze the results, identify problems,
 The AI can act as a tutor to guide new users through complex simulation workflows step-by-step, teaching them the process as they go.
 
 > **User**: "How do I run a glare simulation?"
->
+
 > **AI**: "Of course! To calculate DGP, we need a 180° fisheye view. Your current viewpoint is set to Perspective. Would you like me to change it for you?"
->
+
 > **User**: "Yes"
->
+
 > **AI**: *(Changes viewpoint)* "Great. Next, I'll open the DGP recipe panel for you." *(Opens recipe)* "Now you just need to click 'Generate Package' and run the simulation."
 
 #### Proactive Suggestions
@@ -240,88 +238,173 @@ The AI Assistant can fully control this workflow with commands:
 
 - **AI-Suggested Parameter Ranges**: Before running a full optimization, ask Helios to find the most effective range for a parameter (e.g., `"suggest a good range for overhang depth"`). It runs a quick analysis to find the "sweet spot," helping you avoid testing ineffective values.
 
-- **AI-Powered Trend Analysis**: After a run, ask Helios to `"analyze the optimization results"`. It will analyze the *entire* dataset (not just the best results) to provide high-level insights on parameter sensitivity and key performance trends.
+- AI-Powered Trend Analysis: After a run, ask Helios to `"analyze the optimization results"`. It will analyze the *entire* dataset (not just the best results) to provide high-level insights on parameter sensitivity and key performance trends.
 
 #### Guide for Performing the Optimization
 
-the "Optimization" tab in the Helios panel is a dedicated interface for running Generative Optimization studies.
-Its purpose is to automatically find the best possible shading design (like an overhang, louver, or lightshelf) by running many simulations in the background. You define the goals (e.g., "maximize daylight") and constraints (e.g., "keep glare low"), and the optimizer "evolves" solutions to find the best-performing design parameters.
-While the other tabs are for chatting with Helios, this tab provides a specific UI for this powerful feature. However, Helios (the AI) is deeply integrated to help you set up, run, and understand the results.
-Here is a guide on how to use it, covering both the manual process and how Helios can assist you.
+The "Optimization" tab in the Helios panel is a dedicated interface for running Generative Optimization studies. Its purpose is to automatically find the best possible shading design (like an overhang, louver, or lightshelf) by running many simulations in the background. You define the goals (e.g., "maximize daylight") and constraints (e.g., "keep glare low"), and the optimizer "evolves" solutions to find the best-performing design parameters. While the other tabs are for chatting with Helios, this tab provides a specific UI for this powerful feature. However, Helios (the AI) is deeply integrated to help you set up, run, and understand the results. Here is a guide on how to use it, covering both the manual process and how Helios can assist you.
 
-**First Step: The Info Panel**
-For a detailed guide built directly into the app, click the info button (ⓘ) at the top right of the Optimization panel. This will open the "About Generative Optimization" modal, which explains the entire process, including the AI-powered features.
+**First Step:** The Info Panel For a detailed guide built directly into the app, click the info button (ⓘ) at the top right of the Optimization panel. This will open the "About Generative Optimization" modal, which explains the entire process, including the AI-powered features.
 
-**How to Manually Run an Optimization**
-You can configure and run an optimization yourself by following these steps:
+How to Manually Run an Optimization You can configure and run an optimization yourself by following these steps:
 
 1. **Set Context**:
-
-- **Target Wall**: Select the wall (e.g., "South") where you want to optimize the shading.
-- **Shading Type**: Choose the device you want to test (e.g., "Overhang").
+  
+- **Target Wall**: Select the wall (e.g., "South") where you want to optimize the shading.
+- **Shading Type**: Choose the device you want to test (e.g., "Overhang").
 
 2. **Choose Optimization Type**:
 
-- **Single-Objective (SSGA)**: Use this to find the single best design for one goal (e.g., "Maximize sDA") while meeting an optional constraint (e.g., `ASE < 10`).
-- **Multi-Objective (MOGA)**: Use this to explore the trade-offs between two competing goals (e.g., "Maximize sDA" vs. "Minimize Glare"). This won't give you one "best" answer, but a set of optimal compromises (the "Pareto Front").
+- **Single-Objective (SSGA)**: Use this to find the single best design for one goal (e.g., "Maximize sDA") while meeting an optional constraint (e.g., `ASE < 10`).
+- **Multi-Objective (MOGA)**: Use this to explore the trade-offs between two competing goals (e.g., "Maximize sDA" vs. "Minimize Glare"). This won't give you one "best" answer, but a set of optimal compromises (the "Pareto Front").
 
 3. **Define Parameters (The "Genes")**:
 
-- In the "Parameters to Optimize" section, check the box next to the parameters you want the algorithm to change (e.g., `depth`, `tilt`).
-- You must set a valid **Min** and **Max** range for each parameter you select. This defines the "search space" for the optimizer.
+- In the "Parameters to Optimize" section, check the box next to the parameters you want the algorithm to change (e.g., `depth`, `tilt`).
+- You must set a valid **Min** and **Max** range for each parameter you select. This defines the "search space" for the optimizer.
 
 4. **Define Your Goal(s)**:
 
-- Select the simulation **Recipe** (e.g., `sda-ase`).
-- Select the **Metric** you want to optimize (e.g., `maximize_sDA`).
-- If using SSGA, you can add a **Constraint** (e.g., `ASE < 10`) to filter out bad designs.
+- Select the simulation **Recipe** (e.g.,`sda-ase`).
+- Select the **Metric** you want to optimize (e.g., `maximize_sDA`).
+- If using SSGA, you can add a **Constraint**s(e.g., `ASE < 10`) to filter out bad designs.
+  
+5. **Configure Run Settings**:
+
+- **Population**: The number of designs to test in each "generation." (10-20 is typical).
+- **Max Evals / Gens**: The total number of simulations to run (for SSGA) or the number of generations to evolve (for MOGA). More evaluations take longer but can produce better results.
+- **Quality**:sThe simulation quality for each test. **Medium** is recommended for a balance of speed and accuracy.
+  
+6. **Run and Analyze**:
+
+- Click **"Start Optimization."** The "Progress Log" will show the status.
+- The **"Results"** list will fill with the best-performing designs as they are found.
+- You can click any design in the list and then click **"Apply Selected Design"** to instantly see it in the 3D scene.
+
+✨ **How to Use Helios (The AI) for Optimization**
+This is the most powerful workflow. Instead of (or in addition to) using the manual form, you can use Helios in the **Chat** tab to assist you at every step.
+
+1. **AI-Powered Setup** You can ask Helios to configure the entire optimization for you. Go to the "Chat" tab and ask:
+
+  > "Helios, set up an optimization for the south wall. I want to find the best overhang depth and tilt to maximize sDA, but keep ASE below 10%." Helios will use its `configureOptimization` tool to fill out the entire form in the Optimization tab for you. It will then ask you to review the settings and click "Start Optimization" when you are ready.
+  
+2. **AI-Suggested Parameter Ranges (Most-Recommended)** Not sure what **Min** and **Max** ranges to set for a parameter? Ask Helios to find out. Go to the "Chat" tab and ask:
+
+  > "Before I run a full optimization, can you suggest a good range for the 'overhang depth' on the south wall to maximize sDA?" Helios will use its `suggestOptimizationRanges` tool to:
+
+  > - Run a special "quick optimize" on **only** that one parameter (e.g., 'depth') across a very wide default range (e.g., 0.1m to 3.0m).
+  > - Analyze the results to find the "sweet spot," cutting off the worst-performing 15% and the 5% that give diminishing returns.
+  > - It will then report back with a recommended range (e.g., "The most effective range appears to be `[0.4m, 1.3m]`. I recommend using this in your full optimization."). This saves you from wasting hours testing ineffective parameter ranges.
+
+3. **AI-Powered Trend Analysis (After a Run)** The "Results" list only shows you thesbestdesigns. To understand *why* they performed well, you can ask Helios to analyze the full data from the run. After your optimization is complete, go to the "Chat" tab and ask:
+
+  > "Helios, please analyze my last optimization run and tell me what you found." Helios will use its `analyzeOptimizationResults` tool to get the data from *every single simulation it ran* (not just the best ones). It will then provide a high-level summary of trends and insights, such as:
+
+  > - "I found that **'slat-angle' was the most critical parameter** for minimizing glare."
+  > - "Performance for 'depth' improved up to 1.2m, but then had diminishing returns, so there is no benefit to making it larger."
+  > - "'Slat-width' had almost no impact on performance, so you can choose that based on cost or aesthetics."
+
+**About Generative Optimization**
+This panel uses Genetic Algorithms (GAs) to automatically find high-performing shading designs. You define the goals and constraints, and the algorithm "evolves" solutions over time by running many simulations in the background.
+
+**How to Run an Optimization (Step-by-Step)**
+
+1. **Set Optimization Context**:
+
+- **Target Wall**: Select the wall (N, S, E, W) where the shading will be optimized.
+- **Shading Type**: Choose the device to optimize (e.g., Overhang, Louver).
+  
+2. **Choose Optimization Type**:
+
+- **Single-Objective (SSGA)**: Finds the single "best" design for one specific goal (e.g., maximize sDA) while adhering to an optional constraint (e.g., ASE < 10).
+- **Multi-Objective (MOGA)**: Explores the "trade-offs" between two competing goals (e.g., maximizing sDA vs. minimizing glare). It returns a set of optimal compromises, known as the Pareto Front.
+
+3. **Define Parameters to Optimize**:
+
+- Check the box next to the parameters you want the algorithm to change (the "genes").
+- Set the **Min** and **Max** values to define the "search space" for each parameter.
+- **Pro Tip:** Not sure what range to set? Ask Helios to **"suggest a good range for overhang depth"**. It will run a quick analysis to find the most effective range.
+
+4. **Set Your Goal(s)**:
+
+- **For SSGA:** Select the **Recipe** (simulation type) and the **Metric** you want to optimize. Set the **Goal Type**(Maximize, Minimize, or Set Target). Add an optional **Constraint** to filter out bad designs (e.g., `ASE < 10`).
+- **For MOGA:** Configure **Objective 1** and **Objective 2**. Both metrics must come from the same simulation recipe (e.g., sDA and ASE both come from the `sda-ase` recipe).
 
 5. **Configure Run Settings**:
 
-- **Population**: The number of designs to test in each "generation." (10-20 is typical).
-- **Max Evals / Gens**: The total number of simulations to run (for SSGA) or the number of generations to evolve (for MOGA). More evaluations take longer but can produce better results.
-- **Quality**: The simulation quality for each test. **Medium** is recommended for a balance of speed and accuracy.
+- **Population**: Number of designs in each generation (e.g., 10-20).
+- **Max Evals / Gens**: The total number of simulations (for SSGA) or generations (for MOGA) to run. This controls the total runtime.
+- **Quality**: Simulation quality. **Medium** is recommended for a balance of speed and accuracy.
 
-6. **Run and Analyze**:
+6. **Run the Optimization**:
+   
+- **Start Optimization**: Begins the full run.
+- **Quick Optimize**: Runs with smaller settings for a fast, preliminary result.
 
-- Click **"Start Optimization."** The "Progress Log" will show the status.
-- The **"Results"** list will fill with the best-performing designs as they are found.
-- You can click any design in the list and then click **"Apply Selected Design"** to instantly see it in the 3D scene.
+7. **Analyze and Apply Results**:
 
-✨ **How to Use Helios (The AI) for Optimization**
-This is the most powerful workflow. Instead of (or in addition to) using the manual form, you can use Helios in the **Chat** tab to assist you at every step.
+- As the optimization runs, the **Results** list will fill with the best solutions found so far.
+- **For MOGA**, this list is the **Pareto Front**, showing the best trade-offs.
+- Click any design in the list to select it.
+- Click **"Apply Selected Design"** to apply its parameters to the 3D scene.
+- After the run, ask Helios to **"analyze the optimization results"** for a high-level summary of parameter trends and insights.
 
-1. **AI-Powered Setup**
-    You can ask Helios to configure the entire optimization for you.
+    **AI-Powered Assistance**
+    Helios is integrated with this panel to help you get better results, faster.
+    **1. AI-Suggested Parameter Ranges** Before running a full, time-consuming optimization, you can ask Helios to find the most effective range for a single parameter.
 
-    Go to the "Chat" tab and ask:
-    > "Helios, set up an optimization for the south wall. I want to find the best overhang depth and tilt to maximize sDA, but keep ASE below 10%."
+- **How it works:** When you ask (e.g., "suggest a range for overhang depth"), Helios runs a 'quick optimize' on that one parameter across a very wide default range (e.g., 0.1m to 3.0m).
+- It then analyzes the results to find the "sweet spot"—it cuts off the "worst" 15% of designs and the 5% "diminishing returns" tail.
+- **Result:** Helios will suggest an optimized range (e.g., "[0.4, 1.2]") for you to use in your full optimization, saving you from wasting time testing ineffective parameter values.
+    **2. AI-Powered Trend Analysis** After a run is complete, the results list only shows the *best* designs. To understand *why*they were the best, you can ask Helios to analyze the full dataset.
 
-    Helios will use its `configureOptimization` tool to fill out the entire form in the Optimization tab for you. It will then ask you to review the settings and click "Start Optimization" when you are ready.
-2. **AI-Suggested Parameter Ranges (Most-Recommended)**
-    Not sure what **Min** and **Max** ranges to set for a parameter? Ask Helios to find out.
+- **How it works:** When you ask (e.g., "analyze my optimization results"), Helios uses the `analyzeOptimizationResults` tool to get the data from *all* evaluations, not just the best ones.
+- It then performs a trend analysis to provide a high-level summary.
+- **Result:** Helios will give you insights like:
+- **Key Trends:** "sDA improved as 'depth' increased, but dropped off after 1.5m."
+- **Parameter Sensitivity:** "'Slat Angle' was the most critical driver of performance, while 'Slat Width' had almost no impact and can be chosen based on cost."
 
-    Go to the "Chat" tab and ask:
-    > "Before I run a full optimization, can you suggest a good range for the 'overhang depth' on the south wall to maximize sDA?"
+    **Optimization Methodologies**
+    **Single-Objective (SSGA)** This uses a **Steady-State Genetic Algorithm (SSGA)**. It is efficient for finding the single best solution for one goal.
 
-    Helios will use its `suggestOptimizationRanges` tool to:
+    1. **Initialization:** Creates an initial "population" (e.g., 10) of random designs.
+    2. **Evaluation (Fitness):** Each design is simulated, and its performance on your **Goal Metric** (e.g., sDA score) becomes its "fitness."
+    3. **Selection:** Selects two "parent" designs using **Tournament Selection** (the best of 3 random picks).
+    4. **Crossover & Mutation:** The two parents are "bred" to create two new "child" designs, with a small chance of random mutation.
+    5. **Replacement:** The two new children are evaluated (simulated). They are added to the population, and the two **worst-performing** designs are removed.
+    6. **Repeat:** This "select, breed, evaluate, replace" loop repeats until the **Max Evaluations** is reached.
+    **Multi-Objective (MOGA / NSGA-II)** This uses a **Non-dominated Sorting Genetic Algorithm II (NSGA-II)**, a powerful method for finding a set of optimal trade-offs (the "Pareto Front").
+    1. **Initialization:** Creates and evaluates an initial N-sized population.
+    2. **Sorting:** The population is sorted into "fronts" based on dominance. A design "dominates" another if it is better in at least one objective and not worse in any others. All non-dominated designs are on Rank 1 (the Pareto Front).
+    3. **Selection:** Parents are selected using a **Crowded-Tournament**, which prefers designs with a better rank (lower is better) and, if ranks are equal, a higher "crowding distance" (more unique).
+    4. **Crossover & Mutation:** Child designs (size N) are created from the selected parents.
+    5. **Combine & Re-Sort:** The parent (N) and child (N) populations are combined into one 2N-sized group and evaluated.
+    6. **Elitism (Replacement):** A new N-sized population is built by taking all designs from Rank 1, then all from Rank 2, and so on, until the population is full.The last front is sorted by crowding distance to ensure diversity.
+    7. **Repeat:** This loop repeats for a fixed number of **Max Generations**.
+    **Key Feature: Fitness Caching** If the algorithm generates a design it has already simulated, it retrieves the score from its memory (`fitnessCache`) instead of running a new simulation. This dramatically speeds up the process. This cache is also enhanced to store the raw metrics (e.g., `{sda: 80, ase: 5}`) for every run, which is what powers the AI Trend Analysis tool.
+    **Configuration Options Explained**
+  - **Optimization Type:** Choose between finding a single best solution (SSGA) or a set of trade-offs (MOGA).
+  - **Shading & Parameters:** The "genes" for the algorithm. You must select at least one parameter (up to 3) and define the `min`, `max`, and `step` values.
+  - **Goal & Constraints (SSGA):** The "fitness function" the algorithm tries to improve, and a "pass/fail" rule (e.g., `ASE < 10`) to filter out bad designs.
+  - **Objectives (MOGA):** [The two competing goals (e.g., `maximize_sDA` and `minimize_ASE`) used to sort the population into fronts.
+  - **Population:** The number of designs in each generation.
+  - **Max Evals / Gens:** The total number of simulations (for SSGA) or generations (for MOGA) to run.
+  - **Quality:** The Radiance preset to use for each simulation (`draft`, `medium`, `high`). **Medium** is recommended.
+    **Benefits & Limitations**
+  - **Benefit:** Automates the tedious task of iterating on a design. It can find non-obvious, high-performing combinations of parameters.
+  - **Benefit:** MOGA allows you to explore the *trade-offs* between goals, rather than just finding one solution that might be good at one thing but terrible at another.
+  - **Limitation:** This is a stochastic (random) process. It is not *guaranteed* to find the absolute single best solution, but it is very good at finding globally "good" solutions.
+  - **Limitation:** The process is computationally expensive. A run of 50 evaluations can still take a significant amount of time.
+    **What Happens When You Click "Start"**
+    The `evaluateDesignHeadless` function orchestrates the entire process for each design:
 
-    - Run a special "quick optimize" on *only* that one parameter (e.g., `depth`) across a very wide default range (e.g., 0.1m to 3.0m).
-    - Analyze the results to find the "sweet spot," cutting off the worst-performing 15% and the 5% that give diminishing returns.
-    - It will then report back with a recommended range (e.g., "The most effective range appears to be `[0.4m, 1.3m]`. I recommend using this in your full optimization.").
-
-    This saves you from wasting hours testing ineffective parameter ranges.
-3. **AI-Powered Trend Analysis (After a Run)**
-    The "Results" list only shows you thes*best* designs. To understand *why* they performed well, you can ask Helios to analyze the full data from the run.
-
-    After your optimization is complete, go to the "Chat" tab and ask:
-    > "Helios, please analyze my last optimization run and tell me what you found."
-
-    Helios will use its `analyzeOptimizationResults` tool to get the data from *every single simulation it ran* (not just the best ones). It will then provide a high-level summary of trends and insights, such as:
-
-    - "I found that **'slat-angle' was the most critical parameter** for minimizing glare."
-    - "Performance for 'depth' improved up to 1.2m, but then had diminishing returns, so there is no benefit to making it larger."
-    - "'Slat-width' had almost no impact on performance, so you can choose that based on cost or aesthetics."
+    1. Applies the new design parameters (e.g., `depth: 0.7`) to the 3D scene.
+    2. Programmatically generates a new simulation package (geometry, scripts, etc.) with a unique ID.
+    3. Runs the simulation script headlessly in the background.
+    4. Waits for the script to finish, then reads the unique result files (e.g., `_sDA_final.ill`).
+    5. Parses the results, calculates the fitness score(s), and checks against any constraints.
+    6. Returns this score to the optimizer, which then repeats the loop.
+    **Final Result:** When the process is complete, the results list will show the best solution(s). For SSGA, the best design is automatically selected and can be applied. For MOGA, you can click on any of the trade-off solutions and click "Apply Selected Design" to see it in the 3D scene.
 
 ---
 

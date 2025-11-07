@@ -6,6 +6,131 @@ import { GeneticOptimizer } from './optimizationEngine.js';
 import { MultiObjectiveOptimizer } from './mogaOptimizer.js'; // ADDED
 import { programmaticallyGeneratePackage } from './simulation.js';
 
+// --- Master Parameter Configuration ---
+
+/**
+ * Defines all optimizable parameters in the application.
+ * id: A unique identifier for the parameter.
+ * name: A user-friendly name for the UI.
+ * domain: The category of the parameter (e.g., "Aperture", "Material").
+ * target: The specific element this parameter applies to (e.g., "South Wall", "Ceiling").
+ * uiElementId: The base ID of the DOM element that controls this value.
+ * setter: The function used to programmatically set the value (typically setUiValue).
+ * type: 'continuous' or 'discrete'.
+ * default: Default min/max/step values for the optimizer UI.
+ */
+export const MASTER_PARAMETER_CONFIG = {
+    // --- Aperture Parameters (WWR) ---
+    ...Object.fromEntries(['n', 's', 'e', 'w'].map(dir => [
+        `aperture_${dir}_wwr`, {
+            id: `aperture_${dir}_wwr`, name: `${dir.toUpperCase()} Wall WWR`, domain: 'Aperture', target: `${dir.toUpperCase()} Wall`,
+            uiElementId: `wwr-${dir}`, setter: setUiValue, type: 'continuous',
+            default: { min: 0.1, max: 0.9, step: 0.05 }
+        }
+    ])),
+    // --- Aperture Parameters (Sill Height for WWR mode) ---
+    ...Object.fromEntries(['n', 's', 'e', 'w'].map(dir => [
+        `aperture_${dir}_sill_wwr`, {
+            id: `aperture_${dir}_sill_wwr`, name: `${dir.toUpperCase()} Wall Sill (WWR)`, domain: 'Aperture', target: `${dir.toUpperCase()} Wall`,
+            uiElementId: `wwr-sill-height-${dir}`, setter: setUiValue, type: 'continuous',
+            default: { min: 0.1, max: 1.5, step: 0.05 }
+        }
+    ])),
+    // --- Aperture Parameters (Manual Mode) ---
+    ...Object.fromEntries(['n', 's', 'e', 'w'].flatMap(dir => [
+        [`aperture_${dir}_win_width`, {
+            id: `aperture_${dir}_win_width`, name: `${dir.toUpperCase()} Wall Win Width`, domain: 'Aperture', target: `${dir.toUpperCase()} Wall`,
+            uiElementId: `win-width-${dir}`, setter: setUiValue, type: 'continuous',
+            default: { min: 0.5, max: 5.0, step: 0.1 }
+        }],
+        [`aperture_${dir}_win_height`, {
+            id: `aperture_${dir}_win_height`, name: `${dir.toUpperCase()} Wall Win Height`, domain: 'Aperture', target: `${dir.toUpperCase()} Wall`,
+            uiElementId: `win-height-${dir}`, setter: setUiValue, type: 'continuous',
+            default: { min: 0.5, max: 2.5, step: 0.1 }
+        }],
+        [`aperture_${dir}_sill_manual`, {
+            id: `aperture_${dir}_sill_manual`, name: `${dir.toUpperCase()} Wall Sill (Manual)`, domain: 'Aperture', target: `${dir.toUpperCase()} Wall`,
+            uiElementId: `sill-height-${dir}`, setter: setUiValue, type: 'continuous',
+            default: { min: 0.1, max: 1.5, step: 0.05 }
+        }]
+    ])),
+    // --- Shading Parameters (Overhang) ---
+    ...Object.fromEntries(['n', 's', 'e', 'w'].flatMap(dir => [
+        [`shading_${dir}_overhang_depth`, {
+            id: `shading_${dir}_overhang_depth`, name: `${dir.toUpperCase()} Overhang Depth`, domain: 'Shading', target: `${dir.toUpperCase()} Wall`,
+            uiElementId: `overhang-depth-${dir}`, setter: setUiValue, type: 'continuous',
+            default: { min: 0.1, max: 2.0, step: 0.1 }
+        }],
+        [`shading_${dir}_overhang_tilt`, {
+            id: `shading_${dir}_overhang_tilt`, name: `${dir.toUpperCase()} Overhang Tilt`, domain: 'Shading', target: `${dir.toUpperCase()} Wall`,
+            uiElementId: `overhang-tilt-${dir}`, setter: setUiValue, type: 'continuous',
+            default: { min: -90, max: 90, step: 5 }
+        }],
+        [`shading_${dir}_overhang_dist_above`, {
+            id: `shading_${dir}_overhang_dist_above`, name: `${dir.toUpperCase()} Overhang Dist Above`, domain: 'Shading', target: `${dir.toUpperCase()} Wall`,
+            uiElementId: `overhang-dist-above-${dir}`, setter: setUiValue, type: 'continuous',
+            default: { min: 0.0, max: 1.0, step: 0.05 }
+        }]
+    ])),
+    // --- Shading Parameters (Louver) ---
+    ...Object.fromEntries(['n', 's', 'e', 'w'].flatMap(dir => [
+        [`shading_${dir}_louver_slat_angle`, {
+            id: `shading_${dir}_louver_slat_angle`, name: `${dir.toUpperCase()} Louver Slat Angle`, domain: 'Shading', target: `${dir.toUpperCase()} Wall`,
+            uiElementId: `louver-slat-angle-${dir}`, setter: setUiValue, type: 'continuous',
+            default: { min: -90, max: 90, step: 5 }
+        }],
+        [`shading_${dir}_louver_slat_width`, {
+            id: `shading_${dir}_louver_slat_width`, name: `${dir.toUpperCase()} Louver Slat Width`, domain: 'Shading', target: `${dir.toUpperCase()} Wall`,
+            uiElementId: `louver-slat-width-${dir}`, setter: setUiValue, type: 'continuous',
+            default: { min: 0.01, max: 0.5, step: 0.01 }
+        }],
+        [`shading_${dir}_louver_slat_sep`, {
+            id: `shading_${dir}_louver_slat_sep`, name: `${dir.toUpperCase()} Louver Slat Separation`, domain: 'Shading', target: `${dir.toUpperCase()} Wall`,
+            uiElementId: `louver-slat-sep-${dir}`, setter: setUiValue, type: 'continuous',
+            default: { min: 0.01, max: 0.5, step: 0.01 }
+        }]
+    ])),
+    // --- Material Parameters ---
+    ...Object.fromEntries(['wall', 'floor', 'ceiling', 'furniture', 'shading'].map(type => [
+        `material_${type}_refl`, {
+            id: `material_${type}_refl`, name: `${type.charAt(0).toUpperCase() + type.slice(1)} Reflectance`, domain: 'Material', target: type.charAt(0).toUpperCase() + type.slice(1),
+            uiElementId: `${type}-refl`, setter: setUiValue, type: 'continuous',
+            default: { min: 0.1, max: 0.9, step: 0.05 }
+        }
+    ])),
+    'material_glazing_trans': {
+        id: 'material_glazing_trans', name: 'Glazing Transmittance', domain: 'Material', target: 'Glazing',
+        uiElementId: 'glazing-trans', setter: setUiValue, type: 'continuous',
+        default: { min: 0.1, max: 0.9, step: 0.01 }
+    },
+    // --- Lighting Parameters ---
+    'lighting_grid_rows': {
+        id: 'lighting_grid_rows', name: 'Lighting Grid Rows', domain: 'Lighting', target: 'Luminaire Grid',
+        uiElementId: 'grid-rows', setter: setUiValue, type: 'continuous',
+        default: { min: 1, max: 10, step: 1 }
+    },
+    'lighting_grid_cols': {
+        id: 'lighting_grid_cols', name: 'Lighting Grid Columns', domain: 'Lighting', target: 'Luminaire Grid',
+        uiElementId: 'grid-cols', setter: setUiValue, type: 'continuous',
+        default: { min: 1, max: 10, step: 1 }
+    },
+    'lighting_grid_row_spacing': {
+        id: 'lighting_grid_row_spacing', name: 'Lighting Row Spacing', domain: 'Lighting', target: 'Luminaire Grid',
+        uiElementId: 'grid-row-spacing', setter: setUiValue, type: 'continuous',
+        default: { min: 0.5, max: 5.0, step: 0.1 }
+    },
+    'lighting_grid_col_spacing': {
+        id: 'lighting_grid_col_spacing', name: 'Lighting Col Spacing', domain: 'Lighting', target: 'Luminaire Grid',
+        uiElementId: 'grid-col-spacing', setter: setUiValue, type: 'continuous',
+        default: { min: 0.5, max: 5.0, step: 0.1 }
+    },
+    'lighting_pos_y': {
+        id: 'lighting_pos_y', name: 'Lighting Height (Y)', domain: 'Lighting', target: 'Luminaire Position',
+        uiElementId: 'light-pos-y', setter: setUiValue, type: 'continuous',
+        default: { min: 1.5, max: 3.5, step: 0.1 }
+    }
+};
+
 let optimizer = null; // Can be instance of GeneticOptimizer or MultiObjectiveOptimizer
 let isOptimizing = false;
 let optimizationPanel = null; // This will store the reference to the correct panel
@@ -131,7 +256,7 @@ export function initOptimizationUI(optPanel) {
     optimizationPanel = optPanel; // Store the panel reference
 
     // Get elements scoped to the correct panel
-    const dom = getDom(); // Get all GLOBAL DOM elements (though we don't use it here)
+    const dom = getDom(); // Get all GLOBAL DOM elements
 
     // --- Get all controls ---
     // These elements are INSIDE the optPanel, so we must query it.
@@ -144,10 +269,10 @@ export function initOptimizationUI(optPanel) {
     const optRecipe1 = optPanel.querySelector('#opt-recipe-1'); // MOGA recipe 1
     const optRecipe2 = optPanel.querySelector('#opt-recipe-2'); // MOGA recipe 2
     const optGoal1 = optPanel.querySelector('#opt-goal-1');
-const optGoal2 = optPanel.querySelector('#opt-goal-2');
-const optGoalMetric = optPanel.querySelector('#opt-goal-metric'); // SSGA metric
+    const optGoal2 = optPanel.querySelector('#opt-goal-2');
+    const optGoalMetric = optPanel.querySelector('#opt-goal-metric'); // SSGA metric
 
-const optimizationProfileSelector = optPanel.querySelector('#optimization-profile-selector');
+    const optimizationProfileSelector = optPanel.querySelector('#optimization-profile-selector');
     const startOptimizationBtn = optPanel.querySelector('#start-optimization-btn');
     const quickOptimizeBtn = optPanel.querySelector('#quick-optimize-btn');
     const resumeOptimizationBtn = optPanel.querySelector('#resume-optimization-btn');
@@ -155,6 +280,16 @@ const optimizationProfileSelector = optPanel.querySelector('#optimization-profil
     const infoBtn = optPanel.querySelector('#opt-info-btn');
     const applyBestDesignBtn = optPanel.querySelector('#apply-best-design-btn');
     const summaryList = optPanel.querySelector('#optimization-summary-list');
+
+    // --- Get DOM elements for the new dynamic parameter modal ---
+    // Note: These are global, so we use the 'dom' variable already declared above
+    const addParamBtn = optPanel.querySelector('#add-opt-param-btn');
+    const addParamModal = dom['add-opt-param-modal'];
+    const domainSelect = dom['opt-param-domain-select'];
+    const targetSelect = dom['opt-param-target-select'];
+    const paramSelect = dom['opt-param-name-select'];
+    const confirmAddBtn = dom['confirm-add-param-btn'];
+    const cancelAddBtn = dom['cancel-add-param-btn'];
 
     // --- Attach Event Listeners ---
 
@@ -173,8 +308,11 @@ const optimizationProfileSelector = optPanel.querySelector('#optimization-profil
 
     // Shading type selector
     if (optShadingType) {
+        // This listener is no longer needed to populate parameters,
+        // but we'll keep it in case it's used for something else.
+        // If it's *only* for populating parameters, you can remove it.
         optShadingType.addEventListener('change', () => {
-            populateParameters();
+            // populateParameters(); // <-- OLD logic removed
         });
     }
 
@@ -194,31 +332,31 @@ const optimizationProfileSelector = optPanel.querySelector('#optimization-profil
     };
 
     /// Populate all recipe dropdowns
-[optSimulationRecipe, optRecipe1, optRecipe2].forEach(recipeSelect => {
-    if (!recipeSelect) return;
+    [optSimulationRecipe, optRecipe1, optRecipe2].forEach(recipeSelect => {
+        if (!recipeSelect) return;
 
-    recipeSelect.innerHTML = ''; // Clear
+        recipeSelect.innerHTML = ''; // Clear
 
-    // Add placeholder ONLY for recipe 2
-    if (recipeSelect.id === 'opt-recipe-2') {
-        const placeholder = document.createElement('option');
-        placeholder.value = "";
-        placeholder.textContent = "(Same as Objective 1)";
-        recipeSelect.appendChild(placeholder);
-    }
-
-    Object.keys(RECIPE_METRICS).forEach(recipeId => {
-        const option = document.createElement('option');
-        option.value = recipeId;
-        option.textContent = recipeId.replace(/-/g, ' ').replace('sda ase', 'sDA/ASE');
-
-        // Set default for SSGA and MOGA-1
-        if(recipeId === 'sda-ase' && recipeSelect.id !== 'opt-recipe-2') {
-            option.selected = true;
+        // Add placeholder ONLY for recipe 2
+        if (recipeSelect.id === 'opt-recipe-2') {
+            const placeholder = document.createElement('option');
+            placeholder.value = "";
+            placeholder.textContent = "(Same as Objective 1)";
+            recipeSelect.appendChild(placeholder);
         }
-        recipeSelect.appendChild(option);
+
+        Object.keys(RECIPE_METRICS).forEach(recipeId => {
+            const option = document.createElement('option');
+            option.value = recipeId;
+            option.textContent = recipeId.replace(/-/g, ' ').replace('sda ase', 'sDA/ASE');
+
+            // Set default for SSGA and MOGA-1
+            if (recipeId === 'sda-ase' && recipeSelect.id !== 'opt-recipe-2') {
+                option.selected = true;
+            }
+            recipeSelect.appendChild(option);
+        });
     });
-});
 
     // Add listeners to recipe dropdowns
     optSimulationRecipe?.addEventListener('change', () => {
@@ -259,7 +397,7 @@ const optimizationProfileSelector = optPanel.querySelector('#optimization-profil
             // Store the params
             selectedDesignParams = JSON.parse(li.dataset.params);
             applyBestDesignBtn?.classList.remove('hidden');
-            }
+        }
     });
 
     applyBestDesignBtn?.addEventListener('click', () => {
@@ -291,7 +429,7 @@ const optimizationProfileSelector = optPanel.querySelector('#optimization-profil
     });
 
     // --- Initial Population of UI ---
-    populateParameters();
+    // populateParameters(); // <-- REMOVED old static population call
     if (optSimulationRecipe && optGoalMetric) {
         populateGoals(optSimulationRecipe, optGoalMetric);
     }
@@ -299,26 +437,43 @@ const optimizationProfileSelector = optPanel.querySelector('#optimization-profil
         populateGoals(optRecipe1, optGoal1);
     }
     if (optRecipe1 && optRecipe2 && optGoal2) {
-    // Set default for Recipe 2 to match Recipe 1
-    optRecipe2.value = optRecipe1.value; 
+        // Set default for Recipe 2 to match Recipe 1
+        optRecipe2.value = optRecipe1.value;
 
-    // Populate Goal 2 based on Recipe 1 (since Recipe 2 is now synced)
-    populateGoals(optRecipe1, optGoal2); 
+        // Populate Goal 2 based on Recipe 1 (since Recipe 2 is now synced)
+        populateGoals(optRecipe1, optGoal2);
 
-    // Set default for Obj 2
-    if (optGoal2.options.length > 1) {
-        // Try to set a different default than obj 1
-        if (optGoal1 && optGoal1.value === 'maximize_sDA' && optGoal2.querySelector('[value="minimize_ASE"]')) {
-             optGoal2.value = 'minimize_ASE';
-        } else if (optGoal1 && optGoal1.value === 'minimize_ASE' && optGoal2.querySelector('[value="maximize_sDA"]')) {
-             optGoal2.value = 'maximize_sDA';
-        } else {
-            // fallback
-            optGoal2.selectedIndex = Math.min(1, optGoal2.options.length - 1);
+        // Set default for Obj 2
+        if (optGoal2.options.length > 1) {
+            // Try to set a different default than obj 1
+            if (optGoal1 && optGoal1.value === 'maximize_sDA' && optGoal2.querySelector('[value="minimize_ASE"]')) {
+                optGoal2.value = 'minimize_ASE';
+            } else if (optGoal1 && optGoal1.value === 'minimize_ASE' && optGoal2.querySelector('[value="maximize_sDA"]')) {
+                optGoal2.value = 'maximize_sDA';
+            } else {
+                // fallback
+                optGoal2.selectedIndex = Math.min(1, optGoal2.options.length - 1);
+            }
         }
     }
+    // --- New Listeners for Dynamic Parameter Builder ---
+    if (addParamBtn) {
+        addParamBtn.addEventListener('click', () => _openAddParamModal(optPanel));
+    }
+    if (domainSelect) {
+        domainSelect.addEventListener('change', () => _populateTargets(domainSelect.value));
+    }
+    if (targetSelect) {
+        targetSelect.addEventListener('change', () => _populateParametersForTarget(domainSelect.value, targetSelect.value));
+    }
+    if (cancelAddBtn) {
+        cancelAddBtn.addEventListener('click', () => addParamModal.classList.replace('flex', 'hidden'));
+    }
+    if (confirmAddBtn) {
+        confirmAddBtn.addEventListener('click', () => _addParameterToDynamicList(optPanel));
     }
 }
+
 
 /**
  * Helper to show/hide the annual sim performance warning
@@ -1411,4 +1566,155 @@ async function evaluateDesignHeadless(designParams, settings) {
  */
 export function getFitnessCache() {
     return fitnessCache;
+}
+
+// --- Dynamic Parameter UI Helper Functions ---
+
+/**
+ * Gets a structured map of available domains and their targets from the master config.
+ */
+function _getAvailableDomainsAndTargets() {
+    const domains = new Map();
+    for (const param of Object.values(MASTER_PARAMETER_CONFIG)) {
+        if (!domains.has(param.domain)) {
+            domains.set(param.domain, new Set());
+        }
+        domains.get(param.domain).add(param.target);
+    }
+    return domains;
+}
+
+/**
+ * Opens the "Add Parameter" modal and populates the first dropdown.
+ */
+function _openAddParamModal(optPanel) {
+    const dom = getDom();
+    const modal = dom['add-opt-param-modal'];
+    if (!modal) return;
+
+    // Store the panel reference on the modal
+    modal.dataset.targetPanelId = optPanel.id;
+
+    _populateDomains();
+    modal.style.zIndex = getNewZIndex();
+    modal.classList.replace('hidden', 'flex');
+}
+
+/**
+ * Populates the "Domain" dropdown in the modal.
+ */
+function _populateDomains() {
+    const dom = getDom();
+    const domainSelect = dom['opt-param-domain-select'];
+    const domains = _getAvailableDomainsAndTargets();
+
+    domainSelect.innerHTML = '<option value="">Select Domain...</option>';
+    dom['opt-param-target-select'].innerHTML = '<option value="">Select Target...</option>';
+    dom['opt-param-name-select'].innerHTML = '<option value="">Select Parameter...</option>';
+
+    for (const domain of domains.keys()) {
+        const option = document.createElement('option');
+        option.value = domain;
+        option.textContent = domain;
+        domainSelect.appendChild(option);
+    }
+}
+
+/**
+ * Populates the "Target" dropdown based on the selected Domain.
+ */
+function _populateTargets(selectedDomain) {
+    const dom = getDom();
+    const targetSelect = dom['opt-param-target-select'];
+    const domains = _getAvailableDomainsAndTargets();
+
+    targetSelect.innerHTML = '<option value="">Select Target...</option>';
+    dom['opt-param-name-select'].innerHTML = '<option value="">Select Parameter...</option>';
+
+    if (!selectedDomain || !domains.has(selectedDomain)) return;
+
+    const targets = domains.get(selectedDomain);
+    for (const target of targets) {
+        const option = document.createElement('option');
+        option.value = target;
+        option.textContent = target;
+        targetSelect.appendChild(option);
+    }
+}
+
+/**
+ * Populates the "Parameter" dropdown based on the selected Domain and Target.
+ */
+function _populateParametersForTarget(selectedDomain, selectedTarget) {
+    const dom = getDom();
+    const paramSelect = dom['opt-param-name-select'];
+    paramSelect.innerHTML = '<option value="">Select Parameter...</option>';
+
+    if (!selectedDomain || !selectedTarget) return;
+
+    for (const param of Object.values(MASTER_PARAMETER_CONFIG)) {
+        if (param.domain === selectedDomain && param.target === selectedTarget) {
+            const option = document.createElement('option');
+            option.value = param.id;
+            option.textContent = param.name;
+            paramSelect.appendChild(option);
+        }
+    }
+}
+
+/**
+ * Adds the selected parameter from the modal to the dynamic list in the optimization panel.
+ */
+function _addParameterToDynamicList(optPanel) {
+    const dom = getDom();
+    const modal = dom['add-opt-param-modal'];
+    const paramId = dom['opt-param-name-select'].value;
+
+    if (!paramId) {
+        showAlert("Please select a valid parameter.", "Error");
+        return;
+    }
+
+    const paramConfig = MASTER_PARAMETER_CONFIG[paramId];
+    if (!paramConfig) {
+        showAlert("Invalid parameter configuration.", "Error");
+        return;
+    }
+
+    const container = optPanel.querySelector('#dynamic-opt-params-list');
+    const template = document.getElementById('template-dynamic-opt-param');
+
+    if (!container || !template) {
+        showAlert("UI error: Could not find parameter list or template.", "Error");
+        return;
+    }
+
+    // Check if parameter is already in the list
+    if (container.querySelector(`[data-param-id="${paramId}"]`)) {
+        showAlert("This parameter is already in the list.", "Info");
+        modal.classList.replace('flex', 'hidden');
+        return;
+    }
+
+    // Add the new parameter item
+    const clone = template.content.cloneNode(true);
+    const item = clone.querySelector('.dynamic-opt-param-item');
+    item.dataset.paramId = paramId;
+
+    clone.querySelector('.dynamic-opt-param-name').textContent = paramConfig.name;
+
+    const minInput = clone.querySelector('.dynamic-opt-param-min');
+    const maxInput = clone.querySelector('.dynamic-opt-param-max');
+    const stepInput = clone.querySelector('.dynamic-opt-param-step');
+
+    minInput.value = paramConfig.default.min;
+    maxInput.value = paramConfig.default.max;
+    stepInput.value = paramConfig.default.step;
+
+    clone.querySelector('.remove-dynamic-opt-param-btn').addEventListener('click', (e) => {
+        e.target.closest('.dynamic-opt-param-item').remove();
+    });
+
+    container.appendChild(clone);
+    modal.classList.replace('flex', 'hidden');
 }

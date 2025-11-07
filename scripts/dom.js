@@ -230,8 +230,12 @@ const ids = [
     'daylighting-zone-visualizer-container', 'daylighting-zone-canvas', 'daylight-sensor-placement-header',
     'ai-new-chat-btn',
 
+    // Dynamic Optimization Controls
+    'add-opt-param-modal', 'opt-param-domain-select', 'opt-param-target-select',
+    'opt-param-name-select', 'confirm-add-param-btn', 'cancel-add-param-btn',
+
     // MOGA Controls
-    'opt-type', 'opt-single-objective-controls', 'opt-multi-objective-controls', 
+    'opt-type', 'opt-single-objective-controls', 'opt-multi-objective-controls',
     'opt-recipe-1', 'opt-goal-1', 'opt-goal-type-1', 
     'opt-recipe-2', 'opt-goal-2', 'opt-goal-type-2',
     'optimization-summary-list', 'opt-summary-placeholder', 'apply-best-design-btn',
