@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs/promises');
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 const os = require('os');
 
 function createWindow() {
@@ -74,6 +74,37 @@ app.whenReady().then(() => {
     event.sender.send('script-exit', code);
   });
 });
+
+/**
+ * Handle direct EnergyPlus execution from the renderer (Electron-only).
+ * Expects args:
+ *  - idfPath: path to the IDF file
+ *  - epwPath: path to the EPW file
+ *  - energyPlusPath: path to the EnergyPlus executable
+ */
+ipcMain.on('run-energyplus', (event, { idfPath, epwPath, energyPlusPath }) => {
+  if (!idfPath || !epwPath || !energyPlusPath) {
+    event.sender.send('energyplus-output', 'Error: Missing IDF, EPW, or EnergyPlus executable path.\n');
+    event.sender.send('energyplus-exit', 1);
+    return;
+  }
+
+  const args = ['-w', epwPath, idfPath];
+  const child = spawn(energyPlusPath, args, { shell: false });
+
+  child.stdout.on('data', (data) => {
+    event.sender.send('energyplus-output', data.toString());
+  });
+
+  child.stderr.on('data', (data) => {
+    event.sender.send('energyplus-output', data.toString());
+  });
+
+  child.on('close', (code) => {
+    event.sender.send('energyplus-exit', code);
+  });
+});
+
 
 // Handle request to run a script headlessly (without sending streaming output)
 ipcMain.handle('run-script-headless', async (event, { projectPath, scriptContent, scriptName }) => {
@@ -168,6 +199,10 @@ ipcMain.handle('run-simulations-parallel', async (event, { simulations }) => {
 // Handle request to read a file and return its content
 ipcMain.handle('fs:readFile', async (event, { projectPath, filePath }) => {
   try {
+    if (typeof projectPath !== 'string' || typeof filePath !== 'string' || !projectPath || !filePath) {
+      console.error('fs:readFile - Invalid projectPath or filePath', { projectPath, filePath });
+      return { success: false, error: 'Invalid projectPath or filePath', projectPath, filePath };
+    }
     const fullPath = path.join(projectPath, filePath);
     const content = await fs.readFile(fullPath); // Returns a Buffer
     return { success: true, content: content, name: path.basename(filePath) };
@@ -180,6 +215,10 @@ ipcMain.handle('fs:readFile', async (event, { projectPath, filePath }) => {
 // Handle request to check if a file exists
 ipcMain.handle('fs:checkFileExists', async (event, { projectPath, filePath }) => {
   try {
+    if (typeof projectPath !== 'string' || typeof filePath !== 'string' || !projectPath || !filePath) {
+      console.error('fs:checkFileExists - Invalid projectPath or filePath', { projectPath, filePath });
+      return false;
+    }
     const fullPath = path.join(projectPath, filePath);
     await fs.access(fullPath);
     return true;
@@ -191,6 +230,10 @@ ipcMain.handle('fs:checkFileExists', async (event, { projectPath, filePath }) =>
 // Handle request to write a file
 ipcMain.handle('fs:writeFile', async (event, { projectPath, filePath, content }) => {
   try {
+    if (typeof projectPath !== 'string' || typeof filePath !== 'string' || !projectPath || !filePath) {
+      console.error('fs:writeFile - Invalid projectPath or filePath', { projectPath, filePath });
+      return { success: false, error: 'Invalid projectPath or filePath', projectPath, filePath };
+    }
     const fullPath = path.join(projectPath, filePath);
     const dir = path.dirname(fullPath);
     await fs.mkdir(dir, { recursive: true });

@@ -41,6 +41,7 @@ const shortcutActions = {
     'toggleSensorPanel': () => togglePanelVisibility('panel-sensor', 'toggle-panel-sensor-btn'),
     'toggleViewpointPanel': () => togglePanelVisibility('panel-viewpoint', 'toggle-panel-viewpoint-btn'),
     'toggleScenePanel': () => togglePanelVisibility('panel-scene-elements', 'toggle-panel-scene-btn'),
+    'toggleEnergyPlusPanel': () => togglePanelVisibility('panel-energyplus', 'toggle-panel-energyplus-btn'),
 
     // Other UI toggles
     'toggleInfoPanel': () => togglePanelVisibility('panel-info', 'info-button'),
@@ -79,11 +80,13 @@ const keyMap = {
     'Digit6': 'toggleSensorPanel',
     'Digit7': 'toggleViewpointPanel',
     'Digit8': 'toggleScenePanel',
-    'KeyI': 'toggleInfoPanel',
-    'KeyA': 'toggleAIAssistant',
-    'KeyW': 'gizmoTranslate',
-    'KeyE': 'gizmoRotate',
-    'KeyR': 'gizmoScale',
+    'Digit9': 'toggleEnergyPlusPanel',
+    'Digit9': 'toggleEnergyPlusPanel',
+
+    // Gizmo modes
+    'gizmoTranslate': () => setAndDisplayGizmoMode('translate'),
+    'gizmoRotate': () => setAndDisplayGizmoMode('rotate'),
+    'gizmoScale': () => setAndDisplayGizmoMode('scale'),
     'KeyQ': 'toggleQuadView',
     'KeyV': 'toggleFpv',
     'KeyG': 'toggleGizmo',
@@ -1931,6 +1934,7 @@ function setupPanelToggleButtons() {
         'toggle-panel-sensor-btn': 'panel-sensor',
         'toggle-panel-viewpoint-btn': 'panel-viewpoint',
         'toggle-panel-scene-btn': 'panel-scene-elements',
+        'toggle-panel-energyplus-btn': 'panel-energyplus',
         'info-button': 'panel-info',
         'recipe-guides-btn': 'panel-recipe-guides',
         'toggle-modules-btn': 'panel-simulation-modules',
@@ -2045,7 +2049,8 @@ export function initializePanelControls(win) {
                     'panel-recipe-guides': 'recipe-guides-btn',
                     'panel-ai-assistant': 'ai-assistant-button',
                     'panel-simulation-modules': 'toggle-modules-btn',
-                    'panel-analysis-modules': 'toggle-analysis-btn'
+                    'panel-analysis-modules': 'toggle-analysis-btn',
+                    'panel-energyplus': 'toggle-panel-energyplus-btn'
                 };
                 const btnId = panelMap[win.id];
                 if (btnId && dom[btnId]) {

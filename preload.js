@@ -13,6 +13,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // --- Methods for one-way communication or event listeners ---
   runScript: (args) => ipcRenderer.send('run-script', args),
-    onScriptOutput: (callback) => ipcRenderer.on('script-output', (_event, value) => callback(value)),
-    onScriptExit: (callback) => ipcRenderer.on('script-exit', (_event, value) => callback(value)),
-  });
+  runEnergyPlusScript: (args) => ipcRenderer.send('run-energyplus-script', args),
+  onScriptOutput: (callback) => ipcRenderer.on('script-output', (_event, value) => callback(value)),
+  onScriptExit: (callback) => ipcRenderer.on('script-exit', (_event, value) => callback(value)),
+
+  // --- EnergyPlus integration ---
+  runEnergyPlus: (args) => ipcRenderer.send('run-energyplus', args),
+  onEnergyPlusOutput: (callback) => ipcRenderer.on('energyplus-output', (_event, value) => callback(value)),
+  onEnergyPlusExit: (callback) => ipcRenderer.on('energyplus-exit', (_event, value) => callback(value)),
+});

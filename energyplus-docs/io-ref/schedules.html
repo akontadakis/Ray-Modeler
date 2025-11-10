@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>EnergyPlus I/O Ref — Schedules (Curated)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!--
+    Curated subset for Ray-Modeler offline help.
+
+    Focus:
+      - ScheduleTypeLimits
+      - Schedule:Compact
+      - Notes on how Ray-Modeler schedule definitions map to EnergyPlus.
+
+    IMPORTANT:
+    - When populating with official text, include the EnergyPlus license/attribution.
+  -->
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 11px;
+      line-height: 1.4;
+      color: #e5e5e5;
+      background: transparent;
+      margin: 0;
+      padding: 0 0 8px 0;
+    }
+    h1, h2, h3 {
+      color: #ffffff;
+      margin: 8px 0 4px;
+      font-weight: 600;
+    }
+    h1 { font-size: 14px; }
+    h2 { font-size: 12px; }
+    h3 { font-size: 11px; }
+    p { margin: 2px 0 4px; }
+    code {
+      font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 10px;
+      background: rgba(255,255,255,0.03);
+      padding: 1px 3px;
+      border-radius: 2px;
+    }
+    ul { margin: 2px 0 4px 16px; padding: 0; }
+    li { margin: 0 0 2px; }
+    .object-block {
+      margin: 6px 0;
+      padding: 4px 6px;
+      border-left: 2px solid #3b82f6;
+      background: rgba(0,0,0,0.35);
+      border-radius: 2px;
+    }
+    .field-name {
+      font-weight: 600;
+      color: #93c5fd;
+    }
+    .note {
+      font-size: 9px;
+      color: #9ca3af;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Schedules — Curated Overview</h1>
+
+<p class="note">
+  This page explains how Ray-Modeler schedules correspond to EnergyPlus schedule objects.
+  It focuses on <code>ScheduleTypeLimits</code> and <code>Schedule:Compact</code>, which are
+  commonly used for loads, thermostats, availability, and controls.
+</p>
+
+<div class="object-block" id="scheduletypelimits">
+  <h2>ScheduleTypeLimits</h2>
+  <p>
+    <code>ScheduleTypeLimits</code> defines the valid range and type for schedules:
+    temperature, fraction, on/off, etc.
+  </p>
+  <ul>
+    <li><span class="field-name">Lower/Upper Limit Value</span> — Allowed numeric range.</li>
+    <li><span class="field-name">Numeric Type</span> — CONTINUOUS or DISCRETE.</li>
+    <li><span class="field-name">Unit Type</span> — e.g. Temperature, Fraction, Dimensionless.</li>
+  </ul>
+  <p class="note">
+    Ray-Modeler can assume standard limits for common schedule types (e.g. 0–1 for Fraction).
+    Explicit mapping is handled in the model builder based on schedule usage.
+  </p>
+</div>
+
+<div class="object-block" id="schedule-compact">
+  <h2>Schedule:Compact</h2>
+  <p>
+    <code>Schedule:Compact</code> defines time-varying values using a readable,
+    rule-based syntax (Through/For/Until).
+  </p>
+  <ul>
+    <li>Lines are evaluated in order: Through → For → Until.</li>
+    <li>Values can represent fractions, temperatures, etc., depending on TypeLimits.</li>
+    <li>Used widely for:
+      people, lights, equipment, infiltration, setpoints, IdealLoads availability, etc.
+    </li>
+  </ul>
+  <p class="note">
+    Ray-Modeler’s Schedules panel writes user-defined schedules as <code>Schedule:Compact</code>
+    blocks. Built-in schedules (e.g. RM_AlwaysOn) are provided as predefined compact schedules.
+  </p>
+</div>
+
+<p class="note">
+  Mapping summary:
+  - Ray-Modeler custom schedules → <code>Schedule:Compact</code> with appropriate
+    <code>ScheduleTypeLimits</code>.
+  - Many configuration panels reference schedule names; those names must match
+    the schedules defined here.
+</p>
+
+</body>
+</html>

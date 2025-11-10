@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>EnergyPlus I/O Ref — Daylighting and Outputs (Curated)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!--
+    Curated subset for Ray-Modeler offline help.
+
+    Focus:
+      - Daylighting:Controls
+      - Output:IlluminanceMap
+      - Output:Variable (basics)
+
+    IMPORTANT:
+    - When populating with official text, include the EnergyPlus license/attribution.
+  -->
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 11px;
+      line-height: 1.4;
+      color: #e5e5e5;
+      background: transparent;
+      margin: 0;
+      padding: 0 0 8px 0;
+    }
+    h1, h2, h3 {
+      color: #ffffff;
+      margin: 8px 0 4px;
+      font-weight: 600;
+    }
+    h1 { font-size: 14px; }
+    h2 { font-size: 12px; }
+    h3 { font-size: 11px; }
+    p { margin: 2px 0 4px; }
+    code {
+      font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 10px;
+      background: rgba(255,255,255,0.03);
+      padding: 1px 3px;
+      border-radius: 2px;
+    }
+    ul { margin: 2px 0 4px 16px; padding: 0; }
+    li { margin: 0 0 2px; }
+    .object-block {
+      margin: 6px 0;
+      padding: 4px 6px;
+      border-left: 2px solid #3b82f6;
+      background: rgba(0,0,0,0.35);
+      border-radius: 2px;
+    }
+    .field-name {
+      font-weight: 600;
+      color: #93c5fd;
+    }
+    .note {
+      font-size: 9px;
+      color: #9ca3af;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Daylighting and Outputs — Curated Overview</h1>
+
+<p class="note">
+  This page links the Ray-Modeler "Daylighting & Outputs" configuration
+  to key EnergyPlus objects. For full details, see the official I/O Reference.
+</p>
+
+<div class="object-block" id="daylighting-controls">
+  <h2>Daylighting:Controls</h2>
+  <p>
+    <code>Daylighting:Controls</code> defines one or two reference points in a zone,
+    the desired illuminance setpoint, and how lights are controlled.
+  </p>
+  <ul>
+    <li><span class="field-name">Zone Name</span> — Target zone.</li>
+    <li><span class="field-name">Reference Point(s)</span> — Coordinates (x,y,z).</li>
+    <li><span class="field-name">Illuminance Setpoint</span> — Target [lux].</li>
+    <li><span class="field-name">Lighting Control Type</span> — Continuous, Stepped, etc.</li>
+    <li><span class="field-name">Lighting Control Fraction</span> — Portion of lights controlled.</li>
+  </ul>
+  <p class="note">
+    Ray-Modeler per-zone daylighting settings map directly to
+    <code>Daylighting:Controls</code> with the configured reference points, setpoint,
+    control type, and fraction.
+  </p>
+</div>
+
+<div class="object-block" id="illuminance-map">
+  <h2>Output:IlluminanceMap</h2>
+  <p>
+    <code>Output:IlluminanceMap</code> requests grid-based illuminance results on a plane
+    within a zone.
+  </p>
+  <ul>
+    <li><span class="field-name">Zone Name</span></li>
+    <li><span class="field-name">Origin (x,y,z)</span> — Lower-left corner.</li>
+    <li><span class="field-name">Number of Points and Spacing</span> — Nx, Dx, Ny, Dy.</li>
+  </ul>
+  <p class="note">
+    Ray-Modeler illuminance map definitions map to <code>Output:IlluminanceMap</code> entries
+    using the specified grid and zone.
+  </p>
+</div>
+
+<div class="object-block" id="output-variable">
+  <h2>Output:Variable (Basics)</h2>
+  <p>
+    <code>Output:Variable</code> requests reporting of specific simulation variables
+    at a chosen frequency.
+  </p>
+  <ul>
+    <li><span class="field-name">Key Value</span> — e.g. zone name, "Environment", or "*".</li>
+    <li><span class="field-name">Variable Name</span> — exact name of the variable.</li>
+    <li><span class="field-name">Reporting Frequency</span> — Timestep, Hourly, RunPeriod, etc.</li>
+  </ul>
+  <p class="note">
+    Ray-Modeler Output Variables table maps directly to <code>Output:Variable</code> objects.
+    Use these to enable metrics required by your workflows.
+  </p>
+</div>
+
+<p class="note">
+  Mapping summary:
+  - Daylighting controls UI → <code>Daylighting:Controls</code>.
+  - Illuminance maps UI → <code>Output:IlluminanceMap</code>.
+  - Output variables UI → <code>Output:Variable</code> entries for selected keys/variables/frequencies.
+</p>
+
+</body>
+</html>

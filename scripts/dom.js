@@ -21,7 +21,7 @@ const ids = [
     // Toolbars
     'left-toolbar', 'left-controls-container', 'toggle-panel-project-btn', 'toggle-panel-dimensions-btn', 
     'toggle-panel-aperture-btn', 'toggle-panel-lighting-btn', 'toggle-panel-materials-btn',
-    'toggle-panel-sensor-btn', 'toggle-panel-viewpoint-btn', 'toggle-panel-scene-btn',
+    'toggle-panel-sensor-btn', 'toggle-panel-viewpoint-btn', 'toggle-panel-scene-btn', 'toggle-panel-energyplus-btn',
     'dock-left-sidebar-btn', 'dock-top-sidebar-btn',
     'view-controls', 'view-btn-persp', 'view-btn-ortho', 'view-btn-top', 'view-btn-front', 'view-btn-back', 'view-btn-left', 'view-btn-right', 'view-btn-quad',
     'viewport-main', 'viewport-top', 'viewport-front', 'viewport-side',
@@ -159,7 +159,7 @@ const ids = [
     'wall-mode-srd', 'floor-mode-srd', 'ceiling-mode-srd', 'wall-refl-controls', 'wall-srd-controls',
     'wall-srd-file', 'floor-refl-controls', 'floor-srd-controls', 'floor-srd-file', 'ceiling-refl-controls',
     'ceiling-srd-controls', 'ceiling-srd-file', 'bsdf-file', 'save-project-button', 'load-project-button',
-    'upload-epw-btn', 'epw-upload-modal', 'epw-modal-close', 'panel-project', 'panel-dimensions',
+    'upload-epw-btn', 'epw-upload-modal', 'epw-modal-close', 'panel-project', 'panel-dimensions', 'panel-energyplus',
     'panel-aperture', 'panel-lighting', 'panel-materials', 'panel-sensor', 'panel-viewpoint',
     'panel-scene-elements', 'panel-info', 'panel-recipe-guides', 'panel-simulation-modules', 'panel-analysis-modules',
     'toggle-panel-project-btn', 'toggle-panel-dimensions-btn', 'toggle-panel-aperture-btn', 'toggle-panel-lighting-btn',

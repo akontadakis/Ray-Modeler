@@ -320,6 +320,18 @@
                 <div class="w-full my-1 border-t border-[--grid-color]"></div>
 
                 <div class="action-button-container">
+                    <button id="toggle-panel-energyplus-btn" class="btn" aria-label="EnergyPlus">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="w-6 h-6" aria-hidden="true">
+                            <!-- Main EnergyPlus swoosh uses currentColor to match theme -->
+                            <path d="M498.33 146.495h-37.638l6.195-39.64c1.537-9.819-5.191-17.772-15.002-17.772-9.826 0-19.005 7.954-20.543 17.772l-6.188 39.64H401.88c-.99-11.439-4.606-21.859-11.554-30.064-45.112-53.317-170.866-45.112-259.729 8.205C41.735 177.945 17.127 224.42 3.473 277.729c-13.686 53.318 15.032 114.832 51.939 135.329 36.908 20.505 125.77 23.253 173.614 12.315 47.845-10.937 124.392-41.017 138.062-60.16 13.678-19.134 17.757-35.529-4.11-43.734-21.86-8.205-58.782 24.615-109.36 31.442-37.919 5.115-73.799-2.732-72.436-34.175 1.354-31.442 57.404-16.402 97.044-30.079 18.176-6.272 59.125-24.242 87.492-53.31 16.752-17.171 29.014-39.686 34.03-61.522h21.122l-5.762 36.922c-1.53 9.811 5.191 17.772 15.017 17.772 9.819 0 18.998-7.961 20.536-17.772l5.762-36.922h41.908c7.542 0 13.67-6.12 13.67-13.67-.001-7.543-6.129-13.67-13.671-13.67m-233.629 39.45c-3.319-12.483-13.693-21.67-26.13-21.67-15.085 0-27.324 13.464-27.324 30.064 0 16.608 12.239 30.08 27.324 30.08 5.382 0 10.367-1.773 14.591-4.72-13.13 23.36-34.905 37.235-54.215 36.154-30.156-1.682-20.505-50.578-12.3-75.169 9.582-28.726 35.537-51.955 57.412-47.845 19.515 3.662 27.013 20.415 20.642 53.106" fill="currentColor"/>
+                            <!-- Plus accent: uses theme accent color -->
+                            <path class="icon-plus-accent" d="M256 96c-8.837 0-16 7.163-16 16v48h-48c-8.837 0-16 7.163-16 16s7.163 16 16 16h48v48c0 8.837 7.163 16 16 16s16-7.163 16-16v-48h48c8.837 0 16-7.163 16-16s-7.163-16-16-16h-48v-48c0-8.837-7.163-16-16-16z" />
+                        </svg>
+                    </button>
+                    <span class="tooltip" role="tooltip">EnergyPlus</span>
+                </div>
+
+                <div class="action-button-container">
                     <button id="toggle-modules-btn" class="btn" aria-label="Simulation Modules">
                         <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor" stroke="none"><path d="M16 0 0 8l4.7 1.6L5 15l2.5-2.8L10 16zM7.5 10.4l4.3-5.9-6.2 4.3-3-1L14.2 2 9.7 13.8z"/></svg>
                     </button>
@@ -362,6 +374,21 @@
         </div>
 
     <main id="window-container" class="relative">
+        <div id="panel-energyplus" class="floating-window ui-panel hidden">
+            <div class="window-header">
+                <span>EnergyPlus</span>
+                <div class="window-controls">
+                    <div class="window-icon-max"></div>
+                    <div class="collapse-icon"></div>
+                    <div class="window-icon-close"></div>
+                </div>
+            </div>
+            <div class="window-content">
+                <!-- EnergyPlus content will go here -->
+                <p>EnergyPlus functionality will be integrated here.</p>
+            </div>
+            <div class="resize-handle-edge top"></div><div class="resize-handle-edge right"></div><div class="resize-handle-edge bottom"></div><div class="resize-handle-edge left"></div><div class="resize-handle-corner top-left"></div><div class="resize-handle-corner top-right"></div><div class="resize-handle-corner bottom-left"></div><div class="resize-handle-corner bottom-right"></div>
+        </div>
         <div id="panel-project" class="floating-window ui-panel hidden">
             <div class="window-header">
                 <div class="flex items-center gap-2"> <button class="panel-dock-button left hidden" aria-label="Dock Panel Left">
@@ -4992,251 +5019,39 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     <script>
-        // Enhanced Password Manager Prevention Script
-        (function() {
-            'use strict';
+        // Minimal non-invasive UI-only mitigation:
+        // - Ensure no fields are flagged as password/credential targets
+        // - Optionally hide known password manager overlay elements
+        (function () {
+            const blockSelector = [
+                '[data-lastpass]',
+                '[data-dashlane]',
+                '[data-bitwarden]',
+                '[data-keeper]',
+                '[data-roboform]',
+                '[data-1password]',
+                '.password-manager-overlay',
+                '.password-suggestion',
+                '.autocomplete-suggestion',
+                '.password-autofill'
+            ].join(',');
 
-            // Block password manager content scripts
-            const originalDefineProperty = Object.defineProperty;
-            const originalGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
-
-            // Override property access to prevent password manager detection
-            Object.defineProperty = function(obj, prop, descriptor) {
-                if (prop === 'ControlLooksLikePasswordCredentialField' ||
-                    prop === 'ControlLooksLikeCreditCardNumberField' ||
-                    prop === 'ControlLooksLikeCreditCardSecurityCodeField' ||
-                    prop === 'looksLikePasswordCredentialField' ||
-                    prop === 'looksLikeCreditCardNumberField' ||
-                    prop === 'looksLikeCreditCardSecurityCodeField') {
-                    return obj;
-                }
-                return originalDefineProperty.apply(this, arguments);
-            };
-
-            Object.getOwnPropertyDescriptor = function(obj, prop) {
-                if (prop === 'ControlLooksLikePasswordCredentialField' ||
-                    prop === 'ControlLooksLikeCreditCardNumberField' ||
-                    prop === 'ControlLooksLikeCreditCardSecurityCodeField' ||
-                    prop === 'looksLikePasswordCredentialField' ||
-                    prop === 'looksLikeCreditCardNumberField' ||
-                    prop === 'looksLikeCreditCardSecurityCodeField') {
-                    return undefined;
-                }
-                return originalGetOwnPropertyDescriptor.apply(this, arguments);
-            };
-
-            // Enhanced event listener blocking for password manager activity
-            const originalAddEventListener = EventTarget.prototype.addEventListener;
-            EventTarget.prototype.addEventListener = function(type, listener, options) {
-                if (type === 'focus' || type === 'blur' || type === 'input' || type === 'change' || type === 'focusin' || type === 'focusout') {
-                    // Check if this looks like password manager activity
-                    if (listener && typeof listener === 'function') {
-                        const listenerString = listener.toString();
-                        if (listenerString.includes('password') ||
-                            listenerString.includes('credential') ||
-                            listenerString.includes('autofill') ||
-                            listenerString.includes('ControlLooksLike') ||
-                            listenerString.includes('looksLike') ||
-                            listenerString.includes('getElementById') && listenerString.includes('type')) {
-                            return; // Block password manager listeners
-                        }
-                    }
-                }
-                return originalAddEventListener.apply(this, arguments);
-            };
-
-            // Enhanced DOM query blocking
-            const originalQuerySelector = document.querySelector;
-            const originalQuerySelectorAll = document.querySelectorAll;
-
-            document.querySelector = function(selector) {
-                if (selector && (selector.includes('[type="password"]') ||
-                                selector.includes('[autocomplete]') ||
-                                selector.includes('[data-password]') ||
-                                selector.includes('[name*="password"]') ||
-                                selector.includes('[id*="password"]'))) {
-                    return null;
-                }
-                return originalQuerySelector.apply(this, arguments);
-            };
-
-            document.querySelectorAll = function(selector) {
-                if (selector && (selector.includes('[type="password"]') ||
-                                selector.includes('[autocomplete]') ||
-                                selector.includes('[data-password]') ||
-                                selector.includes('[name*="password"]') ||
-                                selector.includes('[id*="password"]'))) {
-                    return [];
-                }
-                return originalQuerySelectorAll.apply(this, arguments);
-            };
-
-            // Enhanced element property blocking
-            const originalGetAttribute = Element.prototype.getAttribute;
-            Element.prototype.getAttribute = function(name) {
-                if (name === 'type' && this.tagName === 'INPUT') {
-                    const type = originalGetAttribute.call(this, name);
-                    if (type === 'password' || type === 'email' || type === 'tel') {
-                        return 'text'; // Return text instead of actual type
-                    }
-                }
-                return originalGetAttribute.apply(this, arguments);
-            };
-
-            // Block getElementsByTagName for password-related searches
-            const originalGetElementsByTagName = document.getElementsByTagName;
-            document.getElementsByTagName = function(tagName) {
-                if (tagName && tagName.toLowerCase() === 'input') {
-                    const elements = originalGetElementsByTagName.apply(this, arguments);
-                    return Array.from(elements).filter(el => {
-                        const type = el.getAttribute('type');
-                        return type !== 'password' && type !== 'email' && type !== 'tel';
-                    });
-                }
-                return originalGetElementsByTagName.apply(this, arguments);
-            };
-
-            // Prevent password manager overlays with enhanced detection
-            const observer = new MutationObserver(function(mutations) {
-                mutations.forEach(function(mutation) {
-                    mutation.addedNodes.forEach(function(node) {
-                        if (node.nodeType === Node.ELEMENT_NODE) {
-                            const element = node;
-                            const elementString = element.outerHTML || element.innerHTML || '';
-
-                            if (element.id && (element.id.includes('password') ||
-                                             element.id.includes('credential') ||
-                                             element.id.includes('autofill') ||
-                                             element.id.includes('ControlLooksLike'))) {
-                                element.remove();
-                            }
-                            if (element.className && typeof element.className === 'string' &&
-                                (element.className.includes('password') ||
-                                 element.className.includes('credential') ||
-                                 element.className.includes('autofill') ||
-                                 element.className.includes('ControlLooksLike'))) {
-                                element.remove();
-                            }
-                            if (elementString.includes('password') ||
-                                elementString.includes('credential') ||
-                                elementString.includes('autofill') ||
-                                elementString.includes('ControlLooksLike')) {
-                                element.remove();
-                            }
-                        }
-                    });
+            const hideOverlays = () => {
+                document.querySelectorAll(blockSelector).forEach((el) => {
+                    el.style.display = 'none';
+                    el.style.visibility = 'hidden';
+                    el.style.opacity = '0';
+                    el.style.pointerEvents = 'none';
                 });
-            });
+            };
 
-            observer.observe(document.body, {
+            const observer = new MutationObserver(() => hideOverlays());
+            observer.observe(document.documentElement, {
                 childList: true,
                 subtree: true
             });
 
-            // Block common password manager global objects and properties
-            const blockedProperties = [
-                '__passwordManager', '__credentialManager', '__autofillManager',
-                'ControlLooksLikePasswordCredentialField', 'looksLikePasswordCredentialField',
-                'ControlLooksLikeCreditCardNumberField', 'looksLikeCreditCardNumberField',
-                'ControlLooksLikeCreditCardSecurityCodeField', 'looksLikeCreditCardSecurityCodeField'
-            ];
-
-            blockedProperties.forEach(prop => {
-                Object.defineProperty(window, prop, {
-                    get: function() { return undefined; },
-                    set: function() { return; },
-                    configurable: false
-                });
-            });
-
-            // Prevent password manager communication with enhanced blocking
-            const originalPostMessage = window.postMessage;
-            window.postMessage = function(message, targetOrigin, transfer) {
-                if (message && typeof message === 'object') {
-                    const messageString = JSON.stringify(message);
-                    if (message.type === 'password' || message.type === 'credential' ||
-                        message.type === 'autofill' || message.action === 'fill' ||
-                        messageString.includes('password') || messageString.includes('credential') ||
-                        messageString.includes('ControlLooksLike') || messageString.includes('looksLike')) {
-                        return; // Block password manager messages
-                    }
-                }
-                return originalPostMessage.apply(this, arguments);
-            };
-
-            // Enhanced form element protection
-            const originalGetElementsByName = document.getElementsByName;
-            document.getElementsByName = function(name) {
-                if (name && (name.includes('password') || name.includes('email') || name.includes('credential'))) {
-                    return [];
-                }
-                return originalGetElementsByName.apply(this, arguments);
-            };
-
-            // Block getElementById for password-related IDs
-            const originalGetElementById = document.getElementById;
-            document.getElementById = function(id) {
-                if (id && (id.includes('password') || id.includes('credential') || id.includes('autofill'))) {
-                    return null;
-                }
-                return originalGetElementById.apply(this, arguments);
-            };
-
-            // Override hasOwnProperty to hide password-related properties
-            const originalHasOwnProperty = Object.prototype.hasOwnProperty;
-            Object.prototype.hasOwnProperty = function(prop) {
-                if (prop === 'ControlLooksLikePasswordCredentialField' ||
-                    prop === 'ControlLooksLikeCreditCardNumberField' ||
-                    prop === 'ControlLooksLikeCreditCardSecurityCodeField' ||
-                    prop === 'looksLikePasswordCredentialField' ||
-                    prop === 'looksLikeCreditCardNumberField' ||
-                    prop === 'looksLikeCreditCardSecurityCodeField') {
-                    return false;
-                }
-                return originalHasOwnProperty.apply(this, arguments);
-            };
-
-            // Enhanced input element type protection
-            const originalSetAttribute = Element.prototype.setAttribute;
-            Element.prototype.setAttribute = function(name, value) {
-                if (name === 'type' && (value === 'password' || value === 'email' || value === 'tel')) {
-                    return; // Block setting password-like types
-                }
-                return originalSetAttribute.apply(this, arguments);
-            };
-
-            // Console protection - prevent password manager scripts from logging
-            const originalConsoleLog = console.log;
-            const originalConsoleError = console.error;
-            const originalConsoleWarn = console.warn;
-
-            console.log = function(...args) {
-                const message = args.join(' ');
-                if (message.includes('password') || message.includes('credential') ||
-                    message.includes('ControlLooksLike') || message.includes('autofill')) {
-                    return; // Block password manager console output
-                }
-                return originalConsoleLog.apply(this, arguments);
-            };
-
-            console.error = function(...args) {
-                const message = args.join(' ');
-                if (message.includes('password') || message.includes('credential') ||
-                    message.includes('ControlLooksLike') || message.includes('autofill')) {
-                    return; // Block password manager console output
-                }
-                return originalConsoleError.apply(this, arguments);
-            };
-
-            console.warn = function(...args) {
-                const message = args.join(' ');
-                if (message.includes('password') || message.includes('credential') ||
-                    message.includes('ControlLooksLike') || message.includes('autofill')) {
-                    return; // Block password manager console output
-                }
-                return originalConsoleWarn.apply(this, arguments);
-            };
-
+            hideOverlays();
         })();
     </script>
 
