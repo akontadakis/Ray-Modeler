@@ -384,6 +384,15 @@ export function getConfig(project) {
             : {},
         weather: normalizeWeather(ep),
         simulationControl: normalizeSimulationControl(ep, meta),
+        // Phase 1+: expose raw advanced blocks (panels will work directly on these)
+        sizing: ep.sizing && typeof ep.sizing === 'object' ? { ...ep.sizing } : {},
+        outdoorAir: ep.outdoorAir && typeof ep.outdoorAir === 'object' ? { ...ep.outdoorAir } : {},
+        naturalVentilation: ep.naturalVentilation && typeof ep.naturalVentilation === 'object'
+            ? { ...ep.naturalVentilation }
+            : {},
+        shading: ep.shading && typeof ep.shading === 'object'
+            ? { ...ep.shading }
+            : {},
     };
 
     return { meta, ep, config };
@@ -493,6 +502,136 @@ export function setDaylighting(project, daylighting) {
     updateConfig(project, (ep) => ({
         ...ep,
         daylighting: safe,
+    }));
+}
+
+/**
+ * Phase 1: HVAC Sizing (zones)
+ * Overwrite ep.sizing.zones with provided array.
+ */
+export function setSizingZones(project, zones) {
+    const safeZones = Array.isArray(zones) ? zones.map((z) => ({ ...z })) : [];
+    updateConfig(project, (ep) => ({
+        ...ep,
+        sizing: {
+            ...(ep.sizing && typeof ep.sizing === 'object' ? ep.sizing : {}),
+            zones: safeZones,
+        },
+    }));
+}
+
+/**
+ * Phase 5: System Sizing (Sizing:System)
+ * Overwrite ep.sizing.systems with provided array (advanced).
+ */
+export function setSizingSystems(project, systems) {
+    const safeSystems = Array.isArray(systems)
+        ? systems
+              .filter((s) => s && s.airLoopName)
+              .map((s) => ({ ...s }))
+        : [];
+    updateConfig(project, (ep) => ({
+        ...ep,
+        sizing: {
+            ...(ep.sizing && typeof ep.sizing === 'object' ? ep.sizing : {}),
+            systems: safeSystems,
+        },
+    }));
+}
+
+/**
+ * Phase 5: Plant Sizing (Sizing:Plant)
+ * Overwrite ep.sizing.plants with provided array (advanced).
+ */
+export function setSizingPlants(project, plants) {
+    const safePlants = Array.isArray(plants)
+        ? plants
+              .filter((p) => p && p.plantLoopName)
+              .map((p) => ({ ...p }))
+        : [];
+    updateConfig(project, (ep) => ({
+        ...ep,
+        sizing: {
+            ...(ep.sizing && typeof ep.sizing === 'object' ? ep.sizing : {}),
+            plants: safePlants,
+        },
+    }));
+}
+
+/**
+ * Phase 1: Outdoor Air Design Specifications
+ * Overwrite ep.outdoorAir.designSpecs with provided array.
+ */
+export function setOutdoorAirDesignSpecs(project, designSpecs) {
+    const safe = Array.isArray(designSpecs)
+        ? designSpecs
+              .filter((d) => d && d.name)
+              .map((d) => ({ ...d }))
+        : [];
+    updateConfig(project, (ep) => ({
+        ...ep,
+        outdoorAir: {
+            ...(ep.outdoorAir && typeof ep.outdoorAir === 'object' ? ep.outdoorAir : {}),
+            designSpecs: safe,
+        },
+    }));
+}
+
+/**
+ * Phase 2: Natural Ventilation (simple ZoneVentilation:DesignFlowRate)
+ * Replace ep.naturalVentilation with provided object (global + perZone).
+ */
+export function setNaturalVentilation(project, naturalVentilation) {
+    const nv = naturalVentilation && typeof naturalVentilation === 'object'
+        ? { ...naturalVentilation }
+        : {};
+    if (Array.isArray(nv.perZone)) {
+        nv.perZone = nv.perZone
+            .filter((z) => z && z.zoneName)
+            .map((z) => ({ ...z }));
+    }
+    updateConfig(project, (ep) => ({
+        ...ep,
+        naturalVentilation: nv,
+    }));
+}
+
+/**
+ * Phase 4: Shading & Solar Control
+ * Replace ep.shading with provided object (site/zone surfaces, reflectance, window shading controls).
+ */
+export function setShading(project, shading) {
+    const sh = shading && typeof shading === 'object'
+        ? { ...shading }
+        : {};
+
+    if (Array.isArray(sh.siteSurfaces)) {
+        sh.siteSurfaces = sh.siteSurfaces
+            .filter((s) => s && s.name)
+            .map((s) => ({ ...s }));
+    }
+
+    if (Array.isArray(sh.zoneSurfaces)) {
+        sh.zoneSurfaces = sh.zoneSurfaces
+            .filter((s) => s && s.name)
+            .map((s) => ({ ...s }));
+    }
+
+    if (Array.isArray(sh.reflectance)) {
+        sh.reflectance = sh.reflectance
+            .filter((r) => r && r.shadingSurfaceName)
+            .map((r) => ({ ...r }));
+    }
+
+    if (Array.isArray(sh.windowShadingControls)) {
+        sh.windowShadingControls = sh.windowShadingControls
+            .filter((c) => c && c.name)
+            .map((c) => ({ ...c }));
+    }
+
+    updateConfig(project, (ep) => ({
+        ...ep,
+        shading: sh,
     }));
 }
 

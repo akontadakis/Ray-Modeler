@@ -80,7 +80,7 @@ export function buildEnergyPlusModel(options = {}) {
 
     // VERSION
     idf.push(`Version,`);
-    idf.push(`  9.5;                       !- Version Identifier`);
+    idf.push(`  25.1;                      !- Version Identifier`);
     idf.push('');
 
     // TIMESTEP
@@ -246,13 +246,56 @@ export function buildEnergyPlusModel(options = {}) {
     // 5) Internal loads
     emitZoneLoads(idf, zones, loads, scheduleContext);
 
-    // 6) Thermostats & IdealLoads
+    // 6) Outdoor Air Design Specifications (must come before Sizing so links resolve)
+    // Opt-in: only emit when at least one DesignSpecification entry is valid.
+    if (options.outdoorAir && Array.isArray(options.outdoorAir.designSpecs) && options.outdoorAir.designSpecs.length) {
+        emitDesignSpecificationOutdoorAir(idf, options.outdoorAir, scheduleContext);
+        emitDesignSpecificationOutdoorAirSpaceList(idf, options.outdoorAir);
+    }
+
+    // 7) Sizing Objects
+    // Opt-in: only emit advanced Sizing:System/Plant when user provided them.
+    const sizingCfg = options.sizing || {};
+    emitSizingZone(idf, zones, sizingCfg);
+    if (Array.isArray(sizingCfg.systems) && sizingCfg.systems.length) {
+        emitSizingSystem(idf, sizingCfg);
+    }
+    if (Array.isArray(sizingCfg.plants) && sizingCfg.plants.length) {
+        emitSizingPlant(idf, sizingCfg);
+    }
+
+    // 8) Thermostats & IdealLoads
+    // Always safe: IdealLoads/thermostats helper is internally defensive.
     emitThermostatsAndIdealLoads(idf, zones, scheduleContext, idealLoads, thermostats);
 
-    // 7) Daylighting & Outputs
-    emitDaylighting(idf, zones, daylighting);
+    // 9) Daylighting & Outputs (opt-in)
+    if (daylighting && (daylighting.zones || (daylighting.outputs && (daylighting.outputs.illuminanceMaps || daylighting.outputs.variables)))) {
+        emitDaylighting(idf, zones, daylighting);
+    }
 
-    // 8) Weather file reference (comment)
+    // 10) Natural Ventilation (ZoneVentilation:DesignFlowRate, opt-in)
+    if (options.naturalVentilation && (options.naturalVentilation.global || (Array.isArray(options.naturalVentilation.perZone) && options.naturalVentilation.perZone.length))) {
+        emitZoneVentilation(idf, zones, options.naturalVentilation, scheduleContext);
+    }
+
+    // 11) Shading & Solar Control (opt-in)
+    if (options.shading) {
+        const hasSite = Array.isArray(options.shading.siteSurfaces) && options.shading.siteSurfaces.length;
+        const hasZone = Array.isArray(options.shading.zoneSurfaces) && options.shading.zoneSurfaces.length;
+        const hasRefl = Array.isArray(options.shading.reflectance) && options.shading.reflectance.length;
+        const hasCtrls = Array.isArray(options.shading.windowShadingControls) && options.shading.windowShadingControls.length;
+        if (hasSite || hasZone) {
+            emitShadingSurfaces(idf, options.shading, scheduleContext);
+        }
+        if (hasRefl) {
+            emitShadingReflectance(idf, options.shading);
+        }
+        if (hasCtrls) {
+            emitWindowShadingControls(idf, options.shading, scheduleContext);
+        }
+    }
+
+    // 12) Weather file reference (comment)
     if (epwPath) {
         idf.push(`! Weather file: ${epwPath}`);
         idf.push('');
@@ -371,6 +414,13 @@ export function buildEnergyPlusDiagnostics(options = {}) {
         }
     }
 
+    // Extended diagnostics
+    computeSizingDiagnostics(options.sizing || {}, zoneNames, options.outdoorAir || {}, issues);
+    computeOutdoorAirDiagnostics(options.outdoorAir || {}, scheduleCtx, issues);
+    computeNaturalVentilationDiagnostics(options.naturalVentilation || {}, scheduleCtx, zoneNames, issues);
+    computeDaylightingDiagnostics(daylighting, zoneNames, scheduleCtx, issues);
+    computeShadingDiagnostics(options.shading || {}, scheduleCtx, issues);
+
     const diagnostics = {
         geometry: geomDiag,
         constructions: constructionsDiagnostics,
@@ -387,6 +437,477 @@ export function buildEnergyPlusDiagnostics(options = {}) {
     };
 
     return diagnostics;
+}
+
+/**
+ * Extended diagnostics helpers
+ */
+
+/**
+ * Sizing diagnostics: Sizing:Zone / Sizing:System / Sizing:Plant
+ */
+function computeSizingDiagnostics(sizingCfg = {}, zoneNames = [], outdoorAir = {}, issues) {
+    const znSet = new Set(zoneNames);
+    const dsoaNames = new Set(
+        (Array.isArray(outdoorAir.designSpecs) ? outdoorAir.designSpecs : [])
+            .filter((s) => s && s.name)
+            .map((s) => sanitize(s.name))
+    );
+
+    // Sizing:Zone
+    const szZones = Array.isArray(sizingCfg.zones) ? sizingCfg.zones : [];
+    const seenZones = new Set();
+    szZones.forEach((z) => {
+        if (!z || !z.zoneName) return;
+        const zn = sanitize(z.zoneName);
+        seenZones.add(zn);
+        if (!znSet.has(zn)) {
+            issues.push({
+                severity: 'warning',
+                message: `Sizing.zones entry references unknown zone "${z.zoneName}".`,
+            });
+        }
+        if (z.designSpecOutdoorAirName) {
+            const dName = sanitize(z.designSpecOutdoorAirName);
+            if (!dsoaNames.has(dName)) {
+                issues.push({
+                    severity: 'error',
+                    message: `Sizing:Zone for "${z.zoneName}" references DesignSpecification:OutdoorAir "${z.designSpecOutdoorAirName}" which is not defined.`,
+                });
+            }
+        }
+    });
+
+    if (szZones.length && znSet.size) {
+        znSet.forEach((zn) => {
+            if (!seenZones.has(zn)) {
+                issues.push({
+                    severity: 'warning',
+                    message: `Sizing.zones is configured but no Sizing:Zone entry provided for zone "${zn}". Defaults will be used.`,
+                });
+            }
+        });
+    }
+
+    // Sizing:System
+    const systems = Array.isArray(sizingCfg.systems) ? sizingCfg.systems : [];
+    systems.forEach((s) => {
+        if (!s) return;
+        if (!s.airLoopName) {
+            issues.push({
+                severity: 'warning',
+                message: 'Sizing.systems entry is missing "airLoopName".',
+            });
+        }
+        const method = s.systemOutdoorAirMethod || s.systemOutdoorAirMethodEnum;
+        if (method && /VRP|IAQP/i.test(String(method))) {
+            if (!outdoorAir.designSpecs || !outdoorAir.designSpecs.length) {
+                issues.push({
+                    severity: 'warning',
+                    message: `Sizing:System "${s.airLoopName || '(unnamed)'}" uses "${method}" but no outdoor air design specs are configured.`,
+                });
+            }
+        }
+    });
+
+    // Sizing:Plant
+    const plants = Array.isArray(sizingCfg.plants) ? sizingCfg.plants : [];
+    plants.forEach((p) => {
+        if (!p) return;
+        if (!p.plantLoopName) {
+            issues.push({
+                severity: 'warning',
+                message: 'Sizing.plants entry is missing "plantLoopName".',
+            });
+        }
+        const hasExit = p.designLoopExitTemperature != null;
+        const hasDT = p.loopDesignTemperatureDifference != null;
+        if ((hasExit && !hasDT) || (!hasExit && hasDT)) {
+            issues.push({
+                severity: 'warning',
+                message: `Sizing:Plant "${p.plantLoopName || '(unnamed)'}" has incomplete sizing data (both exit temperature and delta T should be set).`,
+            });
+        }
+    });
+}
+
+/**
+ * Outdoor air diagnostics for DesignSpecification:OutdoorAir / SpaceList
+ */
+function computeOutdoorAirDiagnostics(outdoorAir = {}, scheduleCtx, issues) {
+    const compact = scheduleCtx.compact || {};
+    const hasSchedule = (name) => !!(name && compact[sanitize(name)]);
+
+    const specs = Array.isArray(outdoorAir.designSpecs)
+        ? outdoorAir.designSpecs
+        : [];
+    const specNames = new Set();
+
+    specs.forEach((s) => {
+        if (!s || !s.name) return;
+        const name = sanitize(s.name);
+        specNames.add(name);
+
+        const method = s.method || 'Flow/Person';
+        const hasAnyFlow =
+            s.flowPerPerson != null ||
+            s.flowPerArea != null ||
+            s.flowPerZone != null ||
+            s.airChangesPerHour != null;
+
+        if (!hasAnyFlow) {
+            issues.push({
+                severity: 'warning',
+                message: `DesignSpecification:OutdoorAir "${s.name}" uses method "${method}" but has no flow values defined.`,
+            });
+        }
+
+        if (s.scheduleName && !hasSchedule(s.scheduleName)) {
+            issues.push({
+                severity: 'warning',
+                message: `DesignSpecification:OutdoorAir "${s.name}" references missing schedule "${s.scheduleName}".`,
+            });
+        }
+        if (s.proportionalMinOAFractionScheduleName && !hasSchedule(s.proportionalMinOAFractionScheduleName)) {
+            issues.push({
+                severity: 'warning',
+                message: `DesignSpecification:OutdoorAir "${s.name}" references missing proportional minimum OA schedule "${s.proportionalMinOAFractionScheduleName}".`,
+            });
+        }
+    });
+
+    const lists = Array.isArray(outdoorAir.spaceLists)
+        ? outdoorAir.spaceLists
+        : [];
+    lists.forEach((sl) => {
+        if (!sl || !sl.name || !Array.isArray(sl.items)) return;
+        sl.items.forEach((it) => {
+            if (!it || !it.spaceName || !it.designSpecOutdoorAirObjectName) return;
+            const dName = sanitize(it.designSpecOutdoorAirObjectName);
+            if (!specNames.has(dName)) {
+                issues.push({
+                    severity: 'error',
+                    message: `DesignSpecification:OutdoorAir:SpaceList "${sl.name}" references unknown DesignSpecification:OutdoorAir "${it.designSpecOutdoorAirObjectName}".`,
+                });
+            }
+        });
+    });
+}
+
+/**
+ * Natural ventilation diagnostics (ZoneVentilation:DesignFlowRate)
+ */
+function computeNaturalVentilationDiagnostics(natVentCfg = {}, scheduleCtx, zoneNames, issues) {
+    const compact = scheduleCtx.compact || {};
+    const hasSchedule = (name) => !!(name && compact[sanitize(name)]);
+
+    const znSet = new Set(zoneNames);
+    const globalCfg = natVentCfg.global || {};
+    const perZone = Array.isArray(natVentCfg.perZone) ? natVentCfg.perZone : [];
+
+    const checkCfg = (label, cfg) => {
+        if (!cfg) return;
+
+        const flowsDefined =
+            cfg.designFlowRate != null ||
+            cfg.flowPerArea != null ||
+            cfg.flowPerPerson != null ||
+            cfg.airChangesPerHour != null;
+
+        if (cfg.enabled && !flowsDefined) {
+            issues.push({
+                severity: 'warning',
+                message: `Natural ventilation for ${label} is enabled but has no effective flow defined.`,
+            });
+        }
+
+        const scheds = [
+            cfg.scheduleName,
+            cfg.minIndoorTempScheduleName,
+            cfg.maxIndoorTempScheduleName,
+            cfg.deltaTempScheduleName,
+            cfg.minOutdoorTempScheduleName,
+            cfg.maxOutdoorTempScheduleName,
+        ];
+        scheds.forEach((sn) => {
+            if (sn && !hasSchedule(sn)) {
+                issues.push({
+                    severity: 'warning',
+                    message: `Natural ventilation for ${label} references missing schedule "${sn}".`,
+                });
+            }
+        });
+    };
+
+    if (globalCfg) {
+        checkCfg('global', globalCfg);
+    }
+
+    perZone.forEach((pz) => {
+        if (!pz || !pz.zoneName) return;
+        const zn = sanitize(pz.zoneName);
+        if (!znSet.has(zn)) {
+            issues.push({
+                severity: 'warning',
+                message: `Natural ventilation perZone entry references unknown zone "${pz.zoneName}".`,
+            });
+        }
+        checkCfg(`zone "${pz.zoneName}"`, pz);
+    });
+}
+
+/**
+ * Daylighting diagnostics
+ */
+function computeDaylightingDiagnostics(daylighting, zoneNames, scheduleCtx, issues) {
+    if (!daylighting) return;
+
+    const znSet = new Set(zoneNames);
+    const compact = scheduleCtx.compact || {};
+    const hasSchedule = (name) => !!(name && compact[sanitize(name)]);
+
+    // Advanced zones[]
+    const zonesCfg = Array.isArray(daylighting.zones) ? daylighting.zones : [];
+    zonesCfg.forEach((cfg) => {
+        if (!cfg || !cfg.zoneName) return;
+        const zn = sanitize(cfg.zoneName);
+        if (!znSet.has(zn)) {
+            issues.push({
+                severity: 'warning',
+                message: `Daylighting.zones entry references unknown zone "${cfg.zoneName}".`,
+            });
+        }
+
+        if (cfg.enabled === false) return;
+
+        const refs = Array.isArray(cfg.referencePoints)
+            ? cfg.referencePoints.filter(
+                  (rp) =>
+                      rp &&
+                      Number.isFinite(rp.x) &&
+                      Number.isFinite(rp.y) &&
+                      Number.isFinite(rp.z)
+              )
+            : [];
+        if (!refs.length) {
+            issues.push({
+                severity: 'warning',
+                message: `Daylighting for zone "${cfg.zoneName}" has no valid reference points configured.`,
+            });
+        }
+
+        if (cfg.availabilityScheduleName && !hasSchedule(cfg.availabilityScheduleName)) {
+            issues.push({
+                severity: 'warning',
+                message: `Daylighting for zone "${cfg.zoneName}" references missing availability schedule "${cfg.availabilityScheduleName}".`,
+            });
+        }
+
+        if (Array.isArray(cfg.fractions) && cfg.fractions.length >= 2) {
+            const sum = cfg.fractions
+                .slice(0, 2)
+                .reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0);
+            if (sum <= 0 || sum > 1.01) {
+                issues.push({
+                    severity: 'warning',
+                    message: `Daylighting fractions for zone "${cfg.zoneName}" look inconsistent (sum=${sum.toFixed(
+                        3
+                    )}).`,
+                });
+            }
+        }
+    });
+
+    // Legacy controls[]
+    const legacy = Array.isArray(daylighting.controls)
+        ? daylighting.controls
+        : [];
+    legacy.forEach((c) => {
+        if (!c || !c.zoneName) return;
+        const zn = sanitize(c.zoneName);
+        if (!znSet.has(zn)) {
+            issues.push({
+                severity: 'warning',
+                message: `Legacy daylighting.controls entry references unknown zone "${c.zoneName}".`,
+            });
+        }
+        const refs = Array.isArray(c.refPoints)
+            ? c.refPoints.filter(
+                  (rp) =>
+                      rp &&
+                      Number.isFinite(rp.x) &&
+                      Number.isFinite(rp.y) &&
+                      Number.isFinite(rp.z)
+              )
+            : [];
+        if (!refs.length || !Number.isFinite(c.setpoint)) {
+            issues.push({
+                severity: 'warning',
+                message: `Legacy daylighting control for zone "${c.zoneName}" is incomplete (missing refPoints or setpoint).`,
+            });
+        }
+    });
+
+    // Illuminance maps
+    const outputs = daylighting.outputs || {};
+    const maps = []
+        .concat(
+            Array.isArray(outputs.illuminanceMaps)
+                ? outputs.illuminanceMaps
+                : []
+        )
+        .concat(
+            (Array.isArray(daylighting.zones)
+                ? daylighting.zones
+                : []
+            ).flatMap((z) =>
+                Array.isArray(z.illuminanceMaps)
+                    ? z.illuminanceMaps.map((m) => ({
+                          ...m,
+                          zoneName: z.zoneName,
+                      }))
+                    : []
+            )
+        );
+
+    maps.forEach((m) => {
+        if (!m || !m.zoneName) return;
+        const zn = sanitize(m.zoneName);
+        if (!znSet.has(zn)) {
+            issues.push({
+                severity: 'warning',
+                message: `Illuminance map "${m.name || '(unnamed)'}" references unknown zone "${m.zoneName}".`,
+            });
+        }
+        const requiredNums = [
+            m.xOrigin,
+            m.yOrigin,
+            m.zHeight,
+            m.xNumPoints,
+            m.xSpacing,
+            m.yNumPoints,
+            m.ySpacing,
+        ];
+        if (requiredNums.some((v) => !Number.isFinite(v))) {
+            issues.push({
+                severity: 'warning',
+                message: `Illuminance map "${m.name || '(unnamed)'}" for zone "${m.zoneName}" has invalid or missing numeric fields.`,
+            });
+        }
+    });
+}
+
+/**
+ * Shading diagnostics
+ */
+function computeShadingDiagnostics(shading = {}, scheduleCtx, issues) {
+    if (!shading) return;
+
+    const compact = scheduleCtx.compact || {};
+    const hasSchedule = (name) => !!(name && compact[sanitize(name)]);
+
+    const shadingSurfaceNames = new Set();
+
+    const siteSurfaces = Array.isArray(shading.siteSurfaces)
+        ? shading.siteSurfaces
+        : [];
+    siteSurfaces.forEach((s) => {
+        if (!s || !s.name) return;
+        const name = sanitize(s.name);
+        shadingSurfaceNames.add(name);
+
+        if (!Array.isArray(s.vertices) || s.vertices.length < 3) {
+            issues.push({
+                severity: 'warning',
+                message: `Shading site/building surface "${s.name}" has fewer than 3 vertices and will be ignored.`,
+            });
+        }
+        if (s.transmittanceScheduleName && !hasSchedule(s.transmittanceScheduleName)) {
+            issues.push({
+                severity: 'warning',
+                message: `Shading surface "${s.name}" references missing transmittance schedule "${s.transmittanceScheduleName}".`,
+            });
+        }
+    });
+
+    const zoneSurfaces = Array.isArray(shading.zoneSurfaces)
+        ? shading.zoneSurfaces
+        : [];
+    zoneSurfaces.forEach((s) => {
+        if (!s || !s.name) return;
+        const name = sanitize(s.name);
+        shadingSurfaceNames.add(name);
+
+        if (!s.baseSurfaceName) {
+            issues.push({
+                severity: 'warning',
+                message: `Shading:Zone:Detailed "${s.name}" is missing baseSurfaceName.`,
+            });
+        }
+        if (!Array.isArray(s.vertices) || s.vertices.length < 3) {
+            issues.push({
+                severity: 'warning',
+                message: `Shading:Zone:Detailed "${s.name}" has fewer than 3 vertices and will be ignored.`,
+            });
+        }
+        if (s.transmittanceScheduleName && !hasSchedule(s.transmittanceScheduleName)) {
+            issues.push({
+                severity: 'warning',
+                message: `Shading:Zone:Detailed "${s.name}" references missing transmittance schedule "${s.transmittanceScheduleName}".`,
+            });
+        }
+    });
+
+    const refl = Array.isArray(shading.reflectance)
+        ? shading.reflectance
+        : [];
+    refl.forEach((r) => {
+        if (!r || !r.shadingSurfaceName) return;
+        const sName = sanitize(r.shadingSurfaceName);
+        if (!shadingSurfaceNames.has(sName)) {
+            issues.push({
+                severity: 'warning',
+                message: `ShadingProperty:Reflectance references shading surface "${r.shadingSurfaceName}" which is not defined in shading.siteSurfaces/zoneSurfaces.`,
+            });
+        }
+    });
+
+    const ctrls = Array.isArray(shading.windowShadingControls)
+        ? shading.windowShadingControls
+        : [];
+    ctrls.forEach((c) => {
+        if (!c || !c.name) return;
+
+        if (
+            !Array.isArray(c.fenestrationSurfaceNames) ||
+            !c.fenestrationSurfaceNames.length
+        ) {
+            issues.push({
+                severity: 'warning',
+                message: `WindowShadingControl "${c.name}" has no fenestrationSurfaceNames; it will not control any windows.`,
+            });
+        }
+
+        if (c.scheduleName && !hasSchedule(c.scheduleName)) {
+            issues.push({
+                severity: 'warning',
+                message: `WindowShadingControl "${c.name}" references missing schedule "${c.scheduleName}".`,
+            });
+        }
+
+        if (c.setpoint1 != null && typeof c.setpoint1 !== 'number') {
+            issues.push({
+                severity: 'warning',
+                message: `WindowShadingControl "${c.name}" has non-numeric setpoint1.`,
+            });
+        }
+        if (c.setpoint2 != null && typeof c.setpoint2 !== 'number') {
+            issues.push({
+                severity: 'warning',
+                message: `WindowShadingControl "${c.name}" has non-numeric setpoint2.`,
+            });
+        }
+    });
 }
 
 /**
@@ -1606,9 +2127,874 @@ function emitZoneLoads(idf, zones, loads = [], scheduleContext) {
 }
 
 /**
+ * NATURAL VENTILATION
+ * Config: options.naturalVentilation.global / perZone
+ * Emits ZoneVentilation:DesignFlowRate objects when enabled/configured.
+ */
+function emitZoneVentilation(idf, zones, natVentCfg = {}, scheduleContext = {}) {
+    const znList = zones && zones.length ? zones : [{ name: 'Zone_1' }];
+    const compact = scheduleContext.compact || {};
+
+    const scheduleExists = (name) => {
+        if (!name) return false;
+        return !!compact[sanitize(name)];
+    };
+
+    const getAlwaysOn = () => {
+        if (compact.RM_AlwaysOn) return 'RM_AlwaysOn';
+        // Fallback: if not present (should not happen with current buildSchedules),
+        // create a local AlwaysOn inline (won't be de-duped, but safe).
+        idf.push(`Schedule:Compact,`);
+        idf.push(`  RM_AlwaysOn,              !- Name`);
+        idf.push(`  Fraction,                 !- Schedule Type Limits Name`);
+        idf.push(`  Through: 12/31,`);
+        idf.push(`  For: AllDays,`);
+        idf.push(`  Until: 24:00, 1.0;`);
+        idf.push('');
+        compact.RM_AlwaysOn = { typeLimits: 'Fraction', lines: ['Through: 12/31', 'For: AllDays', 'Until: 24:00, 1.0'] };
+        return 'RM_AlwaysOn';
+    };
+
+    const globalCfg = natVentCfg.global || {};
+    const perZone = Array.isArray(natVentCfg.perZone) ? natVentCfg.perZone : [];
+
+    const byZoneOverride = new Map();
+    perZone.forEach((pz) => {
+        if (!pz || !pz.zoneName) return;
+        byZoneOverride.set(sanitize(pz.zoneName), pz);
+    });
+
+    const anyGlobalEnabled =
+        globalCfg.enabled ||
+        globalCfg.designFlowRate != null ||
+        globalCfg.flowPerArea != null ||
+        globalCfg.flowPerPerson != null ||
+        globalCfg.airChangesPerHour != null;
+
+    znList.forEach((z, idx) => {
+        const zn = sanitize(z.name || `Zone_${idx + 1}`);
+        const zCfgRaw = byZoneOverride.get(zn) || {};
+
+        const enabled =
+            zCfgRaw.enabled != null
+                ? !!zCfgRaw.enabled
+                : anyGlobalEnabled;
+
+        if (!enabled) return;
+
+        // Merge global + local overrides (local wins)
+        const cfg = { ...globalCfg, ...zCfgRaw };
+
+        // Determine method
+        let method = cfg.calculationMethod;
+        if (!method) {
+            if (cfg.airChangesPerHour != null) method = 'AirChanges/Hour';
+            else if (cfg.flowPerPerson != null) method = 'Flow/Person';
+            else if (cfg.flowPerArea != null) method = 'Flow/Area';
+            else if (cfg.designFlowRate != null) method = 'Flow/Zone';
+        }
+        if (!method) return; // nothing useful defined
+
+        // Schedule
+        let sched = cfg.scheduleName;
+        if (sched && scheduleExists(sched)) {
+            sched = sanitize(sched);
+        } else if (sched && !scheduleExists(sched)) {
+            // leave as-is; EnergyPlus will flag if invalid
+        } else {
+            sched = getAlwaysOn();
+        }
+
+        // Design flow parameters based on method
+        let design = '';
+        let perArea = '';
+        let perPerson = '';
+        let ach = '';
+
+        if (method === 'Flow/Zone') {
+            design = cfg.designFlowRate != null ? cfg.designFlowRate : '';
+        } else if (method === 'Flow/Area') {
+            perArea = cfg.flowPerArea != null ? cfg.flowPerArea : '';
+        } else if (method === 'Flow/Person') {
+            perPerson = cfg.flowPerPerson != null ? cfg.flowPerPerson : '';
+        } else if (method === 'AirChanges/Hour') {
+            ach = cfg.airChangesPerHour != null ? cfg.airChangesPerHour : '';
+        }
+
+        const ventType = cfg.ventilationType || 'Natural';
+        const fanPress = cfg.fanPressure != null ? cfg.fanPressure : '';
+        const fanEff =
+            cfg.fanTotalEfficiency != null ? cfg.fanTotalEfficiency : '';
+
+        const A = cfg.constantTermCoeff != null ? cfg.constantTermCoeff : 1.0;
+        const B =
+            cfg.temperatureTermCoeff != null ? cfg.temperatureTermCoeff : 0.0;
+        const C =
+            cfg.velocityTermCoeff != null ? cfg.velocityTermCoeff : 0.0;
+        const D =
+            cfg.velocitySquaredTermCoeff != null
+                ? cfg.velocitySquaredTermCoeff
+                : 0.0;
+
+        const minTin = cfg.minIndoorTemp ?? '';
+        const minTinSched = cfg.minIndoorTempScheduleName || '';
+        const maxTin = cfg.maxIndoorTemp ?? '';
+        const maxTinSched = cfg.maxIndoorTempScheduleName || '';
+        const dT = cfg.deltaTemp ?? '';
+        const dTSched = cfg.deltaTempScheduleName || '';
+        const minTout = cfg.minOutdoorTemp ?? '';
+        const minToutSched = cfg.minOutdoorTempScheduleName || '';
+        const maxTout = cfg.maxOutdoorTemp ?? '';
+        const maxToutSched = cfg.maxOutdoorTempScheduleName || '';
+        const maxWS = cfg.maxWindSpeed ?? '';
+        const densityBasis = cfg.densityBasis || 'Outdoor';
+
+        const name = `${zn} Ventilation`;
+
+        idf.push(`ZoneVentilation:DesignFlowRate,`);
+        idf.push(`  ${sanitize(name)},         !- Name`);
+        idf.push(`  ${zn},                    !- Zone or ZoneList or Space or SpaceList Name`);
+        idf.push(`  ${sched},                 !- Schedule Name`);
+        idf.push(`  ${method},                !- Design Flow Rate Calculation Method`);
+        idf.push(`  ${design},                !- Design Flow Rate {m3/s}`);
+        idf.push(`  ${perArea},               !- Flow Rate per Floor Area {m3/s-m2}`);
+        idf.push(`  ${perPerson},             !- Flow Rate per Person {m3/s-person}`);
+        idf.push(`  ${ach},                   !- Air Changes per Hour {1/hr}`);
+        idf.push(`  ${ventType},              !- Ventilation Type`);
+        idf.push(`  ${fanPress},              !- Fan Pressure Rise {Pa}`);
+        idf.push(`  ${fanEff},                !- Fan Total Efficiency`);
+        idf.push(`  ${A},                     !- Constant Term Coefficient`);
+        idf.push(`  ${B},                     !- Temperature Term Coefficient`);
+        idf.push(`  ${C},                     !- Velocity Term Coefficient`);
+        idf.push(`  ${D},                     !- Velocity Squared Term Coefficient`);
+        idf.push(`  ${minTin},                !- Minimum Indoor Temperature {C}`);
+        idf.push(`  ${minTinSched},           !- Minimum Indoor Temperature Schedule Name`);
+        idf.push(`  ${maxTin},                !- Maximum Indoor Temperature {C}`);
+        idf.push(`  ${maxTinSched},           !- Maximum Indoor Temperature Schedule Name`);
+        idf.push(`  ${dT},                    !- Delta Temperature {C}`);
+        idf.push(`  ${dTSched},               !- Delta Temperature Schedule Name`);
+        idf.push(`  ${minTout},               !- Minimum Outdoor Temperature {C}`);
+        idf.push(`  ${minToutSched},          !- Minimum Outdoor Temperature Schedule Name`);
+        idf.push(`  ${maxTout},               !- Maximum Outdoor Temperature {C}`);
+        idf.push(`  ${maxToutSched},          !- Maximum Outdoor Temperature Schedule Name`);
+        idf.push(`  ${maxWS},                 !- Maximum Wind Speed {m/s}`);
+        idf.push(`  ${densityBasis};          !- Density Basis`);
+        idf.push('');
+    });
+}
+
+/**
+ * OUTDOOR AIR DESIGN
+ * Config: options.outdoorAir.designSpecs / spaceLists
+ */
+function emitDesignSpecificationOutdoorAir(idf, outdoorAir = {}, scheduleContext = {}) {
+    const specs = Array.isArray(outdoorAir?.designSpecs)
+        ? outdoorAir.designSpecs
+        : [];
+    if (!specs.length) return;
+
+    const compact = scheduleContext.compact || {};
+    const hasSchedule = (name) => {
+        if (!name) return false;
+        return !!compact[sanitize(name)];
+    };
+
+    specs.forEach((s) => {
+        if (!s || !s.name) return;
+
+        const name = sanitize(s.name);
+        const method = s.method || 'Flow/Person';
+
+        const fp = s.flowPerPerson != null ? s.flowPerPerson : '';
+        const fa = s.flowPerArea != null ? s.flowPerArea : '';
+        const fz = s.flowPerZone != null ? s.flowPerZone : '';
+        const ach = s.airChangesPerHour != null ? s.airChangesPerHour : '';
+
+        const sched =
+            s.scheduleName && hasSchedule(s.scheduleName)
+                ? sanitize(s.scheduleName)
+                : (s.scheduleName || '');
+
+        const propMin =
+            s.proportionalMinOAFractionScheduleName &&
+            hasSchedule(s.proportionalMinOAFractionScheduleName)
+                ? sanitize(s.proportionalMinOAFractionScheduleName)
+                : (s.proportionalMinOAFractionScheduleName || '');
+
+        idf.push(`DesignSpecification:OutdoorAir,`);
+        idf.push(`  ${name},                  !- Name`);
+        idf.push(`  ${method},                !- Outdoor Air Method`);
+        idf.push(`  ${fp},                    !- Outdoor Air Flow per Person {m3/s-person}`);
+        idf.push(`  ${fa},                    !- Outdoor Air Flow per Zone Floor Area {m3/s-m2}`);
+        idf.push(`  ${fz},                    !- Outdoor Air Flow per Zone {m3/s}`);
+        idf.push(`  ${ach},                   !- Outdoor Air Flow Air Changes per Hour {1/hr}`);
+        idf.push(`  ${sched},                 !- Outdoor Air Schedule Name`);
+        idf.push(`  ${propMin};               !- Proportional Control Minimum Outdoor Air Flow Rate Schedule Name`);
+        idf.push('');
+    });
+}
+
+function emitDesignSpecificationOutdoorAirSpaceList(idf, outdoorAir = {}) {
+    const lists = Array.isArray(outdoorAir?.spaceLists)
+        ? outdoorAir.spaceLists
+        : [];
+    if (!lists.length) return;
+
+    lists.forEach((sl) => {
+        if (!sl || !sl.name || !Array.isArray(sl.items) || !sl.items.length) return;
+
+        const name = sanitize(sl.name);
+        idf.push(`DesignSpecification:OutdoorAir:SpaceList,`);
+        idf.push(`  ${name},                  !- Name`);
+
+        sl.items.forEach((it, idx) => {
+            if (!it || !it.spaceName || !it.designSpecOutdoorAirObjectName) return;
+            const space = sanitize(it.spaceName);
+            const dsoa = sanitize(it.designSpecOutdoorAirObjectName);
+            const isLast = idx === sl.items.length - 1;
+            idf.push(`  ${space},               !- Space ${idx + 1} Name`);
+            idf.push(`  ${dsoa}${isLast ? ';' : ','}               !- Space ${idx + 1} Design Specification Outdoor Air Object Name`);
+        });
+
+        idf.push('');
+    });
+}
+
+/**
+ * SHADING SURFACES
+ * Config: shading.siteSurfaces / shading.zoneSurfaces
+ */
+function emitShadingSurfaces(idf, shading = {}, scheduleContext = {}) {
+    if (!shading) return;
+
+    const compact = scheduleContext.compact || {};
+    const hasSchedule = (name) => {
+        if (!name) return false;
+        return !!compact[sanitize(name)];
+    };
+
+    const siteSurfaces = Array.isArray(shading.siteSurfaces)
+        ? shading.siteSurfaces
+        : [];
+    siteSurfaces.forEach((s) => {
+        if (!s || !s.name || !Array.isArray(s.vertices) || s.vertices.length < 3) return;
+        const name = sanitize(s.name);
+        const type =
+            s.type === 'Building'
+                ? 'Shading:Building:Detailed'
+                : 'Shading:Site:Detailed';
+
+        let sched = s.transmittanceScheduleName || '';
+        if (sched && hasSchedule(sched)) {
+            sched = sanitize(sched);
+        }
+
+        idf.push(`${type},`);
+        idf.push(`  ${name},                  !- Name`);
+        idf.push(`  ${sched || ''},           !- Transmittance Schedule Name`);
+        idf.push(`  ,                         !- Solar Distribution (unused)`);
+
+        idf.push(`  ${s.vertices.length},     !- Number of Vertices`);
+        s.vertices.forEach((v, idx) => {
+            if (
+                !v ||
+                !Number.isFinite(v.x) ||
+                !Number.isFinite(v.y) ||
+                !Number.isFinite(v.z)
+            ) {
+                return;
+            }
+            const suffix = idx === s.vertices.length - 1 ? ';' : ',';
+            idf.push(
+                `  ${v.x}, ${v.y}, ${v.z}${suffix}        !- Vertex ${idx + 1} {m}`
+            );
+        });
+        idf.push('');
+    });
+
+    const zoneSurfaces = Array.isArray(shading.zoneSurfaces)
+        ? shading.zoneSurfaces
+        : [];
+    zoneSurfaces.forEach((s) => {
+        if (
+            !s ||
+            !s.name ||
+            !s.baseSurfaceName ||
+            !Array.isArray(s.vertices) ||
+            s.vertices.length < 3
+        ) {
+            return;
+        }
+        const name = sanitize(s.name);
+        const base = sanitize(s.baseSurfaceName);
+
+        let sched = s.transmittanceScheduleName || '';
+        if (sched && hasSchedule(sched)) {
+            sched = sanitize(sched);
+        }
+
+        idf.push(`Shading:Zone:Detailed,`);
+        idf.push(`  ${name},                  !- Name`);
+        idf.push(`  ${sched || ''},           !- Transmittance Schedule Name`);
+        idf.push(`  ${base},                  !- Base Surface Name`);
+        idf.push(`  ${s.vertices.length},     !- Number of Vertices`);
+        s.vertices.forEach((v, idx) => {
+            if (
+                !v ||
+                !Number.isFinite(v.x) ||
+                !Number.isFinite(v.y) ||
+                !Number.isFinite(v.z)
+            ) {
+                return;
+            }
+            const suffix = idx === s.vertices.length - 1 ? ';' : ',';
+            idf.push(
+                `  ${v.x}, ${v.y}, ${v.z}${suffix}        !- Vertex ${idx + 1} {m}`
+            );
+        });
+        idf.push('');
+    });
+}
+
+/**
+ * SHADING REFLECTANCE
+ * Config: shading.reflectance[]
+ */
+function emitShadingReflectance(idf, shading = {}) {
+    const items = Array.isArray(shading.reflectance)
+        ? shading.reflectance
+        : [];
+    items.forEach((r) => {
+        if (!r || !r.shadingSurfaceName) return;
+        const sName = sanitize(r.shadingSurfaceName);
+
+        idf.push(`ShadingProperty:Reflectance,`);
+        idf.push(`  ${sName},                 !- Name`);
+        idf.push(`  ${sName},                 !- Shading Surface Name`);
+        idf.push(
+            `  ${r.solarReflectance != null ? r.solarReflectance : ''}, !- Solar Reflectance`
+        );
+        idf.push(
+            `  ${
+                r.visibleReflectance != null ? r.visibleReflectance : ''
+            }, !- Visible Reflectance`
+        );
+        idf.push(
+            `  ${
+                r.infraredHemisphericalEmissivity != null
+                    ? r.infraredHemisphericalEmissivity
+                    : ''
+            }, !- Infrared Hemispherical Emissivity`
+        );
+        idf.push(
+            `  ${
+                r.infraredTransmittance != null
+                    ? r.infraredTransmittance
+                    : ''
+            }; !- Infrared Transmittance`
+        );
+        idf.push('');
+    });
+}
+
+/**
+ * WINDOW SHADING CONTROL
+ * Config: shading.windowShadingControls[]
+ * Thin mapping; assumes fenestration surfaces exist/are named correctly.
+ */
+function emitWindowShadingControls(idf, shading = {}, scheduleContext = {}) {
+    const compact = scheduleContext.compact || {};
+    const hasSchedule = (name) => {
+        if (!name) return false;
+        return !!compact[sanitize(name)];
+    };
+
+    const ctrls = Array.isArray(shading.windowShadingControls)
+        ? shading.windowShadingControls
+        : [];
+
+    ctrls.forEach((c) => {
+        if (
+            !c ||
+            !c.name ||
+            !c.shadingType ||
+            !c.controlType ||
+            !Array.isArray(c.fenestrationSurfaceNames) ||
+            !c.fenestrationSurfaceNames.length
+        ) {
+            return;
+        }
+
+        const name = sanitize(c.name);
+        const shadingType = c.shadingType;
+        const controlType = c.controlType;
+
+        let sched = c.scheduleName || '';
+        if (sched && hasSchedule(sched)) {
+            sched = sanitize(sched);
+        }
+
+        const set1 =
+            c.setpoint1 != null && isFinite(c.setpoint1)
+                ? c.setpoint1
+                : '';
+        const set2 =
+            c.setpoint2 != null && isFinite(c.setpoint2)
+                ? c.setpoint2
+                : '';
+
+        const glareActive =
+            c.glareControlIsActive === true ? 'Yes' : 'No';
+
+        const multiType =
+            c.multipleSurfaceControlType ||
+            (c.fenestrationSurfaceNames.length > 1 ? 'Group' : '');
+
+        idf.push(`WindowShadingControl,`);
+        idf.push(`  ${name},                  !- Name`);
+        idf.push(`  ${shadingType},           !- Shading Type`);
+        idf.push(`  ${controlType},           !- Shading Control Type`);
+        idf.push(`  ${sched},                 !- Schedule Name`);
+        idf.push(`  ${set1},                  !- Setpoint 1`);
+        idf.push(`  ${set2},                  !- Setpoint 2`);
+        idf.push(
+            `  ${sched ? 'Yes' : 'No'},      !- Shading Control Is Scheduled`
+        );
+        idf.push(
+            `  ${glareActive},              !- Glare Control Is Active`
+        );
+        idf.push(
+            `  ,                           !- Shading Device Material or Construction Name`
+        );
+        idf.push(
+            `  ,                           !- Type of Slat Angle Control for Blinds`
+        );
+        idf.push(
+            `  ,                           !- Slat Angle Schedule Name`
+        );
+        idf.push(`  ,                           !- Setpoint 3`);
+        idf.push(`  ,                           !- Setpoint 4`);
+        idf.push(
+            `  ${multiType},               !- Multiple Surface Control Type`
+        );
+
+        const names = c.fenestrationSurfaceNames.map((n) => sanitize(n));
+        names.forEach((fn, idx) => {
+            const suffix = idx === names.length - 1 ? ';' : ',';
+            idf.push(
+                `  ${fn}${suffix}               !- Fenestration Surface ${idx + 1} Name`
+            );
+        });
+
+        idf.push('');
+    });
+}
+
+/**
  * DAYLIGHTING & OUTPUTS
  */
-function emitDaylighting(idf, zones, daylighting = {}) {
+/**
+ * SIZING:ZONE
+ * Config: options.sizing.zones: [{ zoneName, ...Sizing:Zone fields... }]
+ * If no config, emit robust defaults per zone.
+ */
+function emitSizingZone(idf, zones, sizingCfg = {}) {
+    const znList = zones && zones.length ? zones : [{ name: 'Zone_1' }];
+    const cfgByZone = new Map();
+
+    if (Array.isArray(sizingCfg.zones)) {
+        sizingCfg.zones.forEach((z) => {
+            if (!z || !z.zoneName) return;
+            cfgByZone.set(sanitize(z.zoneName), z);
+        });
+    }
+
+    znList.forEach((z, idx) => {
+        const zn = sanitize(z.name || `Zone_${idx + 1}`);
+        const c = cfgByZone.get(zn) || {};
+
+        // Cooling supply air temperature / method
+        const coolTMethod =
+            c.zoneCoolingDesignSupplyAirTemperatureInputMethod ||
+            (c.zoneCoolingDesignSupplyAirTemperatureDifference != null
+                ? 'TemperatureDifference'
+                : 'SupplyAirTemperature');
+        const coolT =
+            c.zoneCoolingDesignSupplyAirTemperature != null
+                ? c.zoneCoolingDesignSupplyAirTemperature
+                : 14.0;
+        const coolDT =
+            c.zoneCoolingDesignSupplyAirTemperatureDifference != null
+                ? c.zoneCoolingDesignSupplyAirTemperatureDifference
+                : '';
+
+        // Heating supply air temperature / method
+        const heatTMethod =
+            c.zoneHeatingDesignSupplyAirTemperatureInputMethod ||
+            (c.zoneHeatingDesignSupplyAirTemperatureDifference != null
+                ? 'TemperatureDifference'
+                : 'SupplyAirTemperature');
+        const heatT =
+            c.zoneHeatingDesignSupplyAirTemperature != null
+                ? c.zoneHeatingDesignSupplyAirTemperature
+                : 40.0;
+        const heatDT =
+            c.zoneHeatingDesignSupplyAirTemperatureDifference != null
+                ? c.zoneHeatingDesignSupplyAirTemperatureDifference
+                : '';
+
+        const coolHum =
+            c.zoneCoolingDesignSupplyAirHumidityRatio != null
+                ? c.zoneCoolingDesignSupplyAirHumidityRatio
+                : 0.009;
+        const heatHum =
+            c.zoneHeatingDesignSupplyAirHumidityRatio != null
+                ? c.zoneHeatingDesignSupplyAirHumidityRatio
+                : 0.004;
+
+        const dsoaName = c.designSpecOutdoorAirName
+            ? sanitize(c.designSpecOutdoorAirName)
+            : '';
+
+        const heatSF =
+            c.zoneHeatingSizingFactor != null ? c.zoneHeatingSizingFactor : 1.0;
+        const coolSF =
+            c.zoneCoolingSizingFactor != null ? c.zoneCoolingSizingFactor : 1.0;
+
+        const clgFlowMethod =
+            c.coolingDesignAirFlowMethod || 'DesignDay';
+        const clgFlow =
+            c.coolingDesignAirFlowRate != null
+                ? c.coolingDesignAirFlowRate
+                : '';
+        const clgMinPerArea =
+            c.coolingMinimumAirFlowPerZoneFloorArea != null
+                ? c.coolingMinimumAirFlowPerZoneFloorArea
+                : '';
+        const clgMinFlow =
+            c.coolingMinimumAirFlow != null
+                ? c.coolingMinimumAirFlow
+                : '';
+        const clgMinFrac =
+            c.coolingMinimumAirFlowFraction != null
+                ? c.coolingMinimumAirFlowFraction
+                : '';
+
+        const htgFlowMethod =
+            c.heatingDesignAirFlowMethod || 'DesignDay';
+        const htgFlow =
+            c.heatingDesignAirFlowRate != null
+                ? c.heatingDesignAirFlowRate
+                : '';
+        const htgMaxPerArea =
+            c.heatingMaximumAirFlowPerZoneFloorArea != null
+                ? c.heatingMaximumAirFlowPerZoneFloorArea
+                : '';
+        const htgMaxFlow =
+            c.heatingMaximumAirFlow != null
+                ? c.heatingMaximumAirFlow
+                : '';
+        const htgMaxFrac =
+            c.heatingMaximumAirFlowFraction != null
+                ? c.heatingMaximumAirFlowFraction
+                : '';
+
+        const dzadName = c.designSpecificationZoneAirDistributionObjectName
+            ? sanitize(c.designSpecificationZoneAirDistributionObjectName)
+            : '';
+
+        const doasFlag =
+            c.accountForDedicatedOutdoorAirSystem === 'Yes' ? 'Yes' : 'No';
+        const doasCtrl =
+            c.dedicatedOutdoorAirSystemControlStrategy || '';
+        const doasLow =
+            c.dedicatedOutdoorAirLowTemperatureSetpointForDesign != null
+                ? c.dedicatedOutdoorAirLowTemperatureSetpointForDesign
+                : '';
+        const doasHigh =
+            c.dedicatedOutdoorAirHighTemperatureSetpointForDesign != null
+                ? c.dedicatedOutdoorAirHighTemperatureSetpointForDesign
+                : '';
+
+        const loadSizingMethod =
+            c.zoneLoadSizingMethod ||
+            'Sensible Load Only No Latent Load';
+
+        const latCoolHRMethod =
+            c.zoneLatentCoolingDesignSupplyAirHumidityRatioInputMethod || '';
+        const latCoolHR =
+            c.zoneDehumidificationDesignSupplyAirHumidityRatio != null
+                ? c.zoneDehumidificationDesignSupplyAirHumidityRatio
+                : '';
+        const latCoolHRDiff =
+            c.zoneCoolingDesignSupplyAirHumidityRatioDifference != null
+                ? c.zoneCoolingDesignSupplyAirHumidityRatioDifference
+                : '';
+
+        const latHeatHRMethod =
+            c.zoneLatentHeatingDesignSupplyAirHumidityRatioInputMethod || '';
+        const latHeatHR =
+            c.zoneHumidificationDesignSupplyAirHumidityRatio != null
+                ? c.zoneHumidificationDesignSupplyAirHumidityRatio
+                : '';
+        const latHeatHRDiff =
+            c.zoneHeatingDesignSupplyAirHumidityRatioDifference != null
+                ? c.zoneHeatingDesignSupplyAirHumidityRatioDifference
+                : '';
+
+        const dehumSP =
+            c.zoneHumidistatDehumidificationSetPointScheduleName || '';
+        const humSP =
+            c.zoneHumidistatHumidificationSetPointScheduleName || '';
+
+        const spaceSum =
+            c.typeOfSpaceSumToUse || 'Coincident';
+
+        idf.push(`Sizing:Zone,`);
+        idf.push(`  ${zn},                    !- Zone or ZoneList Name`);
+        idf.push(`  ${coolTMethod},           !- Zone Cooling Design Supply Air Temperature Input Method`);
+        idf.push(`  ${coolT},                 !- Zone Cooling Design Supply Air Temperature {C}`);
+        idf.push(`  ${coolDT},                !- Zone Cooling Design Supply Air Temperature Difference {deltaC}`);
+        idf.push(`  ${heatTMethod},           !- Zone Heating Design Supply Air Temperature Input Method`);
+        idf.push(`  ${heatT},                 !- Zone Heating Design Supply Air Temperature {C}`);
+        idf.push(`  ${heatDT},                !- Zone Heating Design Supply Air Temperature Difference {deltaC}`);
+        idf.push(`  ${coolHum},               !- Zone Cooling Design Supply Air Humidity Ratio {kgWater/kgDryAir}`);
+        idf.push(`  ${heatHum},               !- Zone Heating Design Supply Air Humidity Ratio {kgWater/kgDryAir}`);
+        idf.push(`  ${dsoaName},              !- Design Specification Outdoor Air Object Name`);
+        idf.push(`  ${heatSF},                !- Zone Heating Sizing Factor`);
+        idf.push(`  ${coolSF},                !- Zone Cooling Sizing Factor`);
+        idf.push(`  ${clgFlowMethod},         !- Cooling Design Air Flow Method`);
+        idf.push(`  ${clgFlow},               !- Cooling Design Air Flow Rate {m3/s}`);
+        idf.push(`  ${clgMinPerArea},         !- Cooling Minimum Air Flow per Zone Floor Area {m3/s-m2}`);
+        idf.push(`  ${clgMinFlow},            !- Cooling Minimum Air Flow {m3/s}`);
+        idf.push(`  ${clgMinFrac},            !- Cooling Minimum Air Flow Fraction`);
+        idf.push(`  ${htgFlowMethod},         !- Heating Design Air Flow Method`);
+        idf.push(`  ${htgFlow},               !- Heating Design Air Flow Rate {m3/s}`);
+        idf.push(`  ${htgMaxPerArea},         !- Heating Maximum Air Flow per Zone Floor Area {m3/s-m2}`);
+        idf.push(`  ${htgMaxFlow},            !- Heating Maximum Air Flow {m3/s}`);
+        idf.push(`  ${htgMaxFrac},            !- Heating Maximum Air Flow Fraction`);
+        idf.push(`  ${dzadName},              !- Design Specification Zone Air Distribution Object Name`);
+        idf.push(`  ${doasFlag},              !- Account for Dedicated Outdoor Air System`);
+        idf.push(`  ${doasCtrl},              !- Dedicated Outdoor Air System Control Strategy`);
+        idf.push(`  ${doasLow},               !- Dedicated Outdoor Air Low Setpoint for Design {C}`);
+        idf.push(`  ${doasHigh},              !- Dedicated Outdoor Air High Setpoint for Design {C}`);
+        idf.push(`  ${loadSizingMethod},      !- Zone Load Sizing Method`);
+        idf.push(`  ${latCoolHRMethod},       !- Zone Latent Cooling Design Supply Air Humidity Ratio Input Method`);
+        idf.push(`  ${latCoolHR},             !- Zone Dehumidification Design Supply Air Humidity Ratio {kgWater/kgDryAir}`);
+        idf.push(`  ${latCoolHRDiff},         !- Zone Cooling Design Supply Air Humidity Ratio Difference {kgWater/kgDryAir}`);
+        idf.push(`  ${latHeatHRMethod},       !- Zone Latent Heating Design Supply Air Humidity Ratio Input Method`);
+        idf.push(`  ${latHeatHR},             !- Zone Humidification Design Supply Air Humidity Ratio {kgWater/kgDryAir}`);
+        idf.push(`  ${latHeatHRDiff},         !- Zone Heating Design Supply Air Humidity Ratio Difference {kgWater/kgDryAir}`);
+        idf.push(`  ${dehumSP},               !- Zone Humidistat Dehumidification Set Point Schedule Name`);
+        idf.push(`  ${humSP},                 !- Zone Humidistat Humidification Set Point Schedule Name`);
+        idf.push(`  ${spaceSum};              !- Type of Space Sum to Use`);
+        idf.push('');
+    });
+}
+
+/**
+ * SIZING:SYSTEM
+ * Config: options.sizing.systems: [{ airLoopName, ...Sizing:System fields... }]
+ * Only emitted when provided; keeps minimal models clean.
+ */
+function emitSizingSystem(idf, sizingCfg = {}) {
+    const systems = Array.isArray(sizingCfg.systems)
+        ? sizingCfg.systems
+        : [];
+
+    systems.forEach((s) => {
+        if (!s || !s.airLoopName) return;
+        const name = sanitize(s.airLoopName);
+
+        const loadType = s.typeOfLoadToSizeOn || 'Sensible';
+        const doasOA = s.designOutdoorAirFlowRate != null
+            ? s.designOutdoorAirFlowRate
+            : 'autosize';
+
+        const heatFlowRatio =
+            s.centralHeatingMaximumSystemAirFlowRatio != null
+                ? s.centralHeatingMaximumSystemAirFlowRatio
+                : '';
+
+        const preheatT =
+            s.preheatDesignTemperature != null
+                ? s.preheatDesignTemperature
+                : 4.5;
+        const preheatW =
+            s.preheatDesignHumidityRatio != null
+                ? s.preheatDesignHumidityRatio
+                : 0.008;
+        const precoolT =
+            s.precoolDesignTemperature != null
+                ? s.precoolDesignTemperature
+                : 11.0;
+        const precoolW =
+            s.precoolDesignHumidityRatio != null
+                ? s.precoolDesignHumidityRatio
+                : 0.008;
+
+        const coolSAT =
+            s.centralCoolingDesignSupplyAirTemperature != null
+                ? s.centralCoolingDesignSupplyAirTemperature
+                : 12.8;
+        const heatSAT =
+            s.centralHeatingDesignSupplyAirTemperature != null
+                ? s.centralHeatingDesignSupplyAirTemperature
+                : 16.7;
+
+        const zoneSumType =
+            s.typeOfZoneSumToUse || s.sizingOption || 'noncoincident';
+
+        const oaClg100 = s.do100PercentOutdoorAirInCooling === 'Yes'
+            ? 'Yes'
+            : 'No';
+        const oaHtg100 = s.do100PercentOutdoorAirInHeating === 'Yes'
+            ? 'Yes'
+            : 'No';
+
+        const coolSATw =
+            s.centralCoolingDesignSupplyAirHumidityRatio != null
+                ? s.centralCoolingDesignSupplyAirHumidityRatio
+                : 0.008;
+        const heatSATw =
+            s.centralHeatingDesignSupplyAirHumidityRatio != null
+                ? s.centralHeatingDesignSupplyAirHumidityRatio
+                : 0.008;
+
+        const clgFlowMethod =
+            s.coolingSupplyAirFlowRateMethod || 'DesignDay';
+        const clgFlow =
+            s.coolingSupplyAirFlowRate != null
+                ? s.coolingSupplyAirFlowRate
+                : 0;
+        const clgPerArea =
+            s.coolingSupplyAirFlowRatePerFloorArea || '';
+        const clgFracAuto =
+            s.coolingFractionOfAutosizedCoolingDesignSupplyAirFlowRate || '';
+        const clgPerCap =
+            s.coolingSupplyAirFlowRatePerUnitCoolingCapacity || '';
+
+        const htgFlowMethod =
+            s.heatingSupplyAirFlowRateMethod || 'DesignDay';
+        const htgFlow =
+            s.heatingSupplyAirFlowRate != null
+                ? s.heatingSupplyAirFlowRate
+                : 0;
+        const htgPerArea =
+            s.heatingSupplyAirFlowRatePerFloorArea || '';
+        const htgFracHeat =
+            s.heatingFractionOfAutosizedHeatingDesignSupplyAirFlowRate || '';
+        const htgFracCool =
+            s.heatingFractionOfAutosizedCoolingDesignSupplyAirFlowRate || '';
+        const htgPerCap =
+            s.heatingSupplyAirFlowRatePerUnitHeatingCapacity || '';
+
+        const sysOAMethod =
+            s.systemOutdoorAirMethod || 'ZoneSum';
+        const zoneMaxOAFraction =
+            s.zoneMaximumOutdoorAirFraction != null
+                ? s.zoneMaximumOutdoorAirFraction
+                : 1.0;
+
+        const clgCapMethod =
+            s.coolingDesignCapacityMethod || 'CoolingDesignCapacity';
+        const clgCap = s.coolingDesignCapacity || 'autosize';
+        const clgCapPerArea =
+            s.coolingDesignCapacityPerFloorArea || '';
+        const clgCapFracAuto =
+            s.fractionOfAutosizedCoolingDesignCapacity || '';
+
+        const htgCapMethod =
+            s.heatingDesignCapacityMethod || 'HeatingDesignCapacity';
+        const htgCap = s.heatingDesignCapacity || 'autosize';
+        const htgCapPerArea =
+            s.heatingDesignCapacityPerFloorArea || '';
+        const htgCapFracAuto =
+            s.fractionOfAutosizedHeatingDesignCapacity || '';
+
+        const coolCtrl =
+            s.centralCoolingCapacityControlMethod || 'VAV';
+        const diversity =
+            s.occupantDiversity != null
+                ? s.occupantDiversity
+                : 'autosize';
+
+        idf.push(`Sizing:System,`);
+        idf.push(`  ${name},                  !- AirLoop Name`);
+        idf.push(`  ${loadType},              !- Type of Load to Size On`);
+        idf.push(`  ${doasOA},                !- Design Outdoor Air Flow Rate {m3/s}`);
+        idf.push(`  ${heatFlowRatio},         !- Central Heating Maximum System Air Flow Ratio`);
+        idf.push(`  ${preheatT},              !- Preheat Design Temperature {C}`);
+        idf.push(`  ${preheatW},              !- Preheat Design Humidity Ratio {kgWater/kgDryAir}`);
+        idf.push(`  ${precoolT},              !- Precool Design Temperature {C}`);
+        idf.push(`  ${precoolW},              !- Precool Design Humidity Ratio {kgWater/kgDryAir}`);
+        idf.push(`  ${coolSAT},               !- Central Cooling Design Supply Air Temperature {C}`);
+        idf.push(`  ${heatSAT},               !- Central Heating Design Supply Air Temperature {C}`);
+        idf.push(`  ${zoneSumType},           !- Type of Zone Sum to Use`);
+        idf.push(`  ${oaClg100},              !- 100% Outdoor Air in Cooling`);
+        idf.push(`  ${oaHtg100},              !- 100% Outdoor Air in Heating`);
+        idf.push(`  ${coolSATw},              !- Central Cooling Design Supply Air Humidity Ratio {kgWater/kgDryAir}`);
+        idf.push(`  ${heatSATw},              !- Central Heating Design Supply Air Humidity Ratio {kgWater/kgDryAir}`);
+        idf.push(`  ${clgFlowMethod},         !- Cooling Supply Air Flow Rate Method`);
+        idf.push(`  ${clgFlow},               !- Cooling Supply Air Flow Rate {m3/s}`);
+        idf.push(`  ${clgPerArea},            !- Cooling Supply Air Flow Rate Per Floor Area {m3/s-m2}`);
+        idf.push(`  ${clgFracAuto},           !- Cooling Fraction of Autosized Cooling Supply Air Flow Rate`);
+        idf.push(`  ${clgPerCap},             !- Cooling Supply Air Flow Rate Per Unit Cooling Capacity {m3/s-W}`);
+        idf.push(`  ${htgFlowMethod},         !- Heating Supply Air Flow Rate Method`);
+        idf.push(`  ${htgFlow},               !- Heating Supply Air Flow Rate {m3/s}`);
+        idf.push(`  ${htgPerArea},            !- Heating Supply Air Flow Rate Per Floor Area {m3/s-m2}`);
+        idf.push(`  ${htgFracHeat},           !- Heating Fraction of Autosized Heating Supply Air Flow Rate`);
+        idf.push(`  ${htgFracCool},           !- Heating Fraction of Autosized Cooling Supply Air Flow Rate`);
+        idf.push(`  ${htgPerCap},             !- Heating Supply Air Flow Rate Per Unit Heating Capacity {m3/s-W}`);
+        idf.push(`  ${sysOAMethod},           !- System Outdoor Air Method`);
+        idf.push(`  ${zoneMaxOAFraction},     !- Zone Maximum Outdoor Air Fraction`);
+        idf.push(`  ${clgCapMethod},          !- Cooling Design Capacity Method`);
+        idf.push(`  ${clgCap},                !- Cooling Design Capacity {W}`);
+        idf.push(`  ${clgCapPerArea},         !- Cooling Design Capacity Per Floor Area {W/m2}`);
+        idf.push(`  ${clgCapFracAuto},        !- Fraction of Autosized Cooling Design Capacity`);
+        idf.push(`  ${htgCapMethod},          !- Heating Design Capacity Method`);
+        idf.push(`  ${htgCap},                !- Heating Design Capacity {W}`);
+        idf.push(`  ${htgCapPerArea},         !- Heating Design Capacity Per Floor Area {W/m2}`);
+        idf.push(`  ${htgCapFracAuto},        !- Fraction of Autosized Heating Design Capacity`);
+        idf.push(`  ${coolCtrl},              !- Central Cooling Capacity Control Method`);
+        idf.push(`  ${diversity};             !- Occupant Diversity`);
+        idf.push('');
+    });
+}
+
+/**
+ * SIZING:PLANT
+ * Config: options.sizing.plants: [{ plantLoopName, designLoopExitTemperature, loopDesignTemperatureDifference }]
+ * Minimal support; only emitted when configured.
+ */
+function emitSizingPlant(idf, sizingCfg = {}) {
+    const plants = Array.isArray(sizingCfg.plants)
+        ? sizingCfg.plants
+        : [];
+
+    plants.forEach((p) => {
+        if (!p || !p.plantLoopName) return;
+        const name = sanitize(p.plantLoopName);
+        const loopType = p.loopType || ''; // optional / informational
+        const exitT =
+            p.designLoopExitTemperature != null
+                ? p.designLoopExitTemperature
+                : '';
+        const dT =
+            p.loopDesignTemperatureDifference != null
+                ? p.loopDesignTemperatureDifference
+                : '';
+
+        idf.push(`Sizing:Plant,`);
+        idf.push(`  ${name},                  !- Plant or Condenser Loop Name`);
+        idf.push(`  ${loopType},              !- Loop Type`);
+        idf.push(`  ${exitT},                 !- Design Loop Exit Temperature {C}`);
+        idf.push(`  ${dT};                    !- Loop Design Temperature Difference {deltaC}`);
+        idf.push('');
+    });
+}
+
+function emitDaylighting(idf, zones, daylighting = {}, scheduleContext = {}) {
     if (!daylighting) return;
 
     const znIndex = new Map();
@@ -1618,11 +3004,138 @@ function emitDaylighting(idf, zones, daylighting = {}) {
         znIndex.set(name, name);
     });
 
-    // Daylighting:Controls
-    const controls = Array.isArray(daylighting.controls)
+    const compact = scheduleContext.compact || {};
+    const scheduleExists = (name) => {
+        if (!name) return false;
+        return !!compact[sanitize(name)];
+    };
+
+    emitDaylightingControlsAndRefPoints(idf, znIndex, daylighting, scheduleExists);
+    emitIlluminanceMaps(idf, znIndex, daylighting);
+    emitDaylightingOutputVariables(idf, daylighting);
+    // emitDaylightingDevices can be added later in a backward-compatible way.
+}
+
+/**
+ * Advanced Daylighting Controls + Reference Points
+ * Primary schema: daylighting.zones[]
+ * Backward compatible with legacy daylighting.controls format.
+ */
+function emitDaylightingControlsAndRefPoints(idf, znIndex, daylighting, scheduleExists) {
+    const zonesCfg = Array.isArray(daylighting.zones) ? daylighting.zones : [];
+
+    if (zonesCfg.length) {
+        zonesCfg.forEach((cfg) => {
+            if (!cfg || !cfg.zoneName) return;
+            const zn = sanitize(cfg.zoneName);
+            if (!znIndex.has(zn)) return;
+
+            const enabled = cfg.enabled !== false;
+            const refs = Array.isArray(cfg.referencePoints)
+                ? cfg.referencePoints.filter((rp) =>
+                    rp &&
+                    Number.isFinite(rp.x) &&
+                    Number.isFinite(rp.y) &&
+                    Number.isFinite(rp.z) &&
+                    Number.isFinite(rp.setpoint)
+                )
+                : [];
+
+            if (!enabled || !refs.length) return;
+
+            const rpList = refs.slice(0, 2);
+            const ctrlName = sanitize(cfg.controlName || `DL_${zn}`);
+            const controlType =
+                cfg.controlType === 'Stepped'
+                    ? 'Stepped'
+                    : cfg.controlType === 'ContinuousOff'
+                    ? 'ContinuousOff'
+                    : 'Continuous';
+
+            let avail = cfg.availabilityScheduleName || '';
+            if (avail && scheduleExists(avail)) {
+                avail = sanitize(avail);
+            } else if (avail && !scheduleExists(avail)) {
+                // Keep as-is; E+ will warn if invalid
+            } else {
+                avail = '';
+            }
+
+            const minIn = cfg.minInputPowerFraction != null ? cfg.minInputPowerFraction : 0.2;
+            const minOut = cfg.minLightOutputFraction != null ? cfg.minLightOutputFraction : 0.2;
+
+            let frac1 = 1.0;
+            let frac2 = 0.0;
+            if (Array.isArray(cfg.fractions)) {
+                if (cfg.fractions.length >= 1 && typeof cfg.fractions[0] === 'number') {
+                    frac1 = cfg.fractions[0];
+                }
+                if (cfg.fractions.length >= 2 && typeof cfg.fractions[1] === 'number') {
+                    frac2 = cfg.fractions[1];
+                }
+            } else if (typeof cfg.fractions === 'number') {
+                frac1 = cfg.fractions;
+            } else if (rpList.length === 2) {
+                frac1 = 0.5;
+                frac2 = 0.5;
+            }
+
+            // Emit Daylighting:ReferencePoint(s)
+            const rpNames = [];
+            rpList.forEach((rp, i) => {
+                const rpName = sanitize(
+                    rp.name || `RP_${zn}_${i + 1}`
+                );
+                rpNames.push({ name: rpName, setpoint: rp.setpoint });
+                idf.push(`Daylighting:ReferencePoint,`);
+                idf.push(`  ${rpName},              !- Name`);
+                idf.push(`  ${zn},                  !- Zone Name`);
+                idf.push(`  ${rp.x},                !- X-Coordinate of Reference Point {m}`);
+                idf.push(`  ${rp.y},                !- Y-Coordinate of Reference Point {m}`);
+                idf.push(`  ${rp.z};                !- Z-Coordinate of Reference Point {m}`);
+                idf.push('');
+            });
+
+            // Emit Daylighting:Controls
+            idf.push(`Daylighting:Controls,`);
+            idf.push(`  ${ctrlName},             !- Name`);
+            idf.push(`  ${zn},                  !- Zone Name`);
+            idf.push(`  ${controlType},          !- Daylighting System Control Type`);
+            idf.push(`  ${avail},               !- Availability Schedule Name`);
+            idf.push(`  0.0,                    !- Minimum Input Power Fraction for Continuous Dimming Control`);
+            idf.push(`  0.0,                    !- Minimum Light Output Fraction for Continuous Dimming Control`);
+            idf.push(`  ${minIn},               !- Minimum Input Power Fraction for Continuous OFF Control`);
+            idf.push(`  ${minOut},              !- Minimum Light Output Fraction for Continuous OFF Control`);
+            idf.push(`  ${rpNames.length},      !- Number of Daylighting Reference Points`);
+
+            if (rpNames.length >= 1) {
+                idf.push(`  ${rpNames[0].name},    !- Daylighting Reference Point 1 Name`);
+                idf.push(`  ${rpNames[0].setpoint},!- Fraction of Zone Lights Controlled by Reference Point 1`);
+                idf.push(`  ${frac1},              !- Illuminance Setpoint at Reference Point 1 {lux}`);
+            }
+
+            if (rpNames.length >= 2) {
+                idf.push(`  ${rpNames[1].name},    !- Daylighting Reference Point 2 Name`);
+                idf.push(`  ${rpNames[1].setpoint},!- Fraction of Zone Lights Controlled by Reference Point 2`);
+                idf.push(`  ${frac2};              !- Illuminance Setpoint at Reference Point 2 {lux}`);
+            } else {
+                idf.push(`  ,                      !- Daylighting Reference Point 2 Name`);
+                idf.push(`  ,                      !- Fraction of Zone Lights Controlled by Reference Point 2`);
+                idf.push(`  ;                      !- Illuminance Setpoint at Reference Point 2 {lux}`);
+            }
+
+            idf.push('');
+        });
+
+        return;
+    }
+
+    // Backward-compatible path: legacy daylighting.controls
+    const legacyControls = Array.isArray(daylighting.controls)
         ? daylighting.controls
         : [];
-    controls.forEach((c, idx) => {
+
+    legacyControls.forEach((c, idx) => {
         if (!c || !c.zoneName) return;
         if (c.enabled === false) return;
 
@@ -1630,7 +3143,12 @@ function emitDaylighting(idf, zones, daylighting = {}) {
         if (!znIndex.has(zn)) return;
 
         const refPoints = Array.isArray(c.refPoints)
-            ? c.refPoints.slice(0, 2)
+            ? c.refPoints.filter((rp) =>
+                rp &&
+                Number.isFinite(rp.x) &&
+                Number.isFinite(rp.y) &&
+                Number.isFinite(rp.z)
+            ).slice(0, 2)
             : [];
         if (!refPoints.length || !Number.isFinite(c.setpoint)) return;
 
@@ -1649,44 +3167,91 @@ function emitDaylighting(idf, zones, daylighting = {}) {
         const rp1 = refPoints[0];
         const rp2 = refPoints[1];
 
+        const ctrlName = `DL_${zn}_${idx + 1}`;
+        const rp1Name = `RP_${zn}_${idx + 1}_1`;
+        const rp2Name = rp2 ? `RP_${zn}_${idx + 1}_2` : null;
+
+        // Reference Point 1
+        idf.push(`Daylighting:ReferencePoint,`);
+        idf.push(`  ${rp1Name},               !- Name`);
+        idf.push(`  ${zn},                    !- Zone Name`);
+        idf.push(`  ${rp1.x},                 !- X-Coordinate {m}`);
+        idf.push(`  ${rp1.y},                 !- Y-Coordinate {m}`);
+        idf.push(`  ${rp1.z};                 !- Z-Coordinate {m}`);
+        idf.push('');
+
+        // Reference Point 2 (optional)
+        if (rp2) {
+            idf.push(`Daylighting:ReferencePoint,`);
+            idf.push(`  ${rp2Name},             !- Name`);
+            idf.push(`  ${zn},                  !- Zone Name`);
+            idf.push(`  ${rp2.x},               !- X-Coordinate {m}`);
+            idf.push(`  ${rp2.y},               !- Y-Coordinate {m}`);
+            idf.push(`  ${rp2.z};               !- Z-Coordinate {m}`);
+            idf.push('');
+        }
+
+        // Controls
         idf.push(`Daylighting:Controls,`);
-        idf.push(`  DL_${zn}_${idx + 1},       !- Name`);
+        idf.push(`  ${ctrlName},              !- Name`);
         idf.push(`  ${zn},                    !- Zone Name`);
         idf.push(`  ${ctrlType},              !- Daylighting System Control Type`);
         idf.push(`  ,                         !- Availability Schedule Name`);
-        idf.push(`  ${frac},                  !- Lighting Control Throttling Range`);
-        idf.push(`  ${frac},                  !- Lighting Control Type Fraction`);
         idf.push(`  0.2,                      !- Minimum Input Power Fraction for Continuous Dimming Control`);
         idf.push(`  0.2,                      !- Minimum Light Output Fraction for Continuous Dimming Control`);
-        idf.push(`  1,                        !- Number of Daylighting Reference Points`);
-        idf.push(`  ${rp1.x},                 !- X-Coordinate of First Reference Point {m}`);
-        idf.push(`  ${rp1.y},                 !- Y-Coordinate of First Reference Point {m}`);
-        idf.push(`  ${rp1.z},                 !- Z-Coordinate of First Reference Point {m}`);
-        idf.push(`  ${c.setpoint},            !- Illuminance Setpoint at First Reference Point {lux}`);
+        idf.push(`  0.2,                      !- Minimum Input Power Fraction for Continuous OFF Control`);
+        idf.push(`  0.2,                      !- Minimum Light Output Fraction for Continuous OFF Control`);
+        idf.push(`  ${rp2 ? 2 : 1},           !- Number of Daylighting Reference Points`);
+        idf.push(`  ${rp1Name},               !- Daylighting Reference Point 1 Name`);
+        idf.push(`  ${frac},                  !- Fraction of Zone Lights Controlled by Reference Point 1`);
+        idf.push(`  ${c.setpoint},            !- Illuminance Setpoint at Reference Point 1 {lux}`);
 
         if (rp2) {
-            idf.push(`  2,                      !- Number of Daylighting Reference Points`);
-            idf.push(`  ${rp2.x},               !- X-Coordinate of Second Reference Point {m}`);
-            idf.push(`  ${rp2.y},               !- Y-Coordinate of Second Reference Point {m}`);
-            idf.push(`  ${rp2.z},               !- Z-Coordinate of Second Reference Point {m}`);
-            idf.push(`  ${c.setpoint};          !- Illuminance Setpoint at Second Reference Point {lux}`);
+            idf.push(`  ${rp2Name},             !- Daylighting Reference Point 2 Name`);
+            idf.push(`  ${1 - frac},            !- Fraction of Zone Lights Controlled by Reference Point 2`);
+            idf.push(`  ${c.setpoint};          !- Illuminance Setpoint at Reference Point 2 {lux}`);
         } else {
-            idf.push(`  ;                       !- (no second reference point)`);
+            idf.push(`  ,                       !- Daylighting Reference Point 2 Name`);
+            idf.push(`  ,                       !- Fraction of Zone Lights Controlled by Reference Point 2`);
+            idf.push(`  ;                       !- Illuminance Setpoint at Reference Point 2 {lux}`);
         }
 
         idf.push('');
     });
+}
 
-    // Output:IlluminanceMap
+/**
+ * Illuminance maps from daylighting.outputs and daylighting.zones[*].illuminanceMaps
+ */
+function emitIlluminanceMaps(idf, znIndex, daylighting) {
     const outputs = daylighting.outputs || {};
-    const maps = Array.isArray(outputs.illuminanceMaps)
+    const globalMaps = Array.isArray(outputs.illuminanceMaps)
         ? outputs.illuminanceMaps
         : [];
-    maps.forEach((m) => {
+
+    const zoneMaps = [];
+    if (Array.isArray(daylighting.zones)) {
+        daylighting.zones.forEach((z) => {
+            if (!z || !z.zoneName || !Array.isArray(z.illuminanceMaps)) return;
+            const zn = sanitize(z.zoneName);
+            if (!znIndex.has(zn)) return;
+            z.illuminanceMaps.forEach((m) => {
+                if (!m) return;
+                zoneMaps.push({ ...m, zoneName: zn });
+            });
+        });
+    }
+
+    const allMaps = [
+        ...globalMaps,
+        ...zoneMaps,
+    ];
+
+    allMaps.forEach((m) => {
         if (
             !m ||
-            !m.name ||
             !m.zoneName ||
+            !znIndex.has(sanitize(m.zoneName)) ||
             !Number.isFinite(m.xOrigin) ||
             !Number.isFinite(m.yOrigin) ||
             !Number.isFinite(m.zHeight) ||
@@ -1699,10 +3264,10 @@ function emitDaylighting(idf, zones, daylighting = {}) {
         }
 
         const zn = sanitize(m.zoneName);
-        if (!znIndex.has(zn)) return;
+        const name = sanitize(m.name || `IllMap_${zn}`);
 
         idf.push(`Output:IlluminanceMap,`);
-        idf.push(`  ${sanitize(m.name)},       !- Name`);
+        idf.push(`  ${name},                  !- Name`);
         idf.push(`  ${zn},                    !- Zone Name`);
         idf.push(`  ${m.xOrigin},             !- X-Origin {m}`);
         idf.push(`  ${m.yOrigin},             !- Y-Origin {m}`);
@@ -1713,11 +3278,15 @@ function emitDaylighting(idf, zones, daylighting = {}) {
         idf.push(`  ${m.ySpacing};            !- Y-Direction Grid Spacing {m}`);
         idf.push('');
     });
+}
 
-    // Output:Variable
-    const vars = Array.isArray(outputs.variables)
-        ? outputs.variables
-        : [];
+/**
+ * Output:Variable for daylighting
+ */
+function emitDaylightingOutputVariables(idf, daylighting) {
+    const outputs = daylighting.outputs || {};
+    const vars = Array.isArray(outputs.variables) ? outputs.variables : [];
+
     vars.forEach((v) => {
         if (!v || !v.key || !v.variableName) return;
         const freq = v.reportingFrequency || 'Hourly';

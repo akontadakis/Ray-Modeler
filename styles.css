@@ -238,6 +238,63 @@ canvas {
   cursor: pointer;
 }
 
+/* Button size variants (for compact EnergyPlus actions etc.) */
+.btn-sm {
+  padding: 0.45rem 0.8rem;
+  font-size: 0.85rem;
+}
+
+.btn-xs {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+}
+
+.btn-xxs {
+  padding: 0.2rem 0.45rem;
+  font-size: 0.7rem;
+}
+
+/* Sub-panels / nested sections inside panels */
+.panel-subtle {
+  background-color: rgba(0, 0, 0, 0.02);
+  border-radius: 0.5rem;
+  border: 1px solid var(--grid-color);
+  padding: 0.5rem 0.75rem;
+}
+
+/* Dense tables for configuration panels */
+.table-dense {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.table-dense th,
+.table-dense td {
+  padding: 0.25rem 0.35rem;
+  border-bottom: 1px solid var(--grid-color);
+  text-align: left;
+}
+
+.table-dense thead tr {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Status indicators (used in checklists/diagnostics) */
+:root {
+  --status-ok: #22c55e;
+  --status-warn: #facc15;
+  --status-error: #f97316;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
 .btn-primary {
   background-color: var(--bg-selection);
   color: var(--text-on-selection);

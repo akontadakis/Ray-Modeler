@@ -101,6 +101,21 @@ app.whenReady().then(() => {
    *
    * Multiple runs may be in-flight; all events are tagged by runId.
    */
+  // Resolve a path coming from the renderer:
+  // - If absolute, use as-is.
+  // - If relative, interpret as relative to the current working directory
+  //   (which is treated as the project root for EnergyPlus runs).
+  function resolveProjectPath(inputPath) {
+    if (typeof inputPath !== 'string' || !inputPath.trim()) {
+      return null;
+    }
+    const trimmed = inputPath.trim();
+    if (path.isAbsolute(trimmed)) {
+      return trimmed;
+    }
+    return path.join(process.cwd(), trimmed);
+  }
+
   ipcMain.on('run-energyplus', (_event, options = {}) => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
 
@@ -125,8 +140,26 @@ app.whenReady().then(() => {
         return;
       }
 
-      const cwd = process.cwd();
-      const runsDir = path.join(cwd, 'runs');
+      // Canonical resolution:
+      // - idfPath and epwPath:
+      //     absolute => used directly
+      //     relative => resolved against project root (process.cwd()).
+      const resolvedIdf = resolveProjectPath(idfPath);
+      const resolvedEpw = resolveProjectPath(epwPath);
+      const resolvedExe = energyPlusPath.trim();
+
+      if (!resolvedIdf || !resolvedEpw || !resolvedExe) {
+        mainWindow.webContents.send('energyplus-exit', {
+          runId,
+          exitCode: 1,
+          errContent:
+            'EnergyPlus run aborted: failed to resolve idfPath, epwPath, or energyPlusPath.',
+        });
+        return;
+      }
+
+      const projectRoot = process.cwd();
+      const runsDir = path.join(projectRoot, 'runs');
       if (!fs.existsSync(runsDir)) {
         fs.mkdirSync(runsDir, { recursive: true });
       }
@@ -135,10 +168,14 @@ app.whenReady().then(() => {
         fs.mkdirSync(outputDir, { recursive: true });
       }
 
-      const args = ['-w', epwPath, '-d', outputDir, '-r', idfPath];
+      // Standardized invocation:
+      //  -w <epw>     weather file
+      //  -d <dir>     output directory (runs/{runName})
+      //  idf          input IDF (model.idf or user-selected)
+      const args = ['-w', resolvedEpw, '-d', outputDir, resolvedIdf];
 
-      const child = spawn(energyPlusPath, args, {
-        cwd,
+      const child = spawn(resolvedExe, args, {
+        cwd: projectRoot,
         shell: false,
       });
 

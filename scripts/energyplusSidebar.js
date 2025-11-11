@@ -57,48 +57,50 @@ function initializeEnergyPlusSidebar() {
         panel.appendChild(content);
     }
 
-    // Unified layout for the EnergyPlus sidebar
+    // Unified layout for the EnergyPlus sidebar (match global app style)
     content.innerHTML = `
-        <div class="space-y-4 p-1">
-            <div class="border border-gray-800/80 rounded bg-black/40 p-3 space-y-4">
-                
-                <!-- 1. Simulation Checklist -->
-                <div>
-                    <div class="flex items-center justify-between mb-2">
-                        <h3 class="font-semibold text-sm uppercase">Simulation Checklist</h3>
-                        <button class="btn btn-xxs btn-secondary" data-action="refresh-simulation-checklist">Refresh</button>
-                    </div>
-                    <div data-role="simulation-checklist-body" class="space-y-1">
-                        <div class="text-xs text-[--text-secondary]">Evaluating project...</div>
-                    </div>
+        <div class="window-content-inner">
+            <!-- Simulation Checklist -->
+            <section class="param-section">
+                <div class="label">Simulation Checklist</div>
+                <div class="panel-subtle" data-role="simulation-checklist-body">
+                    <div class="data-value">Evaluating project...</div>
                 </div>
-
-                <!-- 2. Simulation Recipes -->
-                <div>
-                    <h3 class="font-semibold text-sm uppercase mb-2">Run Simulation</h3>
-                    <div class="recipe-list space-y-2"></div>
+                <div style="margin-top: 0.35rem; display: flex; justify-content: flex-end;">
+                    <button class="btn btn-xxs btn-secondary" data-action="refresh-simulation-checklist">
+                        Refresh
+                    </button>
                 </div>
+            </section>
 
-                <!-- 3. Configuration -->
-                <div>
-                    <h3 class="font-semibold text-sm uppercase mb-2">Configuration</h3>
-                    <div class="grid grid-cols-2 gap-2">
-                        <button class="btn btn-sm btn-secondary w-full" data-action="open-materials-manager">Materials</button>
-                        <button class="btn btn-sm btn-secondary w-full" data-action="open-constructions-manager">Constructions</button>
-                        <button class="btn btn-sm btn-secondary w-full" data-action="open-schedules-manager">Schedules</button>
-                        <button class="btn btn-sm btn-secondary w-full" data-action="open-zone-loads-manager">Zone Loads</button>
-                        <button class="btn btn-sm btn-secondary w-full" data-action="open-ideal-loads-manager">Thermostats</button>
-                        <button class="btn btn-sm btn-secondary w-full" data-action="open-weather-location-manager">Weather</button>
-                        <button class="btn btn-sm btn-secondary w-full" data-action="open-daylighting-manager">Daylighting</button>
-                        <button class="btn btn-sm btn-secondary w-full" data-action="open-outputs-manager">Outputs</button>
-                        <button class="btn btn-sm btn-secondary w-full col-span-2" data-action="open-simulation-control-manager">Simulation Control</button>
-                    </div>
+            <!-- Simulation Recipes -->
+            <section class="param-section">
+                <div class="label">Run Simulation</div>
+                <div class="recipe-list"></div>
+            </section>
+
+            <!-- Configuration Shortcuts -->
+            <section class="param-section">
+                <div class="label">Configuration</div>
+                <div class="param-grid-sim">
+                    <button class="btn btn-sm btn-secondary" data-action="open-materials-manager">Materials</button>
+                    <button class="btn btn-sm btn-secondary" data-action="open-constructions-manager">Constructions</button>
+                    <button class="btn btn-sm btn-secondary" data-action="open-schedules-manager">Schedules</button>
+                    <button class="btn btn-sm btn-secondary" data-action="open-zone-loads-manager">Zone Loads</button>
+                    <button class="btn btn-sm btn-secondary" data-action="open-ideal-loads-manager">Thermostats</button>
+                    <button class="btn btn-sm btn-secondary" data-action="open-weather-location-manager">Weather</button>
+                    <button class="btn btn-sm btn-secondary" data-action="open-daylighting-manager">Daylighting</button>
+                    <button class="btn btn-sm btn-secondary" data-action="open-outputs-manager">Outputs</button>
+                    <button class="btn btn-sm btn-secondary" data-action="open-hvac-sizing-manager">HVAC Sizing</button>
+                    <button class="btn btn-sm btn-secondary" data-action="open-outdoor-air-manager">Outdoor Air & Ventilation</button>
+                    <button class="btn btn-sm btn-secondary" data-action="open-shading-manager">Shading & Solar Control</button>
+                    <button class="btn btn-sm btn-secondary" data-action="open-simulation-control-manager">Simulation Control</button>
                 </div>
-            </div>
+            </section>
 
-            <p class="text-xs text-[--text-secondary] px-1">
-                <strong>HVAC scope:</strong> Ray-Modeler generates models using <code>ZoneHVAC:IdealLoadsAirSystem</code>.
-                Detailed Air/PlantLoop systems are not generated.
+            <p class="info-box" style="margin-top: 0.75rem; font-size: 0.75rem;">
+                <strong>HVAC scope:</strong> Ray-Modeler generates models using
+                <code>ZoneHVAC:IdealLoadsAirSystem</code>. Detailed Air/PlantLoop systems are not generated.
             </p>
         </div>
     `;
@@ -133,7 +135,10 @@ function initializeEnergyPlusSidebar() {
             'open-ideal-loads-manager': openIdealLoadsManagerPanel,
             'open-daylighting-manager': openDaylightingManagerPanel,
             'open-outputs-manager': openOutputsManagerPanel,
+            'open-hvac-sizing-manager': openHvacSizingManagerPanel,
+            'open-outdoor-air-manager': openOutdoorAirManagerPanel,
             'open-weather-location-manager': openWeatherLocationManagerPanel,
+            'open-shading-manager': openShadingManagerPanel,
             'open-simulation-control-manager': openSimulationControlManagerPanel,
         };
 
@@ -519,10 +524,10 @@ function renderSimulationChecklist(container) {
             }
 
             const icon = (status) => {
-                const baseClasses = "inline-block w-2.5 h-2.5 rounded-full mr-2 flex-shrink-0";
-                if (status === 'ok') return `<span class="${baseClasses} bg-emerald-500"></span>`;
-                if (status === 'warning') return `<span class="${baseClasses} bg-yellow-400"></span>`;
-                return `<span class="${baseClasses} bg-red-500"></span>`;
+                const base = 'status-dot';
+                if (status === 'ok') return `<span class="${base}" style="background-color: var(--status-ok); margin-right: 6px;"></span>`;
+                if (status === 'warning') return `<span class="${base}" style="background-color: var(--status-warn); margin-right: 6px;"></span>`;
+                return `<span class="${base}" style="background-color: var(--status-error); margin-right: 6px;"></span>`;
             };
 
             const html = items
@@ -537,15 +542,19 @@ function renderSimulationChecklist(container) {
                                   .join('')
                             : '';
                     return `
-                        <div class="flex flex-col py-1.5 border-b border-gray-700/50 last:border-b-0">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center min-w-0">
+                        <div style="padding: 0.25rem 0; border-bottom: 1px solid var(--grid-color);">
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:0.25rem;">
+                                <div style="display:flex; align-items:center; min-width:0;">
                                     ${icon(item.status)}
-                                    <span class="font-semibold text-xs truncate">${item.label}</span>
+                                    <span class="data-value" style="font-size:0.78rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                        ${item.label}
+                                    </span>
                                 </div>
-                                <div class="flex items-center flex-shrink-0 ml-2">${actions}</div>
+                                <div style="display:flex; align-items:center; gap:0.25rem;">
+                                    ${actions}
+                                </div>
                             </div>
-                            <div class="text-xs text-[--text-secondary] pl-[18px] pt-0.5">
+                            <div style="margin-left:18px; margin-top:2px; font-size:0.7rem; color:var(--text-secondary);">
                                 ${item.description || ''}
                             </div>
                         </div>
@@ -573,10 +582,18 @@ function populateRecipeList() {
     for (const name in recipes) {
         const recipe = recipes[name];
         const button = document.createElement('button');
-        button.className = 'btn btn-sm btn-secondary w-full text-left p-2';
+        button.className = 'btn btn-sm btn-secondary';
+        button.style.width = '100%';
+        button.style.justifyContent = 'flex-start';
+        button.style.flexDirection = 'column';
+        button.style.alignItems = 'flex-start';
+        button.style.gap = '2px';
+        button.style.padding = '0.4rem 0.6rem';
         button.innerHTML = `
-            <div class="font-semibold">${name}</div>
-            <div class="text-[11px] font-normal normal-case text-[--text-secondary] whitespace-normal">${recipe.description}</div>
+            <div class="data-value" style="font-size:0.8rem; font-weight:600;">${name}</div>
+            <div style="font-size:0.7rem; font-weight:400; color:var(--text-secondary); white-space:normal;">
+                ${recipe.description}
+            </div>
         `;
         button.onclick = () => {
             if (recipe.isDiagnostics) {
@@ -626,7 +643,7 @@ function createDiagnosticsPanel() {
                 <div class="window-icon-close" title="Close"></div>
             </div>
         </div>
-        <div class="window-content space-y-3 text-[9px]">
+        <div class="window-content">
             <div class="resize-handle-edge top"></div>
             <div class="resize-handle-edge right"></div>
             <div class="resize-handle-edge bottom"></div>
@@ -636,28 +653,25 @@ function createDiagnosticsPanel() {
             <div class="resize-handle-corner bottom-left"></div>
             <div class="resize-handle-corner bottom-right"></div>
 
-            <p class="info-box !text-[9px] !py-1.5 !px-2">
+            <p class="info-box">
                 Preview how the current Ray-Modeler project and EnergyPlus configuration map into EnergyPlus objects.
                 This diagnostics view does not modify your project or write files.
             </p>
 
-            <div class="flex justify-between items-center gap-2">
-                <span class="font-semibold text-[9px] uppercase text-[--text-secondary]">
-                    Summary
-                </span>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem;">
+                <span class="label" style="margin-bottom:0;">Summary</span>
                 <button class="btn btn-xxs btn-secondary" data-action="refresh-diagnostics">
                     Refresh
                 </button>
             </div>
 
-            <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1 max-h-72 overflow-y-auto **scrollable-panel-inner**"
-                 data-role="diagnostics-body">
-                <div class="text-[8px] text-[--text-secondary]">
+            <div class="panel-subtle scrollable-panel-inner" style="max-height:18rem;" data-role="diagnostics-body">
+                <div style="font-size:0.7rem; color:var(--text-secondary);">
                     Diagnostics will appear here.
                 </div>
             </div>
 
-            <div class="text-[8px] text-[--text-secondary]">
+            <div style="font-size:0.7rem; color:var(--text-secondary);">
                 Use this panel to:
                 <ul class="list-disc pl-4 space-y-0.5">
                     <li>Verify that zones are detected.</li>
@@ -706,7 +720,7 @@ async function refreshDiagnosticsPanel(panel) {
     } catch (err) {
         console.error('EnergyPlus Diagnostics: failed to load diagnostics', err);
         body.innerHTML = `
-            <div class="text-[8px] text-red-400">
+            <div style="font-size:0.7rem; color:var(--status-error);">
                 Failed to compute diagnostics. Check console for details.
             </div>
         `;
@@ -760,20 +774,96 @@ function renderDiagnostics(container, diagnostics) {
     const missingScheds = schedulesAndLoads?.missingSchedules || [];
     const inconsistentLoads = schedulesAndLoads?.inconsistentLoads || [];
 
-    const issuesHtml =
-        issues && issues.length
-            ? issues
-                  .map((i) => {
-                      const color =
-                          i.severity === 'error'
-                              ? 'text-red-400'
-                              : i.severity === 'warning'
-                              ? 'text-yellow-300'
-                              : 'text-[--text-secondary]';
-                      return `<div class="${color}">• [${i.severity}] ${i.message}</div>`;
-                  })
-                  .join('')
-            : `<div class="text-[8px] text-[--text-secondary]">No issues detected.</div>`;
+    // Group issues by coarse domain for deep-linking
+    const grouped = {
+        geometry: [],
+        constructions: [],
+        schedules: [],
+        thermostats: [],
+        weather: [],
+        daylighting: [],
+        outdoorAir: [],
+        shading: [],
+        other: [],
+    };
+
+    (issues || []).forEach((i) => {
+        const msg = (i.message || '').toLowerCase();
+        const sev = i.severity || 'info';
+        const entry = { ...i, severity: sev };
+
+        if (
+            msg.includes('construction') ||
+            msg.includes('material')
+        ) {
+            grouped.constructions.push(entry);
+        } else if (
+            msg.includes('schedule') ||
+            msg.includes('zone load') ||
+            msg.includes('people:') ||
+            msg.includes('lighting:') ||
+            msg.includes('equipment:')
+        ) {
+            grouped.schedules.push(entry);
+        } else if (
+            msg.includes('thermostat') ||
+            msg.includes('idealloads') ||
+            msg.includes('ideal loads')
+        ) {
+            grouped.thermostats.push(entry);
+        } else if (
+            msg.includes('weather') ||
+            msg.includes('epw') ||
+            msg.includes('runperiod') ||
+            msg.includes('simulationcontrol')
+        ) {
+            grouped.weather.push(entry);
+        } else if (
+            msg.includes('daylighting') ||
+            msg.includes('illuminance map') ||
+            msg.includes('output:variable') && msg.includes('lighting')
+        ) {
+            grouped.daylighting.push(entry);
+        } else if (
+            msg.includes('outdoor air') ||
+            msg.includes('designspecification:outdoorair') ||
+            msg.includes('natural ventilation') ||
+            msg.includes('zoneventilation:')
+        ) {
+            grouped.outdoorAir.push(entry);
+        } else if (
+            msg.includes('shading') ||
+            msg.includes('overhang') ||
+            msg.includes('windowproperty:shadingcontrol')
+        ) {
+            grouped.shading.push(entry);
+        } else if (
+            msg.includes('zone') ||
+            msg.includes('surface') ||
+            msg.includes('geometry')
+        ) {
+            grouped.geometry.push(entry);
+        } else {
+            grouped.other.push(entry);
+        }
+    });
+
+    const renderIssueList = (arr) => {
+        if (!arr.length) {
+            return `<div class="text-[8px] text-[--text-secondary]">No issues.</div>`;
+        }
+        return arr
+            .map((i) => {
+                const color =
+                    i.severity === 'error'
+                        ? 'text-red-400'
+                        : i.severity === 'warning'
+                        ? 'text-yellow-300'
+                        : 'text-[--text-secondary]';
+                return `<div class="${color}">• [${i.severity}] ${i.message}</div>`;
+            })
+            .join('');
+    };
 
     const button = (label, action) =>
         `<button class="btn btn-xxs btn-secondary ml-1" data-nav="${action}">${label}</button>`;
@@ -888,12 +978,117 @@ function renderDiagnostics(container, diagnostics) {
                 </div>
             </div>
 
+            <!-- Grouped Issues with deep-links -->
             <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
                 <div class="font-semibold text-[8px] uppercase text-[--text-secondary]">
-                    Issues
+                    Issues by Category
                 </div>
-                <div class="text-[8px]">
-                    ${issuesHtml}
+
+                <!-- Geometry -->
+                <div class="mt-1">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[8px] font-semibold text-[--text-secondary]">Geometry</span>
+                        <button class="btn btn-xxs btn-secondary ml-1" data-nav="geometry">Open Diagnostics</button>
+                    </div>
+                    <div class="text-[8px]">
+                        ${renderIssueList(grouped.geometry)}
+                    </div>
+                </div>
+
+                <!-- Constructions & Materials -->
+                <div class="mt-1">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[8px] font-semibold text-[--text-secondary]">Constructions & Materials</span>
+                        <div>
+                            <button class="btn btn-xxs btn-secondary ml-1" data-nav="constructions">Constructions</button>
+                            <button class="btn btn-xxs btn-secondary ml-1" data-nav="materials">Materials</button>
+                        </div>
+                    </div>
+                    <div class="text-[8px]">
+                        ${renderIssueList(grouped.constructions)}
+                    </div>
+                </div>
+
+                <!-- Schedules & Zone Loads -->
+                <div class="mt-1">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[8px] font-semibold text-[--text-secondary]">Schedules & Zone Loads</span>
+                        <div>
+                            <button class="btn btn-xxs btn-secondary ml-1" data-nav="schedules">Schedules</button>
+                            <button class="btn btn-xxs btn-secondary ml-1" data-nav="zone-loads">Zone Loads</button>
+                        </div>
+                    </div>
+                    <div class="text-[8px]">
+                        ${renderIssueList(grouped.schedules)}
+                    </div>
+                </div>
+
+                <!-- Thermostats & IdealLoads -->
+                <div class="mt-1">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[8px] font-semibold text-[--text-secondary]">Thermostats & IdealLoads</span>
+                        <button class="btn btn-xxs btn-secondary ml-1" data-nav="ideal-loads">Thermostats & IdealLoads</button>
+                    </div>
+                    <div class="text-[8px]">
+                        ${renderIssueList(grouped.thermostats)}
+                    </div>
+                </div>
+
+                <!-- Weather & Simulation Control -->
+                <div class="mt-1">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[8px] font-semibold text-[--text-secondary]">Weather & Simulation Control</span>
+                        <div>
+                            <button class="btn btn-xxs btn-secondary ml-1" data-nav="weather">Weather & Location</button>
+                            <button class="btn btn-xxs btn-secondary ml-1" data-nav="sim-control">Sim Control</button>
+                        </div>
+                    </div>
+                    <div class="text-[8px]">
+                        ${renderIssueList(grouped.weather)}
+                    </div>
+                </div>
+
+                <!-- Daylighting & Outputs -->
+                <div class="mt-1">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[8px] font-semibold text-[--text-secondary]">Daylighting & Outputs</span>
+                        <button class="btn btn-xxs btn-secondary ml-1" data-nav="daylighting">Daylighting Panel</button>
+                    </div>
+                    <div class="text-[8px]">
+                        ${renderIssueList(grouped.daylighting)}
+                    </div>
+                </div>
+
+                <!-- Outdoor Air & Natural Ventilation -->
+                <div class="mt-1">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[8px] font-semibold text-[--text-secondary]">Outdoor Air & Natural Ventilation</span>
+                        <button class="btn btn-xxs btn-secondary ml-1" data-nav="outdoor-air">Outdoor Air Panel</button>
+                    </div>
+                    <div class="text-[8px]">
+                        ${renderIssueList(grouped.outdoorAir)}
+                    </div>
+                </div>
+
+                <!-- Shading & Solar Control -->
+                <div class="mt-1">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[8px] font-semibold text-[--text-secondary]">Shading & Solar Control</span>
+                        <button class="btn btn-xxs btn-secondary ml-1" data-nav="shading">Shading Panel</button>
+                    </div>
+                    <div class="text-[8px]">
+                        ${renderIssueList(grouped.shading)}
+                    </div>
+                </div>
+
+                <!-- Other -->
+                <div class="mt-1">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[8px] font-semibold text-[--text-secondary]">Other / Unclassified</span>
+                    </div>
+                    <div class="text-[8px]">
+                        ${renderIssueList(grouped.other)}
+                    </div>
                 </div>
             </div>
         </div>
@@ -913,6 +1108,21 @@ function renderDiagnostics(container, diagnostics) {
                     openSchedulesManagerPanel();
                 } else if (nav === 'zone-loads') {
                     openZoneLoadsManagerPanel();
+                } else if (nav === 'ideal-loads') {
+                    openIdealLoadsManagerPanel();
+                } else if (nav === 'weather') {
+                    openWeatherLocationManagerPanel();
+                } else if (nav === 'sim-control') {
+                    openSimulationControlManagerPanel();
+                } else if (nav === 'daylighting') {
+                    openDaylightingManagerPanel();
+                } else if (nav === 'outdoor-air') {
+                    openOutdoorAirManagerPanel();
+                } else if (nav === 'shading') {
+                    openShadingManagerPanel();
+                } else if (nav === 'geometry') {
+                    // Geometry is best inspected via diagnostics panel itself
+                    openDiagnosticsPanel();
                 }
             });
         });
@@ -1018,6 +1228,11 @@ function createRecipePanel(recipe) {
                 <button class="btn btn-primary w-full" data-action="run">Run Simulation</button>
             </div>
             <div class="mt-3">
+                <div class="text-[7px] text-[--text-secondary] mb-0.5">
+                    Runs are executed via Electron with:
+                    <code>model.idf</code> or your selected IDF and outputs written under
+                    <code>runs/<recipe-name>/</code> relative to the project directory.
+                </div>
                 <h5 class="font-semibold text-[10px] uppercase text-[--text-secondary] mb-1">EnergyPlus Output</h5>
                 <pre class="simulation-output-console w-full h-32 font-mono text-[10px] p-2 rounded bg-[--grid-color] border border-gray-500/50 overflow-y-auto whitespace-pre-wrap"></pre>
             </div>
@@ -3319,6 +3534,510 @@ function createZoneLoadsManagerPanel() {
  * DAYLIGHTING MANAGER
  * Manage energyPlusConfig.daylighting.controls and .outputs.illuminanceMaps.
  */
+function openHvacSizingManagerPanel() {
+    const panelId = 'panel-energyplus-hvac-sizing';
+    let panel = document.getElementById(panelId);
+    if (!panel) {
+        panel = createHvacSizingManagerPanel();
+        document.getElementById('window-container').appendChild(panel);
+    }
+    panel.classList.remove('hidden');
+    panel.style.zIndex = getNewZIndex();
+}
+
+/**
+ * HVAC Sizing Manager
+ * Configure:
+ *  - sizing.zones (per-zone Sizing:Zone)
+ *  - sizing.systems (Sizing:System, advanced)
+ *  - sizing.plants (Sizing:Plant, advanced)
+ * Uses energyPlusConfigService setters; no behavior change unless user edits.
+ */
+function createHvacSizingManagerPanel() {
+    const panel = document.createElement('div');
+    panel.id = 'panel-energyplus-hvac-sizing';
+    panel.className = 'floating-window ui-panel resizable-panel';
+
+    panel.innerHTML = `
+        <div class="window-header">
+            <span>HVAC Sizing</span>
+            <div class="window-controls">
+                <div class="window-icon-max" title="Maximize/Restore"></div>
+                <div class="collapse-icon" title="Minimize"></div>
+                <div class="window-icon-close" title="Close"></div>
+            </div>
+        </div>
+        <div class="window-content space-y-3 text-[8px]">
+            <div class="resize-handle-edge top"></div>
+            <div class="resize-handle-edge right"></div>
+            <div class="resize-handle-edge bottom"></div>
+            <div class="resize-handle-edge left"></div>
+            <div class="resize-handle-corner top-left"></div>
+            <div class="resize-handle-corner top-right"></div>
+            <div class="resize-handle-corner bottom-left"></div>
+            <div class="resize-handle-corner bottom-right"></div>
+
+            <p class="info-box !text-[9px] !py-1.5 !px-2">
+                Configure EnergyPlus sizing objects used by the generated IDF.
+                Settings are stored in <code>energyPlusConfig.sizing</code> and consumed by the model builder.
+                If left empty, Ray-Modeler emits safe default Sizing:Zone objects and no system/plant sizing.
+            </p>
+
+            <!-- ZONE SIZING -->
+            <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                <div class="flex justify-between items-center">
+                    <span class="font-semibold text-[9px] uppercase text-[--text-secondary]">Zone Sizing</span>
+                    <span class="text-[7px] text-[--text-secondary]">
+                        Enable per-zone overrides; otherwise defaults are used.
+                    </span>
+                </div>
+                <div class="max-h-64 overflow-y-auto scrollable-panel-inner">
+                    <table class="w-full text-[8px]">
+                        <thead class="bg-black/40">
+                            <tr>
+                                <th class="px-1 py-1 text-left">Zone</th>
+                                <th class="px-1 py-1 text-left">Custom</th>
+                                <th class="px-1 py-1 text-left">Cool SAT/ΔT</th>
+                                <th class="px-1 py-1 text-left">Heat SAT/ΔT</th>
+                                <th class="px-1 py-1 text-left">SF (H/C)</th>
+                                <th class="px-1 py-1 text-left">DSOA Name</th>
+                            </tr>
+                        </thead>
+                        <tbody class="hvac-sizing-zones-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SYSTEM SIZING (ADVANCED) -->
+            <details class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                <summary class="font-semibold text-[9px] uppercase text-[--text-secondary] cursor-pointer">
+                    System Sizing (Sizing:System, advanced)
+                </summary>
+                <div class="flex justify-end mb-1">
+                    <button class="btn btn-xxs btn-secondary" data-action="add-system-sizing">+ Add System</button>
+                </div>
+                <div class="max-h-40 overflow-y-auto scrollable-panel-inner">
+                    <table class="w-full text-[8px]">
+                        <thead class="bg-black/40">
+                            <tr>
+                                <th class="px-1 py-1 text-left">Air Loop Name</th>
+                                <th class="px-1 py-1 text-left">Load Type</th>
+                                <th class="px-1 py-1 text-left">Design OA [m³/s] / auto</th>
+                                <th class="px-1 py-1 text-left">Cool/Heat SAT [°C]</th>
+                                <th class="px-1 py-1 text-left">OA Method</th>
+                                <th class="px-1 py-1 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="hvac-sizing-systems-tbody"></tbody>
+                    </table>
+                </div>
+                <p class="text-[7px] text-[--text-secondary] mt-1">
+                    Only define entries if you have explicit system-level sizing requirements.
+                    Rows without an Air Loop Name are ignored.
+                </p>
+            </details>
+
+            <!-- PLANT SIZING (ADVANCED) -->
+            <details class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                <summary class="font-semibold text-[9px] uppercase text-[--text-secondary] cursor-pointer">
+                    Plant Sizing (Sizing:Plant, advanced)
+                </summary>
+                <div class="flex justify-end mb-1">
+                    <button class="btn btn-xxs btn-secondary" data-action="add-plant-sizing">+ Add Plant Loop</button>
+                </div>
+                <div class="max-h-32 overflow-y-auto scrollable-panel-inner">
+                    <table class="w-full text-[8px]">
+                        <thead class="bg-black/40">
+                            <tr>
+                                <th class="px-1 py-1 text-left">Plant Loop Name</th>
+                                <th class="px-1 py-1 text-left">Exit T [°C]</th>
+                                <th class="px-1 py-1 text-left">ΔT [K]</th>
+                                <th class="px-1 py-1 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="hvac-sizing-plants-tbody"></tbody>
+                    </table>
+                </div>
+                <p class="text-[7px] text-[--text-secondary] mt-1">
+                    Define only for explicit hydronic loops. Rows without a Plant Loop Name are ignored.
+                </p>
+            </details>
+
+            <div class="flex justify-end">
+                <button class="btn btn-xxs btn-secondary" data-action="save-hvac-sizing">
+                    Save HVAC Sizing
+                </button>
+            </div>
+        </div>
+    `;
+
+    if (typeof window !== 'undefined' && window.initializePanelControls) {
+        window.initializePanelControls(panel);
+    } else {
+        const closeBtn = panel.querySelector('.window-icon-close');
+        if (closeBtn) {
+            closeBtn.onclick = () => panel.classList.add('hidden');
+        }
+    }
+
+    // Lazy-load config helpers to avoid circular deps at module parse time.
+    import('./energyplusConfigService.js').then(
+        ({ getConfig, setSizingZones, setSizingSystems, setSizingPlants }) => {
+            const zonesTbody = panel.querySelector('.hvac-sizing-zones-tbody');
+            const systemsTbody = panel.querySelector('.hvac-sizing-systems-tbody');
+            const plantsTbody = panel.querySelector('.hvac-sizing-plants-tbody');
+            const saveBtn = panel.querySelector('[data-action="save-hvac-sizing"]');
+            const addSysBtn = panel.querySelector('[data-action="add-system-sizing"]');
+            const addPlantBtn = panel.querySelector('[data-action="add-plant-sizing"]');
+
+            function getZones() {
+                let zs = [];
+                if (typeof project.getZones === 'function') {
+                    zs = project.getZones() || [];
+                } else if (Array.isArray(project.zones)) {
+                    zs = project.zones;
+                }
+                if (!Array.isArray(zs) || !zs.length) {
+                    return [{ name: 'Zone_1' }];
+                }
+                return zs.map((z, i) => ({
+                    name: z.name || `Zone_${i + 1}`,
+                }));
+            }
+
+            function readState() {
+                const { config } = getConfig(project);
+                const sizing = config.sizing || {};
+                return {
+                    zones: Array.isArray(sizing.zones) ? sizing.zones.slice() : [],
+                    systems: Array.isArray(sizing.systems) ? sizing.systems.slice() : [],
+                    plants: Array.isArray(sizing.plants) ? sizing.plants.slice() : [],
+                    outdoorAir: config.outdoorAir || {},
+                };
+            }
+
+            function renderZones() {
+                const { zones, outdoorAir } = readState();
+                const zoneList = getZones();
+                const dsoaNames = Array.isArray(outdoorAir.designSpecs)
+                    ? outdoorAir.designSpecs.map((d) => d && d.name).filter(Boolean)
+                    : [];
+                zonesTbody.innerHTML = '';
+                zoneList.forEach((z) => {
+                    const zn = String(z.name);
+                    const cfg = zones.find((e) => e.zoneName === zn) || {};
+                    const hasCustom = !!cfg.zoneName;
+                    const tr = document.createElement('tr');
+                    tr.dataset.zoneName = zn;
+                    const dsoaOptions =
+                        '<option value="">(none)</option>' +
+                        dsoaNames
+                            .map(
+                                (n) =>
+                                    `<option value="${n}"${
+                                        cfg.designSpecOutdoorAirName === n ? ' selected' : ''
+                                    }>${n}</option>`
+                            )
+                            .join('');
+                    tr.innerHTML = `
+                        <td class="px-1 py-1 align-top text-[--accent-color]">${zn}</td>
+                        <td class="px-1 py-1 align-top">
+                            <input type="checkbox" data-field="enabled" ${hasCustom ? 'checked' : ''}>
+                        </td>
+                        <td class="px-1 py-1 align-top">
+                            <div class="grid grid-cols-2 gap-0.5">
+                                <input type="number" step="0.1" class="w-full"
+                                    placeholder="Cool SAT"
+                                    data-field="coolSAT"
+                                    value="${cfg.zoneCoolingDesignSupplyAirTemperature ?? ''}">
+                                <input type="number" step="0.1" class="w-full"
+                                    placeholder="ΔT"
+                                    data-field="coolDT"
+                                    value="${cfg.zoneCoolingDesignSupplyAirTemperatureDifference ?? ''}">
+                            </div>
+                        </td>
+                        <td class="px-1 py-1 align-top">
+                            <div class="grid grid-cols-2 gap-0.5">
+                                <input type="number" step="0.1" class="w-full"
+                                    placeholder="Heat SAT"
+                                    data-field="heatSAT"
+                                    value="${cfg.zoneHeatingDesignSupplyAirTemperature ?? ''}">
+                                <input type="number" step="0.1" class="w-full"
+                                    placeholder="ΔT"
+                                    data-field="heatDT"
+                                    value="${cfg.zoneHeatingDesignSupplyAirTemperatureDifference ?? ''}">
+                            </div>
+                        </td>
+                        <td class="px-1 py-1 align-top">
+                            <div class="grid grid-cols-2 gap-0.5">
+                                <input type="number" step="0.01" class="w-full"
+                                    placeholder="H"
+                                    data-field="sfHeat"
+                                    value="${cfg.zoneHeatingSizingFactor ?? ''}">
+                                <input type="number" step="0.01" class="w-full"
+                                    placeholder="C"
+                                    data-field="sfCool"
+                                    value="${cfg.zoneCoolingSizingFactor ?? ''}">
+                            </div>
+                        </td>
+                        <td class="px-1 py-1 align-top">
+                            <select class="w-full" data-field="dsoa">
+                                ${dsoaOptions}
+                            </select>
+                        </td>
+                    `;
+                    zonesTbody.appendChild(tr);
+                });
+            }
+
+            function renderSystems() {
+                const { systems } = readState();
+                systemsTbody.innerHTML = '';
+                systems.forEach((s, idx) => {
+                    const tr = document.createElement('tr');
+                    tr.dataset.index = String(idx);
+                    tr.innerHTML = `
+                        <td class="px-1 py-1 align-top">
+                            <input class="w-full" data-field="airLoopName" value="${s.airLoopName || ''}">
+                        </td>
+                        <td class="px-1 py-1 align-top">
+                            <input class="w-full" data-field="loadType" value="${s.typeOfLoadToSizeOn || ''}" placeholder="Sensible">
+                        </td>
+                        <td class="px-1 py-1 align-top">
+                            <input type="number" step="0.001" class="w-full" data-field="designOA" value="${typeof s.designOutdoorAirFlowRate === 'number' ? s.designOutdoorAirFlowRate : ''}" placeholder="m³/s">
+                        </td>
+                        <td class="px-1 py-1 align-top">
+                            <div class="grid grid-cols-2 gap-0.5">
+                                <input type="number" step="0.1" class="w-full" data-field="coolSAT" value="${s.centralCoolingDesignSupplyAirTemperature ?? ''}" placeholder="Cool">
+                                <input type="number" step="0.1" class="w-full" data-field="heatSAT" value="${s.centralHeatingDesignSupplyAirTemperature ?? ''}" placeholder="Heat">
+                            </div>
+                        </td>
+                        <td class="px-1 py-1 align-top">
+                            <input class="w-full" data-field="oaMethod" value="${s.systemOutdoorAirMethod || ''}" placeholder="ZoneSum">
+                        </td>
+                        <td class="px-1 py-1 align-top text-right">
+                            <button class="btn btn-xxs btn-danger" data-action="delete-system">Delete</button>
+                        </td>
+                    `;
+                    systemsTbody.appendChild(tr);
+                });
+            }
+
+            function renderPlants() {
+                const { plants } = readState();
+                plantsTbody.innerHTML = '';
+                plants.forEach((p, idx) => {
+                    const tr = document.createElement('tr');
+                    tr.dataset.index = String(idx);
+                    tr.innerHTML = `
+                        <td class="px-1 py-1 align-top">
+                            <input class="w-full" data-field="plantLoopName" value="${p.plantLoopName || ''}">
+                        </td>
+                        <td class="px-1 py-1 align-top">
+                            <input type="number" step="0.1" class="w-full" data-field="exitT" value="${p.designLoopExitTemperature ?? ''}">
+                        </td>
+                        <td class="px-1 py-1 align-top">
+                            <input type="number" step="0.1" class="w-full" data-field="dT" value="${p.loopDesignTemperatureDifference ?? ''}">
+                        </td>
+                        <td class="px-1 py-1 align-top text-right">
+                            <button class="btn btn-xxs btn-danger" data-action="delete-plant">Delete</button>
+                        </td>
+                    `;
+                    plantsTbody.appendChild(tr);
+                });
+            }
+
+            function collectZonesFromUI() {
+                const rows = zonesTbody.querySelectorAll('tr[data-zone-name]');
+                const result = [];
+                rows.forEach((tr) => {
+                    const zn = tr.dataset.zoneName;
+                    const enabled = tr.querySelector('[data-field="enabled"]')?.checked;
+                    if (!enabled || !zn) return;
+                    const num = (sel) => {
+                        const el = tr.querySelector(sel);
+                        if (!el) return undefined;
+                        const v = parseFloat(el.value);
+                        return Number.isFinite(v) ? v : undefined;
+                    };
+                    const dsoa = tr.querySelector('[data-field="dsoa"]')?.value || '';
+                    const entry = {
+                        zoneName: zn,
+                    };
+                    const coolSAT = num('[data-field="coolSAT"]');
+                    const coolDT = num('[data-field="coolDT"]');
+                    const heatSAT = num('[data-field="heatSAT"]');
+                    const heatDT = num('[data-field="heatDT"]');
+                    const sfH = num('[data-field="sfHeat"]');
+                    const sfC = num('[data-field="sfCool"]');
+
+                    if (Number.isFinite(coolSAT)) {
+                        entry.zoneCoolingDesignSupplyAirTemperature = coolSAT;
+                    }
+                    if (Number.isFinite(coolDT)) {
+                        entry.zoneCoolingDesignSupplyAirTemperatureDifference = coolDT;
+                        entry.zoneCoolingDesignSupplyAirTemperatureInputMethod = 'TemperatureDifference';
+                    }
+                    if (Number.isFinite(heatSAT)) {
+                        entry.zoneHeatingDesignSupplyAirTemperature = heatSAT;
+                    }
+                    if (Number.isFinite(heatDT)) {
+                        entry.zoneHeatingDesignSupplyAirTemperatureDifference = heatDT;
+                        entry.zoneHeatingDesignSupplyAirTemperatureInputMethod = 'TemperatureDifference';
+                    }
+                    if (Number.isFinite(sfH)) {
+                        entry.zoneHeatingSizingFactor = sfH;
+                    }
+                    if (Number.isFinite(sfC)) {
+                        entry.zoneCoolingSizingFactor = sfC;
+                    }
+                    if (dsoa) {
+                        entry.designSpecOutdoorAirName = dsoa;
+                    }
+
+                    // Only persist if there is at least one meaningful override
+                    if (
+                        entry.zoneCoolingDesignSupplyAirTemperature != null ||
+                        entry.zoneCoolingDesignSupplyAirTemperatureDifference != null ||
+                        entry.zoneHeatingDesignSupplyAirTemperature != null ||
+                        entry.zoneHeatingDesignSupplyAirTemperatureDifference != null ||
+                        entry.zoneHeatingSizingFactor != null ||
+                        entry.zoneCoolingSizingFactor != null ||
+                        entry.designSpecOutdoorAirName
+                    ) {
+                        result.push(entry);
+                    }
+                });
+                return result;
+            }
+
+            function collectSystemsFromUI() {
+                const rows = systemsTbody.querySelectorAll('tr');
+                const systems = [];
+                rows.forEach((tr) => {
+                    const airLoopName = (tr.querySelector('[data-field="airLoopName"]')?.value || '').trim();
+                    if (!airLoopName) return;
+                    const val = (sel) => (tr.querySelector(sel)?.value || '').trim();
+                    const num = (sel) => {
+                        const el = tr.querySelector(sel);
+                        if (!el) return undefined;
+                        const v = parseFloat(el.value);
+                        return Number.isFinite(v) ? v : undefined;
+                    };
+                    const s = {
+                        airLoopName,
+                    };
+                    const loadType = val('[data-field="loadType"]');
+                    if (loadType) s.typeOfLoadToSizeOn = loadType;
+                    const designOA = num('[data-field="designOA"]');
+                    if (designOA != null) s.designOutdoorAirFlowRate = designOA;
+                    const coolSAT = num('[data-field="coolSAT"]');
+                    if (coolSAT != null) s.centralCoolingDesignSupplyAirTemperature = coolSAT;
+                    const heatSAT = num('[data-field="heatSAT"]');
+                    if (heatSAT != null) s.centralHeatingDesignSupplyAirTemperature = heatSAT;
+                    const oaMethod = val('[data-field="oaMethod"]');
+                    if (oaMethod) s.systemOutdoorAirMethod = oaMethod;
+                    systems.push(s);
+                });
+                return systems;
+            }
+
+            function collectPlantsFromUI() {
+                const rows = plantsTbody.querySelectorAll('tr');
+                const plants = [];
+                rows.forEach((tr) => {
+                    const plantLoopName = (tr.querySelector('[data-field="plantLoopName"]')?.value || '').trim();
+                    if (!plantLoopName) return;
+                    const num = (sel) => {
+                        const el = tr.querySelector(sel);
+                        if (!el) return undefined;
+                        const v = parseFloat(el.value);
+                        return Number.isFinite(v) ? v : undefined;
+                    };
+                    const exitT = num('[data-field="exitT"]');
+                    const dT = num('[data-field="dT"]');
+                    const p = { plantLoopName };
+                    if (exitT != null) p.designLoopExitTemperature = exitT;
+                    if (dT != null) p.loopDesignTemperatureDifference = dT;
+                    plants.push(p);
+                });
+                return plants;
+            }
+
+            function wireSystemAndPlantActions() {
+                if (addSysBtn) {
+                    addSysBtn.addEventListener('click', () => {
+                        const { systems } = readState();
+                        systems.push({ airLoopName: '' });
+                        setSizingSystems(project, systems);
+                        renderSystems();
+                        wireSystemAndPlantActions();
+                    });
+                }
+                if (systemsTbody) {
+                    systemsTbody.querySelectorAll('button[data-action="delete-system"]').forEach((btn, idx) => {
+                        btn.addEventListener('click', () => {
+                            const { systems } = readState();
+                            systems.splice(idx, 1);
+                            setSizingSystems(project, systems);
+                            renderSystems();
+                            wireSystemAndPlantActions();
+                        });
+                    });
+                }
+
+                if (addPlantBtn) {
+                    addPlantBtn.addEventListener('click', () => {
+                        const { plants } = readState();
+                        plants.push({ plantLoopName: '' });
+                        setSizingPlants(project, plants);
+                        renderPlants();
+                        wireSystemAndPlantActions();
+                    });
+                }
+                if (plantsTbody) {
+                    plantsTbody.querySelectorAll('button[data-action="delete-plant"]').forEach((btn, idx) => {
+                        btn.addEventListener('click', () => {
+                            const { plants } = readState();
+                            plants.splice(idx, 1);
+                            setSizingPlants(project, plants);
+                            renderPlants();
+                            wireSystemAndPlantActions();
+                        });
+                    });
+                }
+            }
+
+            // Initial render
+            renderZones();
+            renderSystems();
+            renderPlants();
+            wireSystemAndPlantActions();
+
+            if (saveBtn) {
+                saveBtn.addEventListener('click', () => {
+                    try {
+                        const zones = collectZonesFromUI();
+                        const systems = collectSystemsFromUI();
+                        const plants = collectPlantsFromUI();
+                        setSizingZones(project, zones);
+                        setSizingSystems(project, systems);
+                        setSizingPlants(project, plants);
+                        alert('HVAC Sizing configuration saved.');
+                    } catch (err) {
+                        console.error('HVACSizingManager: save failed', err);
+                        alert('Failed to save HVAC Sizing configuration. Check console for details.');
+                    }
+                });
+            }
+        }
+    ).catch((err) => {
+        console.error('HVACSizingManager: failed to load config service', err);
+    });
+
+    return panel;
+}
+
 function openDaylightingManagerPanel() {
     const panelId = 'panel-energyplus-daylighting';
     let panel = document.getElementById(panelId);
@@ -4115,6 +4834,1362 @@ function openIdealLoadsManagerPanel() {
     panel.style.zIndex = getNewZIndex();
 }
 
+function openOutdoorAirManagerPanel() {
+    const panelId = 'panel-energyplus-outdoor-air';
+    let panel = document.getElementById(panelId);
+    if (!panel) {
+        panel = createOutdoorAirManagerPanel();
+        document.getElementById('window-container').appendChild(panel);
+    }
+    panel.classList.remove('hidden');
+    panel.style.zIndex = getNewZIndex();
+}
+
+/**
+ * Outdoor Air & Ventilation Manager
+ * - DesignSpecification:OutdoorAir (energyPlusConfig.outdoorAir.designSpecs)
+ * - Natural Ventilation via ZoneVentilation:DesignFlowRate (energyPlusConfig.naturalVentilation)
+ */
+function createOutdoorAirManagerPanel() {
+    const panel = document.createElement('div');
+    panel.id = 'panel-energyplus-outdoor-air';
+    panel.className = 'floating-window ui-panel resizable-panel';
+
+    panel.innerHTML = `
+        <div class="window-header">
+            <span>Outdoor Air & Ventilation</span>
+            <div class="window-controls">
+                <div class="window-icon-max" title="Maximize/Restore"></div>
+                <div class="collapse-icon" title="Minimize"></div>
+                <div class="window-icon-close" title="Close"></div>
+            </div>
+        </div>
+        <div class="window-content space-y-3 text-[8px]">
+            <div class="resize-handle-edge top"></div>
+            <div class="resize-handle-edge right"></div>
+            <div class="resize-handle-edge bottom"></div>
+            <div class="resize-handle-edge left"></div>
+            <div class="resize-handle-corner top-left"></div>
+            <div class="resize-handle-corner top-right"></div>
+            <div class="resize-handle-corner bottom-left"></div>
+            <div class="resize-handle-corner bottom-right"></div>
+
+            <p class="info-box !text-[9px] !py-1.5 !px-2">
+                Configure outdoor air design specs and simple natural ventilation.
+                Settings are stored in <code>energyPlusConfig.outdoorAir</code> and
+                <code>energyPlusConfig.naturalVentilation</code> and consumed by the model builder.
+                If left empty, no additional DesignSpecification:OutdoorAir or ZoneVentilation objects are emitted.
+            </p>
+
+            <!-- DesignSpecification:OutdoorAir -->
+            <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                <div class="flex justify-between items-center">
+                    <span class="font-semibold text-[9px] uppercase text-[--text-secondary]">
+                        Outdoor Air Design Specs (DesignSpecification:OutdoorAir)
+                    </span>
+                    <button class="btn btn-xxs btn-secondary" data-action="add-dsoa">+ Add Design Spec</button>
+                </div>
+                <div class="max-h-40 overflow-y-auto scrollable-panel-inner">
+                    <table class="w-full text-[8px]">
+                        <thead class="bg-black/40">
+                            <tr>
+                                <th class="px-1 py-1 text-left">Name</th>
+                                <th class="px-1 py-1 text-left">Method</th>
+                                <th class="px-1 py-1 text-left">Flow/Person</th>
+                                <th class="px-1 py-1 text-left">Flow/Area</th>
+                                <th class="px-1 py-1 text-left">Flow/Zone</th>
+                                <th class="px-1 py-1 text-left">ACH</th>
+                                <th class="px-1 py-1 text-left">Schedule</th>
+                                <th class="px-1 py-1 text-left">Min OA Frac Sched</th>
+                                <th class="px-1 py-1 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="dsoa-tbody"></tbody>
+                    </table>
+                </div>
+                <p class="text-[7px] text-[--text-secondary] mt-1">
+                    Refer to these specs from HVAC Sizing and IdealLoads configuration (e.g. DesignSpecification:OutdoorAir Name).
+                </p>
+            </div>
+
+            <!-- Natural Ventilation (ZoneVentilation:DesignFlowRate) -->
+            <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-2">
+                <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">
+                    Natural Ventilation (ZoneVentilation:DesignFlowRate)
+                </div>
+
+                <!-- Global defaults -->
+                <div class="space-y-1">
+                    <label class="inline-flex items-center gap-1">
+                        <input type="checkbox" data-field="nv-global-enabled">
+                        <span>Enable global natural ventilation</span>
+                    </label>
+                    <div class="grid grid-cols-5 gap-1 mt-1">
+                        <div>
+                            <label class="label !text-[7px]">Method</label>
+                            <select class="w-full" data-field="nv-global-method">
+                                <option value="">(none)</option>
+                                <option value="Flow/Zone">Flow/Zone</option>
+                                <option value="Flow/Area">Flow/Area</option>
+                                <option value="Flow/Person">Flow/Person</option>
+                                <option value="AirChanges/Hour">AirChanges/Hour</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="label !text-[7px]">Flow/Zone [m³/s]</label>
+                            <input type="number" step="0.001" class="w-full" data-field="nv-global-flowZone">
+                        </div>
+                        <div>
+                            <label class="label !text-[7px]">Flow/Area [m³/s-m²]</label>
+                            <input type="number" step="0.0001" class="w-full" data-field="nv-global-flowArea">
+                        </div>
+                        <div>
+                            <label class="label !text-[7px]">Flow/Person [m³/s-person]</label>
+                            <input type="number" step="0.0001" class="w-full" data-field="nv-global-flowPerson">
+                        </div>
+                        <div>
+                            <label class="label !text-[7px]">ACH [1/h]</label>
+                            <input type="number" step="0.01" class="w-full" data-field="nv-global-ach">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-6 gap-1 mt-1">
+                        <div>
+                            <label class="label !text-[7px]">Type</label>
+                            <select class="w-full" data-field="nv-global-type">
+                                <option value="">(Natural)</option>
+                                <option value="Natural">Natural</option>
+                                <option value="Exhaust">Exhaust</option>
+                                <option value="Intake">Intake</option>
+                                <option value="Balanced">Balanced</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="label !text-[7px]">Min Tin [°C]</label>
+                            <input type="number" step="0.1" class="w-full" data-field="nv-global-minTin">
+                        </div>
+                        <div>
+                            <label class="label !text-[7px]">Max Tin [°C]</label>
+                            <input type="number" step="0.1" class="w-full" data-field="nv-global-maxTin">
+                        </div>
+                        <div>
+                            <label class="label !text-[7px]">Min Tout [°C]</label>
+                            <input type="number" step="0.1" class="w-full" data-field="nv-global-minTout">
+                        </div>
+                        <div>
+                            <label class="label !text-[7px]">Max Tout [°C]</label>
+                            <input type="number" step="0.1" class="w-full" data-field="nv-global-maxTout">
+                        </div>
+                        <div>
+                            <label class="label !text-[7px]">ΔT (Tin-Tout) [K]</label>
+                            <input type="number" step="0.1" class="w-full" data-field="nv-global-deltaT">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-4 gap-1 mt-1">
+                        <div>
+                            <label class="label !text-[7px]">Max Wind [m/s]</label>
+                            <input type="number" step="0.1" class="w-full" data-field="nv-global-maxWind">
+                        </div>
+                        <div>
+                            <label class="label !text-[7px]">Density Basis</label>
+                            <select class="w-full" data-field="nv-global-density">
+                                <option value="">(default)</option>
+                                <option value="Outdoor">Outdoor</option>
+                                <option value="Indoor">Indoor</option>
+                                <option value="Standard">Standard</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Per-zone overrides -->
+                <div class="border border-gray-700/70 rounded bg-black/30 p-1 space-y-1">
+                    <div class="font-semibold text-[8px] text-[--text-secondary]">
+                        Per-Zone Overrides
+                    </div>
+                    <div class="max-h-40 overflow-y-auto scrollable-panel-inner">
+                        <table class="w-full text-[7px]">
+                            <thead class="bg-black/40">
+                                <tr>
+                                    <th class="px-1 py-1 text-left">Zone</th>
+                                    <th class="px-1 py-1 text-left">Override</th>
+                                    <th class="px-1 py-1 text-left">Enable</th>
+                                    <th class="px-1 py-1 text-left">Method</th>
+                                    <th class="px-1 py-1 text-left">Flow/Zone</th>
+                                    <th class="px-1 py-1 text-left">Flow/Area</th>
+                                    <th class="px-1 py-1 text-left">Flow/Person</th>
+                                    <th class="px-1 py-1 text-left">ACH</th>
+                                </tr>
+                            </thead>
+                            <tbody class="nv-zones-tbody"></tbody>
+                        </table>
+                    </div>
+                    <p class="text-[7px] text-[--text-secondary]">
+                        Only rows with "Override" checked and at least one field set are saved.
+                        Zones without overrides inherit the global settings if enabled.
+                    </p>
+                </div>
+
+                <div class="flex justify-end">
+                    <button class="btn btn-xxs btn-secondary" data-action="save-outdoor-air">
+                        Save Outdoor Air & Ventilation
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    if (typeof window !== 'undefined' && window.initializePanelControls) {
+        window.initializePanelControls(panel);
+    } else {
+        const closeBtn = panel.querySelector('.window-icon-close');
+        if (closeBtn) {
+            closeBtn.onclick = () => panel.classList.add('hidden');
+        }
+    }
+
+    // Wire data loading/saving via energyplusConfigService
+    import('./energyplusConfigService.js')
+        .then(({ getConfig, setOutdoorAirDesignSpecs, setNaturalVentilation }) => {
+            const dsoaTbody = panel.querySelector('.dsoa-tbody');
+            const nvZonesTbody = panel.querySelector('.nv-zones-tbody');
+            const addDsoaBtn = panel.querySelector('[data-action="add-dsoa"]');
+            const saveBtn = panel.querySelector('[data-action="save-outdoor-air"]');
+
+            function getZones() {
+                let zs = [];
+                if (typeof project.getZones === 'function') {
+                    zs = project.getZones() || [];
+                } else if (Array.isArray(project.zones)) {
+                    zs = project.zones;
+                }
+                if (!Array.isArray(zs) || !zs.length) {
+                    return [{ name: 'Zone_1' }];
+                }
+                return zs.map((z, i) => ({
+                    name: z.name || `Zone_${i + 1}`,
+                }));
+            }
+
+            function loadState() {
+                const { config } = getConfig(project);
+                const oa = config.outdoorAir || {};
+                const nat = config.naturalVentilation || {};
+                return {
+                    designSpecs: Array.isArray(oa.designSpecs) ? oa.designSpecs.slice() : [],
+                    naturalVentilation: nat,
+                };
+            }
+
+            function renderDsoa() {
+                const { designSpecs } = loadState();
+                dsoaTbody.innerHTML = '';
+                if (!designSpecs.length) {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="px-1 py-1 text-[--text-secondary]" colspan="9">
+                            No DesignSpecification:OutdoorAir defined.
+                        </td>
+                    `;
+                    dsoaTbody.appendChild(tr);
+                    return;
+                }
+                designSpecs.forEach((d, idx) => {
+                    const tr = document.createElement('tr');
+                    tr.dataset.index = String(idx);
+                    tr.innerHTML = `
+                        <td class="px-1 py-1 align-top">
+                            <input class="w-full" data-field="name" value="${d.name || ''}">
+                        </td>
+                        <td class="px-1 py-1 align-top">
+                            <select class="w-full" data-field="method">
+                                ${[
+                                    '',
+                                    'Flow/Person',
+                                    'Flow/Area',
+                                    'Flow/Zone',
+                                    'AirChanges/Hour',
+                                    'Sum',
+                                    'Maximum',
+                                ]
+                                    .map((m) => {
+                                        const label = m || '(auto)';
+                                        const sel = d.method === m ? ' selected' : '';
+                                        return `<option value="${m}"${sel}>${label}</option>`;
+                                    })
+                                    .join('')}
+                            </select>
+                        </td>
+                        <td class="px-1 py-1 align-top">
+                            <input type="number" step="0.0001" class="w-full" data-field="flowPerPerson" value="${d.flowPerPerson ?? ''}">
+                        </td>
+                        <td class="px-1 py-1 align-top">
+                            <input type="number" step="0.0001" class="w-full" data-field="flowPerArea" value="${d.flowPerArea ?? ''}">
+                        </td>
+                        <td class="px-1 py-1 align-top">
+                            <input type="number" step="0.0001" class="w-full" data-field="flowPerZone" value="${d.flowPerZone ?? ''}">
+                        </td>
+                        <td class="px-1 py-1 align-top">
+                            <input type="number" step="0.01" class="w-full" data-field="ach" value="${d.airChangesPerHour ?? ''}">
+                        </td>
+                        <td class="px-1 py-1 align-top">
+                            <input class="w-full" data-field="sched" value="${d.scheduleName || ''}">
+                        </td>
+                        <td class="px-1 py-1 align-top">
+                            <input class="w-full" data-field="minFracSched" value="${d.proportionalMinOAFractionScheduleName || ''}">
+                        </td>
+                        <td class="px-1 py-1 align-top text-right">
+                            <button class="btn btn-xxs btn-danger" data-action="delete-dsoa">Del</button>
+                        </td>
+                    `;
+                    dsoaTbody.appendChild(tr);
+                });
+
+                dsoaTbody.querySelectorAll('button[data-action="delete-dsoa"]').forEach((btn, idx) => {
+                    btn.addEventListener('click', () => {
+                        const { designSpecs } = loadState();
+                        designSpecs.splice(idx, 1);
+                        setOutdoorAirDesignSpecs(project, designSpecs);
+                        renderDsoa();
+                    });
+                });
+            }
+
+            function renderNaturalVentilation() {
+                const { naturalVentilation } = loadState();
+                const zones = getZones();
+                const global = naturalVentilation.global || {};
+                const perZone = Array.isArray(naturalVentilation.perZone)
+                    ? naturalVentilation.perZone
+                    : [];
+
+                // Global
+                const gEnabled = !!global.enabled;
+                const set = (sel, v) => {
+                    const el = panel.querySelector(sel);
+                    if (!el) return;
+                    if (el.type === 'checkbox') el.checked = !!v;
+                    else el.value = v != null ? String(v) : '';
+                };
+
+                set('[data-field="nv-global-enabled"]', gEnabled);
+                set('[data-field="nv-global-method"]', global.calculationMethod || '');
+                set('[data-field="nv-global-flowZone"]', global.designFlowRate);
+                set('[data-field="nv-global-flowArea"]', global.flowPerArea);
+                set('[data-field="nv-global-flowPerson"]', global.flowPerPerson);
+                set('[data-field="nv-global-ach"]', global.airChangesPerHour);
+                set('[data-field="nv-global-type"]', global.ventilationType || '');
+                set('[data-field="nv-global-minTin"]', global.minIndoorTemp);
+                set('[data-field="nv-global-maxTin"]', global.maxIndoorTemp);
+                set('[data-field="nv-global-minTout"]', global.minOutdoorTemp);
+                set('[data-field="nv-global-maxTout"]', global.maxOutdoorTemp);
+                set('[data-field="nv-global-deltaT"]', global.deltaTemp);
+                set('[data-field="nv-global-maxWind"]', global.maxWindSpeed);
+                set('[data-field="nv-global-density"]', global.densityBasis || '');
+
+                // Per-zone
+                nvZonesTbody.innerHTML = '';
+                zones.forEach((z) => {
+                    const zn = String(z.name);
+                    const entry = perZone.find((p) => p.zoneName === zn) || {};
+                    const tr = document.createElement('tr');
+                    tr.dataset.zoneName = zn;
+                    tr.innerHTML = `
+                        <td class="px-1 py-1 align-top text-[--accent-color]">${zn}</td>
+                        <td class="px-1 py-1 align-top">
+                            <input type="checkbox" data-field="override" ${entry.zoneName ? 'checked' : ''}>
+                        </td>
+                        <td class="px-1 py-1 align-top">
+                            <input type="checkbox" data-field="enabled" ${entry.enabled ? 'checked' : ''}>
+                        </td>
+                        <td class="px-1 py-1 align-top">
+                            <select class="w-full" data-field="method">
+                                ${[
+                                    '',
+                                    'Flow/Zone',
+                                    'Flow/Area',
+                                    'Flow/Person',
+                                    'AirChanges/Hour',
+                                ]
+                                    .map((m) => {
+                                        const label = m || '(inherit)';
+                                        const sel = entry.calculationMethod === m ? ' selected' : '';
+                                        return `<option value="${m}"${sel}>${label}</option>`;
+                                    })
+                                    .join('')}
+                            </select>
+                        </td>
+                        <td class="px-1 py-1 align-top">
+                            <input type="number" step="0.001" class="w-full" data-field="flowZone" value="${entry.designFlowRate ?? ''}">
+                        </td>
+                        <td class="px-1 py-1 align-top">
+                            <input type="number" step="0.0001" class="w-full" data-field="flowArea" value="${entry.flowPerArea ?? ''}">
+                        </td>
+                        <td class="px-1 py-1 align-top">
+                            <input type="number" step="0.0001" class="w-full" data-field="flowPerson" value="${entry.flowPerPerson ?? ''}">
+                        </td>
+                        <td class="px-1 py-1 align-top">
+                            <input type="number" step="0.01" class="w-full" data-field="ach" value="${entry.airChangesPerHour ?? ''}">
+                        </td>
+                    `;
+                    nvZonesTbody.appendChild(tr);
+                });
+            }
+
+            function collectDsoaFromUI() {
+                const rows = dsoaTbody.querySelectorAll('tr');
+                const specs = [];
+                rows.forEach((tr) => {
+                    const name = (tr.querySelector('[data-field="name"]')?.value || '').trim();
+                    if (!name) return;
+                    const method = (tr.querySelector('[data-field="method"]')?.value || '').trim();
+                    const num = (field) => {
+                        const el = tr.querySelector(field);
+                        if (!el) return undefined;
+                        const v = parseFloat(el.value);
+                        return Number.isFinite(v) ? v : undefined;
+                    };
+                    const sched = (tr.querySelector('[data-field="sched"]')?.value || '').trim();
+                    const minFracSched = (tr.querySelector('[data-field="minFracSched"]')?.value || '').trim();
+                    const spec = { name };
+                    if (method) spec.method = method;
+                    const fpp = num('[data-field="flowPerPerson"]');
+                    if (fpp != null) spec.flowPerPerson = fpp;
+                    const fpa = num('[data-field="flowPerArea"]');
+                    if (fpa != null) spec.flowPerArea = fpa;
+                    const fpz = num('[data-field="flowPerZone"]');
+                    if (fpz != null) spec.flowPerZone = fpz;
+                    const ach = num('[data-field="ach"]');
+                    if (ach != null) spec.airChangesPerHour = ach;
+                    if (sched) spec.scheduleName = sched;
+                    if (minFracSched) spec.proportionalMinOAFractionScheduleName = minFracSched;
+                    specs.push(spec);
+                });
+                return specs;
+            }
+
+            function collectNaturalVentilationFromUI() {
+                const nv = {};
+
+                const gEnabled = panel.querySelector('[data-field="nv-global-enabled"]')?.checked;
+                if (gEnabled) {
+                    const method = (panel.querySelector('[data-field="nv-global-method"]')?.value || '').trim();
+                    const num = (sel) => {
+                        const el = panel.querySelector(sel);
+                        if (!el) return undefined;
+                        const v = parseFloat(el.value);
+                        return Number.isFinite(v) ? v : undefined;
+                    };
+                    const val = (sel) => {
+                        const el = panel.querySelector(sel);
+                        return (el && el.value || '').trim() || undefined;
+                    };
+                    const global = { enabled: true };
+                    if (method) global.calculationMethod = method;
+                    const fz = num('[data-field="nv-global-flowZone"]');
+                    if (fz != null) global.designFlowRate = fz;
+                    const fa = num('[data-field="nv-global-flowArea"]');
+                    if (fa != null) global.flowPerArea = fa;
+                    const fp = num('[data-field="nv-global-flowPerson"]');
+                    if (fp != null) global.flowPerPerson = fp;
+                    const ach = num('[data-field="nv-global-ach"]');
+                    if (ach != null) global.airChangesPerHour = ach;
+                    const vt = val('[data-field="nv-global-type"]');
+                    if (vt) global.ventilationType = vt;
+                    const minTin = num('[data-field="nv-global-minTin"]');
+                    if (minTin != null) global.minIndoorTemp = minTin;
+                    const maxTin = num('[data-field="nv-global-maxTin"]');
+                    if (maxTin != null) global.maxIndoorTemp = maxTin;
+                    const minTout = num('[data-field="nv-global-minTout"]');
+                    if (minTout != null) global.minOutdoorTemp = minTout;
+                    const maxTout = num('[data-field="nv-global-maxTout"]');
+                    if (maxTout != null) global.maxOutdoorTemp = maxTout;
+                    const dT = num('[data-field="nv-global-deltaT"]');
+                    if (dT != null) global.deltaTemp = dT;
+                    const maxWind = num('[data-field="nv-global-maxWind"]');
+                    if (maxWind != null) global.maxWindSpeed = maxWind;
+                    const dens = val('[data-field="nv-global-density"]');
+                    if (dens) global.densityBasis = dens;
+                    nv.global = global;
+                }
+
+                const perZone = [];
+                nvZonesTbody.querySelectorAll('tr[data-zone-name]').forEach((tr) => {
+                    const zn = tr.dataset.zoneName;
+                    const override = tr.querySelector('[data-field="override"]')?.checked;
+                    if (!override || !zn) return;
+                    const enabled = tr.querySelector('[data-field="enabled"]')?.checked;
+                    const method = (tr.querySelector('[data-field="method"]')?.value || '').trim();
+                    const num = (sel) => {
+                        const el = tr.querySelector(sel);
+                        if (!el) return undefined;
+                        const v = parseFloat(el.value);
+                        return Number.isFinite(v) ? v : undefined;
+                    };
+                    const entry = { zoneName: zn };
+                    if (enabled) entry.enabled = true;
+                    if (method) entry.calculationMethod = method;
+                    const fz = num('[data-field="flowZone"]');
+                    if (fz != null) entry.designFlowRate = fz;
+                    const fa = num('[data-field="flowArea"]');
+                    if (fa != null) entry.flowPerArea = fa;
+                    const fp = num('[data-field="flowPerson"]');
+                    if (fp != null) entry.flowPerPerson = fp;
+                    const ach = num('[data-field="ach"]');
+                    if (ach != null) entry.airChangesPerHour = ach;
+
+                    // Only keep if there is at least one meaningful override
+                    if (
+                        entry.enabled ||
+                        entry.calculationMethod ||
+                        entry.designFlowRate != null ||
+                        entry.flowPerArea != null ||
+                        entry.flowPerPerson != null ||
+                        entry.airChangesPerHour != null
+                    ) {
+                        perZone.push(entry);
+                    }
+                });
+
+                if (perZone.length) {
+                    nv.perZone = perZone;
+                }
+
+                return nv;
+            }
+
+            function addDsoaRow() {
+                // Append a blank row; actual persistence happens on Save.
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-1 py-1 align-top">
+                        <input class="w-full" data-field="name" placeholder="Name">
+                    </td>
+                    <td class="px-1 py-1 align-top">
+                        <select class="w-full" data-field="method">
+                            <option value="">(auto)</option>
+                            <option value="Flow/Person">Flow/Person</option>
+                            <option value="Flow/Area">Flow/Area</option>
+                            <option value="Flow/Zone">Flow/Zone</option>
+                            <option value="AirChanges/Hour">AirChanges/Hour</option>
+                            <option value="Sum">Sum</option>
+                            <option value="Maximum">Maximum</option>
+                        </select>
+                    </td>
+                    <td class="px-1 py-1 align-top">
+                        <input type="number" step="0.0001" class="w-full" data-field="flowPerPerson">
+                    </td>
+                    <td class="px-1 py-1 align-top">
+                        <input type="number" step="0.0001" class="w-full" data-field="flowPerArea">
+                    </td>
+                    <td class="px-1 py-1 align-top">
+                        <input type="number" step="0.0001" class="w-full" data-field="flowPerZone">
+                    </td>
+                    <td class="px-1 py-1 align-top">
+                        <input type="number" step="0.01" class="w-full" data-field="ach">
+                    </td>
+                    <td class="px-1 py-1 align-top">
+                        <input class="w-full" data-field="sched">
+                    </td>
+                    <td class="px-1 py-1 align-top">
+                        <input class="w-full" data-field="minFracSched">
+                    </td>
+                    <td class="px-1 py-1 align-top text-right">
+                        <button class="btn btn-xxs btn-danger" data-action="delete-dsoa">Del</button>
+                    </td>
+                `;
+                dsoaTbody.appendChild(tr);
+                const del = tr.querySelector('button[data-action="delete-dsoa"]');
+                if (del) {
+                    del.addEventListener('click', () => tr.remove());
+                }
+            }
+
+            // Initial render
+            renderDsoa();
+            renderNaturalVentilation();
+
+            if (addDsoaBtn) {
+                addDsoaBtn.addEventListener('click', () => {
+                    addDsoaRow();
+                });
+            }
+
+            if (saveBtn) {
+                saveBtn.addEventListener('click', () => {
+                    try {
+                        const specs = collectDsoaFromUI();
+                        const nv = collectNaturalVentilationFromUI();
+                        setOutdoorAirDesignSpecs(project, specs);
+                        setNaturalVentilation(project, nv);
+                        alert('Outdoor Air & Ventilation configuration saved.');
+                        renderDsoa();
+                        renderNaturalVentilation();
+                    } catch (err) {
+                        console.error('OutdoorAirManager: save failed', err);
+                        alert('Failed to save Outdoor Air & Ventilation configuration. Check console for details.');
+                    }
+                });
+            }
+        })
+        .catch((err) => {
+            console.error('OutdoorAirManager: failed to load config service', err);
+        });
+
+    return panel;
+}
+
+function openShadingManagerPanel() {
+    const panelId = 'panel-energyplus-shading';
+    let panel = document.getElementById(panelId);
+    if (!panel) {
+        panel = createShadingManagerPanel();
+        document.getElementById('window-container').appendChild(panel);
+    }
+    panel.classList.remove('hidden');
+    panel.style.zIndex = getNewZIndex();
+}
+
+/**
+ * Shading & Solar Control Manager
+ * Fully opt-in:
+ *  - If energyPlusConfig.shading is missing/empty, builder behavior is unchanged.
+ *  - Stores high-level hints only; model builder is responsible for mapping.
+ *
+ * Schema (writer side):
+ *  shading: {
+ *    surfaces?: Array<{
+ *      targetType: 'Surface' | 'SubSurface' | 'Zone',
+ *      targetName: string,
+ *      shortWaveReflectance?: number,
+ *      visibleReflectance?: number,
+ *      longWaveEmissivity?: number
+ *    }>,
+ *    windowControls?: Array<{
+ *      name: string,
+ *      windowGroup: string,
+ *      controlType: string,
+ *      shadingDeviceName?: string,
+ *      scheduleName?: string,
+ *      setpointSolar?: number,
+ *      setpointIlluminance?: number,
+ *      setpointTemp?: number,
+ *      glareProtectionFraction?: number,
+ *      typeHint?: string
+ *    }>,
+ *    overhangs?: Array<{
+ *      name: string,
+ *      windowGroup: string,
+ *      depth: number,
+ *      verticalOffset: number,
+ *      leftExt?: number,
+ *      rightExt?: number
+ *    }>
+ *  }
+ */
+function createShadingManagerPanel() {
+    const panel = document.createElement('div');
+    panel.id = 'panel-energyplus-shading';
+    panel.className = 'floating-window ui-panel resizable-panel';
+
+    panel.innerHTML = `
+        <div class="window-header">
+            <span>Shading & Solar Control</span>
+            <div class="window-controls">
+                <div class="window-icon-max" title="Maximize/Restore"></div>
+                <div class="collapse-icon" title="Minimize"></div>
+                <div class="window-icon-close" title="Close"></div>
+            </div>
+        </div>
+        <div class="window-content space-y-3 text-[8px]">
+            <div class="resize-handle-edge top"></div>
+            <div class="resize-handle-edge right"></div>
+            <div class="resize-handle-edge bottom"></div>
+            <div class="resize-handle-edge left"></div>
+            <div class="resize-handle-corner top-left"></div>
+            <div class="resize-handle-corner top-right"></div>
+            <div class="resize-handle-corner bottom-left"></div>
+            <div class="resize-handle-corner bottom-right"></div>
+
+            <p class="info-box !text-[9px] !py-1.5 !px-2">
+                Configure optional shading and window solar control hints.
+                If left empty, Ray-Modeler will not emit any additional shading or shading controls.
+                All sections below are opt-in and safe to ignore for simple workflows.
+            </p>
+
+            <!-- Surface / Zone Optical Properties -->
+            <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                <div class="flex justify-between items-center">
+                    <span class="font-semibold text-[9px] uppercase text-[--text-secondary]">
+                        Surface / Zone Optical Properties
+                    </span>
+                    <button class="btn btn-xxs btn-secondary" data-action="add-surface-opt">
+                        + Add Entry
+                    </button>
+                </div>
+                <div class="border border-gray-700/70 rounded bg-black/40 max-h-40 overflow-y-auto scrollable-panel-inner">
+                    <table class="w-full text-[7px]">
+                        <thead class="bg-black/40">
+                            <tr>
+                                <th class="px-1 py-1 text-left">Target Type</th>
+                                <th class="px-1 py-1 text-left">Target Name</th>
+                                <th class="px-1 py-1 text-left">Short-wave Refl.</th>
+                                <th class="px-1 py-1 text-left">Visible Refl.</th>
+                                <th class="px-1 py-1 text-left">Long-wave Emiss.</th>
+                                <th class="px-1 py-1 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="shading-surfaces-tbody"></tbody>
+                    </table>
+                </div>
+                <p class="text-[7px] text-[--text-secondary]">
+                    Use this to override optical properties for specific surfaces, subsurfaces, or zones.
+                    Values must be between 0 and 1. Incomplete rows are ignored on save.
+                </p>
+            </div>
+
+            <!-- Window Shading Controls -->
+            <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                <div class="flex justify-between items-center">
+                    <span class="font-semibold text-[9px] uppercase text-[--text-secondary]">
+                        Window Shading Controls
+                    </span>
+                    <button class="btn btn-xxs btn-secondary" data-action="add-window-control">
+                        + Add Control
+                    </button>
+                </div>
+                <div class="border border-gray-700/70 rounded bg-black/40 max-h-40 overflow-y-auto scrollable-panel-inner">
+                    <table class="w-full text-[7px]">
+                        <thead class="bg-black/40">
+                            <tr>
+                                <th class="px-1 py-1 text-left">Name</th>
+                                <th class="px-1 py-1 text-left">Window Group</th>
+                                <th class="px-1 py-1 text-left">Control Type</th>
+                                <th class="px-1 py-1 text-left">Device / Sched</th>
+                                <th class="px-1 py-1 text-left">Setpoints (Solar / Lux / °C)</th>
+                                <th class="px-1 py-1 text-left">Glare Frac</th>
+                                <th class="px-1 py-1 text-left">Type Hint</th>
+                                <th class="px-1 py-1 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="shading-window-controls-tbody"></tbody>
+                    </table>
+                </div>
+                <p class="text-[7px] text-[--text-secondary]">
+                    High-level hints mapped by the model builder to WindowProperty:ShadingControl etc.
+                    Provide at minimum Name, Window Group, and Control Type.
+                </p>
+            </div>
+
+            <!-- Fixed Overhangs / Fins (optional, advanced) -->
+            <details class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                <summary class="font-semibold text-[9px] uppercase text-[--text-secondary] cursor-pointer">
+                    Fixed Overhangs (Advanced, optional)
+                </summary>
+                <div class="flex justify-end mb-1">
+                    <button class="btn btn-xxs btn-secondary" data-action="add-overhang">
+                        + Add Overhang
+                    </button>
+                </div>
+                <div class="border border-gray-700/70 rounded bg-black/40 max-h-32 overflow-y-auto scrollable-panel-inner">
+                    <table class="w-full text-[7px]">
+                        <thead class="bg-black/40">
+                            <tr>
+                                <th class="px-1 py-1 text-left">Name</th>
+                                <th class="px-1 py-1 text-left">Window Group</th>
+                                <th class="px-1 py-1 text-left">Depth [m]</th>
+                                <th class="px-1 py-1 text-left">Vert. Offset [m]</th>
+                                <th class="px-1 py-1 text-left">Left Ext [m]</th>
+                                <th class="px-1 py-1 text-left">Right Ext [m]</th>
+                                <th class="px-1 py-1 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="shading-overhangs-tbody"></tbody>
+                    </table>
+                </div>
+                <p class="text-[7px] text-[--text-secondary]">
+                    Overhang definitions are passed as hints. The builder may emit Shading:* objects where supported.
+                    Leave blank if you do not need geometric shading.
+                </p>
+            </details>
+
+            <div class="flex justify-end">
+                <button class="btn btn-xxs btn-secondary" data-action="save-shading">
+                    Save Shading & Solar Control
+                </button>
+            </div>
+        </div>
+    `;
+
+    if (typeof window !== 'undefined' && window.initializePanelControls) {
+        window.initializePanelControls(panel);
+    } else {
+        const closeButton = panel.querySelector('.window-icon-close');
+        if (closeButton) {
+            closeButton.onclick = () => panel.classList.add('hidden');
+        }
+    }
+
+    const surfacesTbody = panel.querySelector('.shading-surfaces-tbody');
+    const windowControlsTbody = panel.querySelector('.shading-window-controls-tbody');
+    const overhangsTbody = panel.querySelector('.shading-overhangs-tbody');
+    const addSurfaceBtn = panel.querySelector('[data-action="add-surface-opt"]');
+    const addWinCtrlBtn = panel.querySelector('[data-action="add-window-control"]');
+    const addOverhangBtn = panel.querySelector('[data-action="add-overhang"]');
+    const saveBtn = panel.querySelector('[data-action="save-shading"]');
+
+    function getShadingState() {
+        const meta =
+            (typeof project.getMetadata === 'function' && project.getMetadata()) ||
+            project.metadata ||
+            {};
+        const ep = meta.energyPlusConfig || meta.energyplus || {};
+        const shading = ep.shading || {};
+
+        const surfaces = Array.isArray(shading.surfaces) ? shading.surfaces.slice() : [];
+        const windowControls = Array.isArray(shading.windowControls)
+            ? shading.windowControls.slice()
+            : [];
+        const overhangs = Array.isArray(shading.overhangs) ? shading.overhangs.slice() : [];
+
+        return { meta, ep, shading, surfaces, windowControls, overhangs };
+    }
+
+    function clamp01(v) {
+        if (!Number.isFinite(v)) return undefined;
+        if (v < 0) return 0;
+        if (v > 1) return 1;
+        return v;
+    }
+
+    function renderSurfaces() {
+        const { surfaces } = getShadingState();
+        surfacesTbody.innerHTML = '';
+
+        if (!surfaces.length) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="px-1 py-1 text-[7px] text-[--text-secondary]" colspan="6">
+                    No surface/zone shading overrides defined.
+                </td>
+            `;
+            surfacesTbody.appendChild(tr);
+            return;
+        }
+
+        surfaces.forEach((s, idx) => {
+            const tr = document.createElement('tr');
+            tr.dataset.index = String(idx);
+            tr.innerHTML = `
+                <td class="px-1 py-1 align-top">
+                    <select class="w-full" data-field="targetType">
+                        ${['Surface','SubSurface','Zone'].map(t => `
+                            <option value="${t}"${(s.targetType || 'Surface') === t ? ' selected' : ''}>${t}</option>
+                        `).join('')}
+                    </select>
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input class="w-full" data-field="targetName" value="${s.targetName || ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input type="number" step="0.01" min="0" max="1" class="w-full"
+                        data-field="swRefl" value="${s.shortWaveReflectance ?? ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input type="number" step="0.01" min="0" max="1" class="w-full"
+                        data-field="visRefl" value="${s.visibleReflectance ?? ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input type="number" step="0.01" min="0" max="1" class="w-full"
+                        data-field="lwEmiss" value="${s.longWaveEmissivity ?? ''}">
+                </td>
+                <td class="px-1 py-1 align-top text-right">
+                    <button class="btn btn-xxs btn-danger" data-action="delete-surface">Delete</button>
+                </td>
+            `;
+            surfacesTbody.appendChild(tr);
+        });
+
+        surfacesTbody.querySelectorAll('button[data-action="delete-surface"]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const row = btn.closest('tr');
+                if (row) row.remove();
+            });
+        });
+    }
+
+    function addSurfaceRow() {
+        // Remove placeholder row if present
+        if (surfacesTbody.children.length === 1) {
+            const only = surfacesTbody.children[0];
+            if (only && only.querySelector('td[colspan]')) {
+                surfacesTbody.innerHTML = '';
+            }
+        }
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="px-1 py-1 align-top">
+                <select class="w-full" data-field="targetType">
+                    <option value="Surface">Surface</option>
+                    <option value="SubSurface">SubSurface</option>
+                    <option value="Zone">Zone</option>
+                </select>
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input class="w-full" data-field="targetName" placeholder="Name">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input type="number" step="0.01" min="0" max="1" class="w-full" data-field="swRefl">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input type="number" step="0.01" min="0" max="1" class="w-full" data-field="visRefl">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input type="number" step="0.01" min="0" max="1" class="w-full" data-field="lwEmiss">
+            </td>
+            <td class="px-1 py-1 align-top text-right">
+                <button class="btn btn-xxs btn-danger" data-action="delete-surface">Delete</button>
+            </td>
+        `;
+        surfacesTbody.appendChild(tr);
+        tr.querySelector('button[data-action="delete-surface"]').addEventListener('click', () => {
+            tr.remove();
+        });
+    }
+
+    function renderWindowControls() {
+        const { windowControls } = getShadingState();
+        windowControlsTbody.innerHTML = '';
+
+        if (!windowControls.length) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="px-1 py-1 text-[7px] text-[--text-secondary]" colspan="8">
+                    No window shading controls defined.
+                </td>
+            `;
+            windowControlsTbody.appendChild(tr);
+            return;
+        }
+
+        windowControls.forEach((c, idx) => {
+            const tr = document.createElement('tr');
+            tr.dataset.index = String(idx);
+            tr.innerHTML = `
+                <td class="px-1 py-1 align-top">
+                    <input class="w-full" data-field="name" value="${c.name || ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input class="w-full" data-field="windowGroup" value="${c.windowGroup || ''}" placeholder="Group/tag">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <select class="w-full" data-field="controlType">
+                        ${[
+                            '',
+                            'AlwaysOn',
+                            'OnIfHighSolar',
+                            'OnIfHighGlare',
+                            'OnIfHighT',
+                            'OnIfHighSolarOrT',
+                        ].map((t) => `
+                            <option value="${t}"${(c.controlType || '') === t ? ' selected' : ''}>
+                                ${t || '(select)'}
+                            </option>
+                        `).join('')}
+                    </select>
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input class="w-full mb-0.5" data-field="device" placeholder="Shading device"
+                        value="${c.shadingDeviceName || ''}">
+                    <input class="w-full" data-field="schedule" placeholder="Schedule"
+                        value="${c.scheduleName || ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <div class="grid grid-cols-3 gap-0.5">
+                        <input type="number" step="1" class="w-full" data-field="setSolar"
+                            placeholder="W/m²" value="${c.setpointSolar ?? ''}">
+                        <input type="number" step="1" class="w-full" data-field="setLux"
+                            placeholder="lux" value="${c.setpointIlluminance ?? ''}">
+                        <input type="number" step="0.1" class="w-full" data-field="setTemp"
+                            placeholder="°C" value="${c.setpointTemp ?? ''}">
+                    </div>
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input type="number" step="0.05" min="0" max="1" class="w-full"
+                        data-field="glareFrac" value="${c.glareProtectionFraction ?? ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <select class="w-full" data-field="typeHint">
+                        ${['','Blind','Shade','Screen','SwitchableGlazing'].map((t) => `
+                            <option value="${t}"${(c.typeHint || '') === t ? ' selected' : ''}>
+                                ${t || '(auto)'}
+                            </option>
+                        `).join('')}
+                    </select>
+                </td>
+                <td class="px-1 py-1 align-top text-right">
+                    <button class="btn btn-xxs btn-danger" data-action="delete-window-control">Delete</button>
+                </td>
+            `;
+            windowControlsTbody.appendChild(tr);
+        });
+
+        windowControlsTbody
+            .querySelectorAll('button[data-action="delete-window-control"]')
+            .forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const row = btn.closest('tr');
+                    if (row) row.remove();
+                });
+            });
+    }
+
+    function addWindowControlRow() {
+        if (windowControlsTbody.children.length === 1) {
+            const only = windowControlsTbody.children[0];
+            if (only && only.querySelector('td[colspan]')) {
+                windowControlsTbody.innerHTML = '';
+            }
+        }
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="px-1 py-1 align-top">
+                <input class="w-full" data-field="name" placeholder="Control name">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input class="w-full" data-field="windowGroup" placeholder="Window group/tag">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <select class="w-full" data-field="controlType">
+                    <option value="">(select)</option>
+                    <option value="AlwaysOn">AlwaysOn</option>
+                    <option value="OnIfHighSolar">OnIfHighSolar</option>
+                    <option value="OnIfHighGlare">OnIfHighGlare</option>
+                    <option value="OnIfHighT">OnIfHighT</option>
+                    <option value="OnIfHighSolarOrT">OnIfHighSolarOrT</option>
+                </select>
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input class="w-full mb-0.5" data-field="device" placeholder="Shading device">
+                <input class="w-full" data-field="schedule" placeholder="Schedule">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <div class="grid grid-cols-3 gap-0.5">
+                    <input type="number" step="1" class="w-full" data-field="setSolar" placeholder="W/m²">
+                    <input type="number" step="1" class="w-full" data-field="setLux" placeholder="lux">
+                    <input type="number" step="0.1" class="w-full" data-field="setTemp" placeholder="°C">
+                </div>
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input type="number" step="0.05" min="0" max="1" class="w-full"
+                    data-field="glareFrac" placeholder="0-1">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <select class="w-full" data-field="typeHint">
+                    <option value="">(auto)</option>
+                    <option value="Blind">Blind</option>
+                    <option value="Shade">Shade</option>
+                    <option value="Screen">Screen</option>
+                    <option value="SwitchableGlazing">SwitchableGlazing</option>
+                </select>
+            </td>
+            <td class="px-1 py-1 align-top text-right">
+                <button class="btn btn-xxs btn-danger" data-action="delete-window-control">Delete</button>
+            </td>
+        `;
+        windowControlsTbody.appendChild(tr);
+        tr.querySelector('button[data-action="delete-window-control"]').addEventListener('click', () => {
+            tr.remove();
+        });
+    }
+
+    function renderOverhangs() {
+        const { overhangs } = getShadingState();
+        overhangsTbody.innerHTML = '';
+
+        if (!overhangs.length) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="px-1 py-1 text-[7px] text-[--text-secondary]" colspan="7">
+                    No overhangs defined.
+                </td>
+            `;
+            overhangsTbody.appendChild(tr);
+            return;
+        }
+
+        overhangs.forEach((o, idx) => {
+            const tr = document.createElement('tr');
+            tr.dataset.index = String(idx);
+            tr.innerHTML = `
+                <td class="px-1 py-1 align-top">
+                    <input class="w-full" data-field="name" value="${o.name || ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input class="w-full" data-field="windowGroup" value="${o.windowGroup || ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input type="number" step="0.01" class="w-full" data-field="depth" value="${o.depth ?? ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input type="number" step="0.01" class="w-full" data-field="vOffset" value="${o.verticalOffset ?? ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input type="number" step="0.01" class="w-full" data-field="leftExt" value="${o.leftExt ?? ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input type="number" step="0.01" class="w-full" data-field="rightExt" value="${o.rightExt ?? ''}">
+                </td>
+                <td class="px-1 py-1 align-top text-right">
+                    <button class="btn btn-xxs btn-danger" data-action="delete-overhang">Delete</button>
+                </td>
+            `;
+            overhangsTbody.appendChild(tr);
+        });
+
+        overhangsTbody
+            .querySelectorAll('button[data-action="delete-overhang"]')
+            .forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const row = btn.closest('tr');
+                    if (row) row.remove();
+                });
+            });
+    }
+
+    function addOverhangRow() {
+        if (overhangsTbody.children.length === 1) {
+            const only = overhangsTbody.children[0];
+            if (only && only.querySelector('td[colspan]')) {
+                overhangsTbody.innerHTML = '';
+            }
+        }
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="px-1 py-1 align-top">
+                <input class="w-full" data-field="name" placeholder="Overhang name">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input class="w-full" data-field="windowGroup" placeholder="Window group/tag">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input type="number" step="0.01" class="w-full" data-field="depth" placeholder="Depth">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input type="number" step="0.01" class="w-full" data-field="vOffset" placeholder="Offset">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input type="number" step="0.01" class="w-full" data-field="leftExt" placeholder="Left">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input type="number" step="0.01" class="w-full" data-field="rightExt" placeholder="Right">
+            </td>
+            <td class="px-1 py-1 align-top text-right">
+                <button class="btn btn-xxs btn-danger" data-action="delete-overhang">Delete</button>
+            </td>
+        `;
+        overhangsTbody.appendChild(tr);
+        tr.querySelector('button[data-action="delete-overhang"]').addEventListener('click', () => {
+            tr.remove();
+        });
+    }
+
+    function collectAndSaveShading() {
+        const { meta, ep } = getShadingState();
+
+        // Collect surfaces
+        const surfaces = [];
+        surfacesTbody.querySelectorAll('tr').forEach((tr) => {
+            const hasPlaceholder = tr.querySelector('td[colspan]');
+            if (hasPlaceholder) return;
+
+            const targetName = (tr.querySelector('[data-field="targetName"]')?.value || '').trim();
+            if (!targetName) return;
+
+            const targetType =
+                tr.querySelector('[data-field="targetType"]')?.value || 'Surface';
+
+            const num = (field) => {
+                const el = tr.querySelector(`[data-field="${field}"]`);
+                if (!el) return undefined;
+                const v = parseFloat(el.value);
+                return Number.isFinite(v) ? v : undefined;
+            };
+
+            const sw = clamp01(num('swRefl'));
+            const vis = clamp01(num('visRefl'));
+            const lw = clamp01(num('lwEmiss'));
+
+            if (sw == null && vis == null && lw == null) {
+                return;
+            }
+
+            const entry = {
+                targetType,
+                targetName,
+            };
+            if (sw != null) entry.shortWaveReflectance = sw;
+            if (vis != null) entry.visibleReflectance = vis;
+            if (lw != null) entry.longWaveEmissivity = lw;
+            surfaces.push(entry);
+        });
+
+        // Collect window controls
+        const windowControls = [];
+        windowControlsTbody.querySelectorAll('tr').forEach((tr) => {
+            const hasPlaceholder = tr.querySelector('td[colspan]');
+            if (hasPlaceholder) return;
+
+            const name = (tr.querySelector('[data-field="name"]')?.value || '').trim();
+            const windowGroup =
+                (tr.querySelector('[data-field="windowGroup"]')?.value || '').trim();
+            const controlType =
+                (tr.querySelector('[data-field="controlType"]')?.value || '').trim();
+
+            if (!name || !windowGroup || !controlType) {
+                return;
+            }
+
+            const device =
+                (tr.querySelector('[data-field="device"]')?.value || '').trim() || undefined;
+            const schedule =
+                (tr.querySelector('[data-field="schedule"]')?.value || '').trim() ||
+                undefined;
+
+            const num = (field) => {
+                const el = tr.querySelector(`[data-field="${field}"]`);
+                if (!el) return undefined;
+                const v = parseFloat(el.value);
+                return Number.isFinite(v) ? v : undefined;
+            };
+
+            const solar = num('setSolar');
+            const lux = num('setLux');
+            const temp = num('setTemp');
+            let glare = num('glareFrac');
+            if (glare != null) glare = clamp01(glare);
+
+            const typeHint =
+                (tr.querySelector('[data-field="typeHint"]')?.value || '').trim() || undefined;
+
+            const entry = {
+                name,
+                windowGroup,
+                controlType,
+            };
+            if (device) entry.shadingDeviceName = device;
+            if (schedule) entry.scheduleName = schedule;
+            if (solar != null) entry.setpointSolar = solar;
+            if (lux != null) entry.setpointIlluminance = lux;
+            if (temp != null) entry.setpointTemp = temp;
+            if (glare != null) entry.glareProtectionFraction = glare;
+            if (typeHint) entry.typeHint = typeHint;
+
+            windowControls.push(entry);
+        });
+
+        // Collect overhangs
+        const overhangs = [];
+        overhangsTbody.querySelectorAll('tr').forEach((tr) => {
+            const hasPlaceholder = tr.querySelector('td[colspan]');
+            if (hasPlaceholder) return;
+
+            const name = (tr.querySelector('[data-field="name"]')?.value || '').trim();
+            const windowGroup =
+                (tr.querySelector('[data-field="windowGroup"]')?.value || '').trim();
+
+            const num = (field) => {
+                const el = tr.querySelector(`[data-field="${field}"]`);
+                if (!el) return NaN;
+                const v = parseFloat(el.value);
+                return v;
+            };
+
+            const depth = num('depth');
+            const vOffset = num('vOffset');
+            const leftExt = num('leftExt');
+            const rightExt = num('rightExt');
+
+            if (!name || !windowGroup || !Number.isFinite(depth) || !Number.isFinite(vOffset)) {
+                return;
+            }
+
+            const entry = {
+                name,
+                windowGroup,
+                depth,
+                verticalOffset: vOffset,
+            };
+            if (Number.isFinite(leftExt)) entry.leftExt = leftExt;
+            if (Number.isFinite(rightExt)) entry.rightExt = rightExt;
+
+            overhangs.push(entry);
+        });
+
+        const shading = {};
+        if (surfaces.length) shading.surfaces = surfaces;
+        if (windowControls.length) shading.windowControls = windowControls;
+        if (overhangs.length) shading.overhangs = overhangs;
+
+        const nextEP = {
+            ...ep,
+        };
+        if (Object.keys(shading).length) {
+            nextEP.shading = shading;
+        } else {
+            // Leave shading undefined/removed if all sections empty
+            if (nextEP.shading) {
+                delete nextEP.shading;
+            }
+        }
+
+        if (typeof project.updateMetadata === 'function') {
+            project.updateMetadata({
+                ...meta,
+                energyPlusConfig: nextEP,
+            });
+        } else {
+            project.metadata = {
+                ...(project.metadata || meta),
+                energyPlusConfig: nextEP,
+            };
+        }
+    }
+
+    if (addSurfaceBtn) {
+        addSurfaceBtn.addEventListener('click', () => {
+            addSurfaceRow();
+        });
+    }
+    if (addWinCtrlBtn) {
+        addWinCtrlBtn.addEventListener('click', () => {
+            addWindowControlRow();
+        });
+    }
+    if (addOverhangBtn) {
+        addOverhangBtn.addEventListener('click', () => {
+            addOverhangRow();
+        });
+    }
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            try {
+                collectAndSaveShading();
+                alert('Shading & Solar Control configuration saved.');
+            } catch (err) {
+                console.error('ShadingManager: save failed', err);
+                alert('Failed to save Shading & Solar Control configuration. Check console for details.');
+            }
+        });
+    }
+
+    // Initial render from existing config (if any)
+    renderSurfaces();
+    renderWindowControls();
+    renderOverhangs();
+
+    return panel;
+}
+
 function createDaylightingManagerPanel() {
     const panel = document.createElement('div');
     panel.id = 'panel-energyplus-daylighting';
@@ -4122,7 +6197,7 @@ function createDaylightingManagerPanel() {
 
     panel.innerHTML = `
         <div class="window-header">
-            <span>Daylighting</span>
+            <span>Daylighting & Lighting Outputs</span>
             <!-- Help button removed -->
             <div class="window-controls">
                 <div class="window-icon-max" title="Maximize/Restore"></div>
@@ -4140,8 +6215,10 @@ function createDaylightingManagerPanel() {
             <div class="resize-handle-corner bottom-left"></div>
             <div class="resize-handle-corner bottom-right"></div>
             <p class="info-box !text-[10px] !py-1.5 !px-2">
-                Configure per-zone <code>Daylighting:Controls</code> and <code>Output:IlluminanceMap</code>.
+                Configure per-zone <code>Daylighting:Controls</code>, <code>Output:IlluminanceMap</code>,
+                and selected <code>Output:Variable</code> entries.
                 Settings are stored in <code>energyPlusConfig.daylighting</code> and consumed by the EnergyPlus model builder.
+                If left empty, Ray-Modeler emits no additional daylighting controls/maps beyond defaults.
             </p>
 
             <!-- Per-zone Daylighting:Controls -->
@@ -4189,8 +6266,34 @@ function createDaylightingManagerPanel() {
                 </div>
             </div>
 
+            <!-- Output:Variable (lighting/daylighting focused) -->
+            <div class="space-y-1">
+                <div class="flex justify-between items-center">
+                    <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Lighting & Daylighting Output Variables</span>
+                    <button class="btn btn-xxs btn-secondary" data-action="add-output-var">+ Add Variable</button>
+                </div>
+                <div class="border border-gray-700/70 rounded bg-black/40 max-h-40 overflow-y-auto scrollable-panel-inner">
+                    <table class="w-full text-[8px]">
+                        <thead class="bg-black/40">
+                            <tr>
+                                <th class="px-1 py-1 text-left">Key</th>
+                                <th class="px-1 py-1 text-left">Variable Name</th>
+                                <th class="px-1 py-1 text-left">Frequency</th>
+                                <th class="px-1 py-1 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="daylighting-output-vars-tbody"></tbody>
+                    </table>
+                </div>
+                <p class="text-[7px] text-[--text-secondary]">
+                    Examples: Key = zone name or "Environment"; Variable = "Zone Lights Electric Power";
+                    Frequency = Hourly / Timestep / RunPeriod, etc.
+                    These entries are stored in <code>energyPlusConfig.daylighting.outputs.variables</code>.
+                </p>
+            </div>
+
             <div class="flex justify-end gap-2">
-                <button class="btn btn-xxs btn-secondary" data-action="save-daylighting">Save Daylighting</button>
+                <button class="btn btn-xxs btn-secondary" data-action="save-daylighting">Save Daylighting & Outputs</button>
             </div>
         </div>
     `;
@@ -4205,19 +6308,20 @@ function createDaylightingManagerPanel() {
     }
 
     const controlsTbody = panel.querySelector('.daylighting-controls-tbody');
+    const illumTbody = panel.querySelector('.illum-maps-tbody');
+    const outputVarsTbody = panel.querySelector('.daylighting-output-vars-tbody');
+    const addIllumBtn = panel.querySelector('[data-action="add-illum-map"]');
+    const addOutputVarBtn = panel.querySelector('[data-action="add-output-var"]');
+    const saveBtn = panel.querySelector('[data-action="save-daylighting"]');
+
     const headerHelp = panel.querySelector('[data-action="open-help-daylighting"]');
     if (headerHelp) {
         headerHelp.addEventListener('click', (ev) => {
             ev.preventDefault();
             ev.stopPropagation();
-            // Daylighting header help disabled
             console.debug('[EnergyPlus] Daylighting help disabled');
-            // openHelpPanel('config/daylighting');
         });
     }
-    const illumTbody = panel.querySelector('.illum-maps-tbody');
-    const addIllumBtn = panel.querySelector('[data-action="add-illum-map"]');
-    const saveBtn = panel.querySelector('[data-action="save-daylighting"]');
 
     function getMetaEPDaylighting() {
         const meta =
@@ -4408,6 +6512,82 @@ function createDaylightingManagerPanel() {
         }
     }
 
+    function renderOutputVariables() {
+        const { daylighting } = getMetaEPDaylighting();
+        const outputs = daylighting.outputs || {};
+        const vars = Array.isArray(outputs.variables) ? outputs.variables : [];
+        outputVarsTbody.innerHTML = '';
+
+        if (!vars.length) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="px-1 py-1 text-[7px] text-[--text-secondary]" colspan="4">
+                    No Output:Variable entries defined for daylighting/lighting.
+                </td>
+            `;
+            outputVarsTbody.appendChild(tr);
+            return;
+        }
+
+        vars.forEach((v, idx) => {
+            const tr = document.createElement('tr');
+            tr.dataset.index = String(idx);
+            tr.innerHTML = `
+                <td class="px-1 py-1 align-top">
+                    <input class="w-full text-[8px]" data-field="key" value="${v.key || ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input class="w-full text-[8px]" data-field="variableName" value="${v.variableName || ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <select class="w-full text-[8px]" data-field="freq">
+                        ${['Timestep','Hourly','Daily','Monthly','RunPeriod'].map((f) => `
+                            <option value="${f}"${(v.reportingFrequency || 'Hourly') === f ? ' selected' : ''}>${f}</option>
+                        `).join('')}
+                    </select>
+                </td>
+                <td class="px-1 py-1 align-top text-right">
+                    <button class="btn btn-xxs btn-danger" data-action="delete-var">Delete</button>
+                </td>
+            `;
+            outputVarsTbody.appendChild(tr);
+        });
+
+        outputVarsTbody.querySelectorAll('button[data-action="delete-var"]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const row = btn.closest('tr');
+                if (row) row.remove();
+            });
+        });
+    }
+
+    function addOutputVarRow() {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="px-1 py-1 align-top">
+                <input class="w-full text-[8px]" data-field="key" placeholder="Key (zone name, Environment, *)">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input class="w-full text-[8px]" data-field="variableName" placeholder="Variable Name">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <select class="w-full text-[8px]" data-field="freq">
+                    <option value="Hourly" selected>Hourly</option>
+                    <option value="Timestep">Timestep</option>
+                    <option value="Daily">Daily</option>
+                    <option value="Monthly">Monthly</option>
+                    <option value="RunPeriod">RunPeriod</option>
+                </select>
+            </td>
+            <td class="px-1 py-1 align-top text-right">
+                <button class="btn btn-xxs btn-danger" data-action="delete-var">Delete</button>
+            </td>
+        `;
+        outputVarsTbody.appendChild(tr);
+        tr.querySelector('[data-action="delete-var"]').addEventListener('click', () => {
+            tr.remove();
+        });
+    }
 
     function collectDaylightingFromUI() {
         const { meta, ep } = getMetaEPDaylighting();
@@ -4521,14 +6701,32 @@ function createDaylightingManagerPanel() {
             });
         });
 
+        // Output:Variable (lighting/daylighting)
+        const vars = [];
+        outputVarsTbody.querySelectorAll('tr').forEach((tr) => {
+            const key = (tr.querySelector('[data-field="key"]')?.value || '').trim();
+            const variableName = (tr.querySelector('[data-field="variableName"]')?.value || '').trim();
+            const freq = (tr.querySelector('[data-field="freq"]')?.value || '').trim() || 'Hourly';
+            if (!key || !variableName) return;
+            vars.push({
+                key,
+                variableName,
+                reportingFrequency: freq,
+            });
+        });
+
         const nextDaylighting = {};
         if (controls.length) {
             nextDaylighting.controls = controls;
         }
-        if (illuminanceMaps.length) {
-            nextDaylighting.outputs = {
-                illuminanceMaps,
-            };
+        if (illuminanceMaps.length || vars.length) {
+            nextDaylighting.outputs = {};
+            if (illuminanceMaps.length) {
+                nextDaylighting.outputs.illuminanceMaps = illuminanceMaps;
+            }
+            if (vars.length) {
+                nextDaylighting.outputs.variables = vars;
+            }
         }
 
         const nextEP = {
@@ -4542,6 +6740,12 @@ function createDaylightingManagerPanel() {
     if (addIllumBtn) {
         addIllumBtn.addEventListener('click', () => {
             addIlluminanceMapRow();
+        });
+    }
+
+    if (addOutputVarBtn) {
+        addOutputVarBtn.addEventListener('click', () => {
+            addOutputVarRow();
         });
     }
 
@@ -4560,7 +6764,7 @@ function createDaylightingManagerPanel() {
                         energyPlusConfig: nextEP,
                     };
                 }
-                alert('Daylighting configuration saved.');
+                alert('Daylighting & Outputs configuration saved.');
             } catch (err) {
                 console.error('DaylightingManager: save failed', err);
                 alert('Failed to save Daylighting configuration. Check console for details.');
@@ -4568,8 +6772,10 @@ function createDaylightingManagerPanel() {
         });
     }
 
+    // Initial render using existing config (supports legacy energyPlusConfig.daylighting)
     renderControls();
     renderIlluminanceMaps();
+    renderOutputVariables();
 
     return panel;
 }

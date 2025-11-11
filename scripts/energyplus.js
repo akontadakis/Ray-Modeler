@@ -82,6 +82,12 @@ async function generateAndStoreIdf() {
         // Canonical normalized blocks
         simulationControl: sim,
         weather,
+
+        // Advanced / extended EnergyPlus configuration blocks
+        sizing: config.sizing,
+        outdoorAir: config.outdoorAir,
+        naturalVentilation: config.naturalVentilation,
+        shading: config.shading,
     };
 
     // Optional: attempt to reuse diagnostics when available to avoid duplicate work.
@@ -146,6 +152,12 @@ async function generateEnergyPlusDiagnostics() {
         idealLoads: config.idealLoads,
         thermostats: config.thermostats,
         daylighting: config.daylighting,
+
+        // Advanced / extended EnergyPlus configuration blocks
+        sizing: config.sizing,
+        outdoorAir: config.outdoorAir,
+        naturalVentilation: config.naturalVentilation,
+        shading: config.shading,
     };
 
     return buildEnergyPlusDiagnostics(options);
