@@ -1,11 +1,14 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
-const fs = require('fs/promises');
-const { exec, spawn } = require('child_process');
 const os = require('os');
+const { exec, spawn } = require('child_process');
+const fs = require('fs');
+const fsp = require('fs/promises');
+
+let mainWindow;
 
 function createWindow() {
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     webPreferences: {
@@ -16,6 +19,7 @@ function createWindow() {
   });
 
   mainWindow.loadFile('index.html');
+
   // mainWindow.webContents.openDevTools(); // Uncomment to see developer tools
 }
 
@@ -35,19 +39,18 @@ app.whenReady().then(() => {
 
   // Handle request to save the entire project
   ipcMain.handle('fs:saveProject', async (event, { projectPath, files }) => {
-      for (const file of files) {
-          try {
-              const fullPath = path.join(projectPath, ...file.path);
-              const dir = path.dirname(fullPath);
-              await fs.mkdir(dir, { recursive: true });
-              await fs.writeFile(fullPath, file.content);
-          } catch (err) {
-              console.error(`Failed to save file: ${file.path.join('/')}`, err);
-              // You could send an error message back to the renderer here
-              return false; // Indicate failure
-          }
+    for (const file of files) {
+      try {
+        const fullPath = path.join(projectPath, ...file.path);
+        const dir = path.dirname(fullPath);
+        await fsp.mkdir(dir, { recursive: true });
+        await fsp.writeFile(fullPath, file.content);
+      } catch (err) {
+        console.error(`Failed to save file: ${file.path.join('/')}`, err);
+        return false;
       }
-      return true; // Indicate success
+    }
+    return true;
   });
 
 
@@ -68,42 +71,130 @@ app.whenReady().then(() => {
 
     child.stderr.on('data', (data) => {
       event.sender.send('script-output', `ERROR: ${data.toString()}`);
+    });
+
+    child.on('exit', (code) => {
+      event.sender.send('script-exit', code);
+    });
   });
 
-  child.on('exit', (code) => {
-    event.sender.send('script-exit', code);
+  /**
+   * EnergyPlus IPC bridge (updated contract).
+   *
+   * Renderer calls: window.electronAPI.runEnergyPlus({
+   *   idfPath,
+   *   epwPath,
+   *   energyPlusPath,
+   *   runName?,   // e.g. "annual", "heating-design", ...
+   *   runId?      // optional; if omitted, we generate one
+   * })
+   *
+   * Emits to renderer:
+   *  - 'energyplus-output': { runId, chunk, stream }
+   *  - 'energyplus-exit': {
+   *        runId,
+   *        exitCode,
+   *        outputDir,
+   *        errContent?,      // optional eplusout.err contents
+   *        csvContents?      // reserved for future use
+   *    }
+   *
+   * Multiple runs may be in-flight; all events are tagged by runId.
+   */
+  ipcMain.on('run-energyplus', (_event, options = {}) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+
+    try {
+      const {
+        idfPath,
+        epwPath,
+        energyPlusPath,
+        runName = 'energyplus-run',
+        runId: providedRunId,
+      } = options || {};
+
+      const runId = providedRunId || `${runName}-${Date.now()}`;
+
+      if (!idfPath || !epwPath || !energyPlusPath) {
+        mainWindow.webContents.send('energyplus-exit', {
+          runId,
+          exitCode: 1,
+          errContent:
+            'EnergyPlus run aborted: idfPath, epwPath, and energyPlusPath are required.',
+        });
+        return;
+      }
+
+      const cwd = process.cwd();
+      const runsDir = path.join(cwd, 'runs');
+      if (!fs.existsSync(runsDir)) {
+        fs.mkdirSync(runsDir, { recursive: true });
+      }
+      const outputDir = path.join(runsDir, runName);
+      if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+      }
+
+      const args = ['-w', epwPath, '-d', outputDir, '-r', idfPath];
+
+      const child = spawn(energyPlusPath, args, {
+        cwd,
+        shell: false,
+      });
+
+      const sendOutput = (chunk, stream) => {
+        if (!chunk || !mainWindow || mainWindow.isDestroyed()) return;
+        mainWindow.webContents.send('energyplus-output', {
+          runId,
+          chunk: chunk.toString(),
+          stream,
+        });
+      };
+
+      child.stdout.on('data', (data) => sendOutput(data, 'stdout'));
+      child.stderr.on('data', (data) => sendOutput(data, 'stderr'));
+
+      child.on('error', (err) => {
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        mainWindow.webContents.send('energyplus-exit', {
+          runId,
+          exitCode: 1,
+          outputDir,
+          errContent: `Failed to start EnergyPlus: ${err.message}`,
+        });
+      });
+
+      child.on('close', (code) => {
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+
+        let errContent;
+        const errPath = path.join(outputDir, 'eplusout.err');
+        try {
+          if (fs.existsSync(errPath)) {
+            errContent = fs.readFileSync(errPath, 'utf8');
+          }
+        } catch {
+          // ignore
+        }
+
+        const payload = {
+          runId,
+          exitCode: typeof code === 'number' ? code : 0,
+          outputDir,
+          errContent,
+        };
+
+        mainWindow.webContents.send('energyplus-exit', payload);
+      });
+    } catch (err) {
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      mainWindow.webContents.send('energyplus-exit', {
+        runId: options.runId || options.runName || 'energyplus-run',
+        exitCode: 1,
+        errContent: `EnergyPlus bridge internal error: ${err.message}`,
+      });
+    }
   });
-});
-
-/**
- * Handle direct EnergyPlus execution from the renderer (Electron-only).
- * Expects args:
- *  - idfPath: path to the IDF file
- *  - epwPath: path to the EPW file
- *  - energyPlusPath: path to the EnergyPlus executable
- */
-ipcMain.on('run-energyplus', (event, { idfPath, epwPath, energyPlusPath }) => {
-  if (!idfPath || !epwPath || !energyPlusPath) {
-    event.sender.send('energyplus-output', 'Error: Missing IDF, EPW, or EnergyPlus executable path.\n');
-    event.sender.send('energyplus-exit', 1);
-    return;
-  }
-
-  const args = ['-w', epwPath, idfPath];
-  const child = spawn(energyPlusPath, args, { shell: false });
-
-  child.stdout.on('data', (data) => {
-    event.sender.send('energyplus-output', data.toString());
-  });
-
-  child.stderr.on('data', (data) => {
-    event.sender.send('energyplus-output', data.toString());
-  });
-
-  child.on('close', (code) => {
-    event.sender.send('energyplus-exit', code);
-  });
-});
 
 
 // Handle request to run a script headlessly (without sending streaming output)
@@ -114,8 +205,8 @@ ipcMain.handle('run-script-headless', async (event, { projectPath, scriptContent
   const scriptDir = path.dirname(scriptPath);
 
   try {
-    await fs.mkdir(scriptDir, { recursive: true });
-    await fs.writeFile(scriptPath, scriptContent);
+    await fsp.mkdir(scriptDir, { recursive: true });
+    await fsp.writeFile(scriptPath, scriptContent);
 
     return new Promise((resolve) => {
     const isWindows = process.platform === 'win32';
@@ -128,7 +219,7 @@ ipcMain.handle('run-script-headless', async (event, { projectPath, scriptContent
     exec(command, { cwd: scriptDir }, (error, stdout, stderr) => {
       // Clean up the temporary script
         if (!scriptName) {
-          fs.unlink(scriptPath).catch(err => console.error("Failed to delete temp script:", err));
+          fsp.unlink(scriptPath).catch(err => console.error("Failed to delete temp script:", err));
         }
 
         if (error) {
@@ -162,8 +253,8 @@ ipcMain.handle('run-simulations-parallel', async (event, { simulations }) => {
                   const scriptDir = path.dirname(scriptPath);
 
                   try {
-                      await fs.mkdir(scriptDir, { recursive: true });
-                      await fs.writeFile(scriptPath, task.scriptContent);
+                  await fsp.mkdir(scriptDir, { recursive: true });
+                  await fsp.writeFile(scriptPath, task.scriptContent);
 
                   const isWindows = process.platform === 'win32';
                   // For Windows, the command is just the script name. Rely on 'cwd'.
@@ -172,7 +263,7 @@ ipcMain.handle('run-simulations-parallel', async (event, { simulations }) => {
 
                   exec(command, { cwd: scriptDir }, (error, stdout, stderr) => {
                       if (!task.scriptName) {
-                              fs.unlink(scriptPath).catch(err => console.error("Failed to delete temp script:", err));
+                              fsp.unlink(scriptPath).catch(err => console.error("Failed to delete temp script:", err));
                           }
                           if (error) {
                               resolve({ success: false, stdout, stderr, code: error.code });
@@ -204,7 +295,7 @@ ipcMain.handle('fs:readFile', async (event, { projectPath, filePath }) => {
       return { success: false, error: 'Invalid projectPath or filePath', projectPath, filePath };
     }
     const fullPath = path.join(projectPath, filePath);
-    const content = await fs.readFile(fullPath); // Returns a Buffer
+    const content = await fsp.readFile(fullPath); // Returns a Buffer
     return { success: true, content: content, name: path.basename(filePath) };
   } catch (err) {
     console.error(`Failed to read file: ${filePath}`, err);
@@ -220,7 +311,7 @@ ipcMain.handle('fs:checkFileExists', async (event, { projectPath, filePath }) =>
       return false;
     }
     const fullPath = path.join(projectPath, filePath);
-    await fs.access(fullPath);
+    await fsp.access(fullPath);
     return true;
   } catch {
     return false;
@@ -236,8 +327,8 @@ ipcMain.handle('fs:writeFile', async (event, { projectPath, filePath, content })
     }
     const fullPath = path.join(projectPath, filePath);
     const dir = path.dirname(fullPath);
-    await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(fullPath, content);
+    await fsp.mkdir(dir, { recursive: true });
+    await fsp.writeFile(fullPath, content);
     return { success: true };
   } catch (err) {
     console.error(`Failed to write file: ${filePath}`, err);

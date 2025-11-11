@@ -21,6 +21,7 @@ let lpdGauge = null;
 let energyGauge = null;
 let energySavingsGauge = null;
 let temporalMapPanel = null, temporalMapCanvas = null, temporalMapTooltip = null;
+let energyPlusPanel = null;
 
 /**
  * Opens the climate analysis dashboard and generates the charts.
@@ -946,4 +947,229 @@ export function updateCircadianDashboard(metrics) {
     wellList.innerHTML = '';
     checkCompliance(125, 'Min Threshold: 125 EML');
     checkCompliance(200, 'Enhanced Threshold: 200 EML');
+}
+
+/**
+ * Opens the EnergyPlus Results dashboard.
+ * Shows KPIs from the latest successful EnergyPlus run as parsed by resultsManager.
+ */
+export async function openEnergyPlusResultsDashboard() {
+    // Dynamic import to avoid circular dependency
+    const { getNewZIndex, ensureWindowInView, initializePanelControls, showAlert } = await import('./ui.js');
+
+    if (!energyPlusPanel) {
+        energyPlusPanel = document.getElementById('energyplus-results-panel');
+        if (!energyPlusPanel) {
+            energyPlusPanel = document.createElement('div');
+            energyPlusPanel.id = 'energyplus-results-panel';
+            energyPlusPanel.className = 'floating-window ui-panel resizable-panel';
+            energyPlusPanel.innerHTML = `
+                <div class="window-header">
+                    <span>EnergyPlus Results</span>
+                    <div class="window-controls">
+                        <div class="window-icon-max" title="Maximize/Restore"></div>
+                        <div class="collapse-icon" title="Minimize"></div>
+                        <div class="window-icon-close" title="Close"></div>
+                    </div>
+                </div>
+                <div class="window-content space-y-3 text-[10px]">
+                    <div class="resize-handle-edge top"></div>
+                    <div class="resize-handle-edge right"></div>
+                    <div class="resize-handle-edge bottom"></div>
+                    <div class="resize-handle-edge left"></div>
+                    <div class="resize-handle-corner top-left"></div>
+                    <div class="resize-handle-corner top-right"></div>
+                    <div class="resize-handle-corner bottom-left"></div>
+                    <div class="resize-handle-corner bottom-right"></div>
+                    <p class="info-box !text-[9px] !py-1.5 !px-2">
+                        Summary of whole-building KPIs from the latest EnergyPlus run.
+                        Values are derived from EnergyPlus outputs parsed by Ray-Modeler.
+                    </p>
+                    <div data-role="ep-kpi-body" class="space-y-2">
+                        <div class="text-[9px] text-[--text-secondary]">
+                            Waiting for EnergyPlus results...
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('window-container')?.appendChild(energyPlusPanel);
+            initializePanelControls(energyPlusPanel);
+        }
+    }
+
+    const kpi = resultsManager.getEnergyPlusKpisForUi(null);
+    const errors = resultsManager.getEnergyPlusErrors(null);
+    const body = energyPlusPanel.querySelector('[data-role="ep-kpi-body"]');
+
+    if (!body) {
+        showAlert('EnergyPlus Results panel is missing its content container.', 'UI Error');
+        return;
+    }
+
+    if (!kpi) {
+        body.innerHTML = `
+            <div class="text-[9px] text-[--text-secondary]">
+                No parsed EnergyPlus results found.
+                Run a simulation from the EnergyPlus sidebar in the Electron app to see KPIs here.
+            </div>
+        `;
+    } else {
+        const {
+            label, status, eui,
+            heating, cooling, lighting, fans, pumps, other,
+            unmetHeat, unmetCool, peakHeatKw, peakCoolKw
+        } = kpi;
+
+        const fmt = (v, unit = '', digits = 1) =>
+            (v || v === 0)
+                ? `${v.toFixed(digits)}${unit}`
+                : '--';
+
+        const endUses = [
+            { label: 'Heating', val: heating },
+            { label: 'Cooling', val: cooling },
+            { label: 'Lighting', val: lighting },
+            { label: 'Fans', val: fans },
+            { label: 'Pumps', val: pumps },
+            { label: 'Other', val: other },
+        ].filter(e => e.val != null);
+
+        const totalEndUse = endUses.reduce((s, e) => s + (e.val || 0), 0);
+        const endUseRows = endUses.length
+            ? endUses.map(e => {
+                const share = totalEndUse > 0 ? (e.val / totalEndUse) * 100 : 0;
+                return `
+                    <tr>
+                        <td class="px-1 py-0.5 align-top">${e.label}</td>
+                        <td class="px-1 py-0.5 align-top text-right">${fmt(e.val, '', 1)}</td>
+                        <td class="px-1 py-0.5 align-top text-right text-[--text-secondary]">
+                            ${totalEndUse > 0 ? share.toFixed(1) + '%' : '--'}
+                        </td>
+                    </tr>
+                `;
+            }).join('')
+            : `
+                <tr>
+                    <td class="px-1 py-0.5 text-[--text-secondary]" colspan="3">
+                        No end-use breakdown available.
+                    </td>
+                </tr>
+            `;
+
+        const errorBlocks = [];
+        if (errors) {
+            const { fatal = [], severe = [], warning = [] } = errors;
+            if (fatal.length) {
+                errorBlocks.push(`
+                    <div class="text-[8px] text-red-400 font-semibold mb-0.5">Fatal Errors</div>
+                    <div class="max-h-16 overflow-y-auto space-y-0.5">
+                        ${fatal.slice(0, 8).map(l => `<div class="text-[7px] break-all">• ${l}</div>`).join('')}
+                        ${fatal.length > 8 ? '<div class="text-[7px] text-red-300">…more in eplusout.err</div>' : ''}
+                    </div>
+                `);
+            }
+            if (severe.length) {
+                errorBlocks.push(`
+                    <div class="text-[8px] text-orange-300 font-semibold mb-0.5">Severe Errors</div>
+                    <div class="max-h-16 overflow-y-auto space-y-0.5">
+                        ${severe.slice(0, 8).map(l => `<div class="text-[7px] break-all">• ${l}</div>`).join('')}
+                        ${severe.length > 8 ? '<div class="text-[7px] text-orange-200">…more in eplusout.err</div>' : ''}
+                    </div>
+                `);
+            }
+            if (warning.length && !fatal.length && !severe.length) {
+                errorBlocks.push(`
+                    <div class="text-[8px] text-yellow-300 font-semibold mb-0.5">Warnings</div>
+                    <div class="max-h-16 overflow-y-auto space-y-0.5">
+                        ${warning.slice(0, 8).map(l => `<div class="text-[7px] break-all">• ${l}</div>`).join('')}
+                        ${warning.length > 8 ? '<div class="text-[7px] text-yellow-200">…more in eplusout.err</div>' : ''}
+                    </div>
+                `);
+            }
+        }
+
+        const statusColor =
+            status === 'success' ? 'text-emerald-400'
+            : status === 'error' ? 'text-red-400'
+            : 'text-[--text-secondary]';
+
+        body.innerHTML = `
+            <div class="space-y-2">
+                <div class="flex items-baseline justify-between gap-2">
+                    <div class="text-[9px]">
+                        <div class="text-[--text-secondary] uppercase tracking-wide">Latest Run</div>
+                        <div class="font-semibold">${label || kpi.runId}</div>
+                    </div>
+                    <div class="text-[8px] ${statusColor}">
+                        Status: ${status || 'unknown'}
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 text-[8px]">
+                    <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-0.5">
+                        <div class="font-semibold text-[8px] text-[--text-secondary] uppercase mb-0.5">
+                            EUI (kWh/m²·yr)
+                        </div>
+                        <div class="text-xl font-semibold">
+                            ${fmt(eui, '', 1)}
+                        </div>
+                        <div class="text-[7px] text-[--text-secondary]">
+                            Includes all reported end-uses. Configure outputs to refine.
+                        </div>
+                    </div>
+                    <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-0.5">
+                        <div class="font-semibold text-[8px] text-[--text-secondary] uppercase mb-0.5">
+                            Unmet Hours / Peaks
+                        </div>
+                        <div class="text-[8px]">
+                            Heating unmet: <span class="font-semibold">${fmt(unmetHeat, ' h', 0)}</span><br>
+                            Cooling unmet: <span class="font-semibold">${fmt(unmetCool, ' h', 0)}</span><br>
+                            Peak heating: <span class="font-semibold">${fmt(peakHeatKw, ' kW', 1)}</span><br>
+                            Peak cooling: <span class="font-semibold">${fmt(peakCoolKw, ' kW', 1)}</span>
+                        </div>
+                        <div class="text-[7px] text-[--text-secondary]">
+                            High unmet hours suggest issues with loads, schedules, or setpoints.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border border-gray-700/70 rounded bg-black/40 p-2">
+                    <div class="font-semibold text-[8px] text-[--text-secondary] uppercase mb-1">
+                        End Use Breakdown (kWh/m²·yr)
+                    </div>
+                    <table class="w-full text-[8px]">
+                        <thead class="bg-black/40">
+                            <tr>
+                                <th class="px-1 py-0.5 text-left">End Use</th>
+                                <th class="px-1 py-0.5 text-right">kWh/m²·yr</th>
+                                <th class="px-1 py-0.5 text-right">% of total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${endUseRows}
+                        </tbody>
+                    </table>
+                </div>
+
+                ${errorBlocks.length
+                    ? `
+                    <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                        <div class="font-semibold text-[8px] text-[--text-secondary] uppercase">
+                            Messages from eplusout.err
+                        </div>
+                        ${errorBlocks.join('')}
+                    </div>
+                    `
+                    : `
+                    <div class="text-[8px] text-[--text-secondary]">
+                        No fatal or severe errors reported in the parsed results.
+                    </div>
+                    `}
+            </div>
+        `;
+    }
+
+    energyPlusPanel.classList.remove('hidden');
+    energyPlusPanel.style.zIndex = getNewZIndex();
+    ensureWindowInView(energyPlusPanel);
 }

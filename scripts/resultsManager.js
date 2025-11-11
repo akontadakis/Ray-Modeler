@@ -22,19 +22,306 @@ class ResultsManager {
         this.datasets = { a: null, b: null };
         this.differenceData = { data: null, stats: null };
         this.hdrResult = null; // Stays global for now
-        this.datasets = { 
-            a: { annualData: [], annualDirectData: [] }, 
-            b: { annualData: [], annualDirectData: [] } 
+
+        // Annual / spectral datasets for A and B views
+        this.datasets = {
+            a: { annualData: [], annualDirectData: [] },
+            b: { annualData: [], annualDirectData: [] }
         };
+
         this.activeView = 'a'; // 'a', 'b', or 'diff'
         this.activeMetricType = 'photopic'; // Default metric to display
-        this.climateData = null; // To store parsed EPW data
+
+        // Climate data (from EPW)
+        this.climateData = null;
+
+        // Color scale for 3D/heatmaps
         this.colorScale = {
             min: 0,
             max: 1000,
             palette: 'viridis'
         };
+
         this.histogramChart = null;
+
+        // EnergyPlus run tracking (closed-loop integration)
+        // Keyed by runId; each entry:
+        // {
+        //   runId, label, recipeId,
+        //   baseDir,
+        //   status: 'pending' | 'success' | 'error',
+        //   files: { errPath, sqlPath, csvPaths: { [name]: path } },
+        //   metrics: {
+        //     eui_kwh_per_m2_yr,
+        //     heating_kwh_per_m2_yr,
+        //     cooling_kwh_per_m2_yr,
+        //     lighting_kwh_per_m2_yr,
+        //     fans_kwh_per_m2_yr,
+        //     pumps_kwh_per_m2_yr,
+        //     other_kwh_per_m2_yr,
+        //     unmet_hours_heat,
+        //     unmet_hours_cool,
+        //     peak_heating_kw,
+        //     peak_cooling_kw
+        //   },
+        //   errors: {
+        //     fatal: string[],
+        //     severe: string[],
+        //     warning: string[]
+        //   },
+        //   completedAt: timestamp
+        // }
+        this.energyPlusRuns = {};
+    }
+
+    /**
+     * Registers a new EnergyPlus run in the manager.
+     * This should be called when a simulation is launched.
+     * @param {string} runId - Unique identifier for the run.
+     * @param {object} options - Metadata about the run.
+     *   { label?, recipeId?, baseDir?, files? }
+     */
+    registerEnergyPlusRun(runId, options = {}) {
+        if (!runId) return;
+        this.energyPlusRuns[runId] = {
+            runId,
+            label: options.label || `EnergyPlus Run ${runId}`,
+            recipeId: options.recipeId || null,
+            baseDir: options.baseDir || null,
+            status: 'pending',
+            files: options.files || {},
+            metrics: null,
+            errors: { fatal: [], severe: [], warning: [] },
+            completedAt: null
+        };
+    }
+
+    /**
+     * Updates an existing EnergyPlus run entry.
+     * @param {string} runId
+     * @param {object} patch - Partial fields to merge.
+     */
+    updateEnergyPlusRunStatus(runId, patch) {
+        const run = this.energyPlusRuns[runId];
+        if (!run) return;
+        this.energyPlusRuns[runId] = {
+            ...run,
+            ...patch,
+            errors: patch.errors
+                ? {
+                    fatal: patch.errors.fatal || [],
+                    severe: patch.errors.severe || [],
+                    warning: patch.errors.warning || []
+                }
+                : run.errors,
+            files: patch.files ? { ...run.files, ...patch.files } : run.files
+        };
+    }
+
+    /**
+     * Retrieves a specific EnergyPlus run by id.
+     * @param {string} runId
+     * @returns {object | null}
+     */
+    getEnergyPlusRun(runId) {
+        return this.energyPlusRuns[runId] || null;
+    }
+
+    /**
+     * Returns the most recent successful EnergyPlus run, or null.
+     */
+    getLatestSuccessfulEnergyPlusRun() {
+        const runs = Object.values(this.energyPlusRuns)
+            .filter(r => r.status === 'success' && r.metrics);
+        if (runs.length === 0) return null;
+        runs.sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0));
+        return runs[0];
+    }
+
+    /**
+     * Parses EnergyPlus .err content into categorized lists.
+     * @param {string} errContent
+     * @returns {{fatal: string[], severe: string[], warning: string[]}}
+     */
+    parseEnergyPlusErrors(errContent) {
+        const result = { fatal: [], severe: [], warning: [] };
+        if (!errContent) return result;
+
+        const lines = errContent.split(/\r?\n/);
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+
+            const upper = trimmed.toUpperCase();
+            if (upper.includes('** FATAL **')) {
+                result.fatal.push(trimmed);
+            } else if (upper.includes('** SEVERE **')) {
+                result.severe.push(trimmed);
+            } else if (upper.includes('** WARNING **')) {
+                result.warning.push(trimmed);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Parses simple CSV/TSV summary files to derive high-level KPIs.
+     * This is intentionally minimal and robust; can be extended per recipe.
+     *
+     * @param {string} runId
+     * @param {{ [name: string]: string }} csvContents - Map of logical name -> file content.
+     * @returns {object} metrics object
+     */
+    parseEnergyPlusSummaryFromCsv(runId, csvContents = {}) {
+        // Minimal stub: look for a generic "eplusout_annual.csv" with
+        // columns including:
+        // "End Use", "Electricity [kWh]", "Natural Gas [kWh]", "Floor Area [m2]" etc.
+        // Implementation can be extended as repo evolves.
+
+        const metrics = {
+            eui_kwh_per_m2_yr: null,
+            heating_kwh_per_m2_yr: null,
+            cooling_kwh_per_m2_yr: null,
+            lighting_kwh_per_m2_yr: null,
+            fans_kwh_per_m2_yr: null,
+            pumps_kwh_per_m2_yr: null,
+            other_kwh_per_m2_yr: null,
+            unmet_hours_heat: null,
+            unmet_hours_cool: null,
+            peak_heating_kw: null,
+            peak_cooling_kw: null
+        };
+
+        const summaryContent = csvContents.summary || csvContents.eplusout_annual || null;
+        if (!summaryContent) {
+            return metrics; // No-op; UI will handle missing values gracefully
+        }
+
+        const lines = summaryContent.split(/\r?\n/).filter(l => l.trim().length > 0);
+        if (lines.length < 2) return metrics;
+
+        const header = lines[0].split(/,|\t/).map(h => h.trim().toLowerCase());
+        const colIndex = (namePart) => header.findIndex(h => h.includes(namePart));
+
+        const endUseIdx = colIndex('end use');
+        const elecIdx = colIndex('electricity');
+        const gasIdx = colIndex('natural gas');
+        const areaIdx = colIndex('floor area');
+
+        let floorArea = 0;
+        let totalKwh = 0;
+        const byUse = {};
+
+        for (let i = 1; i < lines.length; i++) {
+            const cols = lines[i].split(/,|\t/).map(c => c.trim());
+            if (cols.length !== header.length) continue;
+
+            const endUse = endUseIdx >= 0 ? cols[endUseIdx] : '';
+            const elec = elecIdx >= 0 ? parseFloat(cols[elecIdx]) || 0 : 0;
+            const gas = gasIdx >= 0 ? parseFloat(cols[gasIdx]) || 0 : 0;
+            const area = areaIdx >= 0 ? parseFloat(cols[areaIdx]) || 0 : 0;
+
+            if (area > 0 && !floorArea) {
+                floorArea = area;
+            }
+
+            const rowKwh = elec + gas;
+            totalKwh += rowKwh;
+
+            if (endUse) {
+                const key = endUse.toLowerCase();
+                byUse[key] = (byUse[key] || 0) + rowKwh;
+            }
+        }
+
+        if (floorArea > 0 && totalKwh > 0) {
+            metrics.eui_kwh_per_m2_yr = totalKwh / floorArea;
+        }
+
+        const mapUse = (patternArr) =>
+            Object.entries(byUse)
+                .filter(([name]) => patternArr.some(p => name.includes(p)))
+                .reduce((sum, [, val]) => sum + val, 0);
+
+        const heatingKwh = mapUse(['heating']);
+        const coolingKwh = mapUse(['cooling']);
+        const lightingKwh = mapUse(['interior lighting', 'exterior lighting']);
+        const fansKwh = mapUse(['fans']);
+        const pumpsKwh = mapUse(['pumps']);
+        const otherKwh = totalKwh - (heatingKwh + coolingKwh + lightingKwh + fansKwh + pumpsKwh);
+
+        if (floorArea > 0) {
+            if (heatingKwh) metrics.heating_kwh_per_m2_yr = heatingKwh / floorArea;
+            if (coolingKwh) metrics.cooling_kwh_per_m2_yr = coolingKwh / floorArea;
+            if (lightingKwh) metrics.lighting_kwh_per_m2_yr = lightingKwh / floorArea;
+            if (fansKwh) metrics.fans_kwh_per_m2_yr = fansKwh / floorArea;
+            if (pumpsKwh) metrics.pumps_kwh_per_m2_yr = pumpsKwh / floorArea;
+            if (otherKwh) metrics.other_kwh_per_m2_yr = otherKwh / floorArea;
+        }
+
+        return metrics;
+    }
+
+    /**
+     * High-level entry point to store parsed EnergyPlus results.
+     * This is intended to be called from energyplusSidebar or Electron bridge callbacks.
+     *
+     * @param {string} runId
+     * @param {object} options
+     *   {
+     *     baseDir?,
+     *     errContent?,                          // raw eplusout.err content
+     *     csvContents?: { [name]: string },     // map of logical name -> CSV content
+     *     statusFromRunner?: number | null      // optional exit code
+     *   }
+     */
+    parseEnergyPlusResults(runId, options = {}) {
+        if (!runId) return;
+
+        if (!this.energyPlusRuns[runId]) {
+            this.registerEnergyPlusRun(runId, { baseDir: options.baseDir });
+        }
+
+        const run = this.energyPlusRuns[runId];
+
+        // Parse errors
+        const errors = this.parseEnergyPlusErrors(options.errContent || '');
+        // Derive metrics from CSVs (can be expanded in future)
+        const metrics = this.parseEnergyPlusSummaryFromCsv(runId, options.csvContents || {});
+
+        const exitCode = typeof options.statusFromRunner === 'number' ? options.statusFromRunner : 0;
+
+        let status = 'success';
+        if (exitCode !== 0 || errors.hasFatal) {
+            status = 'error';
+        }
+
+        this.updateEnergyPlusRunStatus(runId, {
+            baseDir: options.baseDir || run.baseDir,
+            metrics,
+            errors: {
+                fatal: errors.fatal,
+                severe: errors.severe,
+                warning: errors.warning
+            },
+            status,
+            completedAt: Date.now()
+        });
+
+        if (status === 'error') {
+            // Surface a concise message to user; detailed list is in dashboard
+            const message =
+                errors.fatal[0] ||
+                errors.severe[0] ||
+                'EnergyPlus reported errors. See EnergyPlus Results panel for details.';
+            showAlert(message, 'EnergyPlus Run Error');
+        } else if (errors.hasWarning || errors.hasSevere) {
+            // Non-fatal issues: notify but do not mark as error
+            const message = `EnergyPlus run completed with ${errors.severe.length} severe and ${errors.warning.length} warning message(s).`;
+            showAlert(message, 'EnergyPlus Run Warnings');
+        }
+
+        return this.energyPlusRuns[runId];
     }
 
     /**
@@ -1040,6 +1327,49 @@ class ResultsManager {
         // For now, only dataset A can have a glare result that isn't grid-based
         const activeDataset = this.datasets[this.activeView];
         return activeDataset ? activeDataset.glareResult : null;
+    }
+
+    /**
+     * Returns normalized KPIs for UI for a given run or the latest successful run.
+     * @param {string|null} runId
+     * @returns {object|null}
+     */
+    getEnergyPlusKpisForUi(runId = null) {
+        const run = runId ? this.getEnergyPlusRun(runId) : this.getLatestSuccessfulEnergyPlusRun();
+        if (!run || !run.metrics) return null;
+
+        const m = run.metrics;
+        return {
+            runId: run.runId,
+            label: run.label,
+            status: run.status,
+            eui: m.eui_kwh_per_m2_yr,
+            heating: m.heating_kwh_per_m2_yr,
+            cooling: m.cooling_kwh_per_m2_yr,
+            lighting: m.lighting_kwh_per_m2_yr,
+            fans: m.fans_kwh_per_m2_yr,
+            pumps: m.pumps_kwh_per_m2_yr,
+            other: m.other_kwh_per_m2_yr,
+            unmetHeat: m.unmet_hours_heat,
+            unmetCool: m.unmet_hours_cool,
+            peakHeatKw: m.peak_heating_kw,
+            peakCoolKw: m.peak_cooling_kw,
+        };
+    }
+
+    /**
+     * Returns categorized errors for a given run or the latest run.
+     * @param {string|null} runId
+     * @returns {{fatal:string[], severe:string[], warning:string[]}|null}
+     */
+    getEnergyPlusErrors(runId = null) {
+        const run = runId ? this.getEnergyPlusRun(runId) : this.getLatestSuccessfulEnergyPlusRun();
+        if (!run || !run.errors) return null;
+        return {
+            fatal: run.errors.fatal || [],
+            severe: run.errors.severe || [],
+            warning: run.errors.warning || [],
+        };
     }
 
     /**

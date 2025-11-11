@@ -1,35 +1,46 @@
 // scripts/energyplusSidebar.js
 import { getDom } from './dom.js';
 import { project } from './project.js';
+import { resultsManager } from './resultsManager.js';
+import { validateEnergyPlusRunRequest, formatIssuesSummary } from './energyplusValidation.js';
 /* EnergyPlus contextual help disabled */
 
 let dom;
 
 const recipes = {
+    "IDF Preview / Diagnostics": {
+        description: "Inspect how the current project and EnergyPlus configuration map into EnergyPlus objects. Highlights missing constructions, materials, schedules, and other issues.",
+        id: "energyplus-diagnostics",
+        isDiagnostics: true
+    },
     "Annual Energy Simulation": {
         description: "Runs a full annual energy simulation using EnergyPlus.",
         id: "annual-energy-simulation",
         scriptName: "run-energyplus.sh",
         params: [
             { id: "idf-file", name: "IDF File (optional, defaults to generated model.idf)", type: "file", accept: ".idf" },
-            { id: "epw-file", name: "EPW File", type: "file", accept: ".epw" },
+            { id: "epw-file", name: "EPW File (optional, uses project-level EPW if omitted)", type: "file", accept: ".epw" },
             { id: "eplus-exe", name: "EnergyPlus Executable Path", type: "text" }
         ]
     },
     "Heating Design Day": {
-        description: "Calculates heating loads for a design day.",
+        description: "Runs a sizing-only simulation using design day periods defined in the IDF (heating-focused).",
         id: "heating-design-day",
         scriptName: "run-heating-design.sh",
         params: [
-            { id: "idf-file", name: "IDF File", type: "file", accept: ".idf" }
+            { id: "idf-file", name: "IDF File (optional, defaults to model.idf)", type: "file", accept: ".idf" },
+            { id: "epw-file", name: "EPW File (optional, uses project-level EPW if omitted)", type: "file", accept: ".epw" },
+            { id: "eplus-exe", name: "EnergyPlus Executable Path", type: "text" }
         ]
     },
     "Cooling Design Day": {
-        description: "Calculates cooling loads for a design day.",
+        description: "Runs a sizing-only simulation using design day periods defined in the IDF (cooling-focused).",
         id: "cooling-design-day",
         scriptName: "run-cooling-design.sh",
         params: [
-            { id: "idf-file", name: "IDF File", type: "file", accept: ".idf" }
+            { id: "idf-file", name: "IDF File (optional, defaults to model.idf)", type: "file", accept: ".idf" },
+            { id: "epw-file", name: "EPW File (optional, uses project-level EPW if omitted)", type: "file", accept: ".epw" },
+            { id: "eplus-exe", name: "EnergyPlus Executable Path", type: "text" }
         ]
     }
 };
@@ -39,7 +50,6 @@ function initializeEnergyPlusSidebar() {
     const panel = dom['panel-energyplus'];
     if (!panel) return;
 
-    // Ensure base content exists
     let content = panel.querySelector('.window-content');
     if (!content) {
         content = document.createElement('div');
@@ -47,185 +57,534 @@ function initializeEnergyPlusSidebar() {
         panel.appendChild(content);
     }
 
-    // Ensure recipe list container
-    let recipeListContainer = content.querySelector('.recipe-list');
-    if (!recipeListContainer) {
-        content.innerHTML = `
-            <div class="space-y-4">
-                <div class="flex items-center justify-between">
-                    <h3 class="font-semibold text-sm uppercase">EnergyPlus Simulations</h3>
-                </div>
-                <div class="recipe-list space-y-2"></div>
-                <div class="materials-manager-entry space-y-1">
-                    <div class="flex items-center justify-between">
-                        <h3 class="font-semibold text-[10px] uppercase text-[--text-secondary]">Configuration Panels</h3>
+    // Unified layout for the EnergyPlus sidebar
+    content.innerHTML = `
+        <div class="space-y-4 p-1">
+            <div class="border border-gray-800/80 rounded bg-black/40 p-3 space-y-4">
+                
+                <!-- 1. Simulation Checklist -->
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="font-semibold text-sm uppercase">Simulation Checklist</h3>
+                        <button class="btn btn-xxs btn-secondary" data-action="refresh-simulation-checklist">Refresh</button>
                     </div>
-                    <button class="btn btn-xs btn-secondary w-full" data-action="open-materials-manager">
-                        EnergyPlus Materials
-                    </button>
-                    <button class="btn btn-xs btn-secondary w-full mt-1" data-action="open-constructions-manager">
-                        EnergyPlus Constructions
-                    </button>
-                    <button class="btn btn-xs btn-secondary w-full mt-1" data-action="open-schedules-manager">
-                        EnergyPlus Schedules
-                    </button>
-                    <button class="btn btn-xs btn-secondary w-full mt-1" data-action="open-zone-loads-manager">
-                        Zone Loads / Thermostats / IdealLoads
-                    </button>
-                    <button class="btn btn-xs btn-secondary w-full mt-1" data-action="open-daylighting-manager">
-                        Daylighting & Outputs
-                    </button>
+                    <div data-role="simulation-checklist-body" class="space-y-1">
+                        <div class="text-xs text-[--text-secondary]">Evaluating project...</div>
+                    </div>
+                </div>
+
+                <!-- 2. Simulation Recipes -->
+                <div>
+                    <h3 class="font-semibold text-sm uppercase mb-2">Run Simulation</h3>
+                    <div class="recipe-list space-y-2"></div>
+                </div>
+
+                <!-- 3. Configuration -->
+                <div>
+                    <h3 class="font-semibold text-sm uppercase mb-2">Configuration</h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button class="btn btn-sm btn-secondary w-full" data-action="open-materials-manager">Materials</button>
+                        <button class="btn btn-sm btn-secondary w-full" data-action="open-constructions-manager">Constructions</button>
+                        <button class="btn btn-sm btn-secondary w-full" data-action="open-schedules-manager">Schedules</button>
+                        <button class="btn btn-sm btn-secondary w-full" data-action="open-zone-loads-manager">Zone Loads</button>
+                        <button class="btn btn-sm btn-secondary w-full" data-action="open-ideal-loads-manager">Thermostats</button>
+                        <button class="btn btn-sm btn-secondary w-full" data-action="open-weather-location-manager">Weather</button>
+                        <button class="btn btn-sm btn-secondary w-full" data-action="open-daylighting-manager">Daylighting</button>
+                        <button class="btn btn-sm btn-secondary w-full" data-action="open-outputs-manager">Outputs</button>
+                        <button class="btn btn-sm btn-secondary w-full col-span-2" data-action="open-simulation-control-manager">Simulation Control</button>
+                    </div>
                 </div>
             </div>
-        `;
-        recipeListContainer = content.querySelector('.recipe-list');
-    } else {
-        // Inject Materials manager entry if not present
-        if (!content.querySelector('[data-action="open-materials-manager"]') &&
-            !content.querySelector('[data-action="open-constructions-manager"]') &&
-            !content.querySelector('[data-action="open-schedules-manager"]')) {
-            const cfgBlock = document.createElement('div');
-            cfgBlock.className = 'materials-manager-entry space-y-1 mt-3';
-            cfgBlock.innerHTML = `
-                <h3 class="font-semibold text-[10px] uppercase text-[--text-secondary]">Configuration Panels</h3>
-                <button class="btn btn-xs btn-secondary w-full" data-action="open-materials-manager">
-                    EnergyPlus Materials
-                </button>
-                <button class="btn btn-xs btn-secondary w-full mt-1" data-action="open-constructions-manager">
-                    EnergyPlus Constructions
-                </button>
-                <button class="btn btn-xs btn-secondary w-full mt-1" data-action="open-schedules-manager">
-                    EnergyPlus Schedules
-                </button>
-            `;
-            content.appendChild(cfgBlock);
-        }
+
+            <p class="text-xs text-[--text-secondary] px-1">
+                <strong>HVAC scope:</strong> Ray-Modeler generates models using <code>ZoneHVAC:IdealLoadsAirSystem</code>.
+                Detailed Air/PlantLoop systems are not generated.
+            </p>
+        </div>
+    `;
+
+    // Wire up all controls after rendering the new layout
+
+    const checklistContainer = content.querySelector('[data-role="simulation-checklist-body"]');
+    if (checklistContainer) {
+        renderSimulationChecklist(checklistContainer);
+    }
+
+    const checklistRefreshBtn = content.querySelector('[data-action="refresh-simulation-checklist"]');
+    if (checklistRefreshBtn && checklistContainer) {
+        checklistRefreshBtn.addEventListener('click', () => {
+            renderSimulationChecklist(checklistContainer);
+        });
     }
 
     populateRecipeList();
 
-    // Wire Materials Manager button
-    const helpSimBtn = content.querySelector('[data-action="open-help-simulations"]');
-    if (helpSimBtn) {
-        // helpSimBtn click (EnergyPlus contextual help) disabled by request
-        // helpSimBtn.addEventListener('click', () => openHelpPanel('simulations/run'));
+    // Delegated click handler for the configuration buttons
+    content.addEventListener('click', async (ev) => {
+        const btn = ev.target.closest('button[data-action]');
+        if (!btn) return;
+
+        const action = btn.dataset.action;
+        const actions = {
+            'open-materials-manager': openMaterialsManagerPanel,
+            'open-constructions-manager': openConstructionsManagerPanel,
+            'open-schedules-manager': openSchedulesManagerPanel,
+            'open-zone-loads-manager': openZoneLoadsManagerPanel,
+            'open-ideal-loads-manager': openIdealLoadsManagerPanel,
+            'open-daylighting-manager': openDaylightingManagerPanel,
+            'open-outputs-manager': openOutputsManagerPanel,
+            'open-weather-location-manager': openWeatherLocationManagerPanel,
+            'open-simulation-control-manager': openSimulationControlManagerPanel,
+        };
+
+        if (actions[action]) {
+            actions[action]();
+        }
+    });
+
+    // Checklist delegated actions
+    const checklistBody = content.querySelector('[data-role="simulation-checklist-body"]');
+    if (checklistBody) {
+        checklistBody.addEventListener('click', async (ev) => {
+            const btn = ev.target.closest('[data-checklist-action]');
+            if (!btn) return;
+            ev.stopPropagation(); // Prevent content click handler from firing
+            const action = btn.getAttribute('data-checklist-action');
+
+            try {
+                const checklistActions = {
+                    'open-diagnostics': openDiagnosticsPanel,
+                    'open-materials': openMaterialsManagerPanel,
+                    'open-constructions': openConstructionsManagerPanel,
+                    'open-schedules': openSchedulesManagerPanel,
+                    'open-zone-loads': openZoneLoadsManagerPanel,
+                    'open-ideal-loads': openIdealLoadsManagerPanel,
+                    'open-daylighting': openDaylightingManagerPanel,
+                    'open-outputs': openOutputsManagerPanel,
+                    'open-weather-location': openWeatherLocationManagerPanel,
+                    'open-sim-control': openSimulationControlManagerPanel,
+                    'open-annual': () => openRecipePanel(recipes['Annual Energy Simulation']),
+                    'open-heating-dd': () => openRecipePanel(recipes['Heating Design Day']),
+                    'open-cooling-dd': () => openRecipePanel(recipes['Cooling Design Day']),
+                };
+
+                if (checklistActions[action]) {
+                    await Promise.resolve(checklistActions[action]());
+                } else if (action === 'generate-idf') {
+                    const { generateAndStoreIdf } = await import('./energyplus.js');
+                    await generateAndStoreIdf();
+                    alert('IDF generated and stored as model.idf');
+                    if (checklistContainer) {
+                        renderSimulationChecklist(checklistContainer);
+                    }
+                }
+            } catch (err) {
+                console.error('Simulation Checklist action failed:', err);
+                alert('Simulation Checklist action failed. Check console for details.');
+            }
+        });
+    }
+}
+
+/**
+ * SIMULATION CHECKLIST
+ * Provides a guided 1→7 workflow status derived from current project metadata and diagnostics.
+ */
+
+async function computeSimulationChecklist() {
+    // Helper to read meta and energyPlusConfig safely
+    const safeGetMeta = () => {
+        try {
+            return (typeof project.getMetadata === 'function' && project.getMetadata()) || project.metadata || {};
+        } catch (e) {
+            console.warn('SimulationChecklist: failed to read project metadata', e);
+            return {};
+        }
+    };
+
+    const meta = safeGetMeta();
+    const ep = meta.energyPlusConfig || meta.energyplus || {};
+    const weather = ep.weather || {};
+    const simControl = ep.simulationControl || {};
+
+    // Try to pull diagnostics; fall back to null if unavailable.
+    let diagnostics = null;
+    try {
+        const { generateEnergyPlusDiagnostics } = await import('./energyplus.js');
+        diagnostics = await generateEnergyPlusDiagnostics();
+    } catch (err) {
+        console.debug('SimulationChecklist: diagnostics unavailable or failed', err);
     }
 
-    const helpCfgBtn = content.querySelector('[data-action="open-help-config-overview"]');
-    if (helpCfgBtn) {
-        // helpCfgBtn click (EnergyPlus contextual help) disabled by request
-        // helpCfgBtn.addEventListener('click', () => openHelpPanel('config/overview'));
-    }
+    const issues = (diagnostics && diagnostics.issues) || [];
 
-    const materialsBtn = content.querySelector('[data-action="open-materials-manager"]');
-    if (materialsBtn) {
-        materialsBtn.addEventListener('click', () => {
-            openMaterialsManagerPanel();
-        });
-    }
-    const constructionsBtn = content.querySelector('[data-action="open-constructions-manager"]');
-    if (constructionsBtn) {
-        constructionsBtn.addEventListener('click', () => {
-            openConstructionsManagerPanel();
-        });
-    }
-    const schedulesBtn = content.querySelector('[data-action="open-schedules-manager"]');
-    if (schedulesBtn) {
-        schedulesBtn.addEventListener('click', () => {
-            openSchedulesManagerPanel();
-        });
-    }
-    const zoneLoadsBtn = content.querySelector('[data-action="open-zone-loads-manager"]');
-    if (zoneLoadsBtn) {
-        zoneLoadsBtn.addEventListener('click', () => {
-            openZoneLoadsManagerPanel();
-        });
-    }
-    const daylightingBtn = content.querySelector('[data-action="open-daylighting-manager"]');
-    if (daylightingBtn) {
-        daylightingBtn.addEventListener('click', () => {
-            openDaylightingManagerPanel();
-        });
-    }
+    const hasFatalIssues = issues.some((i) => i.severity === 'error');
+    const hasWarnings = issues.some((i) => i.severity === 'warning');
 
-    // Wire help buttons inside Configuration Panels block (delegated here for convenience)
-    content
-        .querySelectorAll('[data-action="open-materials-manager"]')
-        .forEach((btn) => {
-            // Left-click opens the manager panel
-            btn.addEventListener('click', () => {
-                openMaterialsManagerPanel();
-            });
-            // Right-click opens contextual help
-            btn.addEventListener('contextmenu', (ev) => {
-                // Materials help disabled
-                ev.preventDefault();
-                // openHelpPanel('config/materials');
-            });
-        });
+    const geometry = diagnostics && diagnostics.geometry;
+    const constructionsDiag = diagnostics && diagnostics.constructions;
+    const materialsDiag = diagnostics && diagnostics.materials;
+    const schedLoadsDiag = diagnostics && diagnostics.schedulesAndLoads;
 
-    content
-        .querySelectorAll('[data-action="open-constructions-manager"]')
-        .forEach((btn) => {
-            btn.addEventListener('click', () => {
-                openConstructionsManagerPanel();
-            });
-            btn.addEventListener('contextmenu', (ev) => {
-                // Constructions help disabled
-                ev.preventDefault();
-                // openHelpPanel('config/constructions');
-            });
-        });
+    // Quick helpers
+    const hasZones =
+        (geometry && geometry.totals && geometry.totals.zones > 0) ||
+        (typeof project.getZones === 'function' && (project.getZones() || []).length > 0) ||
+        (Array.isArray(project.zones) && project.zones.length > 0);
 
-    content
-        .querySelectorAll('[data-action="open-schedules-manager"]')
-        .forEach((btn) => {
-            btn.addEventListener('click', () => {
-                openSchedulesManagerPanel();
-            });
-            btn.addEventListener('contextmenu', (ev) => {
-                // Schedules help disabled
-                ev.preventDefault();
-                // openHelpPanel('config/schedules');
-            });
-        });
+    const missingCons = (constructionsDiag && constructionsDiag.missingConstructions) || [];
+    const missingMats = (materialsDiag && materialsDiag.missingMaterials) || [];
+    const missingScheds = (schedLoadsDiag && schedLoadsDiag.missingSchedules) || [];
+    const inconsistentLoads = (schedLoadsDiag && schedLoadsDiag.inconsistentLoads) || [];
 
-    content
-        .querySelectorAll('[data-action="open-zone-loads-manager"]')
-        .forEach((btn) => {
-            btn.addEventListener('click', () => {
-                openZoneLoadsManagerPanel();
-            });
-            btn.addEventListener('contextmenu', (ev) => {
-                // Loads help disabled
-                ev.preventDefault();
-                // openHelpPanel('config/loads');
-            });
-        });
+    const epwPath = weather.epwPath || ep.weatherFilePath || null;
+    const locationSource = weather.locationSource || 'FromEPW';
+    const cl = weather.customLocation || null;
 
-    content
-        .querySelectorAll('[data-action="open-daylighting-manager"]')
-        .forEach((btn) => {
-            btn.addEventListener('click', () => {
-                openDaylightingManagerPanel();
-            });
-            btn.addEventListener('contextmenu', (ev) => {
-                // Daylighting help disabled
-                ev.preventDefault();
-                // openHelpPanel('config/daylighting');
-            });
+    const validateCustomLocation = () => {
+        if (!cl) return false;
+        const { name, latitude, longitude, timeZone, elevation } = cl;
+        if (!name) return false;
+        if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) return false;
+        if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) return false;
+        if (!Number.isFinite(timeZone) || timeZone < -12 || timeZone > 14) return false;
+        if (!Number.isFinite(elevation)) return false;
+        return true;
+    };
+
+    // Step 1: Geometry
+    const step1 = (() => {
+        if (hasZones) {
+            return {
+                id: 'geometry',
+                label: '1. Geometry',
+                status: 'ok',
+                description: 'Project zones detected.',
+                actions: [{ label: 'Open Diagnostics', actionId: 'open-diagnostics' }],
+            };
+        }
+        return {
+            id: 'geometry',
+            label: '1. Geometry',
+            status: 'warning',
+            description: 'No explicit zones found. IDF will fall back to a default Zone_1.',
+            actions: [{ label: 'Open Diagnostics', actionId: 'open-diagnostics' }],
+        };
+    })();
+
+    // Step 2: Constructions & Materials
+    const step2 = (() => {
+        if (missingCons.length || missingMats.length) {
+            return {
+                id: 'constructions',
+                label: '2. Constructions & Materials',
+                status: 'error',
+                description: 'Missing constructions or materials referenced by the model.',
+                actions: [
+                    { label: 'Open Constructions', actionId: 'open-constructions' },
+                    { label: 'Open Materials', actionId: 'open-materials' },
+                    { label: 'Diagnostics', actionId: 'open-diagnostics' },
+                ],
+            };
+        }
+        const hasAny =
+            (Array.isArray(ep.constructions) && ep.constructions.length) ||
+            (Array.isArray(ep.materials) && ep.materials.length);
+        return {
+            id: 'constructions',
+            label: '2. Constructions & Materials',
+            status: hasAny ? 'ok' : 'warning',
+            description: hasAny
+                ? 'Constructions and materials configured or using built-ins.'
+                : 'Using built-in defaults only. Review for project-specific envelopes.',
+            actions: [
+                { label: 'Open Constructions', actionId: 'open-constructions' },
+                { label: 'Open Materials', actionId: 'open-materials' },
+            ],
+        };
+    })();
+
+    // Step 3: Schedules & Zone Loads
+    const step3 = (() => {
+        if (missingScheds.length || inconsistentLoads.length) {
+            return {
+                id: 'schedules-loads',
+                label: '3. Schedules & Zone Loads',
+                status: 'warning',
+                description: 'Some schedules or zone loads may be missing or inconsistent.',
+                actions: [
+                    { label: 'Open Schedules', actionId: 'open-schedules' },
+                    { label: 'Open Zone Loads', actionId: 'open-zone-loads' },
+                    { label: 'Diagnostics', actionId: 'open-diagnostics' },
+                ],
+            };
+        }
+        const hasZoneLoads = Array.isArray(ep.zoneLoads) && ep.zoneLoads.length > 0;
+        return {
+            id: 'schedules-loads',
+            label: '3. Schedules & Zone Loads',
+            status: hasZoneLoads ? 'ok' : 'warning',
+            description: hasZoneLoads
+                ? 'Zone loads and schedules configured.'
+                : 'No explicit zone loads defined. Results may under-estimate internal gains.',
+            actions: [
+                { label: 'Open Schedules', actionId: 'open-schedules' },
+                { label: 'Open Zone Loads', actionId: 'open-zone-loads' },
+            ],
+        };
+    })();
+
+    // Step 4: Thermostats & Ideal Loads
+    const step4 = (() => {
+        const hasThermostats = Array.isArray(ep.thermostats) && ep.thermostats.length > 0;
+        const hasIdealLoads =
+            (ep.idealLoads && ep.idealLoads.global) ||
+            (ep.idealLoads && Array.isArray(ep.idealLoads.perZone) && ep.idealLoads.perZone.length > 0);
+
+        if (hasThermostats && hasIdealLoads) {
+            return {
+                id: 'thermostats-ideal-loads',
+                label: '4. Thermostats & Ideal Loads',
+                status: 'ok',
+                description: 'Thermostats and IdealLoads configured. HVAC modeled via IdealLoads.',
+                actions: [{ label: 'Thermostats & IdealLoads', actionId: 'open-ideal-loads' }],
+            };
+        }
+
+        return {
+            id: 'thermostats-ideal-loads',
+            label: '4. Thermostats & Ideal Loads',
+            status: 'warning',
+            description:
+                'No complete thermostat/IdealLoads configuration detected. Zones may free-float or be unconstrained.',
+            actions: [{ label: 'Thermostats & IdealLoads', actionId: 'open-ideal-loads' }],
+        };
+    })();
+
+    // Step 5: Weather & Location
+    const step5 = (() => {
+        const actions = [{ label: 'Weather & Location', actionId: 'open-weather-location' }];
+
+        if (!epwPath) {
+            return {
+                id: 'weather-location',
+                label: '5. Weather & Location',
+                status: 'error',
+                description:
+                    'No EPW selected. Annual/design-day simulations cannot run reliably without a project EPW.',
+                actions,
+            };
+        }
+
+        if (locationSource === 'Custom' && !validateCustomLocation()) {
+            return {
+                id: 'weather-location',
+                label: '5. Weather & Location',
+                status: 'error',
+                description: 'Custom location selected but fields are incomplete or invalid.',
+                actions,
+            };
+        }
+
+        return {
+            id: 'weather-location',
+            label: '5. Weather & Location',
+            status: 'ok',
+            description:
+                locationSource === 'Custom'
+                    ? 'EPW set and custom location defined.'
+                    : 'EPW set. Location derived from EPW.',
+            actions,
+        };
+    })();
+
+    // Step 6: IDF Generation readiness
+    const step6 = (() => {
+        if (hasFatalIssues || missingCons.length || missingMats.length) {
+            return {
+                id: 'idf-generation',
+                label: '6. IDF Generation',
+                status: 'error',
+                description:
+                    'Diagnostics report blocking issues (e.g., missing constructions/materials). Fix before generating IDF.',
+                actions: [
+                    { label: 'Diagnostics', actionId: 'open-diagnostics' },
+                    { label: 'Generate IDF', actionId: 'generate-idf' },
+                ],
+            };
+        }
+
+        if (hasWarnings || missingScheds.length || inconsistentLoads.length) {
+            return {
+                id: 'idf-generation',
+                label: '6. IDF Generation',
+                status: 'warning',
+                description:
+                    'IDF can be generated, but diagnostics report warnings (e.g., schedules/loads). Review before final runs.',
+                actions: [
+                    { label: 'Diagnostics', actionId: 'open-diagnostics' },
+                    { label: 'Generate IDF', actionId: 'generate-idf' },
+                ],
+            };
+        }
+
+        return {
+            id: 'idf-generation',
+            label: '6. IDF Generation',
+            status: 'ok',
+            description: 'Configuration is consistent. Generate IDF from the current project.',
+            actions: [{ label: 'Generate IDF', actionId: 'generate-idf' }],
+        };
+    })();
+
+    // Step 7: Run EnergyPlus readiness
+    const step7 = (() => {
+        const actions = [
+            { label: 'Annual', actionId: 'open-annual' },
+            { label: 'Heating DD', actionId: 'open-heating-dd' },
+            { label: 'Cooling DD', actionId: 'open-cooling-dd' },
+        ];
+
+        if (!epwPath) {
+            return {
+                id: 'run-energyplus',
+                label: '7. Run EnergyPlus',
+                status: 'error',
+                description: 'Cannot run: EPW is missing. Configure in Weather & Location.',
+                actions: [{ label: 'Weather & Location', actionId: 'open-weather-location' }],
+            };
+        }
+
+        if (hasFatalIssues || missingCons.length || missingMats.length) {
+            return {
+                id: 'run-energyplus',
+                label: '7. Run EnergyPlus',
+                status: 'error',
+                description: 'Cannot run safely: diagnostics report blocking IDF issues.',
+                actions: [
+                    { label: 'Diagnostics', actionId: 'open-diagnostics' },
+                    { label: 'Constructions', actionId: 'open-constructions' },
+                    { label: 'Materials', actionId: 'open-materials' },
+                ],
+            };
+        }
+
+        const isElectron = typeof window !== 'undefined' && !!window.electronAPI;
+
+        if (!isElectron) {
+            return {
+                id: 'run-energyplus',
+                label: '7. Run EnergyPlus',
+                status: 'warning',
+                description:
+                    'Electron bridge not detected. You can generate IDF/scripts but cannot run EnergyPlus directly here.',
+                actions: [
+                    { label: 'Annual', actionId: 'open-annual' },
+                    { label: 'Heating DD', actionId: 'open-heating-dd' },
+                    { label: 'Cooling DD', actionId: 'open-cooling-dd' },
+                ],
+            };
+        }
+
+        return {
+            id: 'run-energyplus',
+            label: '7. Run EnergyPlus',
+            status: hasWarnings ? 'warning' : 'ok',
+            description: hasWarnings
+                ? 'Ready to run via Electron; diagnostics report warnings to review.'
+                : 'Ready to run EnergyPlus via Electron recipes.',
+            actions,
+        };
+    })();
+
+    return [step1, step2, step3, step4, step5, step6, step7];
+}
+
+function renderSimulationChecklist(container) {
+    container.innerHTML = `
+        <div class="text-xs text-[--text-secondary]">
+            Evaluating project configuration...
+        </div>
+    `;
+
+    computeSimulationChecklist()
+        .then((items) => {
+            if (!items || !items.length) {
+                container.innerHTML = `
+                    <div class="text-xs text-red-400">
+                        Failed to evaluate checklist.
+                    </div>
+                `;
+                return;
+            }
+
+            const icon = (status) => {
+                const baseClasses = "inline-block w-2.5 h-2.5 rounded-full mr-2 flex-shrink-0";
+                if (status === 'ok') return `<span class="${baseClasses} bg-emerald-500"></span>`;
+                if (status === 'warning') return `<span class="${baseClasses} bg-yellow-400"></span>`;
+                return `<span class="${baseClasses} bg-red-500"></span>`;
+            };
+
+            const html = items
+                .map((item) => {
+                    const actions =
+                        item.actions && item.actions.length
+                            ? item.actions
+                                  .map(
+                                      (a) =>
+                                          `<button class="btn btn-xxs btn-secondary ml-1" data-checklist-action="${a.actionId}">${a.label}</button>`
+                                  )
+                                  .join('')
+                            : '';
+                    return `
+                        <div class="flex flex-col py-1.5 border-b border-gray-700/50 last:border-b-0">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center min-w-0">
+                                    ${icon(item.status)}
+                                    <span class="font-semibold text-xs truncate">${item.label}</span>
+                                </div>
+                                <div class="flex items-center flex-shrink-0 ml-2">${actions}</div>
+                            </div>
+                            <div class="text-xs text-[--text-secondary] pl-[18px] pt-0.5">
+                                ${item.description || ''}
+                            </div>
+                        </div>
+                    `;
+                })
+                .join('');
+
+            container.innerHTML = html;
+        })
+        .catch((err) => {
+            console.error('SimulationChecklist: render failed', err);
+            container.innerHTML = `
+                <div class="text-xs text-red-400">
+                    Failed to evaluate checklist. Check console for details.
+                </div>
+            `;
         });
 }
 
 function populateRecipeList() {
-    const recipeList = dom['panel-energyplus'].querySelector('.recipe-list');
+    const recipeList = dom['panel-energyplus']?.querySelector('.recipe-list');
+    if (!recipeList) return;
+
     recipeList.innerHTML = '';
     for (const name in recipes) {
         const recipe = recipes[name];
         const button = document.createElement('button');
-        button.className = 'btn btn-secondary w-full';
-        button.textContent = name;
-        button.onclick = () => openRecipePanel(recipe);
+        button.className = 'btn btn-sm btn-secondary w-full text-left p-2';
+        button.innerHTML = `
+            <div class="font-semibold">${name}</div>
+            <div class="text-[11px] font-normal normal-case text-[--text-secondary] whitespace-normal">${recipe.description}</div>
+        `;
+        button.onclick = () => {
+            if (recipe.isDiagnostics) {
+                openDiagnosticsPanel();
+            } else {
+                openRecipePanel(recipe);
+            }
+        };
         recipeList.appendChild(button);
     }
 }
@@ -241,6 +600,324 @@ function openRecipePanel(recipe) {
     panel.style.zIndex = getNewZIndex();
 }
 
+async function openDiagnosticsPanel() {
+    const panelId = 'panel-energyplus-diagnostics';
+    let panel = document.getElementById(panelId);
+    if (!panel) {
+        panel = createDiagnosticsPanel();
+        document.getElementById('window-container').appendChild(panel);
+    }
+    panel.classList.remove('hidden');
+    panel.style.zIndex = getNewZIndex();
+    await refreshDiagnosticsPanel(panel);
+}
+
+function createDiagnosticsPanel() {
+    const panel = document.createElement('div');
+    panel.id = 'panel-energyplus-diagnostics';
+    panel.className = 'floating-window ui-panel resizable-panel';
+
+    panel.innerHTML = `
+        <div class="window-header">
+            <span>EnergyPlus IDF Preview / Diagnostics</span>
+            <div class="window-controls">
+                <div class="window-icon-max" title="Maximize/Restore"></div>
+                <div class="collapse-icon" title="Minimize"></div>
+                <div class="window-icon-close" title="Close"></div>
+            </div>
+        </div>
+        <div class="window-content space-y-3 text-[9px]">
+            <div class="resize-handle-edge top"></div>
+            <div class="resize-handle-edge right"></div>
+            <div class="resize-handle-edge bottom"></div>
+            <div class="resize-handle-edge left"></div>
+            <div class="resize-handle-corner top-left"></div>
+            <div class="resize-handle-corner top-right"></div>
+            <div class="resize-handle-corner bottom-left"></div>
+            <div class="resize-handle-corner bottom-right"></div>
+
+            <p class="info-box !text-[9px] !py-1.5 !px-2">
+                Preview how the current Ray-Modeler project and EnergyPlus configuration map into EnergyPlus objects.
+                This diagnostics view does not modify your project or write files.
+            </p>
+
+            <div class="flex justify-between items-center gap-2">
+                <span class="font-semibold text-[9px] uppercase text-[--text-secondary]">
+                    Summary
+                </span>
+                <button class="btn btn-xxs btn-secondary" data-action="refresh-diagnostics">
+                    Refresh
+                </button>
+            </div>
+
+            <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1 max-h-72 overflow-y-auto **scrollable-panel-inner**"
+                 data-role="diagnostics-body">
+                <div class="text-[8px] text-[--text-secondary]">
+                    Diagnostics will appear here.
+                </div>
+            </div>
+
+            <div class="text-[8px] text-[--text-secondary]">
+                Use this panel to:
+                <ul class="list-disc pl-4 space-y-0.5">
+                    <li>Verify that zones are detected.</li>
+                    <li>Check constructions and materials are defined and referenced correctly.</li>
+                    <li>Check schedules and loads for missing references.</li>
+                    <li>Jump directly to configuration panels to fix detected issues.</li>
+                </ul>
+            </div>
+        </div>
+    `;
+
+    if (typeof window !== 'undefined' && window.initializePanelControls) {
+        window.initializePanelControls(panel);
+    } else {
+        const closeButton = panel.querySelector('.window-icon-close');
+        if (closeButton) {
+            closeButton.onclick = () => panel.classList.add('hidden');
+        }
+    }
+
+    const refreshBtn = panel.querySelector('[data-action="refresh-diagnostics"]');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', async () => {
+            await refreshDiagnosticsPanel(panel);
+        });
+    }
+
+    return panel;
+}
+
+async function refreshDiagnosticsPanel(panel) {
+    const body = panel.querySelector('[data-role="diagnostics-body"]');
+    if (!body) return;
+
+    body.innerHTML = `
+        <div class="text-[8px] text-[--text-secondary]">
+            Gathering diagnostics from current project...
+        </div>
+    `;
+
+    try {
+        const { generateEnergyPlusDiagnostics } = await import('./energyplus.js');
+        const diagnostics = await generateEnergyPlusDiagnostics();
+
+        renderDiagnostics(body, diagnostics);
+    } catch (err) {
+        console.error('EnergyPlus Diagnostics: failed to load diagnostics', err);
+        body.innerHTML = `
+            <div class="text-[8px] text-red-400">
+                Failed to compute diagnostics. Check console for details.
+            </div>
+        `;
+    }
+}
+
+function renderDiagnostics(container, diagnostics) {
+    if (!diagnostics) {
+        container.innerHTML = `
+            <div class="text-[8px] text-red-400">
+                No diagnostics data returned.
+            </div>
+        `;
+        return;
+    }
+
+    const { geometry, constructions, materials, schedulesAndLoads, issues } = diagnostics;
+
+    const hasErrors = (issues || []).some((i) => i.severity === 'error');
+    const hasWarnings = (issues || []).some((i) => i.severity === 'warning');
+
+    const issueBadge = hasErrors
+        ? `<span class="ml-1 px-1 rounded bg-red-600/70 text-[7px]">Errors</span>`
+        : hasWarnings
+        ? `<span class="ml-1 px-1 rounded bg-yellow-600/70 text-[7px]">Warnings</span>`
+        : `<span class="ml-1 px-1 rounded bg-emerald-700/70 text-[7px]">Clean</span>`;
+
+    const zonesHtml = (geometry?.zones || [])
+        .map(
+            (z) => `
+            <tr>
+                <td class="px-1 py-0.5 align-top">${z.name}</td>
+                <td class="px-1 py-0.5 align-top text-[--text-secondary]">
+                    ${z.surfaces?.total ?? 0}
+                </td>
+                <td class="px-1 py-0.5 align-top text-[--text-secondary]">
+                    ${z.windows?.total ?? 0}
+                </td>
+            </tr>
+        `
+        )
+        .join('') ||
+        `<tr><td class="px-1 py-0.5 text-[--text-secondary]" colspan="3">
+            No zones detected. Generated IDF will fall back to a single Zone_1.
+        </td></tr>`;
+
+    const missingCons = constructions?.missingConstructions || [];
+    const unusedCons = constructions?.unusedConstructions || [];
+    const missingMats = materials?.missingMaterials || [];
+    const unusedMats = materials?.unusedMaterials || [];
+    const missingScheds = schedulesAndLoads?.missingSchedules || [];
+    const inconsistentLoads = schedulesAndLoads?.inconsistentLoads || [];
+
+    const issuesHtml =
+        issues && issues.length
+            ? issues
+                  .map((i) => {
+                      const color =
+                          i.severity === 'error'
+                              ? 'text-red-400'
+                              : i.severity === 'warning'
+                              ? 'text-yellow-300'
+                              : 'text-[--text-secondary]';
+                      return `<div class="${color}">• [${i.severity}] ${i.message}</div>`;
+                  })
+                  .join('')
+            : `<div class="text-[8px] text-[--text-secondary]">No issues detected.</div>`;
+
+    const button = (label, action) =>
+        `<button class="btn btn-xxs btn-secondary ml-1" data-nav="${action}">${label}</button>`;
+
+    container.innerHTML = `
+        <div class="space-y-2">
+            <div class="flex items-center justify-between">
+                <div>
+                    <span class="font-semibold text-[9px] uppercase text-[--text-secondary]">
+                        Overall Status
+                    </span>
+                    ${issueBadge}
+                </div>
+            </div>
+
+            <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                <div class="font-semibold text-[8px] uppercase text-[--text-secondary]">
+                    Geometry
+                </div>
+                <div class="text-[8px] text-[--text-secondary] mb-1">
+                    Zones detected: ${geometry?.totals?.zones ?? 0}
+                </div>
+                <table class="w-full text-[8px]">
+                    <thead class="bg-black/40">
+                        <tr>
+                            <th class="px-1 py-0.5 text-left">Zone</th>
+                            <th class="px-1 py-0.5 text-left">Surfaces*</th>
+                            <th class="px-1 py-0.5 text-left">Windows*</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${zonesHtml}
+                    </tbody>
+                </table>
+                <div class="text-[7px] text-[--text-secondary] mt-0.5">
+                    *Surface/window counts are placeholders until explicit geometry mapping is exposed.
+                </div>
+            </div>
+
+            <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                <div class="flex items-center justify-between">
+                    <div class="font-semibold text-[8px] uppercase text-[--text-secondary]">
+                        Constructions & Materials
+                    </div>
+                    <div class="flex items-center">
+                        ${(missingCons.length || missingMats.length)
+                            ? button('Open Constructions', 'constructions') +
+                              button('Open Materials', 'materials')
+                            : ''}
+                    </div>
+                </div>
+                <div class="text-[8px]">
+                    ${missingCons.length
+                        ? `<div class="text-red-400">Missing constructions: ${missingCons
+                              .map((n) => `<code>${n}</code>`)
+                              .join(', ')}</div>`
+                        : `<div class="text-[--text-secondary]">No missing constructions.</div>`}
+                    ${unusedCons.length
+                        ? `<div class="text-[--text-secondary]">Unused constructions: ${unusedCons
+                              .slice(0, 10)
+                              .map((n) => `<code>${n}</code>`)
+                              .join(', ')}${unusedCons.length > 10 ? '…' : ''}</div>`
+                        : ''}
+                    ${missingMats.length
+                        ? `<div class="text-red-400">Missing materials (referenced but not defined): ${missingMats
+                              .map((n) => `<code>${n}</code>`)
+                              .join(', ')}</div>`
+                        : `<div class="text-[--text-secondary]">No missing materials referenced by constructions.</div>`}
+                    ${unusedMats.length
+                        ? `<div class="text-[--text-secondary]">Unused materials: ${unusedMats
+                              .slice(0, 10)
+                              .map((n) => `<code>${n}</code>`)
+                              .join(', ')}${unusedMats.length > 10 ? '…' : ''}</div>`
+                        : ''}
+                </div>
+            </div>
+
+            <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                <div class="flex items-center justify-between">
+                    <div class="font-semibold text-[8px] uppercase text-[--text-secondary]">
+                        Schedules & Loads
+                    </div>
+                    <div class="flex items-center">
+                        ${missingScheds.length || inconsistentLoads.length
+                            ? button('Open Schedules', 'schedules') +
+                              button('Open Zone Loads', 'zone-loads')
+                            : ''}
+                    </div>
+                </div>
+                <div class="text-[8px]">
+                    ${missingScheds.length
+                        ? `<div class="text-yellow-300">Missing schedules: ${missingScheds
+                              .map((n) => `<code>${n}</code>`)
+                              .join(', ')}</div>`
+                        : `<div class="text-[--text-secondary]">No missing schedules referenced by loads/controls.</div>`}
+                    ${inconsistentLoads.length
+                        ? `<div class="mt-1 text-[8px] text-yellow-300">
+                               ${inconsistentLoads
+                                   .slice(0, 20)
+                                   .map(
+                                       (e) =>
+                                           `• [${e.zone}] ${e.issue}`
+                                   )
+                                   .join('<br>')}
+                               ${
+                                   inconsistentLoads.length > 20
+                                       ? '<br>…'
+                                       : ''
+                               }
+                           </div>`
+                        : ''}
+                </div>
+            </div>
+
+            <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                <div class="font-semibold text-[8px] uppercase text-[--text-secondary]">
+                    Issues
+                </div>
+                <div class="text-[8px]">
+                    ${issuesHtml}
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Wire quick navigation buttons
+    container
+        .querySelectorAll('button[data-nav]')
+        .forEach((btn) => {
+            btn.addEventListener('click', (ev) => {
+                const nav = ev.currentTarget.getAttribute('data-nav');
+                if (nav === 'materials') {
+                    openMaterialsManagerPanel();
+                } else if (nav === 'constructions') {
+                    openConstructionsManagerPanel();
+                } else if (nav === 'schedules') {
+                    openSchedulesManagerPanel();
+                } else if (nav === 'zone-loads') {
+                    openZoneLoadsManagerPanel();
+                }
+            });
+        });
+}
+
 function createRecipePanel(recipe) {
     const panel = document.createElement('div');
     panel.id = `panel-${recipe.id}`;
@@ -248,7 +925,7 @@ function createRecipePanel(recipe) {
     panel.dataset.scriptName = recipe.scriptName;
 
     let paramsHtml = '';
-    recipe.params.forEach(param => {
+    recipe.params.forEach((param) => {
         paramsHtml += `
             <div>
                 <label class="label" for="${param.id}">${param.name}</label>
@@ -258,6 +935,31 @@ function createRecipePanel(recipe) {
     });
 
     const isAnnual = recipe.id === 'annual-energy-simulation';
+    const isHeating = recipe.id === 'heating-design-day';
+    const isCooling = recipe.id === 'cooling-design-day';
+
+    // Helper: read current project-level EPW from metadata
+    function getProjectEpwPath() {
+        try {
+            const meta =
+                (typeof project.getMetadata === 'function' && project.getMetadata()) ||
+                project.metadata ||
+                {};
+            const ep = meta.energyPlusConfig || meta.energyplus || {};
+            const weather = ep.weather || {};
+            return weather.epwPath || ep.weatherFilePath || null;
+        } catch (e) {
+            console.warn('EnergyPlus: failed to read project-level EPW', e);
+            return null;
+        }
+    }
+
+    function getRunName() {
+        if (isAnnual) return 'annual';
+        if (isHeating) return 'heating-design';
+        if (isCooling) return 'cooling-design';
+        return recipe.id || 'custom';
+    }
 
     panel.innerHTML = `
         <div class="window-header">
@@ -278,17 +980,40 @@ function createRecipePanel(recipe) {
             <div class="resize-handle-corner bottom-left"></div>
             <div class="resize-handle-corner bottom-right"></div>
             <p class="info-box !text-xs !py-2 !px-3">${recipe.description}</p>
-            ${isAnnual ? `
+            ${
+                isAnnual
+                    ? `
             <button class="btn btn-secondary w-full" data-action="generate-idf-from-project">
                 Generate IDF from current Ray-Modeler project
             </button>
             <p class="text-[9px] text-[--text-secondary] mt-1">
-                IDF generation uses the current <code>energyPlusConfig</code>.
-                Use the EnergyPlus configuration panels (Materials, Constructions, Schedules, Zone Loads / IdealLoads, Daylighting & Outputs)
-                in the sidebar to manage these settings.
+                Uses the current <code>energyPlusConfig</code> to write <code>model.idf</code>.
+                Configure Materials, Constructions, Schedules, Zone Loads, Thermostats & IdealLoads, Daylighting, Outputs, and Simulation Control in the sidebar.
             </p>
-            ` : ''}
+            `
+                    : ''
+            }
             ${paramsHtml}
+            ${
+                isAnnual
+                    ? `
+            <div class="text-[8px] text-[--text-secondary]">
+                Project EPW: <span data-role="project-epw-label">(resolving...)</span>
+            </div>
+            `
+                    : ''
+            }
+            ${
+                isHeating || isCooling
+                    ? `
+            <p class="text-[8px] text-[--text-secondary]">
+                This recipe reuses the selected IDF (or <code>model.idf</code> by default).
+                Ensure your <code>SimulationControl</code> and <code>SizingPeriod</code> objects in the IDF represent the desired design-day conditions.
+                EnergyPlus is run in a dedicated <code>runs/${isHeating ? 'heating-design' : 'cooling-design'}</code> directory via the Electron bridge.
+            </p>
+            `
+                    : ''
+            }
             <div class="space-y-2">
                 <button class="btn btn-primary w-full" data-action="run">Run Simulation</button>
             </div>
@@ -313,6 +1038,12 @@ function createRecipePanel(recipe) {
     const generateBtn = panel.querySelector('[data-action="generate-idf-from-project"]');
     const runBtn = panel.querySelector('[data-action="run"]');
     const outputConsole = panel.querySelector('.simulation-output-console');
+    const projectEpwLabel = panel.querySelector('[data-role="project-epw-label"]');
+
+    if (isAnnual && projectEpwLabel) {
+        const epw = getProjectEpwPath();
+        projectEpwLabel.textContent = epw || '(not set)';
+    }
 
     // Lazy import to avoid circular deps on load
     if (generateBtn) {
@@ -335,12 +1066,19 @@ function createRecipePanel(recipe) {
 
 
     if (runBtn) {
+        // Per-panel listeners to avoid leaks; scoped to this recipe panel.
+        let epOutputListener = null;
+        let epExitListener = null;
+
         runBtn.addEventListener('click', () => {
             if (!window.electronAPI) {
                 if (outputConsole) {
-                    outputConsole.textContent += 'Electron environment not detected. Please run via Electron or use generated scripts.\n';
+                    outputConsole.textContent +=
+                        'Electron environment not detected. Please run via Electron or use the generated IDF/scripts.\n';
                 }
-                alert('EnergyPlus can only be run directly inside the Electron app. In browser, use generated scripts manually.');
+                alert(
+                    'EnergyPlus can only be run directly inside the Electron app. In browser, use the generated IDF/scripts manually.'
+                );
                 return;
             }
 
@@ -348,20 +1086,36 @@ function createRecipePanel(recipe) {
             const epwInput = panel.querySelector('#epw-file');
             const exeInput = panel.querySelector('#eplus-exe');
 
-            const idfPath = idfInput && idfInput.files && idfInput.files[0]
-                ? idfInput.files[0].path || idfInput.files[0].name
-                : 'model.idf'; // fallback: use generated IDF in project folder
+            const idfPath =
+                idfInput &&
+                idfInput.files &&
+                idfInput.files[0]
+                    ? idfInput.files[0].path || idfInput.files[0].name
+                    : 'model.idf'; // fallback: use generated IDF in project folder
 
-            const epwPath = epwInput && epwInput.files && epwInput.files[0]
-                ? epwInput.files[0].path || epwInput.files[0].name
-                : null;
+            // EPW resolution for all recipes:
+            // 1) Explicit EPW selected in this panel (if present)
+            // 2) Project-level EPW from energyPlusConfig.weather.epwPath / weatherFilePath
+            const explicitEpw =
+                epwInput &&
+                epwInput.files &&
+                epwInput.files[0]
+                    ? epwInput.files[0].path || epwInput.files[0].name
+                    : null;
 
-            const energyPlusPath = exeInput && exeInput.value
-                ? exeInput.value.trim()
-                : null;
+            const projectEpw = getProjectEpwPath();
+            const epwPath = explicitEpw || projectEpw || null;
 
+            const energyPlusPath =
+                exeInput && exeInput.value
+                    ? exeInput.value.trim()
+                    : null;
+
+            // For annual and design-day recipes, we require EPW to keep behavior explicit.
             if (!epwPath) {
-                alert('Select an EPW weather file before running.');
+                alert(
+                    'No EPW specified. Select an EPW here or configure a project-level EPW in the "Weather & Location" panel.'
+                );
                 return;
             }
 
@@ -370,29 +1124,252 @@ function createRecipePanel(recipe) {
                 return;
             }
 
-            if (outputConsole) {
-                outputConsole.textContent = `Running EnergyPlus...\nIDF: ${idfPath}\nEPW: ${epwPath}\nExe: ${energyPlusPath}\n\n`;
-            }
+            const runName = getRunName();
+            const runId = `${runName}-${Date.now()}`;
 
-            window.electronAPI.runEnergyPlus({
+            // Pre-run validation (no Electron call if blocking issues exist)
+            const preRun = validateEnergyPlusRunRequest({
                 idfPath,
                 epwPath,
-                energyPlusPath
+                energyPlusPath,
+                recipeId: recipe.id,
             });
 
-            window.electronAPI.onEnergyPlusOutput((data) => {
+            if (!preRun.ok) {
+                const summary = formatIssuesSummary(preRun.issues, 4);
                 if (outputConsole) {
-                    outputConsole.textContent += data;
-                    outputConsole.scrollTop = outputConsole.scrollHeight;
+                    outputConsole.textContent +=
+                        'Pre-run validation failed:\n' +
+                        (summary ||
+                            'Blocking configuration issues detected.') +
+                        '\n\n';
+                    outputConsole.scrollTop =
+                        outputConsole.scrollHeight;
                 }
+                alert(
+                    'Cannot start EnergyPlus run due to configuration issues.\n\n' +
+                        (summary ||
+                            'Check the EnergyPlus sidebar configuration and diagnostics.')
+                );
+                return;
+            }
+
+            // Register run in resultsManager (status: pending)
+            resultsManager.registerEnergyPlusRun(runId, {
+                label: `EnergyPlus ${runName}`,
+                recipeId: recipe.id,
             });
 
-            window.electronAPI.onEnergyPlusExit((code) => {
-                if (outputConsole) {
-                    outputConsole.textContent += `\n--- EnergyPlus exited with code: ${code} ---\n`;
-                    outputConsole.scrollTop = outputConsole.scrollHeight;
+            if (outputConsole) {
+                outputConsole.textContent =
+                    `Running EnergyPlus [${runName}]...\n` +
+                    `IDF: ${idfPath}\n` +
+                    `EPW: ${epwPath}\n` +
+                    `Exe: ${energyPlusPath}\n` +
+                    `Outputs: runs/${runName}/ (if supported by Electron bridge)\n\n`;
+            }
+
+            // Clean up any previous listeners for this panel to avoid leaks.
+            if (
+                window.electronAPI.offEnergyPlusOutput &&
+                epOutputListener
+            ) {
+                window.electronAPI.offEnergyPlusOutput(
+                    epOutputListener
+                );
+                epOutputListener = null;
+            }
+            if (
+                window.electronAPI.offEnergyPlusExit &&
+                epExitListener
+            ) {
+                window.electronAPI.offEnergyPlusExit(epExitListener);
+                epExitListener = null;
+            }
+
+            // Run EnergyPlus via Electron bridge.
+            // See preload.js for full contract; main should:
+            // - Use runName/runId to choose output directory, e.g. runs/annual, runs/heating-design.
+            // - Invoke: energyplus -w epwPath -d runs/runName -r idfPath
+            // - Stream stdout/stderr to 'energyplus-output'; send 'energyplus-exit' on completion.
+            const runOptions = {
+                idfPath,
+                epwPath,
+                energyPlusPath,
+                runName,
+                runId, // Used by ResultsManager and for filtering logs
+            };
+
+            window.electronAPI.runEnergyPlus(runOptions);
+
+            // Output handler, tolerant to both structured and legacy payloads.
+            const handleOutput = (payload) => {
+                if (!outputConsole) return;
+
+                let text = '';
+                if (
+                    payload &&
+                    typeof payload === 'object' &&
+                    typeof payload.chunk === 'string'
+                ) {
+                    // New structured form: filter by runId if provided.
+                    if (
+                        payload.runId &&
+                        payload.runId !== runId
+                    ) {
+                        return;
+                    }
+                    text = payload.chunk;
+                } else {
+                    // Legacy: plain string.
+                    text = String(payload ?? '');
                 }
-            });
+
+                if (!text) return;
+                outputConsole.textContent += text;
+                outputConsole.scrollTop =
+                    outputConsole.scrollHeight;
+            };
+
+            // Exit handler, tolerant to both structured and legacy payloads.
+            const handleExit = (payload) => {
+                // Ignore events for other runs if runId is present.
+                if (
+                    payload &&
+                    typeof payload === 'object' &&
+                    payload.runId &&
+                    payload.runId !== runId
+                ) {
+                    return;
+                }
+
+                const code =
+                    typeof payload === 'object' &&
+                    payload !== null
+                        ? typeof payload.exitCode === 'number'
+                            ? payload.exitCode
+                            : 0
+                        : typeof payload === 'number'
+                        ? payload
+                        : 0;
+
+                const resolvedRunId =
+                    (payload &&
+                        typeof payload === 'object' &&
+                        payload.runId) ||
+                    runId;
+
+                const baseDir =
+                    payload &&
+                    typeof payload === 'object'
+                        ? payload.outputDir
+                        : undefined;
+
+                const errContent =
+                    payload &&
+                    typeof payload === 'object'
+                        ? payload.errContent
+                        : undefined;
+
+                const csvContents =
+                    payload &&
+                    typeof payload === 'object'
+                        ? payload.csvContents
+                        : undefined;
+
+                const runRecord =
+                    resultsManager.parseEnergyPlusResults(
+                        resolvedRunId,
+                        {
+                            baseDir,
+                            errContent,
+                            csvContents,
+                            statusFromRunner: code,
+                        }
+                    );
+
+                if (outputConsole) {
+                    outputConsole.textContent +=
+                        `\n--- EnergyPlus exited with code: ${code} ---\n`;
+
+                    if (runRecord && runRecord.errors) {
+                        const {
+                            fatal,
+                            severe,
+                            warning,
+                        } = runRecord.errors;
+                        const lines = [];
+                        if (fatal.length) {
+                            lines.push(
+                                `Fatal errors: ${fatal.length}`
+                            );
+                            lines.push(fatal[0]);
+                        }
+                        if (severe.length) {
+                            lines.push(
+                                `Severe errors: ${severe.length}`
+                            );
+                            if (!fatal.length) {
+                                lines.push(severe[0]);
+                            }
+                        }
+                        if (warning.length) {
+                            lines.push(
+                                `Warnings: ${warning.length}`
+                            );
+                        }
+                        if (lines.length) {
+                            outputConsole.textContent +=
+                                lines.join('\n') + '\n';
+                        }
+                    }
+
+                    outputConsole.scrollTop =
+                        outputConsole.scrollHeight;
+                }
+
+                // Auto-detach listeners on completion when off* is available.
+                if (
+                    window.electronAPI.offEnergyPlusOutput &&
+                    epOutputListener
+                ) {
+                    window.electronAPI.offEnergyPlusOutput(
+                        epOutputListener
+                    );
+                    epOutputListener = null;
+                }
+                if (
+                    window.electronAPI.offEnergyPlusExit &&
+                    epExitListener
+                ) {
+                    window.electronAPI.offEnergyPlusExit(
+                        epExitListener
+                    );
+                    epExitListener = null;
+                }
+            };
+
+            // Attach listeners (prefer structured helpers; fallback to legacy).
+            if (window.electronAPI.onEnergyPlusOutput) {
+                epOutputListener =
+                    window.electronAPI.onEnergyPlusOutput(
+                        handleOutput
+                    );
+            }
+
+            if (window.electronAPI.onceEnergyPlusExit) {
+                epExitListener =
+                    window.electronAPI.onceEnergyPlusExit(
+                        handleExit
+                    );
+            } else if (
+                window.electronAPI.onEnergyPlusExit
+            ) {
+                epExitListener =
+                    window.electronAPI.onEnergyPlusExit(
+                        handleExit
+                    );
+            }
         });
     }
 
@@ -1850,8 +2827,8 @@ Until: 24:00, 1.0">${linesText}</textarea>
 }
 
 /**
- * ENERGYPLUS ZONE LOADS / THERMOSTATS / IDEALLOADS MANAGER
- * Per-zone control panel, backed by energyPlusConfig.zoneLoads, thermostats, idealLoads.
+ * ENERGYPLUS ZONE LOADS MANAGER
+ * Per-zone loads control panel, backed by energyPlusConfig.zoneLoads.
  */
 function openZoneLoadsManagerPanel() {
     const panelId = 'panel-energyplus-zone-loads';
@@ -1871,7 +2848,7 @@ function createZoneLoadsManagerPanel() {
 
     panel.innerHTML = `
         <div class="window-header">
-            <span>Zone Loads / Thermostats / IdealLoads</span>
+            <span>Zone Loads</span>
             <!-- Help button removed -->
             <div class="window-controls">
                 <div class="window-icon-max" title="Maximize/Restore"></div>
@@ -1889,8 +2866,8 @@ function createZoneLoadsManagerPanel() {
             <div class="resize-handle-corner bottom-left"></div>
             <div class="resize-handle-corner bottom-right"></div>
             <p class="info-box !text-[10px] !py-1.5 !px-2">
-                Configure per-zone internal loads, thermostat setpoints, and IdealLoads overrides.
-                Values are stored in <code>energyPlusConfig.zoneLoads</code>, <code>energyPlusConfig.thermostats</code>, and <code>energyPlusConfig.idealLoads</code>.
+                Configure per-zone internal loads (people, lighting, equipment, infiltration).
+                Values are stored in <code>energyPlusConfig.zoneLoads</code>.
             </p>
 
             <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
@@ -1934,40 +2911,6 @@ function createZoneLoadsManagerPanel() {
                         <select class="w-full text-[8px]" data-template="infilSched"></select>
                     </div>
                 </div>
-                <div class="grid grid-cols-4 gap-1 mt-1 text-[8px]">
-                    <div>
-                        <label class="label !text-[8px]">IL Avail Sched (GLOBAL)</label>
-                        <select class="w-full text-[8px]" data-template="ilAvail"></select>
-                    </div>
-                    <div>
-                        <label class="label !text-[8px]">Heat Cap [W] (GLOBAL)</label>
-                        <input type="number" step="10" class="w-full text-[8px]" data-template="ilHeatCap">
-                    </div>
-                    <div>
-                        <label class="label !text-[8px]">Cool Cap [W] (GLOBAL)</label>
-                        <input type="number" step="10" class="w-full text-[8px]" data-template="ilCoolCap">
-                    </div>
-                    <div>
-                        <label class="label !text-[8px]">OA Method (GLOBAL)</label>
-                        <select class="w-full text-[8px]" data-template="ilOaMethod">
-                            <option value="">(inherit)</option>
-                            <option value="None">None</option>
-                            <option value="Sum">Sum</option>
-                            <option value="Flow/Person">Flow/Person</option>
-                            <option value="Flow/Area">Flow/Area</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="grid grid-cols-4 gap-1 mt-1 text-[8px]">
-                    <div>
-                        <label class="label !text-[8px]">OA [L/s.person] (GLOBAL)</label>
-                        <input type="number" step="0.01" class="w-full text-[8px]" data-template="ilOaPerPerson">
-                    </div>
-                    <div>
-                        <label class="label !text-[8px]">OA [L/s.m²] (GLOBAL)</label>
-                        <input type="number" step="0.01" class="w-full text-[8px]" data-template="ilOaPerArea">
-                    </div>
-                </div>
             </div>
 
             <div class="border border-gray-700/70 rounded bg-black/40 max-h-72 overflow-y-auto **scrollable-panel-inner**">
@@ -1979,8 +2922,6 @@ function createZoneLoadsManagerPanel() {
                             <th class="px-1 py-1 text-left">Lights [W/m²] / Sched</th>
                             <th class="px-1 py-1 text-left">Equip [W/m²] / Sched</th>
                             <th class="px-1 py-1 text-left">Infil [ACH] / Sched</th>
-                            <th class="px-1 py-1 text-left">Tstat Heat/Cool Sched</th>
-                            <th class="px-1 py-1 text-left">IdealLoads (Avail / Caps / OA)</th>
                         </tr>
                     </thead>
                     <tbody class="zone-loads-tbody"></tbody>
@@ -1997,8 +2938,6 @@ function createZoneLoadsManagerPanel() {
                 Notes:
                 <ul class="list-disc pl-4 space-y-0.5">
                     <li>Loads are stored per zone in <code>zoneLoads</code> (one entry per zone).</li>
-                    <li>Thermostats use one GLOBAL entry plus optional per-zone overrides.</li>
-                    <li>IdealLoads uses <code>idealLoads.global</code> and optional <code>idealLoads.perZone</code> overrides.</li>
                 </ul>
             </div>
         </div>
@@ -2074,42 +3013,7 @@ function createZoneLoadsManagerPanel() {
                 }
             });
         }
-
-        let globalTstat = null;
-        const tstatPerZone = new Map();
-        if (Array.isArray(ep.thermostats)) {
-            ep.thermostats.forEach((t) => {
-                if (!t) return;
-                const zn = (t.zoneName || '').toString();
-                if (!zn || zn.toUpperCase() === 'GLOBAL') {
-                    if (!globalTstat) {
-                        globalTstat = {
-                            zoneName: 'GLOBAL',
-                            heatingScheduleName: t.heatingScheduleName,
-                            coolingScheduleName: t.coolingScheduleName,
-                        };
-                    }
-                } else if (!tstatPerZone.has(zn)) {
-                    tstatPerZone.set(zn, {
-                        zoneName: zn,
-                        heatingScheduleName: t.heatingScheduleName,
-                        coolingScheduleName: t.coolingScheduleName,
-                    });
-                }
-            });
-        }
-
-        const idealGlobal = (ep.idealLoads && ep.idealLoads.global) || {};
-        const idealPerZone = new Map();
-        if (ep.idealLoads && Array.isArray(ep.idealLoads.perZone)) {
-            ep.idealLoads.perZone.forEach((c) => {
-                if (c && c.zoneName) {
-                    idealPerZone.set(String(c.zoneName), { ...c });
-                }
-            });
-        }
-
-        return { zoneLoadsIndex, globalTstat, tstatPerZone, idealGlobal, idealPerZone };
+        return { zoneLoadsIndex };
     }
 
     function fillTemplateScheduleOptions(ep) {
@@ -2139,8 +3043,7 @@ function createZoneLoadsManagerPanel() {
         const { ep } = getMetaAndEP();
         const zones = getZones();
         const schedNames = getScheduleNames(ep);
-        const { zoneLoadsIndex, globalTstat, tstatPerZone, idealGlobal, idealPerZone } =
-            buildIndexes(ep);
+        const { zoneLoadsIndex } = buildIndexes(ep);
 
         // Template selects
         fillTemplateScheduleOptions(ep);
@@ -2149,13 +3052,6 @@ function createZoneLoadsManagerPanel() {
         zones.forEach((z) => {
             const zn = String(z.name);
             const zl = zoneLoadsIndex.get(zn) || {};
-            const tstat = tstatPerZone.get(zn) || {};
-            const idealZ = idealPerZone.get(zn) || {};
-
-            const effHeatT =
-                tstat.heatingScheduleName || globalTstat?.heatingScheduleName || '';
-            const effCoolT =
-                tstat.coolingScheduleName || globalTstat?.coolingScheduleName || '';
 
             const tr = document.createElement('tr');
             tr.dataset.zoneName = zn;
@@ -2224,50 +3120,6 @@ function createZoneLoadsManagerPanel() {
                     </select>
                 </td>
 
-                <td class="px-1 py-1 align-top">
-                    <select class="w-full text-[8px] mb-0.5" data-field="tstatHeatOverride">
-                        ${schedOptions(tstat.heatingScheduleName || '')}
-                    </select>
-                    <select class="w-full text-[8px]" data-field="tstatCoolOverride">
-                        ${schedOptions(tstat.coolingScheduleName || '')}
-                    </select>
-                    <div class="text-[7px] text-[--text-secondary]">
-                        Blank = use GLOBAL or no control.
-                    </div>
-                </td>
-
-                <td class="px-1 py-1 align-top">
-                    <select class="w-full text-[8px] mb-0.5" data-field="idealAvail">
-                        ${schedOptions(idealZ.availabilitySchedule || '')}
-                    </select>
-                    <div class="grid grid-cols-2 gap-0.5 mt-0.5">
-                        <input type="number" step="10"
-                            class="w-full text-[8px]"
-                            placeholder="Heat cap W (override)"
-                            data-field="idealHeatCap"
-                            value="${idealZ.maxHeatingCapacity ?? ''}">
-                        <input type="number" step="10"
-                            class="w-full text-[8px]"
-                            placeholder="Cool cap W (override)"
-                            data-field="idealCoolCap"
-                            value="${idealZ.maxCoolingCapacity ?? ''}">
-                    </div>
-                    <select class="w-full text-[8px] mt-0.5" data-field="idealOaMethod">
-                        ${oaMethodOptions(idealZ.outdoorAirMethod || '')}
-                    </select>
-                    <div class="grid grid-cols-2 gap-0.5 mt-0.5">
-                        <input type="number" step="0.001"
-                            class="w-full text-[8px]"
-                            placeholder="OA L/s.person (override)"
-                            data-field="idealOaPerPerson"
-                            value="${idealZ.outdoorAirFlowPerPerson != null ? idealZ.outdoorAirFlowPerPerson * 1000.0 : ''}">
-                        <input type="number" step="0.001"
-                            class="w-full text-[8px]"
-                            placeholder="OA L/s.m² (override)"
-                            data-field="idealOaPerArea"
-                            value="${idealZ.outdoorAirFlowPerArea != null ? idealZ.outdoorAirFlowPerArea * 1000.0 : ''}">
-                    </div>
-                </td>
             `;
 
             tbody.appendChild(tr);
@@ -2355,8 +3207,6 @@ function createZoneLoadsManagerPanel() {
         const zones = rows.map((tr) => tr.dataset.zoneName);
 
         const nextZoneLoads = [];
-        const perZoneTstats = [];
-        const perZoneIdeal = [];
 
         // Collect per-zone values
         rows.forEach((tr) => {
@@ -2421,162 +3271,11 @@ function createZoneLoadsManagerPanel() {
                 nextZoneLoads.push(zl);
             }
 
-            const tHeat = str('[data-field="tstatHeatOverride"]');
-            const tCool = str('[data-field="tstatCoolOverride"]');
-            if (tHeat || tCool) {
-                perZoneTstats.push({
-                    zoneName: zn,
-                    heatingScheduleName: tHeat,
-                    coolingScheduleName: tCool,
-                });
-            }
-
-            const idealAvail = str('[data-field="idealAvail"]');
-            const idealHeatCap = num('[data-field="idealHeatCap"]');
-            const idealCoolCap = num('[data-field="idealCoolCap"]');
-            const idealOaMethod = str('[data-field="idealOaMethod"]');
-            const idealOaPerPerson_Ls = num('[data-field="idealOaPerPerson"]');
-            const idealOaPerArea_Ls = num('[data-field="idealOaPerArea"]');
-
-            if (
-                idealAvail ||
-                idealHeatCap != null ||
-                idealCoolCap != null ||
-                idealOaMethod ||
-                idealOaPerPerson_Ls != null ||
-                idealOaPerArea_Ls != null
-            ) {
-                const cfg = { zoneName: zn };
-                if (idealAvail) cfg.availabilitySchedule = idealAvail;
-                if (idealHeatCap != null) {
-                    cfg.heatingLimitType = 'LimitCapacity';
-                    cfg.maxHeatingCapacity = idealHeatCap;
-                }
-                if (idealCoolCap != null) {
-                    cfg.coolingLimitType = 'LimitCapacity';
-                    cfg.maxCoolingCapacity = idealCoolCap;
-                }
-                if (idealOaMethod) cfg.outdoorAirMethod = idealOaMethod;
-                if (idealOaPerPerson_Ls != null) {
-                    cfg.outdoorAirFlowPerPerson = idealOaPerPerson_Ls / 1000.0;
-                }
-                if (idealOaPerArea_Ls != null) {
-                    cfg.outdoorAirFlowPerArea = idealOaPerArea_Ls / 1000.0;
-                }
-                perZoneIdeal.push(cfg);
-            }
         });
-
-        // Template-driven GLOBAL thermostat and IdealLoads
-        const tmpl = collectTemplateValues();
-        const nextThermostats = [];
-        if (tmpl.heatSpSched || tmpl.coolSpSched) {
-            nextThermostats.push({
-                zoneName: 'GLOBAL',
-                heatingScheduleName: tmpl.heatSpSched,
-                coolingScheduleName: tmpl.coolSpSched,
-            });
-        }
-
-        perZoneTstats.forEach((t) => {
-            const heat = t.heatingScheduleName;
-            const cool = t.coolingScheduleName;
-            if (heat || cool) {
-                nextThermostats.push({
-                    zoneName: t.zoneName,
-                    heatingScheduleName: heat,
-                    coolingScheduleName: cool,
-                });
-            }
-        });
-
-        const existingIdeal = ep.idealLoads || {};
-        const globalIdeal = { ...(existingIdeal.global || {}) };
-
-        // Global availability schedule
-        if (tmpl.ilAvail !== undefined) {
-            if (tmpl.ilAvail) {
-                globalIdeal.availabilitySchedule = tmpl.ilAvail;
-            } else {
-                delete globalIdeal.availabilitySchedule;
-            }
-        }
-
-        // Global heating capacity
-        if (tmpl.ilHeatCap !== undefined) {
-            if (Number.isFinite(tmpl.ilHeatCap)) {
-                globalIdeal.heatingLimitType = 'LimitCapacity';
-                globalIdeal.maxHeatingCapacity = tmpl.ilHeatCap;
-            } else {
-                globalIdeal.heatingLimitType = 'NoLimit';
-                delete globalIdeal.maxHeatingCapacity;
-            }
-        }
-
-        // Global cooling capacity
-        if (tmpl.ilCoolCap !== undefined) {
-            if (Number.isFinite(tmpl.ilCoolCap)) {
-                globalIdeal.coolingLimitType = 'LimitCapacity';
-                globalIdeal.maxCoolingCapacity = tmpl.ilCoolCap;
-            } else {
-                globalIdeal.coolingLimitType = 'NoLimit';
-                delete globalIdeal.maxCoolingCapacity;
-            }
-        }
-
-        // Global OA method
-        if (tmpl.ilOaMethod !== undefined) {
-            if (tmpl.ilOaMethod) {
-                globalIdeal.outdoorAirMethod = tmpl.ilOaMethod;
-            } else {
-                delete globalIdeal.outdoorAirMethod;
-            }
-        }
-
-        // Global OA flows (L/s → m3/s)
-        if (tmpl.ilOaPerPerson !== undefined) {
-            if (Number.isFinite(tmpl.ilOaPerPerson) && tmpl.ilOaPerPerson > 0) {
-                globalIdeal.outdoorAirFlowPerPerson = tmpl.ilOaPerPerson / 1000.0;
-            } else {
-                delete globalIdeal.outdoorAirFlowPerPerson;
-            }
-        }
-        if (tmpl.ilOaPerArea !== undefined) {
-            if (Number.isFinite(tmpl.ilOaPerArea) && tmpl.ilOaPerArea > 0) {
-                globalIdeal.outdoorAirFlowPerArea = tmpl.ilOaPerArea / 1000.0;
-            } else {
-                delete globalIdeal.outdoorAirFlowPerArea;
-            }
-        }
-
-        const cleanedGlobalIdeal =
-            Object.keys(globalIdeal).length > 0 ? globalIdeal : existingIdeal.global || {};
-
-        const nextIdealLoads = {
-            global: cleanedGlobalIdeal,
-            perZone: perZoneIdeal,
-        };
-
-        // Filter out thermostats / perZone configs for zones that no longer exist
-        const zoneSet = new Set(zones);
-        const filteredThermostats = nextThermostats.filter((t) => {
-            if (!t) return false;
-            if (!t.zoneName) return false;
-            if (t.zoneName.toUpperCase() === 'GLOBAL') return true;
-            return zoneSet.has(String(t.zoneName));
-        });
-        const filteredPerZoneIdeal = nextIdealLoads.perZone.filter((c) =>
-            c && c.zoneName && zoneSet.has(String(c.zoneName))
-        );
 
         const nextConfig = {
             ...ep,
             zoneLoads: nextZoneLoads,
-            thermostats: filteredThermostats,
-            idealLoads: {
-                global: nextIdealLoads.global,
-                perZone: filteredPerZoneIdeal,
-            },
         };
 
         return { meta, nextConfig };
@@ -2603,7 +3302,7 @@ function createZoneLoadsManagerPanel() {
                         energyPlusConfig: nextConfig,
                     };
                 }
-                alert('Zone loads, thermostats, and IdealLoads configuration saved.');
+                alert('Zone loads configuration saved.');
             } catch (err) {
                 console.error('EnergyPlus Zone Manager: save failed', err);
                 alert('Failed to save configuration. Check console for details.');
@@ -2617,14 +3316,799 @@ function createZoneLoadsManagerPanel() {
 }
 
 /**
- * DAYLIGHTING & OUTPUTS MANAGER
- * Manage energyPlusConfig.daylighting.controls and .outputs (IlluminanceMaps, Output:Variable).
+ * DAYLIGHTING MANAGER
+ * Manage energyPlusConfig.daylighting.controls and .outputs.illuminanceMaps.
  */
 function openDaylightingManagerPanel() {
     const panelId = 'panel-energyplus-daylighting';
     let panel = document.getElementById(panelId);
     if (!panel) {
         panel = createDaylightingManagerPanel();
+        document.getElementById('window-container').appendChild(panel);
+    }
+    panel.classList.remove('hidden');
+    panel.style.zIndex = getNewZIndex();
+}
+
+function createIdealLoadsManagerPanel() {
+    const panel = document.createElement('div');
+    panel.id = 'panel-energyplus-ideal-loads';
+    panel.className = 'floating-window ui-panel resizable-panel';
+
+    panel.innerHTML = `
+        <div class="window-header">
+            <span>Thermostats & IdealLoads</span>
+            <div class="window-controls">
+                <div class="window-icon-max" title="Maximize/Restore"></div>
+                <div class="collapse-icon" title="Minimize"></div>
+                <div class="window-icon-close" title="Close"></div>
+            </div>
+        </div>
+        <div class="window-content space-y-3">
+            <div class="resize-handle-edge top"></div>
+            <div class="resize-handle-edge right"></div>
+            <div class="resize-handle-edge bottom"></div>
+            <div class="resize-handle-edge left"></div>
+            <div class="resize-handle-corner top-left"></div>
+            <div class="resize-handle-corner top-right"></div>
+            <div class="resize-handle-corner bottom-left"></div>
+            <div class="resize-handle-corner bottom-right"></div>
+
+            <p class="info-box !text-[10px] !py-1.5 !px-2">
+                Configure global/per-zone thermostats and IdealLoads settings.
+                Backed by <code>energyPlusConfig.thermostats</code> and <code>energyPlusConfig.idealLoads</code>.
+                Ray-Modeler's EnergyPlus integration uses <code>ZoneHVAC:IdealLoadsAirSystem</code> plus standard
+                zone controls only; system-level AirLoopHVAC/PlantLoop objects are intentionally not generated.
+            </p>
+
+            <!-- THERMOSTAT SETPOINTS -->
+            <div class="space-y-1 border border-gray-700/70 rounded bg-black/40 p-2">
+                <div class="flex justify-between items-center">
+                    <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Thermostat Setpoints</span>
+                    <button class="btn btn-xxs btn-secondary" data-action="add-tstat-setpoint">+ Add Setpoint</button>
+                </div>
+                <div class="border border-gray-700/70 rounded bg-black/60 max-h-32 overflow-y-auto **scrollable-panel-inner** mt-1">
+                    <table class="w-full text-[8px]">
+                        <thead class="bg-black/40">
+                            <tr>
+                                <th class="px-1 py-1 text-left">Name</th>
+                                <th class="px-1 py-1 text-left">Type</th>
+                                <th class="px-1 py-1 text-left">Schedule(s)</th>
+                                <th class="px-1 py-1 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="tstat-setpoints-tbody"></tbody>
+                    </table>
+                </div>
+                <div class="text-[7px] text-[--text-secondary]">
+                    Defines ThermostatSetpoint:SingleHeating / SingleCooling / SingleHeatingOrCooling / DualSetpoint
+                    objects referenced by zone thermostat controls.
+                </div>
+            </div>
+
+            <!-- ZONE THERMOSTAT CONTROLS -->
+            <div class="space-y-1 border border-gray-700/70 rounded bg-black/40 p-2">
+                <div class="flex justify-between items-center">
+                    <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Zone Thermostat Controls</span>
+                </div>
+                <div class="border border-gray-700/70 rounded bg-black/60 max-h-40 overflow-y-auto **scrollable-panel-inner** mt-1">
+                    <table class="w-full text-[8px]">
+                        <thead class="bg-black/40">
+                            <tr>
+                                <th class="px-1 py-1 text-left">Zone</th>
+                                <th class="px-1 py-1 text-left">Control Type Schedule</th>
+                                <th class="px-1 py-1 text-left">SingleHeat</th>
+                                <th class="px-1 py-1 text-left">SingleCool</th>
+                                <th class="px-1 py-1 text-left">SingleHeat/Cool</th>
+                                <th class="px-1 py-1 text-left">DualSetpoint</th>
+                            </tr>
+                        </thead>
+                        <tbody class="tstat-zone-controls-tbody"></tbody>
+                    </table>
+                </div>
+                <div class="text-[7px] text-[--text-secondary]">
+                    Maps zones to ZoneControl:Thermostat using the setpoints above. Leave cells blank to inherit or skip.
+                </div>
+            </div>
+
+            <!-- GLOBAL IDEAL LOADS -->
+            <div class="space-y-1 border border-gray-700/70 rounded bg-black/40 p-2">
+                <div class="flex justify-between items-center">
+                    <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Global IdealLoads (Defaults)</span>
+                </div>
+                <div class="grid grid-cols-4 gap-2 text-[8px] mt-1">
+                    <div>
+                        <label class="label !text-[8px]">Availability Schedule</label>
+                        <select class="w-full text-[8px]" data-field="il-global-avail"></select>
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Max Heat T [°C]</label>
+                        <input type="number" class="w-full text-[8px]" data-field="il-global-maxHeatT" placeholder="50">
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Min Cool T [°C]</label>
+                        <input type="number" class="w-full text-[8px]" data-field="il-global-minCoolT" placeholder="13">
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Heat Limit</label>
+                        <select class="w-full text-[8px]" data-field="il-global-heatLimit">
+                            <option value="">(default)</option>
+                            <option value="NoLimit">NoLimit</option>
+                            <option value="LimitFlowRate">LimitFlowRate</option>
+                            <option value="LimitCapacity">LimitCapacity</option>
+                            <option value="LimitFlowRateAndCapacity">LimitFlowRateAndCapacity</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-4 gap-2 text-[8px] mt-1">
+                    <div>
+                        <label class="label !text-[8px]">Max Heat Flow [m³/s]</label>
+                        <input type="number" step="0.001" class="w-full text-[8px]" data-field="il-global-maxHeatFlow">
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Max Heat Cap [W]</label>
+                        <input type="number" class="w-full text-[8px]" data-field="il-global-maxHeatCap">
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Cool Limit</label>
+                        <select class="w-full text-[8px]" data-field="il-global-coolLimit">
+                            <option value="">(default)</option>
+                            <option value="NoLimit">NoLimit</option>
+                            <option value="LimitFlowRate">LimitFlowRate</option>
+                            <option value="LimitCapacity">LimitCapacity</option>
+                            <option value="LimitFlowRateAndCapacity">LimitFlowRateAndCapacity</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Max Cool Flow [m³/s]</label>
+                        <input type="number" step="0.001" class="w-full text-[8px]" data-field="il-global-maxCoolFlow">
+                    </div>
+                </div>
+                <div class="grid grid-cols-4 gap-2 text-[8px] mt-1">
+                    <div>
+                        <label class="label !text-[8px]">Max Cool Cap [W]</label>
+                        <input type="number" class="w-full text-[8px]" data-field="il-global-maxCoolCap">
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Dehum Type</label>
+                        <select class="w-full text-[8px]" data-field="il-global-dehumType">
+                            <option value="">(default)</option>
+                            <option value="None">None</option>
+                            <option value="ConstantSensibleHeatRatio">ConstantSensibleHeatRatio</option>
+                            <option value="Humidistat">Humidistat</option>
+                            <option value="ConstantSupplyHumidityRatio">ConstantSupplyHumidityRatio</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Cool SHR</label>
+                        <input type="number" step="0.01" class="w-full text-[8px]" data-field="il-global-coolSHR">
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Humid Type</label>
+                        <select class="w-full text-[8px]" data-field="il-global-humType">
+                            <option value="">(default)</option>
+                            <option value="None">None</option>
+                            <option value="Humidistat">Humidistat</option>
+                            <option value="ConstantSupplyHumidityRatio">ConstantSupplyHumidityRatio</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-4 gap-2 text-[8px] mt-1">
+                    <div>
+                        <label class="label !text-[8px]">OA Method</label>
+                        <select class="w-full text-[8px]" data-field="il-global-oaMethod">
+                            <option value="">(none)</option>
+                            <option value="None">None</option>
+                            <option value="Sum">Sum</option>
+                            <option value="Flow/Person">Flow/Person</option>
+                            <option value="Flow/Area">Flow/Area</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">OA L/s.person</label>
+                        <input type="number" step="0.001" class="w-full text-[8px]" data-field="il-global-oaPP">
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">OA L/s.m²</label>
+                        <input type="number" step="0.001" class="w-full text-[8px]" data-field="il-global-oaPA">
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Heat Recovery</label>
+                        <select class="w-full text-[8px]" data-field="il-global-hrType">
+                            <option value="">(default)</option>
+                            <option value="None">None</option>
+                            <option value="Sensible">Sensible</option>
+                            <option value="Enthalpy">Enthalpy</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-4 gap-2 text-[8px] mt-1">
+                    <div>
+                        <label class="label !text-[8px]">HR Sens Eff</label>
+                        <input type="number" step="0.01" class="w-full text-[8px]" data-field="il-global-hrSens">
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">HR Lat Eff</label>
+                        <input type="number" step="0.01" class="w-full text-[8px]" data-field="il-global-hrLat">
+                    </div>
+                </div>
+                <div class="text-[7px] text-[--text-secondary]">
+                    Values left blank use EnergyPlus defaults. These act as defaults for all zones unless overridden below.
+                </div>
+            </div>
+
+            <!-- PER-ZONE IDEAL LOADS -->
+            <div class="space-y-1 border border-gray-700/70 rounded bg-black/40 p-2">
+                <div class="flex justify-between items-center">
+                    <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Per-Zone IdealLoads Overrides</span>
+                </div>
+                <div class="border border-gray-700/70 rounded bg-black/60 max-h-40 overflow-y-auto **scrollable-panel-inner** mt-1">
+                    <table class="w-full text-[8px]">
+                        <thead class="bg-black/40">
+                            <tr>
+                                <th class="px-1 py-1 text-left">Zone</th>
+                                <th class="px-1 py-1 text-left">Avail</th>
+                                <th class="px-1 py-1 text-left">Heat Limit / Cap / Flow</th>
+                                <th class="px-1 py-1 text-left">Cool Limit / Cap / Flow</th>
+                                <th class="px-1 py-1 text-left">Dehum/Hum</th>
+                                <th class="px-1 py-1 text-left">OA Method / Flows</th>
+                                <th class="px-1 py-1 text-left">HR Type/Eff</th>
+                            </tr>
+                        </thead>
+                        <tbody class="ideal-perzone-tbody"></tbody>
+                    </table>
+                </div>
+                <div class="flex justify-end gap-2 mt-2">
+                    <button class="btn btn-xxs btn-secondary" data-action="save-ideal-loads">
+                        Save Thermostats & IdealLoads
+                    </button>
+                </div>
+                <div class="text-[7px] text-[--text-secondary]">
+                    Blank cells inherit from Global IdealLoads. This configuration is emitted into ZoneControl:Thermostat and ZoneHVAC:IdealLoadsAirSystem.
+                </div>
+            </div>
+
+            <!-- GLOBAL THERMOSTATS -->
+            <div class="space-y-1 border border-gray-700/70 rounded bg-black/40 p-2">
+                <div class="flex justify-between items-center">
+                    <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Global Thermostat Schedules</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-[8px] mt-1">
+                    <div>
+                        <label class="label !text-[8px]">Heating Schedule</label>
+                        <select class="w-full text-[8px]" data-field="globalHeatSched"></select>
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Cooling Schedule</label>
+                        <select class="w-full text-[8px]" data-field="globalCoolSched"></select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PER-ZONE THERMOSTATS -->
+            <div class="space-y-1 border border-gray-700/70 rounded bg-black/40 p-2">
+                <div class="flex justify-between items-center">
+                    <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Per-Zone Thermostat Overrides</span>
+                </div>
+                <div class="max-h-40 overflow-y-auto **scrollable-panel-inner**">
+                    <table class="w-full text-[8px]">
+                        <thead class="bg-black/40">
+                            <tr>
+                                <th class="px-1 py-1 text-left">Zone</th>
+                                <th class="px-1 py-1 text-left">Heat Sched (override)</th>
+                                <th class="px-1 py-1 text-left">Cool Sched (override)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="tstats-tbody"></tbody>
+                    </table>
+                </div>
+                <div class="text-[7px] text-[--text-secondary]">
+                    Leave blank to use global schedules or no control.
+                </div>
+            </div>
+
+            <!-- GLOBAL IDEALLOADS -->
+            <div class="space-y-1 border border-gray-700/70 rounded bg-black/40 p-2">
+                <div class="flex justify-between items-center">
+                    <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Global IdealLoads Settings</span>
+                </div>
+                <div class="grid grid-cols-4 gap-2 text-[8px] mt-1">
+                    <div>
+                        <label class="label !text-[8px]">Avail. Schedule</label>
+                        <select class="w-full text-[8px]" data-field="il-global-avail"></select>
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Heat Cap [W]</label>
+                        <input type="number" class="w-full text-[8px]" data-field="il-global-heatcap">
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Cool Cap [W]</label>
+                        <input type="number" class="w-full text-[8px]" data-field="il-global-coolcap">
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">OA Method</label>
+                        <select class="w-full text-[8px]" data-field="il-global-oamethod">
+                            <option value="">(none)</option>
+                            <option value="None">None</option>
+                            <option value="Sum">Sum</option>
+                            <option value="Flow/Person">Flow/Person</option>
+                            <option value="Flow/Area">Flow/Area</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-4 gap-2 text-[8px] mt-1">
+                    <div>
+                        <label class="label !text-[8px]">OA L/s.person</label>
+                        <input type="number" step="0.001" class="w-full text-[8px]" data-field="il-global-oaperperson">
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">OA L/s.m²</label>
+                        <input type="number" step="0.001" class="w-full text-[8px]" data-field="il-global-oaperarea">
+                    </div>
+                </div>
+                <div class="text-[7px] text-[--text-secondary]">
+                    OA flows are stored in m³/s in metadata; values here are in L/s and converted.
+                </div>
+            </div>
+
+            <!-- PER-ZONE IDEALLOADS -->
+            <div class="space-y-1 border border-gray-700/70 rounded bg-black/40 p-2">
+                <div class="flex justify-between items-center">
+                    <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Per-Zone IdealLoads Overrides</span>
+                </div>
+                <div class="max-h-40 overflow-y-auto **scrollable-panel-inner**">
+                    <table class="w-full text-[8px]">
+                        <thead class="bg-black/40">
+                            <tr>
+                                <th class="px-1 py-1 text-left">Zone</th>
+                                <th class="px-1 py-1 text-left">Avail. Sched</th>
+                                <th class="px-1 py-1 text-left">Heat Cap [W]</th>
+                                <th class="px-1 py-1 text-left">Cool Cap [W]</th>
+                                <th class="px-1 py-1 text-left">OA Method</th>
+                                <th class="px-1 py-1 text-left">OA L/s.person</th>
+                                <th class="px-1 py-1 text-left">OA L/s.m²</th>
+                            </tr>
+                        </thead>
+                        <tbody class="ideal-perzone-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2">
+                <button class="btn btn-xxs btn-secondary" data-action="save-ideal-loads">Save Thermostats & IdealLoads</button>
+            </div>
+        </div>
+    `;
+
+    if (typeof window !== 'undefined' && window.initializePanelControls) {
+        window.initializePanelControls(panel);
+    } else {
+        const closeButton = panel.querySelector('.window-icon-close');
+        if (closeButton) {
+            closeButton.onclick = () => panel.classList.add('hidden');
+        }
+    }
+
+    const tstatsTbody = panel.querySelector('.tstats-tbody');
+    const idealPerZoneTbody = panel.querySelector('.ideal-perzone-tbody');
+    const saveBtn = panel.querySelector('[data-action="save-ideal-loads"]');
+
+    function getMetaEp() {
+        const meta =
+            (typeof project.getMetadata === 'function' && project.getMetadata()) ||
+            project.metadata ||
+            {};
+        const ep = meta.energyPlusConfig || meta.energyplus || {};
+        return { meta, ep };
+    }
+
+    function getZones() {
+        let zones = [];
+        if (typeof project.getZones === 'function') {
+            zones = project.getZones() || [];
+        } else if (Array.isArray(project.zones)) {
+            zones = project.zones;
+        }
+        if (!Array.isArray(zones) || !zones.length) {
+            return [{ name: 'Zone_1' }];
+        }
+        return zones.map((z, i) => ({
+            name: z.name || `Zone_${i + 1}`,
+        }));
+    }
+
+    function getScheduleNames(ep) {
+        const names = new Set([
+            'RM_AlwaysOn',
+            'RM_Office_Occ',
+            'RM_Office_Lighting',
+            'RM_Office_Equipment',
+        ]);
+        const sc = ep.schedules && ep.schedules.compact;
+        if (Array.isArray(sc)) {
+            sc.forEach((s) => {
+                if (s && s.name) names.add(String(s.name));
+            });
+        } else if (sc && typeof sc === 'object') {
+            Object.keys(sc).forEach((nm) => names.add(nm));
+        }
+        return Array.from(names);
+    }
+
+    function buildState(ep) {
+        const zones = getZones();
+        const schedNames = getScheduleNames(ep);
+
+        // Thermostats
+        let globalT = { heatingScheduleName: '', coolingScheduleName: '' };
+        const perZoneT = new Map();
+        if (Array.isArray(ep.thermostats)) {
+            ep.thermostats.forEach((t) => {
+                if (!t) return;
+                const zn = (t.zoneName || '').toString();
+                if (!zn || zn.toUpperCase() === 'GLOBAL') {
+                    if (!globalT) globalT = {};
+                    if (t.heatingScheduleName) globalT.heatingScheduleName = t.heatingScheduleName;
+                    if (t.coolingScheduleName) globalT.coolingScheduleName = t.coolingScheduleName;
+                } else {
+                    perZoneT.set(zn, {
+                        zoneName: zn,
+                        heatingScheduleName: t.heatingScheduleName || '',
+                        coolingScheduleName: t.coolingScheduleName || '',
+                    });
+                }
+            });
+        }
+
+        // IdealLoads
+        const ideal = ep.idealLoads || {};
+        const g = ideal.global || {};
+        const perZoneIdeal = new Map();
+        if (Array.isArray(ideal.perZone)) {
+            ideal.perZone.forEach((cfg) => {
+                if (cfg && cfg.zoneName) {
+                    perZoneIdeal.set(String(cfg.zoneName), { ...cfg });
+                }
+            });
+        }
+
+        return { zones, schedNames, globalT, perZoneT, idealGlobal: g, perZoneIdeal };
+    }
+
+    function fillGlobalThermostatUI(ep, state) {
+        const heatSel = panel.querySelector('[data-field="globalHeatSched"]');
+        const coolSel = panel.querySelector('[data-field="globalCoolSched"]');
+        if (!heatSel || !coolSel) return;
+        const addOptions = (sel, selected) => {
+            sel.innerHTML = '<option value="">(none)</option>';
+            state.schedNames.forEach((nm) => {
+                const opt = document.createElement('option');
+                opt.value = nm;
+                opt.textContent = nm;
+                if (nm === selected) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        };
+        addOptions(heatSel, state.globalT.heatingScheduleName || '');
+        addOptions(coolSel, state.globalT.coolingScheduleName || '');
+    }
+
+    function renderPerZoneThermostats(ep, state) {
+        tstatsTbody.innerHTML = '';
+        const schedOptions = (selected) => {
+            let html = '<option value="">(inherit)</option>';
+            state.schedNames.forEach((nm) => {
+                const sel = nm === selected ? ' selected' : '';
+                html += `<option value="${nm}"${sel}>${nm}</option>`;
+            });
+            return html;
+        };
+        state.zones.forEach((z) => {
+            const zn = String(z.name);
+            const t = state.perZoneT.get(zn) || {};
+            const tr = document.createElement('tr');
+            tr.dataset.zoneName = zn;
+            tr.innerHTML = `
+                <td class="px-1 py-1 align-top text-[--accent-color]">${zn}</td>
+                <td class="px-1 py-1 align-top">
+                    <select class="w-full text-[8px]" data-field="heatSched">${schedOptions(t.heatingScheduleName || '')}</select>
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <select class="w-full text-[8px]" data-field="coolSched">${schedOptions(t.coolingScheduleName || '')}</select>
+                </td>
+            `;
+            tstatsTbody.appendChild(tr);
+        });
+    }
+
+    function fillGlobalIdealUI(ep, state) {
+        const availSel = panel.querySelector('[data-field="il-global-avail"]');
+        const heatCapInput = panel.querySelector('[data-field="il-global-heatcap"]');
+        const coolCapInput = panel.querySelector('[data-field="il-global-coolcap"]');
+        const oaMethodSel = panel.querySelector('[data-field="il-global-oamethod"]');
+        const oaPerPersonInput = panel.querySelector('[data-field="il-global-oaperperson"]');
+        const oaPerAreaInput = panel.querySelector('[data-field="il-global-oaperarea"]');
+        if (!availSel || !heatCapInput || !coolCapInput || !oaMethodSel || !oaPerPersonInput || !oaPerAreaInput) return;
+
+        // availability schedule options
+        availSel.innerHTML = '<option value="">(none)</option>';
+        state.schedNames.forEach((nm) => {
+            const opt = document.createElement('option');
+            opt.value = nm;
+            opt.textContent = nm;
+            if (nm === state.idealGlobal.availabilitySchedule) opt.selected = true;
+            availSel.appendChild(opt);
+        });
+
+        heatCapInput.value = state.idealGlobal.maxHeatingCapacity ?? '';
+        coolCapInput.value = state.idealGlobal.maxCoolingCapacity ?? '';
+        oaMethodSel.value = state.idealGlobal.outdoorAirMethod || '';
+
+        oaPerPersonInput.value =
+            state.idealGlobal.outdoorAirFlowPerPerson != null
+                ? (state.idealGlobal.outdoorAirFlowPerPerson * 1000.0).toString()
+                : '';
+        oaPerAreaInput.value =
+            state.idealGlobal.outdoorAirFlowPerArea != null
+                ? (state.idealGlobal.outdoorAirFlowPerArea * 1000.0).toString()
+                : '';
+    }
+
+    function renderPerZoneIdeal(state) {
+        idealPerZoneTbody.innerHTML = '';
+        const schedOptions = (selected) => {
+            let html = '<option value="">(inherit/global)</option>';
+            state.schedNames.forEach((nm) => {
+                const sel = nm === selected ? ' selected' : '';
+                html += `<option value="${nm}"${sel}>${nm}</option>`;
+            });
+            return html;
+        };
+        const oaMethodOptions = (selected) => {
+            const methods = ['', 'None', 'Sum', 'Flow/Person', 'Flow/Area'];
+            return methods
+                .map((m) => {
+                    const label = m || '(inherit/global)';
+                    const sel = m === selected ? ' selected' : '';
+                    return `<option value="${m}"${sel}>${label}</option>`;
+                })
+                .join('');
+        };
+
+        state.zones.forEach((z) => {
+            const zn = String(z.name);
+            const cfg = state.perZoneIdeal.get(zn) || {};
+            const tr = document.createElement('tr');
+            tr.dataset.zoneName = zn;
+            tr.innerHTML = `
+                <td class="px-1 py-1 align-top text-[--accent-color]">${zn}</td>
+                <td class="px-1 py-1 align-top">
+                    <select class="w-full text-[8px]" data-field="il-avail">${schedOptions(cfg.availabilitySchedule || '')}</select>
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input type="number" class="w-full text-[8px]" data-field="il-heatcap" value="${cfg.maxHeatingCapacity ?? ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input type="number" class="w-full text-[8px]" data-field="il-coolcap" value="${cfg.maxCoolingCapacity ?? ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <select class="w-full text-[8px]" data-field="il-oamethod">
+                        ${oaMethodOptions(cfg.outdoorAirMethod || '')}
+                    </select>
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input type="number" step="0.001" class="w-full text-[8px]" data-field="il-oaperperson"
+                        value="${
+                            cfg.outdoorAirFlowPerPerson != null
+                                ? cfg.outdoorAirFlowPerPerson * 1000.0
+                                : ''
+                        }">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input type="number" step="0.001" class="w-full text-[8px]" data-field="il-oaperarea"
+                        value="${
+                            cfg.outdoorAirFlowPerArea != null
+                                ? cfg.outdoorAirFlowPerArea * 1000.0
+                                : ''
+                        }">
+                </td>
+            `;
+            idealPerZoneTbody.appendChild(tr);
+        });
+    }
+
+    function collectAndSave() {
+        const { meta, ep } = getMetaEp();
+        const state = buildState(ep);
+        const zones = state.zones.map((z) => z.name);
+        const zoneSet = new Set(zones);
+
+        // Collect global thermostats
+        const heatSel = panel.querySelector('[data-field="globalHeatSched"]');
+        const coolSel = panel.querySelector('[data-field="globalCoolSched"]');
+        const globalHeat = (heatSel?.value || '').trim();
+        const globalCool = (coolSel?.value || '').trim();
+
+        const thermostats = [];
+
+        if (globalHeat || globalCool) {
+            thermostats.push({
+                zoneName: 'GLOBAL',
+                heatingScheduleName: globalHeat || undefined,
+                coolingScheduleName: globalCool || undefined,
+            });
+        }
+
+        // Collect per-zone tstat overrides
+        tstatsTbody.querySelectorAll('tr[data-zone-name]').forEach((tr) => {
+            const zn = tr.dataset.zoneName;
+            if (!zn || !zoneSet.has(zn)) return;
+            const heat = (tr.querySelector('[data-field="heatSched"]')?.value || '').trim();
+            const cool = (tr.querySelector('[data-field="coolSched"]')?.value || '').trim();
+            if (heat || cool) {
+                thermostats.push({
+                    zoneName: zn,
+                    heatingScheduleName: heat || undefined,
+                    coolingScheduleName: cool || undefined,
+                });
+            }
+        });
+
+        // Collect global IdealLoads
+        const availSel = panel.querySelector('[data-field="il-global-avail"]');
+        const heatCapInput = panel.querySelector('[data-field="il-global-heatcap"]');
+        const coolCapInput = panel.querySelector('[data-field="il-global-coolcap"]');
+        const oaMethodSel = panel.querySelector('[data-field="il-global-oamethod"]');
+        const oaPerPersonInput = panel.querySelector('[data-field="il-global-oaperperson"]');
+        const oaPerAreaInput = panel.querySelector('[data-field="il-global-oaperarea"]');
+
+        const idealGlobal = {};
+
+        if (availSel && availSel.value) {
+            idealGlobal.availabilitySchedule = availSel.value;
+        }
+
+        const gHeatCap = parseFloat(heatCapInput?.value || '');
+        if (Number.isFinite(gHeatCap)) {
+            idealGlobal.heatingLimitType = 'LimitCapacity';
+            idealGlobal.maxHeatingCapacity = gHeatCap;
+        }
+
+        const gCoolCap = parseFloat(coolCapInput?.value || '');
+        if (Number.isFinite(gCoolCap)) {
+            idealGlobal.coolingLimitType = 'LimitCapacity';
+            idealGlobal.maxCoolingCapacity = gCoolCap;
+        }
+
+        const gOaMethod = oaMethodSel?.value || '';
+        if (gOaMethod) {
+            idealGlobal.outdoorAirMethod = gOaMethod;
+        }
+
+        const gOaPerPerson_Ls = parseFloat(oaPerPersonInput?.value || '');
+        if (Number.isFinite(gOaPerPerson_Ls) && gOaPerPerson_Ls > 0) {
+            idealGlobal.outdoorAirFlowPerPerson = gOaPerPerson_Ls / 1000.0;
+        }
+
+        const gOaPerArea_Ls = parseFloat(oaPerAreaInput?.value || '');
+        if (Number.isFinite(gOaPerArea_Ls) && gOaPerArea_Ls > 0) {
+            idealGlobal.outdoorAirFlowPerArea = gOaPerArea_Ls / 1000.0;
+        }
+
+        // Collect per-zone IdealLoads overrides
+        const perZoneIdeal = [];
+        idealPerZoneTbody.querySelectorAll('tr[data-zone-name]').forEach((tr) => {
+            const zn = tr.dataset.zoneName;
+            if (!zn || !zoneSet.has(zn)) return;
+
+            const avail = (tr.querySelector('[data-field="il-avail"]')?.value || '').trim();
+            const heatCap = parseFloat(
+                tr.querySelector('[data-field="il-heatcap"]')?.value || ''
+            );
+            const coolCap = parseFloat(
+                tr.querySelector('[data-field="il-coolcap"]')?.value || ''
+            );
+            const oaMethod = (tr.querySelector('[data-field="il-oamethod"]')?.value || '').trim();
+            const oaPerPerson_Ls = parseFloat(
+                tr.querySelector('[data-field="il-oaperperson"]')?.value || ''
+            );
+            const oaPerArea_Ls = parseFloat(
+                tr.querySelector('[data-field="il-oaperarea"]')?.value || ''
+            );
+
+            const cfg = { zoneName: zn };
+            let has = false;
+
+            if (avail) {
+                cfg.availabilitySchedule = avail;
+                has = true;
+            }
+            if (Number.isFinite(heatCap)) {
+                cfg.heatingLimitType = 'LimitCapacity';
+                cfg.maxHeatingCapacity = heatCap;
+                has = true;
+            }
+            if (Number.isFinite(coolCap)) {
+                cfg.coolingLimitType = 'LimitCapacity';
+                cfg.maxCoolingCapacity = coolCap;
+                has = true;
+            }
+            if (oaMethod) {
+                cfg.outdoorAirMethod = oaMethod;
+                has = true;
+            }
+            if (Number.isFinite(oaPerPerson_Ls) && oaPerPerson_Ls > 0) {
+                cfg.outdoorAirFlowPerPerson = oaPerPerson_Ls / 1000.0;
+                has = true;
+            }
+            if (Number.isFinite(oaPerArea_Ls) && oaPerArea_Ls > 0) {
+                cfg.outdoorAirFlowPerArea = oaPerArea_Ls / 1000.0;
+                has = true;
+            }
+
+            if (has) {
+                perZoneIdeal.push(cfg);
+            }
+        });
+
+        const idealLoads = {};
+        if (Object.keys(idealGlobal).length) {
+            idealLoads.global = idealGlobal;
+        }
+        if (perZoneIdeal.length) {
+            idealLoads.perZone = perZoneIdeal;
+        }
+
+        const nextEp = {
+            ...ep,
+            thermostats: thermostats,
+            idealLoads: idealLoads,
+        };
+
+        if (typeof project.updateMetadata === 'function') {
+            project.updateMetadata({
+                ...meta,
+                energyPlusConfig: nextEp,
+            });
+        } else {
+            project.metadata = {
+                ...(project.metadata || meta),
+                energyPlusConfig: nextEp,
+            };
+        }
+    }
+
+    function renderAll() {
+        const { ep } = getMetaEp();
+        const state = buildState(ep);
+        fillGlobalThermostatUI(ep, state);
+        renderPerZoneThermostats(ep, state);
+        fillGlobalIdealUI(ep, state);
+        renderPerZoneIdeal(state);
+    }
+
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            try {
+                collectAndSave();
+                alert('Thermostats & IdealLoads configuration saved.');
+            } catch (err) {
+                console.error('IdealLoadsManager: save failed', err);
+                alert('Failed to save Thermostats & IdealLoads configuration. Check console for details.');
+            }
+        });
+    }
+
+    renderAll();
+
+    return panel;
+}
+
+function openIdealLoadsManagerPanel() {
+    const panelId = 'panel-energyplus-ideal-loads';
+    let panel = document.getElementById(panelId);
+    if (!panel) {
+        panel = createIdealLoadsManagerPanel();
         document.getElementById('window-container').appendChild(panel);
     }
     panel.classList.remove('hidden');
@@ -2638,7 +4122,7 @@ function createDaylightingManagerPanel() {
 
     panel.innerHTML = `
         <div class="window-header">
-            <span>Daylighting & Outputs</span>
+            <span>Daylighting</span>
             <!-- Help button removed -->
             <div class="window-controls">
                 <div class="window-icon-max" title="Maximize/Restore"></div>
@@ -2656,7 +4140,7 @@ function createDaylightingManagerPanel() {
             <div class="resize-handle-corner bottom-left"></div>
             <div class="resize-handle-corner bottom-right"></div>
             <p class="info-box !text-[10px] !py-1.5 !px-2">
-                Configure per-zone <code>Daylighting:Controls</code>, <code>Output:IlluminanceMap</code>, and key <code>Output:Variable</code> entries.
+                Configure per-zone <code>Daylighting:Controls</code> and <code>Output:IlluminanceMap</code>.
                 Settings are stored in <code>energyPlusConfig.daylighting</code> and consumed by the EnergyPlus model builder.
             </p>
 
@@ -2705,32 +4189,8 @@ function createDaylightingManagerPanel() {
                 </div>
             </div>
 
-            <!-- Output Variables -->
-            <div class="space-y-1">
-                <div class="flex justify-between items-center">
-                    <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Output Variables</span>
-                    <button class="btn btn-xxs btn-secondary" data-action="add-output-var">+ Add Variable</button>
-                </div>
-                <div class="border border-gray-700/70 rounded bg-black/40 max-h-40 overflow-y-auto **scrollable-panel-inner**">
-                    <table class="w-full text-[8px]">
-                        <thead class="bg-black/40">
-                            <tr>
-                                <th class="px-1 py-1 text-left">Key</th>
-                                <th class="px-1 py-1 text-left">Variable Name</th>
-                                <th class="px-1 py-1 text-left">Frequency</th>
-                                <th class="px-1 py-1 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="output-vars-tbody"></tbody>
-                    </table>
-                </div>
-                <div class="text-[7px] text-[--text-secondary]">
-                    Examples: Key = zone name or "Environment"; Variable = "Zone Lights Electric Power"; Frequency = Hourly/RunPeriod/etc.
-                </div>
-            </div>
-
             <div class="flex justify-end gap-2">
-                <button class="btn btn-xxs btn-secondary" data-action="save-daylighting">Save Daylighting & Outputs</button>
+                <button class="btn btn-xxs btn-secondary" data-action="save-daylighting">Save Daylighting</button>
             </div>
         </div>
     `;
@@ -2756,9 +4216,7 @@ function createDaylightingManagerPanel() {
         });
     }
     const illumTbody = panel.querySelector('.illum-maps-tbody');
-    const varsTbody = panel.querySelector('.output-vars-tbody');
     const addIllumBtn = panel.querySelector('[data-action="add-illum-map"]');
-    const addVarBtn = panel.querySelector('[data-action="add-output-var"]');
     const saveBtn = panel.querySelector('[data-action="save-daylighting"]');
 
     function getMetaEPDaylighting() {
@@ -2950,84 +4408,6 @@ function createDaylightingManagerPanel() {
         }
     }
 
-    function renderOutputVars() {
-        const { daylighting } = getMetaEPDaylighting();
-        const vars = (daylighting.outputs && Array.isArray(daylighting.outputs.variables))
-            ? daylighting.outputs.variables
-            : [];
-
-        varsTbody.innerHTML = '';
-
-        if (!vars.length) {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td class="px-1 py-1 text-[8px] text-[--text-secondary]" colspan="4">
-                    No Output:Variable entries defined.
-                </td>
-            `;
-            varsTbody.appendChild(tr);
-            return;
-        }
-
-        vars.forEach((v) => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td class="px-1 py-1 align-top">
-                    <input class="w-full text-[8px]" data-field="key" value="${v.key || ''}">
-                </td>
-                <td class="px-1 py-1 align-top">
-                    <input class="w-full text-[8px]" data-field="variableName" value="${v.variableName || ''}">
-                </td>
-                <td class="px-1 py-1 align-top">
-                    <select class="w-full text-[8px]" data-field="freq">
-                        ${['Timestep','Hourly','Daily','Monthly','RunPeriod'].map((f) => `
-                            <option value="${f}"${(v.reportingFrequency || 'Hourly') === f ? ' selected' : ''}>${f}</option>
-                        `).join('')}
-                    </select>
-                </td>
-                <td class="px-1 py-1 align-top text-right">
-                    <button class="btn btn-xxs btn-danger" data-action="delete-var">Delete</button>
-                </td>
-            `;
-            varsTbody.appendChild(tr);
-        });
-
-        varsTbody.querySelectorAll('button[data-action="delete-var"]').forEach((btn) => {
-            btn.addEventListener('click', () => {
-                const row = btn.closest('tr');
-                if (row) row.remove();
-            });
-        });
-    }
-
-    function addOutputVarRow() {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td class="px-1 py-1 align-top">
-                <input class="w-full text-[8px]" data-field="key" placeholder="Key (zone name, Environment, *)">
-            </td>
-            <td class="px-1 py-1 align-top">
-                <input class="w-full text-[8px]" data-field="variableName" placeholder="Variable Name">
-            </td>
-            <td class="px-1 py-1 align-top">
-                <select class="w-full text-[8px]" data-field="freq">
-                    <option value="Hourly" selected>Hourly</option>
-                    <option value="Timestep">Timestep</option>
-                    <option value="Daily">Daily</option>
-                    <option value="Monthly">Monthly</option>
-                    <option value="RunPeriod">RunPeriod</option>
-                </select>
-            </td>
-            <td class="px-1 py-1 align-top text-right">
-                <button class="btn btn-xxs btn-danger" data-action="delete-var">Delete</button>
-            </td>
-        `;
-        varsTbody.appendChild(tr);
-        const delBtn = tr.querySelector('button[data-action="delete-var"]');
-        if (delBtn) {
-            delBtn.addEventListener('click', () => tr.remove());
-        }
-    }
 
     function collectDaylightingFromUI() {
         const { meta, ep } = getMetaEPDaylighting();
@@ -3141,32 +4521,14 @@ function createDaylightingManagerPanel() {
             });
         });
 
-        // Output variables
-        const variables = [];
-        varsTbody.querySelectorAll('tr').forEach((tr) => {
-            const key = (tr.querySelector('[data-field="key"]')?.value || '').trim();
-            const variableName = (tr.querySelector('[data-field="variableName"]')?.value || '').trim();
-            const freq = tr.querySelector('[data-field="freq"]')?.value || 'Hourly';
-            if (!key || !variableName) return;
-            variables.push({
-                key,
-                variableName,
-                reportingFrequency: freq,
-            });
-        });
-
         const nextDaylighting = {};
         if (controls.length) {
             nextDaylighting.controls = controls;
         }
-        if (illuminanceMaps.length || variables.length) {
-            nextDaylighting.outputs = {};
-            if (illuminanceMaps.length) {
-                nextDaylighting.outputs.illuminanceMaps = illuminanceMaps;
-            }
-            if (variables.length) {
-                nextDaylighting.outputs.variables = variables;
-            }
+        if (illuminanceMaps.length) {
+            nextDaylighting.outputs = {
+                illuminanceMaps,
+            };
         }
 
         const nextEP = {
@@ -3180,12 +4542,6 @@ function createDaylightingManagerPanel() {
     if (addIllumBtn) {
         addIllumBtn.addEventListener('click', () => {
             addIlluminanceMapRow();
-        });
-    }
-
-    if (addVarBtn) {
-        addVarBtn.addEventListener('click', () => {
-            addOutputVarRow();
         });
     }
 
@@ -3204,17 +4560,1132 @@ function createDaylightingManagerPanel() {
                         energyPlusConfig: nextEP,
                     };
                 }
-                alert('Daylighting & Outputs configuration saved.');
+                alert('Daylighting configuration saved.');
             } catch (err) {
                 console.error('DaylightingManager: save failed', err);
-                alert('Failed to save Daylighting & Outputs configuration. Check console for details.');
+                alert('Failed to save Daylighting configuration. Check console for details.');
             }
         });
     }
 
     renderControls();
     renderIlluminanceMaps();
-    renderOutputVars();
+
+    return panel;
+}
+
+/**
+ * OUTPUTS MANAGER
+ * Manage energyPlusConfig.daylighting.outputs.variables (Output:Variable entries).
+ */
+function openOutputsManagerPanel() {
+    const panelId = 'panel-energyplus-outputs';
+    let panel = document.getElementById(panelId);
+    if (!panel) {
+        panel = createOutputsManagerPanel();
+        document.getElementById('window-container').appendChild(panel);
+    }
+    panel.classList.remove('hidden');
+    panel.style.zIndex = getNewZIndex();
+}
+
+function createOutputsManagerPanel() {
+    const panel = document.createElement('div');
+    panel.id = 'panel-energyplus-outputs';
+    panel.className = 'floating-window ui-panel resizable-panel';
+
+    panel.innerHTML = `
+        <div class="window-header">
+            <span>Outputs</span>
+            <div class="window-controls">
+                <div class="window-icon-max" title="Maximize/Restore"></div>
+                <div class="collapse-icon" title="Minimize"></div>
+                <div class="window-icon-close" title="Close"></div>
+            </div>
+        </div>
+        <div class="window-content space-y-2">
+            <div class="resize-handle-edge top"></div>
+            <div class="resize-handle-edge right"></div>
+            <div class="resize-handle-edge bottom"></div>
+            <div class="resize-handle-edge left"></div>
+            <div class="resize-handle-corner top-left"></div>
+            <div class="resize-handle-corner top-right"></div>
+            <div class="resize-handle-corner bottom-left"></div>
+            <div class="resize-handle-corner bottom-right"></div>
+
+            <p class="info-box !text-[10px] !py-1.5 !px-2">
+                Configure <code>Output:Variable</code> entries.
+                Settings are stored in <code>energyPlusConfig.daylighting.outputs.variables</code>.
+            </p>
+
+            <div class="flex justify-between items-center">
+                <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Output Variables</span>
+                <button class="btn btn-xxs btn-secondary" data-action="add-output-var">+ Add Variable</button>
+            </div>
+
+            <div class="border border-gray-700/70 rounded bg-black/40 max-h-56 overflow-y-auto **scrollable-panel-inner**">
+                <table class="w-full text-[8px]">
+                    <thead class="bg-black/40">
+                        <tr>
+                            <th class="px-1 py-1 text-left">Key</th>
+                            <th class="px-1 py-1 text-left">Variable Name</th>
+                            <th class="px-1 py-1 text-left">Frequency</th>
+                            <th class="px-1 py-1 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="outputs-vars-tbody"></tbody>
+                </table>
+            </div>
+
+            <div class="text-[7px] text-[--text-secondary]">
+                Examples: Key = zone name or "Environment"; Variable = "Zone Lights Electric Power"; Frequency = Hourly/RunPeriod/etc.
+            </div>
+
+            <div class="flex justify-end gap-2">
+                <button class="btn btn-xxs btn-secondary" data-action="save-outputs">Save Outputs</button>
+            </div>
+        </div>
+    `;
+
+    if (typeof window !== 'undefined' && window.initializePanelControls) {
+        window.initializePanelControls(panel);
+    } else {
+        const closeButton = panel.querySelector('.window-icon-close');
+        if (closeButton) {
+            closeButton.onclick = () => panel.classList.add('hidden');
+        }
+    }
+
+    const tbody = panel.querySelector('.outputs-vars-tbody');
+    const addBtn = panel.querySelector('[data-action="add-output-var"]');
+    const saveBtn = panel.querySelector('[data-action="save-outputs"]');
+
+    function getState() {
+        const meta =
+            (typeof project.getMetadata === 'function' && project.getMetadata()) ||
+            project.metadata ||
+            {};
+        const ep = meta.energyPlusConfig || meta.energyplus || {};
+        const daylighting = ep.daylighting || {};
+        const outputs = daylighting.outputs || {};
+        const vars = Array.isArray(outputs.variables) ? outputs.variables.slice() : [];
+        return { meta, ep, daylighting, vars };
+    }
+
+    function render() {
+        const { vars } = getState();
+        tbody.innerHTML = '';
+
+        if (!vars.length) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="px-1 py-1 text-[8px] text-[--text-secondary]" colspan="4">
+                    No Output:Variable entries defined.
+                </td>
+            `;
+            tbody.appendChild(tr);
+            return;
+        }
+
+        vars.forEach((v, index) => {
+            const tr = document.createElement('tr');
+            tr.dataset.index = String(index);
+            tr.innerHTML = `
+                <td class="px-1 py-1 align-top">
+                    <input class="w-full text-[8px]" data-field="key" value="${v.key || ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input class="w-full text-[8px]" data-field="variableName" value="${v.variableName || ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <select class="w-full text-[8px]" data-field="freq">
+                        ${['Timestep','Hourly','Daily','Monthly','RunPeriod'].map((f) => `
+                            <option value="${f}"${(v.reportingFrequency || 'Hourly') === f ? ' selected' : ''}>${f}</option>
+                        `).join('')}
+                    </select>
+                </td>
+                <td class="px-1 py-1 align-top text-right">
+                    <button class="btn btn-xxs btn-danger" data-action="delete-var">Delete</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        tbody.querySelectorAll('button[data-action="delete-var"]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const row = btn.closest('tr');
+                if (row) row.remove();
+            });
+        });
+    }
+
+    function addRow() {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="px-1 py-1 align-top">
+                <input class="w-full text-[8px]" data-field="key" placeholder="Key (zone name, Environment, *)">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input class="w-full text-[8px]" data-field="variableName" placeholder="Variable Name">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <select class="w-full text-[8px]" data-field="freq">
+                    <option value="Hourly" selected>Hourly</option>
+                    <option value="Timestep">Timestep</option>
+                    <option value="Daily">Daily</option>
+                    <option value="Monthly">Monthly</option>
+                    <option value="RunPeriod">RunPeriod</option>
+                </select>
+            </td>
+            <td class="px-1 py-1 align-top text-right">
+                <button class="btn btn-xxs btn-danger" data-action="delete-var">Delete</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+        tr.querySelector('[data-action="delete-var"]').addEventListener('click', () => {
+            tr.remove();
+        });
+    }
+
+    function collect() {
+        const { meta, ep, daylighting } = getState();
+        const vars = [];
+        tbody.querySelectorAll('tr').forEach((tr) => {
+            const key = (tr.querySelector('[data-field="key"]')?.value || '').trim();
+            const variableName = (tr.querySelector('[data-field="variableName"]')?.value || '').trim();
+            const freq = tr.querySelector('[data-field="freq"]')?.value || 'Hourly';
+            if (!key || !variableName) return;
+            vars.push({
+                key,
+                variableName,
+                reportingFrequency: freq,
+            });
+        });
+
+        const nextDaylighting = {
+            ...daylighting,
+            outputs: {
+                ...(daylighting.outputs || {}),
+                variables: vars,
+            },
+        };
+
+        const nextEP = {
+            ...ep,
+            daylighting: nextDaylighting,
+        };
+
+        return { meta, nextEP };
+    }
+
+    if (addBtn) {
+        addBtn.addEventListener('click', () => addRow());
+    }
+
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            try {
+                const { meta, nextEP } = collect();
+                if (typeof project.updateMetadata === 'function') {
+                    project.updateMetadata({
+                        ...meta,
+                        energyPlusConfig: nextEP,
+                    });
+                } else {
+                    project.metadata = {
+                        ...(project.metadata || meta),
+                        energyPlusConfig: nextEP,
+                    };
+                }
+                alert('Outputs configuration saved.');
+            } catch (err) {
+                console.error('OutputsManager: save failed', err);
+                alert('Failed to save Outputs configuration. Check console for details.');
+            }
+        });
+    }
+
+    render();
+
+    return panel;
+}
+
+/**
+ * ENERGYPLUS SIMULATION CONTROL MANAGER
+ * Configure global simulation objects:
+ *  - Building
+ *  - Timestep
+ *  - SimulationControl
+ *  - GlobalGeometryRules
+ *  - ShadowCalculation
+ *  - SurfaceConvectionAlgorithm:Inside/Outside
+ *  - HeatBalanceAlgorithm
+ *  - SizingPeriod:WeatherFileDays
+ *  - RunPeriod
+ *  - RunPeriodControl:DaylightSavingTime
+ * Values stored in energyPlusConfig.simulationControl.
+ */
+function openWeatherLocationManagerPanel() {
+    const panelId = 'panel-energyplus-weather-location';
+    let panel = document.getElementById(panelId);
+    if (!panel) {
+        panel = createWeatherLocationManagerPanel();
+        document.getElementById('window-container').appendChild(panel);
+    }
+    panel.classList.remove('hidden');
+    panel.style.zIndex = getNewZIndex();
+}
+
+/**
+ * Weather & Location Manager
+ * Canonical project-level weather configuration:
+ *   energyPlusConfig.weather = {
+ *     epwPath?: string,
+ *     locationSource?: 'FromEPW' | 'Custom',
+ *     customLocation?: {
+ *       name: string,
+ *       latitude: number,
+ *       longitude: number,
+ *       timeZone: number,
+ *       elevation: number
+ *     }
+ *   }
+ *
+ * Backwards compatibility:
+ *   - If ep.weatherFilePath exists and weather.epwPath is missing, it is shown as selected EPW.
+ */
+function createWeatherLocationManagerPanel() {
+    const panel = document.createElement('div');
+    panel.id = 'panel-energyplus-weather-location';
+    panel.className = 'floating-window ui-panel resizable-panel';
+
+    const { meta, ep, weather } = getWeatherConfig();
+
+    const locationSource = weather.locationSource || 'FromEPW';
+    const epwPath = weather.epwPath || ep.weatherFilePath || '';
+    const cl = weather.customLocation || {};
+
+    panel.innerHTML = `
+        <div class="window-header">
+            <span>Weather & Location</span>
+            <div class="window-controls">
+                <div class="window-icon-max" title="Maximize/Restore"></div>
+                <div class="collapse-icon" title="Minimize"></div>
+                <div class="window-icon-close" title="Close"></div>
+            </div>
+        </div>
+        <div class="window-content space-y-3 text-[8px]">
+            <div class="resize-handle-edge top"></div>
+            <div class="resize-handle-edge right"></div>
+            <div class="resize-handle-edge bottom"></div>
+            <div class="resize-handle-edge left"></div>
+            <div class="resize-handle-corner top-left"></div>
+            <div class="resize-handle-corner top-right"></div>
+            <div class="resize-handle-corner bottom-left"></div>
+            <div class="resize-handle-corner bottom-right"></div>
+
+            <p class="info-box !text-[9px] !py-1.5 !px-2">
+                Configure the project-level EnergyPlus weather file (EPW) and location strategy.
+                This configuration is used when generating IDFs and running simulations.
+            </p>
+
+            <!-- Project EPW selection -->
+            <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                <div class="flex items-center justify-between">
+                    <span class="font-semibold text-[9px] uppercase text-[--text-secondary]">
+                        Project Weather File (EPW)
+                    </span>
+                </div>
+                <div class="flex items-center gap-2 mt-1">
+                    <input
+                        type="text"
+                        class="w-full text-[8px]"
+                        data-field="epw-path"
+                        value="${epwPath || ''}"
+                        placeholder="No EPW selected"
+                        readonly
+                    >
+                    <button class="btn btn-xxs btn-secondary" data-action="select-epw">
+                        Select EPW
+                    </button>
+                    <button class="btn btn-xxs btn-secondary" data-action="clear-epw">
+                        Clear
+                    </button>
+                </div>
+                <div class="text-[7px] text-[--text-secondary] mt-1">
+                    The selected EPW is stored in <code>energyPlusConfig.weather.epwPath</code>.
+                    If not set, annual simulations will fail validation.
+                </div>
+                <div class="text-[7px] text-yellow-300" data-role="epw-warning" style="${epwPath ? 'display:none;' : ''}">
+                    No EPW is currently configured.
+                </div>
+            </div>
+
+            <!-- Location source -->
+            <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">
+                    Location Source
+                </div>
+                <div class="flex flex-col gap-1 mt-1">
+                    <label class="inline-flex items-center gap-1">
+                        <input type="radio" name="loc-source" value="FromEPW" data-field="loc-from-epw" ${locationSource === 'Custom' ? '' : 'checked'}>
+                        <span class="text-[8px]">From EPW (recommended)</span>
+                    </label>
+                    <label class="inline-flex items-center gap-1">
+                        <input type="radio" name="loc-source" value="Custom" data-field="loc-custom" ${locationSource === 'Custom' ? 'checked' : ''}>
+                        <span class="text-[8px]">Custom location (advanced)</span>
+                    </label>
+                </div>
+                <div class="mt-2 grid grid-cols-5 gap-1 text-[8px]" data-role="custom-location-fields" style="${locationSource === 'Custom' ? '' : 'display:none;'}">
+                    <div>
+                        <label class="label !text-[7px]">Name</label>
+                        <input class="w-full" data-field="cl-name" value="${cl.name || ''}" placeholder="MySite">
+                    </div>
+                    <div>
+                        <label class="label !text-[7px]">Lat (°)</label>
+                        <input type="number" step="0.01" class="w-full" data-field="cl-lat" value="${cl.latitude ?? ''}">
+                    </div>
+                    <div>
+                        <label class="label !text-[7px]">Lon (°)</label>
+                        <input type="number" step="0.01" class="w-full" data-field="cl-lon" value="${cl.longitude ?? ''}">
+                    </div>
+                    <div>
+                        <label class="label !text-[7px]">TZ (hr)</label>
+                        <input type="number" step="0.1" class="w-full" data-field="cl-tz" value="${cl.timeZone ?? ''}">
+                    </div>
+                    <div>
+                        <label class="label !text-[7px]">Elev (m)</label>
+                        <input type="number" step="0.1" class="w-full" data-field="cl-elev" value="${cl.elevation ?? ''}">
+                    </div>
+                </div>
+                <div class="text-[7px] text-[--text-secondary] mt-1">
+                    When using "Custom location", these values override EPW-derived location for IDF generation.
+                    All fields are required for a valid custom location.
+                </div>
+            </div>
+
+            <div class="flex justify-end">
+                <button class="btn btn-xxs btn-secondary" data-action="save-weather-location">
+                    Save Weather & Location
+                </button>
+            </div>
+        </div>
+    `;
+
+    if (typeof window !== 'undefined' && window.initializePanelControls) {
+        window.initializePanelControls(panel);
+    } else {
+        const closeButton = panel.querySelector('.window-icon-close');
+        if (closeButton) {
+            closeButton.onclick = () => panel.classList.add('hidden');
+        }
+    }
+
+    const selectBtn = panel.querySelector('[data-action="select-epw"]');
+    const clearBtn = panel.querySelector('[data-action="clear-epw"]');
+    const saveBtn = panel.querySelector('[data-action="save-weather-location"]');
+    const epwInput = panel.querySelector('[data-field="epw-path"]');
+    const epwWarning = panel.querySelector('[data-role="epw-warning"]');
+    const locFromEpwRadio = panel.querySelector('[data-field="loc-from-epw"]');
+    const locCustomRadio = panel.querySelector('[data-field="loc-custom"]');
+    const customFields = panel.querySelector('[data-role="custom-location-fields"]');
+
+    function setEpwPath(path) {
+        if (!epwInput) return;
+        epwInput.value = path || '';
+        if (epwWarning) {
+            epwWarning.style.display = path ? 'none' : '';
+        }
+    }
+
+    if (selectBtn) {
+        selectBtn.addEventListener('click', async () => {
+            // Prefer Electron dialog when available
+            if (window.electronAPI && typeof window.electronAPI.openFileDialog === 'function') {
+                try {
+                    const result = await window.electronAPI.openFileDialog({
+                        filters: [{ name: 'EPW files', extensions: ['epw'] }],
+                    });
+                    if (result && result.filePaths && result.filePaths[0]) {
+                        setEpwPath(result.filePaths[0]);
+                    }
+                } catch (err) {
+                    console.error('Weather & Location: EPW selection failed', err);
+                    alert('Failed to select EPW via Electron. Check console for details.');
+                }
+            } else {
+                // Browser-only fallback: use an <input type="file"> just to capture the name.
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.epw';
+                input.onchange = () => {
+                    const file = input.files && input.files[0];
+                    if (file) {
+                        // In browser builds we cannot rely on absolute paths; store the name as a hint.
+                        setEpwPath(file.path || file.name);
+                    }
+                };
+                input.click();
+            }
+        });
+    }
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            setEpwPath('');
+        });
+    }
+
+    function updateLocationSourceUI() {
+        if (!locCustomRadio || !locFromEpwRadio || !customFields) return;
+        const useCustom = locCustomRadio.checked;
+        customFields.style.display = useCustom ? '' : 'none';
+    }
+
+    if (locFromEpwRadio) {
+        locFromEpwRadio.addEventListener('change', updateLocationSourceUI);
+    }
+    if (locCustomRadio) {
+        locCustomRadio.addEventListener('change', updateLocationSourceUI);
+    }
+    updateLocationSourceUI();
+
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            try {
+                const { meta: m0, ep: ep0 } = getWeatherConfig();
+
+                const nextWeather = {};
+
+                // EPW path
+                const epw = (epwInput?.value || '').trim();
+                if (epw) {
+                    nextWeather.epwPath = epw;
+                }
+
+                // Location source
+                const useCustom = locCustomRadio && locCustomRadio.checked;
+                nextWeather.locationSource = useCustom ? 'Custom' : 'FromEPW';
+
+                if (useCustom) {
+                    const name = (panel.querySelector('[data-field="cl-name"]')?.value || '').trim();
+                    const lat = parseFloat(panel.querySelector('[data-field="cl-lat"]')?.value || '');
+                    const lon = parseFloat(panel.querySelector('[data-field="cl-lon"]')?.value || '');
+                    const tz = parseFloat(panel.querySelector('[data-field="cl-tz"]')?.value || '');
+                    const elev = parseFloat(panel.querySelector('[data-field="cl-elev"]')?.value || '');
+
+                    if (
+                        !name ||
+                        !Number.isFinite(lat) ||
+                        lat < -90 ||
+                        lat > 90 ||
+                        !Number.isFinite(lon) ||
+                        lon < -180 ||
+                        lon > 180 ||
+                        !Number.isFinite(tz) ||
+                        tz < -12 ||
+                        tz > 14 ||
+                        !Number.isFinite(elev)
+                    ) {
+                        alert(
+                            'Custom location is incomplete or invalid. Please fill all fields (name, lat, lon, tz, elev) with valid values.'
+                        );
+                        return;
+                    }
+
+                    nextWeather.customLocation = {
+                        name,
+                        latitude: lat,
+                        longitude: lon,
+                        timeZone: tz,
+                        elevation: elev,
+                    };
+                }
+
+                const nextEP = {
+                    ...ep0,
+                    weather: nextWeather,
+                };
+
+                if (typeof project.updateMetadata === 'function') {
+                    project.updateMetadata({
+                        ...m0,
+                        energyPlusConfig: nextEP,
+                    });
+                } else {
+                    project.metadata = {
+                        ...(project.metadata || m0),
+                        energyPlusConfig: nextEP,
+                    };
+                }
+
+                alert('Weather & Location configuration saved.');
+            } catch (err) {
+                console.error('Weather & Location: save failed', err);
+                alert('Failed to save Weather & Location configuration. Check console for details.');
+            }
+        });
+    }
+
+    return panel;
+}
+
+function getWeatherConfig() {
+    const meta =
+        (typeof project.getMetadata === 'function' && project.getMetadata()) ||
+        project.metadata ||
+        {};
+    const ep = meta.energyPlusConfig || meta.energyplus || {};
+    const weather = ep.weather || {};
+    return { meta, ep, weather };
+}
+
+function openSimulationControlManagerPanel() {
+    const panelId = 'panel-energyplus-sim-control';
+    let panel = document.getElementById(panelId);
+    if (!panel) {
+        panel = createSimulationControlManagerPanel();
+        document.getElementById('window-container').appendChild(panel);
+    }
+    panel.classList.remove('hidden');
+    panel.style.zIndex = getNewZIndex();
+}
+
+function getSimulationControlConfig() {
+    const meta =
+        (typeof project.getMetadata === 'function' && project.getMetadata()) ||
+        project.metadata ||
+        {};
+    const ep = meta.energyPlusConfig || meta.energyplus || {};
+    const sc = ep.simulationControl || {};
+
+    const withDefaults = {
+        building: {
+            name: sc.building?.name ?? 'OfficeBuilding',
+            northAxis: sc.building?.northAxis ?? 0.0,
+            terrain: sc.building?.terrain ?? 'City',
+            loadsTolerance: sc.building?.loadsTolerance ?? 0.04,
+            tempTolerance: sc.building?.tempTolerance ?? 0.4,
+            solarDistribution: sc.building?.solarDistribution ?? 'FullInteriorAndExteriorWithReflections',
+            maxWarmupDays: sc.building?.maxWarmupDays ?? 25,
+            minWarmupDays: sc.building?.minWarmupDays ?? 6,
+        },
+        timestep: {
+            timestepsPerHour: sc.timestep?.timestepsPerHour ?? 4,
+        },
+        simulationControlFlags: {
+            doZoneSizing: sc.simulationControlFlags?.doZoneSizing ?? false,
+            doSystemSizing: sc.simulationControlFlags?.doSystemSizing ?? false,
+            doPlantSizing: sc.simulationControlFlags?.doPlantSizing ?? false,
+            runSizingPeriods: sc.simulationControlFlags?.runSizingPeriods ?? true,
+            runWeatherRunPeriods: sc.simulationControlFlags?.runWeatherRunPeriods ?? true,
+        },
+        globalGeometryRules: {
+            startingVertexPosition: sc.globalGeometryRules?.startingVertexPosition ?? 'UpperLeftCorner',
+            vertexEntryDirection: sc.globalGeometryRules?.vertexEntryDirection ?? 'Counterclockwise',
+            coordinateSystem: sc.globalGeometryRules?.coordinateSystem ?? 'Relative',
+        },
+        shadowCalculation: {
+            calculationFrequency: sc.shadowCalculation?.calculationFrequency ?? 10,
+            maxFigures: sc.shadowCalculation?.maxFigures ?? 15000,
+            algorithm: sc.shadowCalculation?.algorithm ?? 'ConvexWeilerAtherton',
+            skyDiffuseModel: sc.shadowCalculation?.skyDiffuseModel ?? 'SimpleSkyDiffuseModeling',
+        },
+        surfaceConvection: {
+            insideAlgorithm: sc.surfaceConvection?.insideAlgorithm ?? 'TARP',
+            outsideAlgorithm: sc.surfaceConvection?.outsideAlgorithm ?? 'DOE-2',
+        },
+        heatBalanceAlgorithm: {
+            algorithm: sc.heatBalanceAlgorithm?.algorithm ?? 'ConductionTransferFunction',
+            surfaceTempUpperLimit: sc.heatBalanceAlgorithm?.surfaceTempUpperLimit ?? 200,
+            hConvMin: sc.heatBalanceAlgorithm?.hConvMin ?? 0.1,
+            hConvMax: sc.heatBalanceAlgorithm?.hConvMax ?? 1000,
+        },
+        sizingPeriodWeatherFileDays: {
+            name: sc.sizingPeriodWeatherFileDays?.name ?? 'Sizing',
+            beginMonth: sc.sizingPeriodWeatherFileDays?.beginMonth ?? 1,
+            beginDayOfMonth: sc.sizingPeriodWeatherFileDays?.beginDayOfMonth ?? 1,
+            endMonth: sc.sizingPeriodWeatherFileDays?.endMonth ?? 12,
+            endDayOfMonth: sc.sizingPeriodWeatherFileDays?.endDayOfMonth ?? 31,
+            useWeatherFileDaylightSaving: sc.sizingPeriodWeatherFileDays?.useWeatherFileDaylightSaving ?? true,
+            useWeatherFileRainSnowIndicators: sc.sizingPeriodWeatherFileDays?.useWeatherFileRainSnowIndicators ?? true,
+        },
+        runPeriod: {
+            name: sc.runPeriod?.name ?? 'Annual_Simulation',
+            beginMonth: sc.runPeriod?.beginMonth ?? 1,
+            beginDayOfMonth: sc.runPeriod?.beginDayOfMonth ?? 1,
+            endMonth: sc.runPeriod?.endMonth ?? 12,
+            endDayOfMonth: sc.runPeriod?.endDayOfMonth ?? 31,
+            dayOfWeekForStart: sc.runPeriod?.dayOfWeekForStart ?? 'UseWeatherFile',
+            useWeatherFileHolidays: sc.runPeriod?.useWeatherFileHolidays ?? false,
+            useWeatherFileDaylightSaving: sc.runPeriod?.useWeatherFileDaylightSaving ?? false,
+            applyWeekendHolidayRule: sc.runPeriod?.applyWeekendHolidayRule ?? true,
+            useWeatherFileRain: sc.runPeriod?.useWeatherFileRain ?? true,
+            useWeatherFileSnow: sc.runPeriod?.useWeatherFileSnow ?? true,
+            numTimesRunperiodToBeRepeated: sc.runPeriod?.numTimesRunperiodToBeRepeated ?? 1,
+        },
+        daylightSavingTime: {
+            startDate: sc.daylightSavingTime?.startDate ?? '4/1',
+            endDate: sc.daylightSavingTime?.endDate ?? '9/30',
+        },
+    };
+
+    return { meta, ep, sc: withDefaults };
+}
+
+function saveSimulationControlConfig(meta, ep, sc) {
+    const next = {
+        ...ep,
+        simulationControl: sc,
+    };
+    if (typeof project.updateMetadata === 'function') {
+        project.updateMetadata({
+            ...meta,
+            energyPlusConfig: next,
+        });
+    } else {
+        project.metadata = {
+            ...(project.metadata || meta),
+            energyPlusConfig: next,
+        };
+    }
+}
+
+function createSimulationControlManagerPanel() {
+    const panel = document.createElement('div');
+    panel.id = 'panel-energyplus-sim-control';
+    panel.className = 'floating-window ui-panel resizable-panel';
+
+    const { sc } = getSimulationControlConfig();
+
+    panel.innerHTML = `
+        <div class="window-header">
+            <span>EnergyPlus Simulation Control</span>
+            <div class="window-controls">
+                <div class="window-icon-max" title="Maximize/Restore"></div>
+                <div class="collapse-icon" title="Minimize"></div>
+                <div class="window-icon-close" title="Close"></div>
+            </div>
+        </div>
+        <div class="window-content space-y-3 text-[8px]">
+            <div class="resize-handle-edge top"></div>
+            <div class="resize-handle-edge right"></div>
+            <div class="resize-handle-edge bottom"></div>
+            <div class="resize-handle-edge left"></div>
+            <div class="resize-handle-corner top-left"></div>
+            <div class="resize-handle-corner top-right"></div>
+            <div class="resize-handle-corner bottom-left"></div>
+            <div class="resize-handle-corner bottom-right"></div>
+
+            <p class="info-box !text-[9px] !py-1.5 !px-2">
+                Configure global EnergyPlus simulation settings used when generating the IDF.
+                Location is taken from the EPW file and is not configured here.
+            </p>
+
+            <!-- Building -->
+            <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">Building</div>
+                <div class="grid grid-cols-4 gap-1">
+                    <div>
+                        <label class="label !text-[8px]">Name</label>
+                        <input class="w-full" data-field="b-name" value="${sc.building.name}">
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">North Axis [deg]</label>
+                        <input type="number" step="0.1" class="w-full" data-field="b-north" value="${sc.building.northAxis}">
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Terrain</label>
+                        <select class="w-full" data-field="b-terrain">
+                            ${['Ocean','Country','Suburbs','City'].map(t => `
+                                <option value="${t}" ${t === sc.building.terrain ? 'selected' : ''}>${t}</option>
+                            `).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Solar Dist.</label>
+                        <select class="w-full" data-field="b-solar">
+                            ${[
+                                'MinimalShadowing',
+                                'FullExterior',
+                                'FullInteriorAndExterior',
+                                'FullInteriorAndExteriorWithReflections'
+                            ].map(v => `
+                                <option value="${v}" ${v === sc.building.solarDistribution ? 'selected' : ''}>${v}</option>
+                            `).join('')}
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-4 gap-1 mt-1">
+                    <div>
+                        <label class="label !text-[8px]">Loads Tol.</label>
+                        <input type="number" step="0.001" class="w-full" data-field="b-loadsTol" value="${sc.building.loadsTolerance}">
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Temp Tol. [°C]</label>
+                        <input type="number" step="0.01" class="w-full" data-field="b-tempTol" value="${sc.building.tempTolerance}">
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Max Warmup Days</label>
+                        <input type="number" class="w-full" data-field="b-maxWarmup" value="${sc.building.maxWarmupDays}">
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Min Warmup Days</label>
+                        <input type="number" class="w-full" data-field="b-minWarmup" value="${sc.building.minWarmupDays}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Timestep & SimulationControl -->
+            <div class="grid grid-cols-2 gap-2">
+                <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                    <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">Timestep</div>
+                    <label class="label !text-[8px]">Timesteps per Hour</label>
+                    <input type="number" min="1" max="60" class="w-full" data-field="ts-perhour" value="${sc.timestep.timestepsPerHour}">
+                </div>
+                <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                    <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">Simulation Control</div>
+                    <div class="grid grid-cols-2 gap-1">
+                        <label class="inline-flex items-center gap-1">
+                            <input type="checkbox" data-field="sc-doZone" ${sc.simulationControlFlags.doZoneSizing ? 'checked' : ''}>
+                            <span>Do Zone Sizing</span>
+                        </label>
+                        <label class="inline-flex items-center gap-1">
+                            <input type="checkbox" data-field="sc-doSystem" ${sc.simulationControlFlags.doSystemSizing ? 'checked' : ''}>
+                            <span>Do System Sizing</span>
+                        </label>
+                        <label class="inline-flex items-center gap-1">
+                            <input type="checkbox" data-field="sc-doPlant" ${sc.simulationControlFlags.doPlantSizing ? 'checked' : ''}>
+                            <span>Do Plant Sizing</span>
+                        </label>
+                        <label class="inline-flex items-center gap-1">
+                            <input type="checkbox" data-field="sc-runSizing" ${sc.simulationControlFlags.runSizingPeriods ? 'checked' : ''}>
+                            <span>Run Sizing Periods</span>
+                        </label>
+                        <label class="inline-flex items-center gap-1">
+                            <input type="checkbox" data-field="sc-runWeather" ${sc.simulationControlFlags.runWeatherRunPeriods ? 'checked' : ''}>
+                            <span>Run Weather Periods</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GlobalGeometryRules & ShadowCalculation -->
+            <div class="grid grid-cols-2 gap-2">
+                <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                    <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">Global Geometry Rules</div>
+                    <div>
+                        <label class="label !text-[8px]">Starting Vertex Position</label>
+                        <select class="w-full" data-field="ggr-start">
+                            ${['UpperLeftCorner','UpperRightCorner','LowerLeftCorner','LowerRightCorner'].map(v => `
+                                <option value="${v}" ${v === sc.globalGeometryRules.startingVertexPosition ? 'selected' : ''}>${v}</option>
+                            `).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Vertex Entry Direction</label>
+                        <select class="w-full" data-field="ggr-dir">
+                            ${['Counterclockwise','Clockwise'].map(v => `
+                                <option value="${v}" ${v === sc.globalGeometryRules.vertexEntryDirection ? 'selected' : ''}>${v}</option>
+                            `).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Coordinate System</label>
+                        <select class="w-full" data-field="ggr-coord">
+                            ${['World','Local','Relative'].map(v => `
+                                <option value="${v}" ${v === sc.globalGeometryRules.coordinateSystem ? 'selected' : ''}>${v}</option>
+                            `).join('')}
+                        </select>
+                    </div>
+                </div>
+                <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                    <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">Shadow Calculation</div>
+                    <div class="grid grid-cols-2 gap-1">
+                        <div>
+                            <label class="label !text-[8px]">Calc Frequency</label>
+                            <input type="number" class="w-full" data-field="shad-freq" value="${sc.shadowCalculation.calculationFrequency}">
+                        </div>
+                        <div>
+                            <label class="label !text-[8px]">Max Figures</label>
+                            <input type="number" class="w-full" data-field="shad-maxfig" value="${sc.shadowCalculation.maxFigures}">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Algorithm</label>
+                        <input class="w-full" data-field="shad-alg" value="${sc.shadowCalculation.algorithm}">
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Sky Diffuse Model</label>
+                        <input class="w-full" data-field="shad-sky" value="${sc.shadowCalculation.skyDiffuseModel}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Surface Convection & Heat Balance -->
+            <div class="grid grid-cols-2 gap-2">
+                <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                    <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">Surface Convection</div>
+                    <div>
+                        <label class="label !text-[8px]">Inside Algorithm</label>
+                        <input class="w-full" data-field="conv-in" value="${sc.surfaceConvection.insideAlgorithm}">
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Outside Algorithm</label>
+                        <input class="w-full" data-field="conv-out" value="${sc.surfaceConvection.outsideAlgorithm}">
+                    </div>
+                </div>
+                <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                    <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">Heat Balance Algorithm</div>
+                    <div>
+                        <label class="label !text-[8px]">Algorithm</label>
+                        <input class="w-full" data-field="hb-alg" value="${sc.heatBalanceAlgorithm.algorithm}">
+                    </div>
+                    <div class="grid grid-cols-3 gap-1 mt-1">
+                        <div>
+                            <label class="label !text-[8px]">Surf T max [°C]</label>
+                            <input type="number" class="w-full" data-field="hb-tmax" value="${sc.heatBalanceAlgorithm.surfaceTempUpperLimit}">
+                        </div>
+                        <div>
+                            <label class="label !text-[8px]">hConv min</label>
+                            <input type="number" step="0.01" class="w-full" data-field="hb-hmin" value="${sc.heatBalanceAlgorithm.hConvMin}">
+                        </div>
+                        <div>
+                            <label class="label !text-[8px]">hConv max</label>
+                            <input type="number" class="w-full" data-field="hb-hmax" value="${sc.heatBalanceAlgorithm.hConvMax}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sizing Period -->
+            <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">SizingPeriod:WeatherFileDays</div>
+                <div class="grid grid-cols-6 gap-1">
+                    <div>
+                        <label class="label !text-[8px]">Name</label>
+                        <input class="w-full" data-field="sp-name" value="${sc.sizingPeriodWeatherFileDays.name}">
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Begin M</label>
+                        <input type="number" min="1" max="12" class="w-full" data-field="sp-bm" value="${sc.sizingPeriodWeatherFileDays.beginMonth}">
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">Begin D</label>
+                        <input type="number" min="1" max="31" class="w-full" data-field="sp-bd" value="${sc.sizingPeriodWeatherFileDays.beginDayOfMonth}">
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">End M</label>
+                        <input type="number" min="1" max="12" class="w-full" data-field="sp-em" value="${sc.sizingPeriodWeatherFileDays.endMonth}">
+                    </div>
+                    <div>
+                        <label class="label !text-[8px]">End D</label>
+                        <input type="number" min="1" max="31" class="w-full" data-field="sp-ed" value="${sc.sizingPeriodWeatherFileDays.endDayOfMonth}">
+                    </div>
+                    <div class="flex flex-col justify-end gap-0.5">
+                        <label class="inline-flex items-center gap-1">
+                            <input type="checkbox" data-field="sp-dst" ${sc.sizingPeriodWeatherFileDays.useWeatherFileDaylightSaving ? 'checked' : ''}>
+                            <span class="whitespace-nowrap">Use WF DST</span>
+                        </label>
+                        <label class="inline-flex items-center gap-1">
+                            <input type="checkbox" data-field="sp-rain" ${sc.sizingPeriodWeatherFileDays.useWeatherFileRainSnowIndicators ? 'checked' : ''}>
+                            <span class="whitespace-nowrap">Use WF Rain/Snow</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RunPeriod & DST -->
+            <div class="grid grid-cols-2 gap-2">
+                <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                    <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">RunPeriod</div>
+                    <div class="grid grid-cols-4 gap-1">
+                        <div class="col-span-2">
+                            <label class="label !text-[8px]">Name</label>
+                            <input class="w-full" data-field="rp-name" value="${sc.runPeriod.name}">
+                        </div>
+                        <div>
+                            <label class="label !text-[8px]">Begin M</label>
+                            <input type="number" min="1" max="12" class="w-full" data-field="rp-bm" value="${sc.runPeriod.beginMonth}">
+                        </div>
+                        <div>
+                            <label class="label !text-[8px]">Begin D</label>
+                            <input type="number" min="1" max="31" class="w-full" data-field="rp-bd" value="${sc.runPeriod.beginDayOfMonth}">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-4 gap-1 mt-1">
+                        <div>
+                            <label class="label !text-[8px]">End M</label>
+                            <input type="number" min="1" max="12" class="w-full" data-field="rp-em" value="${sc.runPeriod.endMonth}">
+                        </div>
+                        <div>
+                            <label class="label !text-[8px]">End D</label>
+                            <input type="number" min="1" max="31" class="w-full" data-field="rp-ed" value="${sc.runPeriod.endDayOfMonth}">
+                        </div>
+                        <div class="col-span-2">
+                            <label class="label !text-[8px]">Day of Week / UseWeatherFile</label>
+                            <input class="w-full" data-field="rp-dow" value="${sc.runPeriod.dayOfWeekForStart}">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-1 mt-1">
+                        <label class="inline-flex items-center gap-1">
+                            <input type="checkbox" data-field="rp-holidays" ${sc.runPeriod.useWeatherFileHolidays ? 'checked' : ''}>
+                            <span>Use WF Holidays</span>
+                        </label>
+                        <label class="inline-flex items-center gap-1">
+                            <input type="checkbox" data-field="rp-dst" ${sc.runPeriod.useWeatherFileDaylightSaving ? 'checked' : ''}>
+                            <span>Use WF DST</span>
+                        </label>
+                        <label class="inline-flex items-center gap-1">
+                            <input type="checkbox" data-field="rp-weekend" ${sc.runPeriod.applyWeekendHolidayRule ? 'checked' : ''}>
+                            <span>Weekend Holiday Rule</span>
+                        </label>
+                        <label class="inline-flex items-center gap-1">
+                            <input type="checkbox" data-field="rp-rain" ${sc.runPeriod.useWeatherFileRain ? 'checked' : ''}>
+                            <span>Use WF Rain</span>
+                        </label>
+                        <label class="inline-flex items-center gap-1">
+                            <input type="checkbox" data-field="rp-snow" ${sc.runPeriod.useWeatherFileSnow ? 'checked' : ''}>
+                            <span>Use WF Snow</span>
+                        </label>
+                        <div>
+                            <label class="label !text-[8px]">Repeat Count</label>
+                            <input type="number" min="1" class="w-full" data-field="rp-repeat" value="${sc.runPeriod.numTimesRunperiodToBeRepeated}">
+                        </div>
+                    </div>
+                </div>
+                <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                    <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">RunPeriodControl:DaylightSavingTime</div>
+                    <div class="grid grid-cols-2 gap-1">
+                        <div>
+                            <label class="label !text-[8px]">Start Date (M/D)</label>
+                            <input class="w-full" data-field="dst-start" value="${sc.daylightSavingTime.startDate}">
+                        </div>
+                        <div>
+                            <label class="label !text-[8px]">End Date (M/D)</label>
+                            <input class="w-full" data-field="dst-end" value="${sc.daylightSavingTime.endDate}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end">
+                <button class="btn btn-xxs btn-secondary" data-action="save-sim-control">Save Simulation Control</button>
+            </div>
+        </div>
+    `;
+
+    if (typeof window !== 'undefined' && window.initializePanelControls) {
+        window.initializePanelControls(panel);
+    } else {
+        const closeButton = panel.querySelector('.window-icon-close');
+        if (closeButton) {
+            closeButton.onclick = () => panel.classList.add('hidden');
+        }
+    }
+
+    const saveBtn = panel.querySelector('[data-action="save-sim-control"]');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            try {
+                const { meta, ep } = getSimulationControlConfig();
+                const root = panel;
+
+                const num = (sel) => {
+                    const el = root.querySelector(sel);
+                    if (!el) return undefined;
+                    const v = parseFloat(el.value);
+                    return Number.isFinite(v) ? v : undefined;
+                };
+                const str = (sel) => {
+                    const el = root.querySelector(sel);
+                    if (!el) return '';
+                    return (el.value || '').trim();
+                };
+                const bool = (sel) => {
+                    const el = root.querySelector(sel);
+                    return !!(el && el.checked);
+                };
+
+                const sim = {
+                    building: {
+                        name: str('[data-field="b-name"]') || 'OfficeBuilding',
+                        northAxis: num('[data-field="b-north"]') ?? 0,
+                        terrain: str('[data-field="b-terrain"]') || 'City',
+                        loadsTolerance: num('[data-field="b-loadsTol"]') ?? 0.04,
+                        tempTolerance: num('[data-field="b-tempTol"]') ?? 0.4,
+                        solarDistribution: str('[data-field="b-solar"]') || 'FullInteriorAndExteriorWithReflections',
+                        maxWarmupDays: num('[data-field="b-maxWarmup"]') ?? 25,
+                        minWarmupDays: num('[data-field="b-minWarmup"]') ?? 6,
+                    },
+                    timestep: {
+                        timestepsPerHour: num('[data-field="ts-perhour"]') ?? 4,
+                    },
+                    simulationControlFlags: {
+                        doZoneSizing: bool('[data-field="sc-doZone"]'),
+                        doSystemSizing: bool('[data-field="sc-doSystem"]'),
+                        doPlantSizing: bool('[data-field="sc-doPlant"]'),
+                        runSizingPeriods: bool('[data-field="sc-runSizing"]'),
+                        runWeatherRunPeriods: bool('[data-field="sc-runWeather"]'),
+                    },
+                    globalGeometryRules: {
+                        startingVertexPosition: str('[data-field="ggr-start"]') || 'UpperLeftCorner',
+                        vertexEntryDirection: str('[data-field="ggr-dir"]') || 'Counterclockwise',
+                        coordinateSystem: str('[data-field="ggr-coord"]') || 'Relative',
+                    },
+                    shadowCalculation: {
+                        calculationFrequency: num('[data-field="shad-freq"]') ?? 10,
+                        maxFigures: num('[data-field="shad-maxfig"]') ?? 15000,
+                        algorithm: str('[data-field="shad-alg"]') || 'ConvexWeilerAtherton',
+                        skyDiffuseModel: str('[data-field="shad-sky"]') || 'SimpleSkyDiffuseModeling',
+                    },
+                    surfaceConvection: {
+                        insideAlgorithm: str('[data-field="conv-in"]') || 'TARP',
+                        outsideAlgorithm: str('[data-field="conv-out"]') || 'DOE-2',
+                    },
+                    heatBalanceAlgorithm: {
+                        algorithm: str('[data-field="hb-alg"]') || 'ConductionTransferFunction',
+                        surfaceTempUpperLimit: num('[data-field="hb-tmax"]') ?? 200,
+                        hConvMin: num('[data-field="hb-hmin"]') ?? 0.1,
+                        hConvMax: num('[data-field="hb-hmax"]') ?? 1000,
+                    },
+                    sizingPeriodWeatherFileDays: {
+                        name: str('[data-field="sp-name"]') || 'Sizing',
+                        beginMonth: num('[data-field="sp-bm"]') ?? 1,
+                        beginDayOfMonth: num('[data-field="sp-bd"]') ?? 1,
+                        endMonth: num('[data-field="sp-em"]') ?? 12,
+                        endDayOfMonth: num('[data-field="sp-ed"]') ?? 31,
+                        useWeatherFileDaylightSaving: bool('[data-field="sp-dst"]'),
+                        useWeatherFileRainSnowIndicators: bool('[data-field="sp-rain"]'),
+                    },
+                    runPeriod: {
+                        name: str('[data-field="rp-name"]') || 'Annual_Simulation',
+                        beginMonth: num('[data-field="rp-bm"]') ?? 1,
+                        beginDayOfMonth: num('[data-field="rp-bd"]') ?? 1,
+                        endMonth: num('[data-field="rp-em"]') ?? 12,
+                        endDayOfMonth: num('[data-field="rp-ed"]') ?? 31,
+                        dayOfWeekForStart: str('[data-field="rp-dow"]') || 'UseWeatherFile',
+                        useWeatherFileHolidays: bool('[data-field="rp-holidays"]'),
+                        useWeatherFileDaylightSaving: bool('[data-field="rp-dst"]'),
+                        applyWeekendHolidayRule: bool('[data-field="rp-weekend"]'),
+                        useWeatherFileRain: bool('[data-field="rp-rain"]'),
+                        useWeatherFileSnow: bool('[data-field="rp-snow"]'),
+                        numTimesRunperiodToBeRepeated: num('[data-field="rp-repeat"]') ?? 1,
+                    },
+                    daylightSavingTime: {
+                        startDate: str('[data-field="dst-start"]') || '4/1',
+                        endDate: str('[data-field="dst-end"]') || '9/30',
+                    },
+                };
+
+                saveSimulationControlConfig(meta, ep, sim);
+                alert('EnergyPlus Simulation Control configuration saved.');
+            } catch (err) {
+                console.error('SimulationControlManager: save failed', err);
+                alert('Failed to save Simulation Control configuration. Check console for details.');
+            }
+        });
+    }
 
     return panel;
 }

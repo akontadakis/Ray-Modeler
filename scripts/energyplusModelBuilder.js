@@ -1,6 +1,7 @@
 // scripts/energyplusModelBuilder.js
 // Minimal EnergyPlus IDF builder integrated with Ray-Modeler data structures.
-// Goal: take current project state and global simulation params and emit a runnable IDF.
+// Goal: take current project state and global simulation params and emit a runnable IDF
+// and provide a diagnostics summary for UI visibility.
 //
 // Canonical configuration entrypoint (single source of truth):
 //   meta.energyPlusConfig (or meta.energyplus for backward-compat)
@@ -21,151 +22,19 @@
 //       elevation: number,
 //     },
 //
-//     materials?: (
-//       | {
-//           type: 'Material',
-//           name: string,
-//           roughness?: string,
-//           thickness?: number,
-//           conductivity?: number,
-//           density?: number,
-//           specificHeat?: number,
-//           solarAbsorptance?: number,
-//           thermalAbsorptance?: number,
-//           visibleAbsorptance?: number,
-//         }
-//       | {
-//           type: 'Material:NoMass',
-//           name: string,
-//           roughness?: string,
-//           thermalResistance?: number,
-//           solarAbsorptance?: number,
-//           thermalAbsorptance?: number,
-//           visibleAbsorptance?: number,
-//         }
-//       | {
-//           type: 'WindowMaterial:SimpleGlazingSystem',
-//           name: string,
-//           uFactor?: number,
-//           solarHeatGainCoeff?: number,
-//           visibleTransmittance?: number,
-//         }
-//     )[],
-//
-//     constructions?: {
-//       name: string,
-//       layers: string[], // material names
-//     }[],
-//
-//     schedules?: {
-//       compact?: (
-//         | {
-//             name: string,
-//             typeLimits?: string,
-//             lines: string[],
-//           }[]
-//         | {
-//             [name: string]: {
-//               typeLimits?: string,
-//               lines: string[],
-//             },
-//           }
-//       )
-//     },
-//
-//     defaults?: {
-//       wallConstruction?: string,
-//       roofConstruction?: string,
-//       floorConstruction?: string,
-//       windowConstruction?: string,
-//       // future: intWall, intFloor, door, etc.
-//     },
-//
-//     zoneLoads?: {
-//       zoneName: string,
-//       people?: {
-//         peoplePerArea?: number,
-//         schedule?: string,
-//         activityLevel?: number,
-//       },
-//       lighting?: {
-//         wattsPerArea?: number,
-//         schedule?: string,
-//       },
-//       equipment?: {
-//         wattsPerArea?: number,
-//         schedule?: string,
-//       },
-//       infiltration?: {
-//         ach?: number,          // air changes per hour
-//         flowPerArea?: number,  // m3/s-m2
-//         schedule?: string,
-//       },
-//     }[],
-//
-//     thermostats?: {
-//       zoneName?: string | 'GLOBAL',
-//       heatingScheduleName?: string,
-//       coolingScheduleName?: string,
-//     }[],
-//
-//     idealLoads?: {
-//       global?: {
-//         availabilitySchedule?: string,
-//         heatingLimitType?: string,
-//         maxHeatingCapacity?: number,
-//         coolingLimitType?: string,
-//         maxCoolingCapacity?: number,
-//         outdoorAirMethod?: string,
-//         outdoorAirFlowPerPerson?: number,
-//         outdoorAirFlowPerArea?: number,
-//       },
-//       perZone?: {
-//         zoneName: string,
-//         availabilitySchedule?: string,
-//         heatingLimitType?: string,
-//         maxHeatingCapacity?: number,
-//         coolingLimitType?: string,
-//         maxCoolingCapacity?: number,
-//         outdoorAirMethod?: string,
-//         outdoorAirFlowPerPerson?: number,
-//         outdoorAirFlowPerArea?: number,
-//       }[],
-//     },
-//
-//     daylighting?: {
-//       controls?: {
-//         zoneName: string,
-//         enabled?: boolean, // if false, ignore
-//         refPoints: { x: number, y: number, z: number }[], // 1–2 points used
-//         setpoint: number, // lux
-//         fraction?: number, // fraction of zone controlled (0–1)
-//         type?: 'Continuous' | 'Stepped' | 'ContinuousOff',
-//       }[],
-//       outputs?: {
-//         illuminanceMaps?: {
-//           name: string,
-//           zoneName: string,
-//           xOrigin: number,
-//           yOrigin: number,
-//           zHeight: number,
-//           xNumPoints: number,
-//           xSpacing: number,
-//           yNumPoints: number,
-//           ySpacing: number,
-//         }[],
-//         variables?: {
-//           key: string, // e.g. zone name, 'Environment', '*', etc.
-//           variableName: string,
-//           reportingFrequency?: 'Timestep' | 'Hourly' | 'Daily' | 'Monthly' | 'RunPeriod',
-//         }[],
-//       },
-//     },
+//     materials?: ( ... ),
+//     constructions?: ( ... ),
+//     schedules?: { ... },
+//     defaults?: { ... },
+//     zoneLoads?: ( ... ),
+//     thermostats?: ( ... ),
+//     idealLoads?: ( ... ),
+//     daylighting?: ( ... )
 //   }
 //
 // Notes:
 // - All names are sanitized by sanitize().
-// - Builder is pure/deterministic: no DOM, no side effects beyond returning IDF text.
+// - Builder/diagnostics are pure/deterministic: no DOM, no side effects beyond return values.
 // - Invalid or incomplete entries are gracefully ignored; built-ins provide robustness.
 
 import { project } from './project.js';
@@ -173,30 +42,11 @@ import * as energyplusDefaults from './energyplusDefaults.js';
 
 /**
  * Build a minimal EnergyPlus IDF from the current Ray-Modeler project.
- * Pure function: output depends only on (options + project metadata accessors).
- *
- * @param {object} options
- *  - weatherFilePath {string} Optional EPW path for Sizing/RunPeriod context.
- *  - buildingName {string} Optional building name override.
- *  - runPeriod {object} Optional { startMonth, startDay, endMonth, endDay }
- *  - timestep {number} Optional timestep per hour (default 6 → 10-min).
- *  - northAxis {number} Optional north axis in degrees.
- *  - terrain {string} Optional terrain (default 'City').
- *  - location {object} Optional { name, latitude, longitude, timeZone, elevation }
- *  - materials {Array} Optional explicit material definitions (see schema above).
- *  - constructions {Array} Optional construction definitions (layered assemblies).
- *  - schedules {Object} Optional schedule presets and/or custom schedules.
- *  - loads {Array} Optional zone-level internal loads referencing schedules.
- *  - defaults {Object} Optional defaults e.g. { wallConstruction, roofConstruction, ... }.
- *  - idealLoads {Object} Optional global/per-zone IdealLoadsAirSystem config.
- *  - thermostats {Array} Optional thermostat setpoint bindings.
- *  - daylighting {Object} Optional daylighting controls and outputs (see schema).
- *
- * @returns {string} IDF content
  */
 export function buildEnergyPlusModel(options = {}) {
     const {
         weatherFilePath,
+        weather,
         buildingName,
         runPeriod,
         timestep,
@@ -213,11 +63,13 @@ export function buildEnergyPlusModel(options = {}) {
         daylighting,
     } = options;
 
-    // 1) Base header and defaults
-    const idf = [];
+    // Normalize unified weather/location config
+    const weatherCfg = weather || {};
+    const epwPath = weatherFilePath || weatherCfg.epwPath;
+    const locationSource = weatherCfg.locationSource || 'FromEPW';
+    const customLocation = weatherCfg.customLocation;
 
-    // Load centralized defaults (materials, constructions, schedules, loads, HVAC, outputs)
-    // extracted from OffiveRoomModel_WWR40.idf. These provide stable, reusable defaults.
+    const idf = [];
     const epDefaults = energyplusDefaults.loadDefaults();
 
     idf.push(`! ==============================================================================`);
@@ -231,7 +83,7 @@ export function buildEnergyPlusModel(options = {}) {
     idf.push(`  9.5;                       !- Version Identifier`);
     idf.push('');
 
-    // TIMESTEP (prefer user option, otherwise default library if present)
+    // TIMESTEP
     let ts = Number.isFinite(timestep) && timestep > 0 ? timestep : null;
     if (!ts && epDefaults?.simulation?.Timestep?.NumberOfTimestepsPerHour) {
         ts = epDefaults.simulation.Timestep.NumberOfTimestepsPerHour;
@@ -261,14 +113,33 @@ export function buildEnergyPlusModel(options = {}) {
         idf.push('');
     }
 
-    // SITE:LOCATION (fallback to something valid)
-    const loc = location || inferLocationFromProject() || {
-        name: 'Athens-GR',
-        latitude: 37.98,
-        longitude: 23.72,
-        timeZone: 2.0,
-        elevation: 107.0,
-    };
+    // SITE:LOCATION
+    // Strategy:
+    // - If weather.locationSource === 'Custom' and customLocation is valid, use it.
+    // - Else if options.location is provided (legacy hook), use it.
+    // - Else try to infer from project.
+    // - Fallback to Athens-GR.
+    let loc = null;
+    if (
+        locationSource === 'Custom' &&
+        customLocation &&
+        isValidCustomLocation(customLocation)
+    ) {
+        loc = customLocation;
+    } else if (location) {
+        loc = location;
+    } else {
+        loc = inferLocationFromProject();
+    }
+    if (!loc) {
+        loc = {
+            name: 'Athens-GR',
+            latitude: 37.98,
+            longitude: 23.72,
+            timeZone: 2.0,
+            elevation: 107.0,
+        };
+    }
 
     idf.push(`Site:Location,`);
     idf.push(`  ${sanitize(loc.name)},     !- Name`);
@@ -278,7 +149,7 @@ export function buildEnergyPlusModel(options = {}) {
     idf.push(`  ${loc.elevation};          !- Elevation {m}`);
     idf.push('');
 
-    // RUNPERIOD
+    // RUNPERIOD (legacy simple)
     const rp = runPeriod || {
         startMonth: 1,
         startDay: 1,
@@ -302,7 +173,7 @@ export function buildEnergyPlusModel(options = {}) {
     idf.push(`  Yes;                      !- Use Weather File Snow Indicators`);
     idf.push('');
 
-    // BUILDING (prefer defaults, allow overrides)
+    // BUILDING (from defaults or overrides)
     const defaultBuilding = epDefaults?.simulation?.Building || {};
     const bName = buildingName || inferBuildingNameFromProject() || defaultBuilding.Name || 'Ray-Modeler Building';
     const bNorthAxis = Number.isFinite(northAxis)
@@ -333,22 +204,22 @@ export function buildEnergyPlusModel(options = {}) {
     const constructionLibrary = buildConstructionLibrary(constructions, materialLibrary);
     emitConstructions(idf, constructionLibrary);
 
+    // defaultConstructions reserved for future explicit surface mapping
     const defaultConstructions = {
         wall: defaults?.wallConstruction || 'RM_Ext_Wall',
         roof: defaults?.roofConstruction || 'RM_Roof',
         floor: defaults?.floorConstruction || 'RM_Slab_On_Grade',
         window: defaults?.windowConstruction || 'RM_Dbl_Clr_3mm_13mmAir',
     };
-    // defaultConstructions reserved for future surface mapping.
+    void defaultConstructions;
 
     // 3) Schedules
     const scheduleContext = buildSchedules(schedules);
     emitSchedules(idf, scheduleContext);
 
-    // 4) Zones from project
+    // 4) Zones (from project; simple)
     const zones = inferZonesFromProject();
-    if (zones.length === 0) {
-        // Provide at least one simple thermal zone so file is runnable.
+    if (!zones.length) {
         idf.push(`Zone,`);
         idf.push(`  Zone_1,                   !- Name`);
         idf.push(`  0.0,                      !- Direction of Relative North {deg}`);
@@ -363,9 +234,7 @@ export function buildEnergyPlusModel(options = {}) {
             idf.push(`Zone,`);
             idf.push(`  ${sanitize(z.name)},      !- Name`);
             idf.push(`  0.0,                      !- Direction of Relative North {deg}`);
-            idf.push(
-                `  ${z.x || 0.0}, ${z.y || 0.0}, ${z.z || 0.0},  !- X,Y,Z Origin {m}`
-            );
+            idf.push(`  ${z.x || 0.0}, ${z.y || 0.0}, ${z.z || 0.0},  !- X,Y,Z Origin {m}`);
             idf.push(`  1,                        !- Type`);
             idf.push(`  ${z.multiplier || 1},      !- Multiplier`);
             idf.push(`  autocalculate,            !- Ceiling Height {m}`);
@@ -374,18 +243,18 @@ export function buildEnergyPlusModel(options = {}) {
         });
     }
 
-    // 5) Internal loads (People, Lights, Equipment, Infiltration)
+    // 5) Internal loads
     emitZoneLoads(idf, zones, loads, scheduleContext);
 
-    // 6) Thermostats and IdealLoads for each zone (configurable)
+    // 6) Thermostats & IdealLoads
     emitThermostatsAndIdealLoads(idf, zones, scheduleContext, idealLoads, thermostats);
 
     // 7) Daylighting & Outputs
     emitDaylighting(idf, zones, daylighting);
 
-    // 8) Optionally embed a reference to weather file as comment
-    if (weatherFilePath) {
-        idf.push(`! Weather file: ${weatherFilePath}`);
+    // 8) Weather file reference (comment)
+    if (epwPath) {
+        idf.push(`! Weather file: ${epwPath}`);
         idf.push('');
     }
 
@@ -393,262 +262,953 @@ export function buildEnergyPlusModel(options = {}) {
 }
 
 /**
+ * Build a diagnostics summary describing how options + project geometry map into EnergyPlus objects.
+ *
+ * @param {object} options Same shape as buildEnergyPlusModel
+ * @returns {{
+ *   geometry: {
+ *     zones: Array<{
+ *       name: string,
+ *       surfaces: { total: number, exteriorWalls: number, roofs: number, floors: number },
+ *       windows: { total: number, totalArea: number },
+ *       wwrByOrientation: { N?: number, E?: number, S?: number, W?: number }
+ *     }>,
+ *     totals: { zones: number, exteriorWalls: number, roofs: number, floors: number, windows: number }
+ *   },
+ *   constructions: { usedConstructions: Array<{name:string,missing:boolean}>, missingConstructions: string[], unusedConstructions: string[] },
+ *   materials: { missingMaterials: string[], unusedMaterials: string[] },
+ *   schedulesAndLoads: { missingSchedules: string[], inconsistentLoads: Array<{ zone: string, issue: string }> },
+ *   issues: Array<{ severity: 'info'|'warning'|'error', message: string }>
+ * }}
+ */
+export function buildEnergyPlusDiagnostics(options = {}) {
+    const {
+        weatherFilePath,
+        weather,
+        materials,
+        constructions,
+        schedules,
+        defaults,
+        loads,
+        idealLoads,
+        thermostats,
+        daylighting,
+    } = options;
+
+    const issues = [];
+
+    const weatherCfg = weather || {};
+    const epwPath = weatherFilePath || weatherCfg.epwPath;
+    const locationSource = weatherCfg.locationSource || 'FromEPW';
+    const customLocation = weatherCfg.customLocation;
+
+    const epDefaults = energyplusDefaults.loadDefaults();
+    const materialLib = buildMaterialLibrary(materials, epDefaults);
+    const constructionLib = buildConstructionLibrary(constructions, materialLib);
+    const scheduleCtx = buildSchedules(schedules);
+
+    // Geometry snapshot from current parametric model (single room) or fallback.
+    const geom = getGeometrySnapshotSafe(issues);
+    const znList = geom.zones.length ? geom.zones : inferZonesFromProject();
+    const zoneNames = znList.length
+        ? znList.map((z, i) => sanitize(z.name || `Zone_${i + 1}`))
+        : ['Zone_1'];
+
+    // 1) Geometry diagnostics: per-zone surfaces, windows, WWR
+    const geomDiag = computeGeometryDiagnostics(geom, zoneNames);
+
+    // 2) Constructions diagnostics (defaults-based + geometry-based)
+    const {
+        constructionsDiagnostics,
+        missingConstructionsFromDefaults,
+    } = computeConstructionsDiagnostics(defaults, constructionLib);
+
+    constructionsDiagnostics.missingConstructions.forEach((name) => {
+        if (missingConstructionsFromDefaults.has(name)) {
+            issues.push({
+                severity: 'error',
+                message: `Default construction "${name}" is not defined in EnergyPlus constructions.`,
+            });
+        }
+    });
+
+    // 3) Materials diagnostics (based on constructions)
+    const materialsDiagnostics = computeMaterialsDiagnostics(constructionLib, materialLib, issues);
+
+    // 4) Schedules & loads diagnostics
+    const schedulesAndLoadsDiagnostics = computeSchedulesAndLoadsDiagnostics(
+        scheduleCtx,
+        loads,
+        idealLoads,
+        thermostats,
+        daylighting,
+        issues
+    );
+
+    if (!zoneNames.length) {
+        issues.push({
+            severity: 'warning',
+            message: 'No zones detected; a fallback Zone_1 will be created in the generated IDF.',
+        });
+    }
+
+    // Weather / location diagnostics
+    if (!epwPath && locationSource !== 'Custom') {
+        issues.push({
+            severity: 'error',
+            message:
+                'No EPW weather file is configured. Set energyPlusConfig.weather.epwPath in the Weather & Location panel.',
+        });
+    }
+
+    if (locationSource === 'Custom') {
+        if (!customLocation || !isValidCustomLocation(customLocation)) {
+            issues.push({
+                severity: 'warning',
+                message:
+                    'Custom location is selected but incomplete or invalid. The generated IDF will fall back to a default location.',
+            });
+        }
+    }
+
+    const diagnostics = {
+        geometry: geomDiag,
+        constructions: constructionsDiagnostics,
+        materials: materialsDiagnostics,
+        schedulesAndLoads: schedulesAndLoadsDiagnostics,
+        issues,
+        weather: {
+            epwPath: epwPath || null,
+            locationSource,
+            customLocation: isValidCustomLocation(customLocation)
+                ? customLocation
+                : null,
+        },
+    };
+
+    return diagnostics;
+}
+
+/**
+ * Compute geometry-level diagnostics from a normalized snapshot.
+ */
+function computeGeometryDiagnostics(geom, zoneNames) {
+    const byZone = new Map();
+    zoneNames.forEach((zn) => {
+        byZone.set(zn, {
+            name: zn,
+            surfaces: {
+                total: 0,
+                exteriorWalls: 0,
+                roofs: 0,
+                floors: 0,
+            },
+            windows: {
+                total: 0,
+                totalArea: 0,
+            },
+            wwrByOrientation: {},
+        });
+    });
+
+    const totals = {
+        zones: zoneNames.length,
+        exteriorWalls: 0,
+        roofs: 0,
+        floors: 0,
+        windows: 0,
+    };
+
+    // Orientation bucketing helper
+    const bucketOrientation = (azimuth) => {
+        if (!Number.isFinite(azimuth)) return null;
+        const a = ((azimuth % 360) + 360) % 360;
+        if (a < 45 || a >= 315) return 'N';
+        if (a >= 45 && a < 135) return 'E';
+        if (a >= 135 && a < 225) return 'S';
+        if (a >= 225 && a < 315) return 'W';
+        return null;
+    };
+
+    // surfaces may be empty if geometry not available; then we keep defaults (zeros)
+    (geom.surfaces || []).forEach((s) => {
+        const zn = sanitize(s.zoneName || 'Zone_1');
+        const z = byZone.get(zn);
+        if (!z) return;
+
+        z.surfaces.total += 1;
+
+        const type = String(s.type || '').toLowerCase();
+        const isExt = !!s.isExterior;
+        const azimuth = typeof s.azimuth === 'number' ? s.azimuth : null;
+        const grossArea = Number.isFinite(s.grossArea) ? s.grossArea : 0;
+
+        if (isExt && grossArea > 0) {
+            if (type.includes('wall')) {
+                z.surfaces.exteriorWalls += 1;
+                totals.exteriorWalls += 1;
+            } else if (type.includes('roof') || type.includes('ceiling')) {
+                z.surfaces.roofs += 1;
+                totals.roofs += 1;
+            } else if (type.includes('floor')) {
+                z.surfaces.floors += 1;
+                totals.floors += 1;
+            }
+        }
+
+        // Subsurfaces (windows) for WWR
+        if (Array.isArray(s.subsurfaces)) {
+            s.subsurfaces.forEach((sub) => {
+                const stype = String(sub.type || '').toLowerCase();
+                const area = Number.isFinite(sub.area) ? sub.area : 0;
+                if (stype.includes('window') && area > 0) {
+                    z.windows.total += 1;
+                    z.windows.totalArea += area;
+                    totals.windows += 1;
+
+                    const dir = isExt ? bucketOrientation(azimuth) : null;
+                    if (dir) {
+                        const key = `__wwr_acc_${dir}`;
+                        const wallKey = `__wall_acc_${dir}`;
+                        z[wallKey] = (z[wallKey] || 0) + grossArea;
+                        z[key] = (z[key] || 0) + area;
+                    }
+                }
+            });
+        }
+    });
+
+    // Compute WWR per orientation using accumulated values
+    byZone.forEach((z) => {
+        const wwr = {};
+        ['N', 'E', 'S', 'W'].forEach((dir) => {
+            const wallArea = z[`__wall_acc_${dir}`] || 0;
+            const winArea = z[`__wwr_acc_${dir}`] || 0;
+            if (wallArea > 0 && winArea > 0) {
+                wwr[dir] = +(winArea / wallArea).toFixed(3);
+            }
+            delete z[`__wall_acc_${dir}`];
+            delete z[`__wwr_acc_${dir}`];
+        });
+        z.wwrByOrientation = wwr;
+    });
+
+    return {
+        zones: Array.from(byZone.values()),
+        totals,
+    };
+}
+
+/**
+ * Safely build a geometry snapshot from the current parametric model.
+ * For now, we support the single-room parametric model defined in geometry.js.
+ *
+ * Snapshot is conservative and will not throw if geometry is unavailable.
+ */
+function getGeometrySnapshotSafe(issues) {
+    const snapshot = {
+        zones: [],
+        surfaces: [],
+    };
+
+    try {
+        // For the current parametric model:
+        // - Single thermal zone: "Zone_1"
+        // - Four walls (N,S,E,W) defined via getAllWindowParams() and room dimensions.
+        // We do not import geometry.js to keep the builder environment-agnostic,
+        // but we can approximate from project metadata if present.
+
+        const meta = project?.getMetadata?.() || project?.metadata || {};
+        const room = meta.room || meta.geometry || null;
+
+        if (!room) {
+            // Fallback: if no metadata, just declare one zone with no explicit surfaces.
+            snapshot.zones.push({ name: 'Zone_1' });
+            return snapshot;
+        }
+
+        const zoneName = room.name || 'Zone_1';
+        snapshot.zones.push({ name: zoneName });
+
+        const W = Number(room.width) || Number(room.W) || 0;
+        const L = Number(room.length) || Number(room.L) || 0;
+        const H = Number(room.height) || Number(room.H) || 0;
+        const wwrMeta = room.windows || {};
+
+        // Helper to push a surface
+        const addSurface = (cfg) => {
+            snapshot.surfaces.push({
+                id: cfg.id,
+                zoneName: zoneName,
+                type: cfg.type,
+                isExterior: true,
+                azimuth: cfg.azimuth,
+                grossArea: cfg.grossArea,
+                netArea: cfg.grossArea, // no cutouts applied here
+                constructionName: cfg.constructionName,
+                subsurfaces: cfg.subsurfaces || [],
+            });
+        };
+
+        if (W > 0 && L > 0 && H > 0) {
+            // North wall (facing -Z): azimuth 0
+            addSurface({
+                id: 'Wall_N',
+                type: 'Wall',
+                azimuth: 0,
+                grossArea: W * H,
+                constructionName: null,
+                subsurfaces: buildWindowSubs(wwrMeta.N, W, H),
+            });
+            // South wall (facing +Z): azimuth 180
+            addSurface({
+                id: 'Wall_S',
+                type: 'Wall',
+                azimuth: 180,
+                grossArea: W * H,
+                constructionName: null,
+                subsurfaces: buildWindowSubs(wwrMeta.S, W, H),
+            });
+            // West wall (facing -X): azimuth 270
+            addSurface({
+                id: 'Wall_W',
+                type: 'Wall',
+                azimuth: 270,
+                grossArea: L * H,
+                constructionName: null,
+                subsurfaces: buildWindowSubs(wwrMeta.W, L, H),
+            });
+            // East wall (facing +X): azimuth 90
+            addSurface({
+                id: 'Wall_E',
+                type: 'Wall',
+                azimuth: 90,
+                grossArea: L * H,
+                constructionName: null,
+                subsurfaces: buildWindowSubs(wwrMeta.E, L, H),
+            });
+
+            // Simple roof/floor placeholders
+            snapshot.surfaces.push({
+                id: 'Roof',
+                zoneName,
+                type: 'Roof',
+                isExterior: true,
+                azimuth: NaN,
+                grossArea: W * L,
+                netArea: W * L,
+                constructionName: null,
+                subsurfaces: [],
+            });
+            snapshot.surfaces.push({
+                id: 'Floor',
+                zoneName,
+                type: 'Floor',
+                isExterior: true,
+                azimuth: NaN,
+                grossArea: W * L,
+                netArea: W * L,
+                constructionName: null,
+                subsurfaces: [],
+            });
+        } else {
+            // If room dimensions are not valid, keep a minimal snapshot.
+            snapshot.zones.push({ name: 'Zone_1' });
+        }
+    } catch (e) {
+        if (issues) {
+            issues.push({
+                severity: 'warning',
+                message: 'Geometry diagnostics unavailable; falling back to configuration-only diagnostics.',
+            });
+        }
+    }
+
+    return snapshot;
+}
+
+/**
+ * Build window subsurfaces array from a simple metadata description.
+ * This is a placeholder using WWR-like info if available; otherwise returns [].
+ */
+function buildWindowSubs(winMeta, wallWidth, wallHeight) {
+    if (!winMeta || typeof winMeta.wwr !== 'number' || winMeta.wwr <= 0) {
+        return [];
+    }
+    const wallArea = wallWidth * wallHeight;
+    const winArea = Math.max(0, Math.min(1, winMeta.wwr)) * wallArea;
+    if (!winArea) return [];
+    return [
+        {
+            id: 'Win_1',
+            type: 'Window',
+            area: winArea,
+            constructionName: null,
+        },
+    ];
+}
+
+/**
+ * Compute construction diagnostics based on defaults and construction library.
+ */
+function computeConstructionsDiagnostics(defaults, constructionLib) {
+    const usedConstructionNames = new Set();
+    const missingConstructions = new Set();
+    const missingFromDefaults = new Set();
+
+    const defaultCons = {
+        wall: defaults?.wallConstruction,
+        roof: defaults?.roofConstruction,
+        floor: defaults?.floorConstruction,
+        window: defaults?.windowConstruction,
+    };
+
+    Object.values(defaultCons).forEach((name) => {
+        if (!name) return;
+        const key = sanitize(name);
+        if (constructionLib.has(key)) {
+            usedConstructionNames.add(key);
+        } else {
+            missingConstructions.add(key);
+            missingFromDefaults.add(key);
+        }
+    });
+
+    const allConstructionNames = Array.from(constructionLib.keys());
+    const unusedConstructions = allConstructionNames.filter(
+        (n) => !usedConstructionNames.has(n)
+    );
+
+    const constructionsDiagnostics = {
+        usedConstructions: Array.from(
+            new Set([...usedConstructionNames, ...missingConstructions])
+        ).map((name) => ({
+            name,
+            missing: missingConstructions.has(name),
+        })),
+        missingConstructions: Array.from(missingConstructions),
+        unusedConstructions,
+    };
+
+    return { constructionsDiagnostics, missingConstructionsFromDefaults: missingFromDefaults };
+}
+
+/**
+ * Compute materials diagnostics from construction library usage.
+ */
+function computeMaterialsDiagnostics(constructionLib, materialLib, issues) {
+    const usedMaterialNames = new Set();
+    const missingMaterials = new Set();
+
+    constructionLib.forEach((c) => {
+        (c.layers || []).forEach((ln) => {
+            const key = sanitize(ln);
+            if (materialLib.has(key)) {
+                usedMaterialNames.add(key);
+            } else {
+                missingMaterials.add(key);
+            }
+        });
+    });
+
+    if (missingMaterials.size && issues) {
+        issues.push({
+            severity: 'error',
+            message: `One or more constructions reference missing materials: ${Array.from(
+                missingMaterials
+            ).join(', ')}`,
+        });
+    }
+
+    const allMaterialNames = Array.from(materialLib.keys());
+    const unusedMaterials = allMaterialNames.filter(
+        (n) => !usedMaterialNames.has(n)
+    );
+
+    return {
+        missingMaterials: Array.from(missingMaterials),
+        unusedMaterials,
+    };
+}
+
+/**
+ * Compute schedules and loads diagnostics.
+ */
+function computeSchedulesAndLoadsDiagnostics(
+    scheduleCtx,
+    loads,
+    idealLoads,
+    thermostats,
+    daylighting,
+    issues
+) {
+    const compactSchedules = scheduleCtx.compact || {};
+    const scheduleExists = (name) => {
+        if (!name) return false;
+        const key = sanitize(name);
+        return !!compactSchedules[key];
+    };
+
+    const missingScheduleNames = new Set();
+    const inconsistentLoads = [];
+
+    // Zone loads
+    (loads || []).forEach((l) => {
+        if (!l || !l.zoneName) return;
+        const zn = sanitize(l.zoneName);
+        const check = (field, schedName) => {
+            if (!schedName) return;
+            if (!scheduleExists(schedName)) {
+                missingScheduleNames.add(schedName);
+                inconsistentLoads.push({
+                    zone: zn,
+                    issue: `${field} schedule "${schedName}" is not defined.`,
+                });
+            }
+        };
+
+        if (l.people) check('People', l.people.schedule);
+        if (l.lighting) check('Lighting', l.lighting.schedule);
+        if (l.equipment) check('Equipment', l.equipment.schedule);
+        if (l.infiltration) check('Infiltration', l.infiltration.schedule);
+    });
+
+    // IdealLoads availability
+    if (idealLoads) {
+        const g = idealLoads.global || {};
+        if (g.availabilitySchedule && !scheduleExists(g.availabilitySchedule)) {
+            missingScheduleNames.add(g.availabilitySchedule);
+            issues.push({
+                severity: 'warning',
+                message: `IdealLoads global availability schedule "${g.availabilitySchedule}" is not defined.`,
+            });
+        }
+        (idealLoads.perZone || []).forEach((cfg) => {
+            if (!cfg || !cfg.zoneName || !cfg.availabilitySchedule) return;
+            if (!scheduleExists(cfg.availabilitySchedule)) {
+                missingScheduleNames.add(cfg.availabilitySchedule);
+                issues.push({
+                    severity: 'warning',
+                    message: `IdealLoads availability schedule "${cfg.availabilitySchedule}" for zone "${cfg.zoneName}" is not defined.`,
+                });
+            }
+        });
+    }
+
+    // Thermostats
+    (thermostats || []).forEach((t) => {
+        if (!t) return;
+        const heat = t.heatingScheduleName;
+        const cool = t.coolingScheduleName;
+        if (heat && !scheduleExists(heat)) {
+            missingScheduleNames.add(heat);
+            issues.push({
+                severity: 'warning',
+                message: `Thermostat heating schedule "${heat}" is not defined.`,
+            });
+        }
+        if (cool && !scheduleExists(cool)) {
+            missingScheduleNames.add(cool);
+            issues.push({
+                severity: 'warning',
+                message: `Thermostat cooling schedule "${cool}" is not defined.`,
+            });
+        }
+    });
+
+    // Daylighting outputs: no schedule references to validate currently.
+
+    return {
+        missingSchedules: Array.from(missingScheduleNames),
+        inconsistentLoads,
+    };
+}
+
+/**
  * THERMOSTATS + IDEAL LOADS
- * Configurable control over ZoneHVAC:IdealLoadsAirSystem per zone.
  *
- * idealLoads shape:
- *  {
- *    global: {
- *      availabilitySchedule,
- *      heatingLimitType,
- *      maxHeatingCapacity,
- *      coolingLimitType,
- *      maxCoolingCapacity,
- *      outdoorAirMethod,
- *      outdoorAirFlowPerPerson,
- *      outdoorAirFlowPerArea
- *    },
- *    perZone: [
- *      {
- *        zoneName,
- *        availabilitySchedule,
- *        heatingLimitType,
- *        maxHeatingCapacity,
- *        coolingLimitType,
- *        maxCoolingCapacity,
- *        outdoorAirMethod,
- *        outdoorAirFlowPerPerson,
- *        outdoorAirFlowPerArea
- *      }
- *    ]
- *  }
+ * Full-fidelity mapping for:
+ *  - ZoneControl:Thermostat + ThermostatSetpoint:* (classic modes 0–4)
+ *  - ZoneHVAC:IdealLoadsAirSystem (key documented fields)
  *
- * thermostats shape:
- *  [
- *    {
- *      zoneName or "global",
- *      heatingScheduleName,
- *      coolingScheduleName
- *    }
- *  ]
+ * Backward compatible with legacy:
+ *  - thermostats: [{ zoneName, heatingScheduleName, coolingScheduleName }]
+ *  - idealLoads.global / idealLoads.perZone with limited fields.
  */
 function emitThermostatsAndIdealLoads(
     idf,
     zones,
     scheduleContext,
     idealLoads = {},
-    thermostats = []
+    thermostats = {}
 ) {
     const znList = zones.length ? zones : [{ name: 'Zone_1' }];
     const compact = scheduleContext.compact || {};
 
-    const getSched = (name, fallback) => {
-        if (!name) return fallback;
-        const key = sanitize(name);
-        return compact[key] ? key : fallback;
-    };
-
-    const globalCfg = idealLoads.global || {};
-    const perZoneCfg = Array.isArray(idealLoads.perZone) ? idealLoads.perZone : [];
-
-    // Index thermostats by zone
-    const tstatIndex = new Map();
-    (thermostats || []).forEach((t) => {
-        if (!t) return;
-        const zn = t.zoneName ? sanitize(t.zoneName) : 'GLOBAL';
-        tstatIndex.set(zn, {
-            heating: t.heatingScheduleName,
-            cooling: t.coolingScheduleName,
-        });
-    });
-
-    // Default setpoint schedules: generate simple ones if referenced but missing
-    function ensureSetpointSchedule(name, defaultValue) {
+    const getSched = (name) => {
         if (!name) return null;
         const key = sanitize(name);
-        if (!compact[key] && defaultValue !== undefined) {
-            const lines = ['Through: 12/31', 'For: AllDays', `Until: 24:00, ${defaultValue}`];
-            scheduleContext.compact[key] = { typeLimits: 'Temperature', lines };
-            emitSchedules(idf, scheduleContext);
-        }
-        return key;
+        return compact[key] ? key : null;
+    };
+
+    // Normalize thermostats schema:
+    // - New schema: { setpoints, zoneControls }
+    // - Legacy array: [{ zoneName, heatingScheduleName, coolingScheduleName }]
+    const setpointsMap = new Map();
+    const zoneControls = [];
+
+    if (Array.isArray(thermostats)) {
+        // Legacy: create DualSetpoint controls from heating/cooling schedules
+        thermostats.forEach((t) => {
+            if (!t) return;
+            const zn = t.zoneName ? sanitize(t.zoneName) : 'GLOBAL';
+            const heat = t.heatingScheduleName;
+            const cool = t.coolingScheduleName;
+            if (!heat && !cool) return;
+
+            const spName = `SP_Dual_${zn}`;
+            setpointsMap.set(spName, {
+                type: 'DualSetpoint',
+                heatingSchedule: heat,
+                coolingSchedule: cool,
+            });
+
+            zoneControls.push({
+                zoneName: zn,
+                controlTypeScheduleName: '', // default: always dual setpoint
+                dualSetpointName: spName,
+            });
+        });
+    } else {
+        const sp = thermostats.setpoints || {};
+        Object.keys(sp).forEach((name) => {
+            const def = sp[name];
+            if (!def || !def.type) return;
+            const key = sanitize(name);
+            if (!setpointsMap.has(key)) {
+                setpointsMap.set(key, { ...def, name: key });
+            }
+        });
+
+        (thermostats.zoneControls || []).forEach((c) => {
+            if (!c || !c.zoneName) return;
+            zoneControls.push({
+                zoneName: c.zoneName,
+                controlTypeScheduleName: c.controlTypeScheduleName || '',
+                singleHeatingSetpointName: c.singleHeatingSetpointName,
+                singleCoolingSetpointName: c.singleCoolingSetpointName,
+                singleHeatCoolSetpointName: c.singleHeatCoolSetpointName,
+                dualSetpointName: c.dualSetpointName,
+                cutoutDeltaT: c.cutoutDeltaT,
+            });
+        });
     }
+
+    // Helper: emit ThermostatSetpoint objects from setpointsMap
+    function emitSetpoints() {
+        setpointsMap.forEach((sp, key) => {
+            const type = sp.type;
+            if (type === 'SingleHeating') {
+                const sch = getSched(sp.schedule || sp.heatingSchedule);
+                if (!sch) return;
+                idf.push(`ThermostatSetpoint:SingleHeating,`);
+                idf.push(`  ${key},                 !- Name`);
+                idf.push(`  ${sch};                !- Setpoint Temperature Schedule Name`);
+                idf.push('');
+            } else if (type === 'SingleCooling') {
+                const sch = getSched(sp.schedule || sp.coolingSchedule);
+                if (!sch) return;
+                idf.push(`ThermostatSetpoint:SingleCooling,`);
+                idf.push(`  ${key},                 !- Name`);
+                idf.push(`  ${sch};                !- Setpoint Temperature Schedule Name`);
+                idf.push('');
+            } else if (type === 'SingleHeatingOrCooling') {
+                const sch = getSched(sp.schedule);
+                if (!sch) return;
+                idf.push(`ThermostatSetpoint:SingleHeatingOrCooling,`);
+                idf.push(`  ${key},                 !- Name`);
+                idf.push(`  ${sch};                !- Setpoint Temperature Schedule Name`);
+                idf.push('');
+            } else if (type === 'DualSetpoint') {
+                const hSch = getSched(sp.heatingSchedule);
+                const cSch = getSched(sp.coolingSchedule);
+                idf.push(`ThermostatSetpoint:DualSetpoint,`);
+                idf.push(`  ${key},                 !- Name`);
+                idf.push(`  ${hSch || ''},          !- Heating Setpoint Temperature Schedule Name`);
+                idf.push(`  ${cSch || ''};          !- Cooling Setpoint Temperature Schedule Name`);
+                idf.push('');
+            }
+        });
+    }
+
+    // Emit setpoints before ZoneControl:Thermostat
+    emitSetpoints();
+
+    // Index zone controls by zone (and handle GLOBAL)
+    const zoneCtrlByZone = new Map();
+    zoneControls.forEach((c) => {
+        const zn = c.zoneName ? sanitize(c.zoneName) : 'GLOBAL';
+        zoneCtrlByZone.set(zn, c);
+    });
+
+    // Emit ZoneControl:Thermostat per zone if configured
+    znList.forEach((z, idx) => {
+        const zn = sanitize(z.name || `Zone_${idx + 1}`);
+        const ctrl =
+            zoneCtrlByZone.get(zn) ||
+            zoneCtrlByZone.get('GLOBAL');
+
+        if (!ctrl) return;
+
+        const ctSchedule = getSched(ctrl.controlTypeScheduleName) || '';
+        const pairs = [];
+
+        if (ctrl.singleHeatingSetpointName) {
+            pairs.push({
+                type: 'ThermostatSetpoint:SingleHeating',
+                name: sanitize(ctrl.singleHeatingSetpointName),
+            });
+        }
+        if (ctrl.singleCoolingSetpointName) {
+            pairs.push({
+                type: 'ThermostatSetpoint:SingleCooling',
+                name: sanitize(ctrl.singleCoolingSetpointName),
+            });
+        }
+        if (ctrl.singleHeatCoolSetpointName) {
+            pairs.push({
+                type: 'ThermostatSetpoint:SingleHeatingOrCooling',
+                name: sanitize(ctrl.singleHeatCoolSetpointName),
+            });
+        }
+        if (ctrl.dualSetpointName) {
+            pairs.push({
+                type: 'ThermostatSetpoint:DualSetpoint',
+                name: sanitize(ctrl.dualSetpointName),
+            });
+        }
+
+        // Fallback for legacy: if no pairs but we have a dual setpoint setpoint
+        if (!pairs.length && ctrl.dualSetpointName) {
+            pairs.push({
+                type: 'ThermostatSetpoint:DualSetpoint',
+                name: sanitize(ctrl.dualSetpointName),
+            });
+        }
+
+        if (!pairs.length) return;
+
+        idf.push(`ZoneControl:Thermostat,`);
+        idf.push(`  Tstat_${zn},              !- Name`);
+        idf.push(`  ${zn},                    !- Zone or ZoneList Name`);
+        idf.push(`  ${ctSchedule},            !- Control Type Schedule Name`);
+
+        pairs.forEach((p, i) => {
+            const suffix = i === pairs.length - 1 ? ';' : ',';
+            idf.push(
+                `  ${p.type},           !- Control ${i + 1} Object Type${i ? '' : ''}`
+            );
+            idf.push(
+                `  ${p.name}${suffix}           !- Control ${i + 1} Name`
+            );
+        });
+
+        idf.push('');
+        // Note: cutoutDeltaT exposed in UI can be supported via
+        //  ZoneControl:Thermostat:TemperatureAndHumidity or EMS; omitted here intentionally.
+    });
+
+    // IdealLoads: merge global/per-zone configuration and emit ZoneHVAC:IdealLoadsAirSystem
+    const globalCfg = idealLoads.global || {};
+    const perZoneCfg = Array.isArray(idealLoads.perZone) ? idealLoads.perZone : [];
 
     znList.forEach((z, idx) => {
         const zn = sanitize(z.name || `Zone_${idx + 1}`);
 
-        // Resolve thermostat schedules (zone-specific or global)
-        const zTstat = tstatIndex.get(zn) || tstatIndex.get('GLOBAL') || {};
-        const heatSP = zTstat.heating;
-        const coolSP = zTstat.cooling;
-
-        const heatSPKey = heatSP ? getSched(heatSP, null) : null;
-        const coolSPKey = coolSP ? getSched(coolSP, null) : null;
-
-        if (heatSP && !heatSPKey) ensureSetpointSchedule(heatSP, 21);
-        if (coolSP && !coolSPKey) ensureSetpointSchedule(coolSP, 24);
-
-        const finalHeatSP = heatSP ? sanitize(heatSP) : null;
-        const finalCoolSP = coolSP ? sanitize(coolSP) : null;
-
-        // Emit ThermostatSetpoint:DualSetpoint if any setpoints defined
-        if (finalHeatSP || finalCoolSP) {
-            const tName = `TstatSet_${zn}`;
-            idf.push(`ThermostatSetpoint:DualSetpoint,`);
-            idf.push(`  ${tName},                 !- Name`);
-            idf.push(
-                `  ${finalHeatSP || ''},     !- Heating Setpoint Temperature Schedule Name`
-            );
-            idf.push(
-                `  ${finalCoolSP || ''};     !- Cooling Setpoint Temperature Schedule Name`
-            );
-            idf.push('');
-
-            idf.push(`ZoneControl:Thermostat,`);
-            idf.push(`  Tstat_${zn},              !- Name`);
-            idf.push(`  ${zn},                    !- Zone or ZoneList Name`);
-            idf.push(`  ,                         !- Control Type Schedule Name`);
-            idf.push(
-                `  ThermostatSetpoint:DualSetpoint, !- Control 1 Object Type`
-            );
-            idf.push(`  ${tName};                 !- Control 1 Name`);
-            idf.push('');
-        }
-
-        // Resolve IdealLoads configuration
-        const zCfg =
+        const zCfgRaw =
             perZoneCfg.find(
                 (c) => c.zoneName && sanitize(c.zoneName) === zn
             ) || {};
 
-        const availSchedName = getSched(
-            zCfg.availabilitySchedule ||
-                globalCfg.availabilitySchedule ||
-                'RM_AlwaysOn',
-            'RM_AlwaysOn'
-        );
+        const cfg = { ...globalCfg, ...zCfgRaw };
 
-        const heatLimitType =
-            zCfg.heatingLimitType || globalCfg.heatingLimitType || 'NoLimit';
-        const coolLimitType =
-            zCfg.coolingLimitType || globalCfg.coolingLimitType || 'NoLimit';
+        const avail = getSched(
+            cfg.availabilitySchedule || 'RM_AlwaysOn'
+        ) || 'RM_AlwaysOn';
 
-        const maxHeatCap =
-            zCfg.maxHeatingCapacity ?? globalCfg.maxHeatingCapacity ?? '';
-        const maxCoolCap =
-            zCfg.maxCoolingCapacity ?? globalCfg.maxCoolingCapacity ?? '';
+        const heatLimit =
+            cfg.heatingLimitType || 'NoLimit';
+        const coolLimit =
+            cfg.coolingLimitType || 'NoLimit';
 
-        const oaMethod =
-            zCfg.outdoorAirMethod || globalCfg.outdoorAirMethod || 'None';
-        const oaPerPerson =
-            zCfg.outdoorAirFlowPerPerson ??
-            globalCfg.outdoorAirFlowPerPerson ??
-            '';
-        const oaPerArea =
-            zCfg.outdoorAirFlowPerArea ??
-            globalCfg.outdoorAirFlowPerArea ??
-            '';
+        const maxHeatFlow = cfg.maxHeatingAirFlowRate;
+        const maxCoolFlow = cfg.maxCoolingAirFlowRate;
+        const maxHeatCap = cfg.maxSensibleHeatingCapacity ?? cfg.maxHeatingCapacity;
+        const maxCoolCap = cfg.maxTotalCoolingCapacity ?? cfg.maxCoolingCapacity;
+
+        const heatAvail = getSched(cfg.heatingAvailabilitySchedule) || '';
+        const coolAvail = getSched(cfg.coolingAvailabilitySchedule) || '';
+
+        const dehumType = cfg.dehumidificationControlType || '';
+        const coolSHR =
+            typeof cfg.coolingSensibleHeatRatio === 'number'
+                ? cfg.coolingSensibleHeatRatio
+                : '';
+
+        const humType = cfg.humidificationControlType || '';
+
+        const dcvType = cfg.demandControlledVentilationType || 'None';
+        const econType = cfg.outdoorAirEconomizerType || 'NoEconomizer';
+
+        const hrType = cfg.heatRecoveryType || 'None';
+        const hrSensEff = cfg.sensibleHeatRecoveryEffectiveness;
+        const hrLatEff = cfg.latentHeatRecoveryEffectiveness;
+
+        // Supply T/RH
+        const maxHeatSupT = cfg.maxHeatingSupplyAirTemp;
+        const minCoolSupT = cfg.minCoolingSupplyAirTemp;
+        const maxHeatSupW = cfg.maxHeatingSupplyAirHumRat;
+        const minCoolSupW = cfg.minCoolingSupplyAirHumRat;
+
+        // OA method/flows: support legacy + new
+        const oaMethod = cfg.outdoorAirMethod || 'None';
+        const oaPP = cfg.outdoorAirFlowPerPerson;
+        const oaPA = cfg.outdoorAirFlowPerArea;
 
         idf.push(`ZoneHVAC:IdealLoadsAirSystem,`);
         idf.push(`  IdealLoads_${zn},          !- Name`);
-        idf.push(`  ${availSchedName},         !- Availability Schedule Name`);
+        idf.push(`  ${avail},                  !- Availability Schedule Name`);
         idf.push(
-            `  ,                          !- Heating Supply Air Temperature Schedule Name`
+            `  ,                           !- Zone Supply Air Node Name (auto-wired downstream)`
         );
         idf.push(
-            `  ,                          !- Cooling Supply Air Temperature Schedule Name`
-        );
-        idf.push(`  ${heatLimitType},          !- Heating Limit`);
-        idf.push(
-            `  ,                          !- Maximum Heating Air Flow Rate {m3/s}`
+            `  ,                           !- Zone Exhaust Air Node Name (auto-wired downstream)`
         );
         idf.push(
-            `  ${maxHeatCap || ''},       !- Maximum Sensible Heating Capacity {W}`
-        );
-        idf.push(`  ${coolLimitType},          !- Cooling Limit`);
-        idf.push(
-            `  ,                          !- Maximum Cooling Air Flow Rate {m3/s}`
+            `  ,                           !- System Inlet Air Node Name (auto/optional)`
         );
         idf.push(
-            `  ${maxCoolCap || ''},       !- Maximum Total Cooling Capacity {W}`
+            `  ${maxHeatSupT != null ? maxHeatSupT : 50}, !- Maximum Heating Supply Air Temperature {C}`
         );
         idf.push(
-            `  ,                          !- Heating Availability Schedule Name`
+            `  ${minCoolSupT != null ? minCoolSupT : 13}, !- Minimum Cooling Supply Air Temperature {C}`
         );
         idf.push(
-            `  ,                          !- Cooling Availability Schedule Name`
+            `  ${maxHeatSupW != null ? maxHeatSupW : 0.0156}, !- Maximum Heating Supply Air Humidity Ratio {kgWater/kgDryAir}`
         );
         idf.push(
-            `  ,                          !- Dehumidification Control Type`
+            `  ${minCoolSupW != null ? minCoolSupW : 0.0077}, !- Minimum Cooling Supply Air Humidity Ratio {kgWater/kgDryAir}`
+        );
+        idf.push(`  ${heatLimit},              !- Heating Limit`);
+        idf.push(
+            `  ${maxHeatFlow != null ? maxHeatFlow : ''}, !- Maximum Heating Air Flow Rate {m3/s}`
         );
         idf.push(
-            `  ,                          !- Cooling Sensible Heat Ratio {dimensionless}`
+            `  ${maxHeatCap != null ? maxHeatCap : ''}, !- Maximum Sensible Heating Capacity {W}`
+        );
+        idf.push(`  ${coolLimit},              !- Cooling Limit`);
+        idf.push(
+            `  ${maxCoolFlow != null ? maxCoolFlow : ''}, !- Maximum Cooling Air Flow Rate {m3/s}`
         );
         idf.push(
-            `  ,                          !- Dehumidification Setpoint {percent}`
+            `  ${maxCoolCap != null ? maxCoolCap : ''}, !- Maximum Total Cooling Capacity {W}`
         );
         idf.push(
-            `  ,                          !- Humidification Control Type`
+            `  ${heatAvail || ''},          !- Heating Availability Schedule Name`
         );
         idf.push(
-            `  ,                          !- Humidification Setpoint {percent}`
+            `  ${coolAvail || ''},          !- Cooling Availability Schedule Name`
         );
         idf.push(
-            `  ,                          !- Outdoor Air Economizer Type`
-        );
-        idf.push(`  ,                          !- Heat Recovery Type`);
-        idf.push(
-            `  ,                          !- Sensible Heat Recovery Effectiveness`
+            `  ${dehumType || 'None'},      !- Dehumidification Control Type`
         );
         idf.push(
-            `  ,                          !- Latent Heat Recovery Effectiveness`
+            `  ${coolSHR !== '' ? coolSHR : ''}, !- Cooling Sensible Heat Ratio {dimensionless}`
+        );
+        idf.push(
+            `  ,                           !- Dehumidification Setpoint (unused; use humidistat objects)`
+        );
+        idf.push(
+            `  ${humType || 'None'},        !- Humidification Control Type`
+        );
+        idf.push(
+            `  ,                           !- Humidification Setpoint (unused; use humidistat objects)`
+        );
+        idf.push(
+            `  ${econType},                 !- Outdoor Air Economizer Type`
+        );
+        idf.push(
+            `  ${hrType},                   !- Heat Recovery Type`
+        );
+        idf.push(
+            `  ${hrSensEff != null ? hrSensEff : ''}, !- Sensible Heat Recovery Effectiveness`
+        );
+        idf.push(
+            `  ${hrLatEff != null ? hrLatEff : ''}, !- Latent Heat Recovery Effectiveness`
         );
 
+        // DesignSpecification:OutdoorAir, DCV, etc. are advanced; allow explicit binding via config
+        const dsOa = cfg.designSpecOutdoorAirObjectName || '';
+        const dcv = dcvType || 'None';
+
+        // Following 4 OA fields map to:
+        //  - Design Specification Outdoor Air Object Name
+        //  - Outdoor Air Inlet Node Name
+        //  - Demand Controlled Ventilation Type
+        //  - Outdoor Air Economizer Type (already emitted)
+        idf.push(
+            `  ${dsOa},                     !- Design Specification Outdoor Air Object Name`
+        );
+        idf.push(
+            `  ,                           !- Outdoor Air Inlet Node Name (auto if blank)`
+        );
+        idf.push(
+            `  ${dcv},                      !- Demand Controlled Ventilation Type`
+        );
+
+        // Heat recovery fields already emitted; remaining OA flow parameters:
         if (oaMethod !== 'None') {
             idf.push(
                 `  ${oaMethod},              !- Outdoor Air Method`
             );
             idf.push(
-                `  ${oaPerPerson || ''},     !- Outdoor Air Flow per Person {m3/s-person}`
+                `  ${oaPP != null ? oaPP : ''}, !- Outdoor Air Flow per Person {m3/s-person}`
             );
             idf.push(
-                `  ${oaPerArea || ''},       !- Outdoor Air Flow per Zone Floor Area {m3/s-m2}`
+                `  ${oaPA != null ? oaPA : ''}, !- Outdoor Air Flow per Zone Floor Area {m3/s-m2}`
             );
             idf.push(
-                `  ,                          !- Outdoor Air Flow per Zone {m3/s}`
+                `  ,                           !- Outdoor Air Flow per Zone {m3/s}`
             );
             idf.push(
-                `  ;                          !- Outdoor Air Flow Air Changes per Hour {1/hr}`
+                `  ;                           !- Outdoor Air Flow Air Changes per Hour {1/hr}`
             );
         } else {
+            idf.push(`  None,                    !- Outdoor Air Method`);
             idf.push(
-                `  None,                     !- Outdoor Air Method`
+                `  ,                           !- Outdoor Air Flow per Person {m3/s-person}`
             );
             idf.push(
-                `  ,                          !- Outdoor Air Flow per Person {m3/s-person}`
+                `  ,                           !- Outdoor Air Flow per Zone Floor Area {m3/s-m2}`
             );
             idf.push(
-                `  ,                          !- Outdoor Air Flow per Zone Floor Area {m3/s-m2}`
+                `  ,                           !- Outdoor Air Flow per Zone {m3/s}`
             );
             idf.push(
-                `  ,                          !- Outdoor Air Flow per Zone {m3/s}`
-            );
-            idf.push(
-                `  ;                          !- Outdoor Air Flow Air Changes per Hour {1/hr}`
+                `  ;                           !- Outdoor Air Flow Air Changes per Hour {1/hr}`
             );
         }
+
         idf.push('');
     });
 }
 
 /**
  * MATERIALS
- * Build a combined material library from user-provided materials plus a minimal built-in set.
  */
 function buildMaterialLibrary(userMaterials = [], epDefaults) {
     const lib = new Map();
 
-    // 2.1) Start from defaults/energyplusDefaults.json (requested MATERIAL, AIRGAP, WINDOWMATERIAL*)
     if (epDefaults && epDefaults.materials) {
         const m = epDefaults.materials;
 
@@ -740,8 +1300,7 @@ function buildMaterialLibrary(userMaterials = [], epDefaults) {
         });
     }
 
-    // 2.2) User-provided materials extend/override defaults
-    [...userMaterials].forEach((m) => {
+    (userMaterials || []).forEach((m) => {
         if (!m || !m.name) return;
         const key = sanitize(m.name);
         if (!lib.has(key)) {
@@ -758,89 +1317,29 @@ function emitMaterials(idf, lib) {
             idf.push(`WindowMaterial:SimpleGlazingSystem,`);
             idf.push(`  ${m.name},               !- Name`);
             idf.push(`  ${m.uFactor ?? 2.7},    !- U-Factor {W/m2-K}`);
-            idf.push(
-                `  ${
-                    m.solarHeatGainCoeff ?? 0.65
-                }, !- Solar Heat Gain Coefficient`
-            );
-            idf.push(
-                `  ${
-                    m.visibleTransmittance ?? 0.78
-                }; !- Visible Transmittance`
-            );
+            idf.push(`  ${m.solarHeatGainCoeff ?? 0.65}, !- Solar Heat Gain Coefficient`);
+            idf.push(`  ${m.visibleTransmittance ?? 0.78}; !- Visible Transmittance`);
             idf.push('');
         } else if (m.type === 'Material:NoMass') {
             idf.push(`Material:NoMass,`);
             idf.push(`  ${m.name},               !- Name`);
-            idf.push(
-                `  ${
-                    m.roughness || 'Rough'
-                }, !- Roughness`
-            );
-            idf.push(
-                `  ${
-                    m.thermalResistance ?? 1.0
-                }, !- Thermal Resistance {m2-K/W}`
-            );
-            idf.push(
-                `  ${
-                    m.solarAbsorptance ?? 0.6
-                }, !- Solar Absorptance`
-            );
-            idf.push(
-                `  ${
-                    m.thermalAbsorptance ?? 0.9
-                }, !- Thermal Absorptance`
-            );
-            idf.push(
-                `  ${
-                    m.visibleAbsorptance ?? 0.6
-                }; !- Visible Absorptance`
-            );
+            idf.push(`  ${m.roughness || 'Rough'}, !- Roughness`);
+            idf.push(`  ${m.thermalResistance ?? 1.0}, !- Thermal Resistance {m2-K/W}`);
+            idf.push(`  ${m.solarAbsorptance ?? 0.6}, !- Solar Absorptance`);
+            idf.push(`  ${m.thermalAbsorptance ?? 0.9}, !- Thermal Absorptance`);
+            idf.push(`  ${m.visibleAbsorptance ?? 0.6}; !- Visible Absorptance`);
             idf.push('');
         } else {
             idf.push(`Material,`);
             idf.push(`  ${m.name},               !- Name`);
-            idf.push(
-                `  ${
-                    m.roughness || 'MediumRough'
-                }, !- Roughness`
-            );
-            idf.push(
-                `  ${
-                    m.thickness ?? 0.1
-                },  !- Thickness {m}`
-            );
-            idf.push(
-                `  ${
-                    m.conductivity ?? 0.5
-                }, !- Conductivity {W/m-K}`
-            );
-            idf.push(
-                `  ${
-                    m.density ?? 800
-                },    !- Density {kg/m3}`
-            );
-            idf.push(
-                `  ${
-                    m.specificHeat ?? 1000
-                }, !- Specific Heat {J/kg-K}`
-            );
-            idf.push(
-                `  ${
-                    m.solarAbsorptance ?? 0.6
-                }, !- Solar Absorptance`
-            );
-            idf.push(
-                `  ${
-                    m.thermalAbsorptance ?? 0.9
-                }, !- Thermal Absorptance`
-            );
-            idf.push(
-                `  ${
-                    m.visibleAbsorptance ?? 0.6
-                }; !- Visible Absorptance`
-            );
+            idf.push(`  ${m.roughness || 'MediumRough'}, !- Roughness`);
+            idf.push(`  ${m.thickness ?? 0.1},  !- Thickness {m}`);
+            idf.push(`  ${m.conductivity ?? 0.5}, !- Conductivity {W/m-K}`);
+            idf.push(`  ${m.density ?? 800},    !- Density {kg/m3}`);
+            idf.push(`  ${m.specificHeat ?? 1000}, !- Specific Heat {J/kg-K}`);
+            idf.push(`  ${m.solarAbsorptance ?? 0.6}, !- Solar Absorptance`);
+            idf.push(`  ${m.thermalAbsorptance ?? 0.9}, !- Thermal Absorptance`);
+            idf.push(`  ${m.visibleAbsorptance ?? 0.6}; !- Visible Absorptance`);
             idf.push('');
         }
     }
@@ -848,12 +1347,10 @@ function emitMaterials(idf, lib) {
 
 /**
  * CONSTRUCTIONS
- * Build a set of constructions referencing the material library.
  */
 function buildConstructionLibrary(userConstructions = [], materialLibrary) {
     const lib = new Map();
 
-    // 3.1) Defaults from energyplusDefaults (requested CONSTRUCTION objects)
     const builtin = [];
     if (energyplusDefaults && typeof energyplusDefaults.getConstructionDefaults === 'function') {
         const defaultsCons = energyplusDefaults.getConstructionDefaults();
@@ -866,9 +1363,8 @@ function buildConstructionLibrary(userConstructions = [], materialLibrary) {
         });
     }
 
-    [...builtin, ...userConstructions].forEach((c) => {
-        if (!c || !c.name || !Array.isArray(c.layers) || c.layers.length === 0)
-            return;
+    [...builtin, ...(userConstructions || [])].forEach((c) => {
+        if (!c || !c.name || !Array.isArray(c.layers) || !c.layers.length) return;
         const key = sanitize(c.name);
         if (!lib.has(key)) {
             const validLayers = c.layers
@@ -889,9 +1385,7 @@ function emitConstructions(idf, lib) {
         idf.push(`  ${c.name},                 !- Name`);
         c.layers.forEach((layer, idx) => {
             const suffix = idx === c.layers.length - 1 ? ';' : ',';
-            idf.push(
-                `  ${layer}${suffix}              !- Layer ${idx + 1}`
-            );
+            idf.push(`  ${layer}${suffix}              !- Layer ${idx + 1}`);
         });
         idf.push('');
     }
@@ -899,7 +1393,6 @@ function emitConstructions(idf, lib) {
 
 /**
  * SCHEDULES
- * Support built-in schedules and user-defined Schedule:Compact.
  */
 function buildSchedules(userSchedules = {}) {
     const builtinCompact = {
@@ -955,8 +1448,7 @@ function buildSchedules(userSchedules = {}) {
     if (userSchedules && typeof userSchedules === 'object') {
         if (Array.isArray(userSchedules.compact)) {
             userSchedules.compact.forEach((s) => {
-                if (!s || !s.name || !Array.isArray(s.lines) || !s.lines.length)
-                    return;
+                if (!s || !s.name || !Array.isArray(s.lines) || !s.lines.length) return;
                 const key = sanitize(s.name);
                 schedules.compact[key] = {
                     typeLimits: s.typeLimits || 'Fraction',
@@ -992,11 +1484,7 @@ function emitSchedules(idf, scheduleContext) {
         const s = compact[name];
         idf.push(`Schedule:Compact,`);
         idf.push(`  ${name},                  !- Name`);
-        idf.push(
-            `  ${
-                s.typeLimits || 'Fraction'
-            }, !- Schedule Type Limits Name`
-        );
+        idf.push(`  ${s.typeLimits || 'Fraction'}, !- Schedule Type Limits Name`);
         s.lines.forEach((line, idx) => {
             const suffix = idx === s.lines.length - 1 ? ';' : ',';
             idf.push(`  ${line}${suffix}`);
@@ -1007,7 +1495,6 @@ function emitSchedules(idf, scheduleContext) {
 
 /**
  * LOADS
- * Emit zone-level internal gains based on zoneLoads.
  */
 function emitZoneLoads(idf, zones, loads = [], scheduleContext) {
     const znIndex = new Map();
@@ -1037,40 +1524,16 @@ function emitZoneLoads(idf, zones, loads = [], scheduleContext) {
                 AlwaysOn
             );
             idf.push(`People,`);
-            idf.push(
-                `  People_${zn}_${i},       !- Name`
-            );
-            idf.push(
-                `  ${zn},                   !- Zone or ZoneList Name`
-            );
-            idf.push(
-                `  ${sch},                  !- Number of People Schedule Name`
-            );
-            idf.push(
-                `  People/Area,             !- Number of People Calculation Method`
-            );
-            idf.push(
-                `  ,                        !- Number of People`
-            );
-            idf.push(
-                `  ${
-                    l.people.peoplePerArea
-                }, !- People per Zone Floor Area {person/m2}`
-            );
-            idf.push(
-                `  ,                        !- People per Person`
-            );
-            idf.push(
-                `  0.3,                     !- Fraction Radiant`
-            );
-            idf.push(
-                `  0.5,                     !- Sensible Heat Fraction`
-            );
-            idf.push(
-                `  ${
-                    l.people.activityLevel || 120
-                }; !- Activity Level {W/person}`
-            );
+            idf.push(`  People_${zn}_${i},       !- Name`);
+            idf.push(`  ${zn},                   !- Zone or ZoneList Name`);
+            idf.push(`  ${sch},                  !- Number of People Schedule Name`);
+            idf.push(`  People/Area,             !- Number of People Calculation Method`);
+            idf.push(`  ,                        !- Number of People`);
+            idf.push(`  ${l.people.peoplePerArea}, !- People per Zone Floor Area {person/m2}`);
+            idf.push(`  ,                        !- People per Person`);
+            idf.push(`  0.3,                     !- Fraction Radiant`);
+            idf.push(`  0.5,                     !- Sensible Heat Fraction`);
+            idf.push(`  ${l.people.activityLevel || 120}; !- Activity Level {W/person}`);
             idf.push('');
         }
 
@@ -1081,44 +1544,18 @@ function emitZoneLoads(idf, zones, loads = [], scheduleContext) {
                 AlwaysOn
             );
             idf.push(`Lights,`);
-            idf.push(
-                `  Lights_${zn}_${i},       !- Name`
-            );
-            idf.push(
-                `  ${zn},                   !- Zone or ZoneList Name`
-            );
-            idf.push(
-                `  ${sch},                  !- Schedule Name`
-            );
-            idf.push(
-                `  Watts/Area,              !- Design Level Calculation Method`
-            );
-            idf.push(
-                `  ,                        !- Lighting Level {W}`
-            );
-            idf.push(
-                `  ${
-                    l.lighting.wattsPerArea
-                }, !- Watts per Zone Floor Area {W/m2}`
-            );
-            idf.push(
-                `  ,                        !- Watts per Person {W/person}`
-            );
-            idf.push(
-                `  0.0,                     !- Return Air Fraction`
-            );
-            idf.push(
-                `  0.6,                     !- Fraction Radiant`
-            );
-            idf.push(
-                `  0.2,                     !- Fraction Visible`
-            );
-            idf.push(
-                `  0.0,                     !- Fraction Replaceable`
-            );
-            idf.push(
-                `  General;                 !- End-Use Subcategory`
-            );
+            idf.push(`  Lights_${zn}_${i},       !- Name`);
+            idf.push(`  ${zn},                   !- Zone or ZoneList Name`);
+            idf.push(`  ${sch},                  !- Schedule Name`);
+            idf.push(`  Watts/Area,              !- Design Level Calculation Method`);
+            idf.push(`  ,                        !- Lighting Level {W}`);
+            idf.push(`  ${l.lighting.wattsPerArea}, !- Watts per Zone Floor Area {W/m2}`);
+            idf.push(`  ,                        !- Watts per Person {W/person}`);
+            idf.push(`  0.0,                     !- Return Air Fraction`);
+            idf.push(`  0.6,                     !- Fraction Radiant`);
+            idf.push(`  0.2,                     !- Fraction Visible`);
+            idf.push(`  0.0,                     !- Fraction Replaceable`);
+            idf.push(`  General;                 !- End-Use Subcategory`);
             idf.push('');
         }
 
@@ -1129,92 +1566,39 @@ function emitZoneLoads(idf, zones, loads = [], scheduleContext) {
                 AlwaysOn
             );
             idf.push(`ElectricEquipment,`);
-            idf.push(
-                `  Equip_${zn}_${i},        !- Name`
-            );
-            idf.push(
-                `  ${zn},                   !- Zone or ZoneList Name`
-            );
-            idf.push(
-                `  ${sch},                  !- Schedule Name`
-            );
-            idf.push(
-                `  Watts/Area,              !- Design Level Calculation Method`
-            );
-            idf.push(
-                `  ,                        !- Design Level {W}`
-            );
-            idf.push(
-                `  ${
-                    l.equipment.wattsPerArea
-                }, !- Watts per Zone Floor Area {W/m2}`
-            );
-            idf.push(
-                `  ,                        !- Watts per Person {W/person}`
-            );
-            idf.push(
-                `  0.0,                     !- Fraction Latent`
-            );
-            idf.push(
-                `  0.3,                     !- Fraction Radiant`
-            );
-            idf.push(
-                `  0.7;                     !- Fraction Lost`
-            );
+            idf.push(`  Equip_${zn}_${i},        !- Name`);
+            idf.push(`  ${zn},                   !- Zone or ZoneList Name`);
+            idf.push(`  ${sch},                  !- Schedule Name`);
+            idf.push(`  Watts/Area,              !- Design Level Calculation Method`);
+            idf.push(`  ,                        !- Design Level {W}`);
+            idf.push(`  ${l.equipment.wattsPerArea}, !- Watts per Zone Floor Area {W/m2}`);
+            idf.push(`  ,                        !- Watts per Person {W/person}`);
+            idf.push(`  0.0,                     !- Fraction Latent`);
+            idf.push(`  0.3,                     !- Fraction Radiant`);
+            idf.push(`  0.7;                     !- Fraction Lost`);
             idf.push('');
         }
 
         // Infiltration
-        if (
-            l.infiltration &&
-            (l.infiltration.ach || l.infiltration.flowPerArea)
-        ) {
+        if (l.infiltration && (l.infiltration.ach || l.infiltration.flowPerArea)) {
             const sch = ensureSchedule(
                 l.infiltration.schedule || AlwaysOn,
                 AlwaysOn
             );
-            idf.push(
-                `ZoneInfiltration:DesignFlowRate,`
-            );
-            idf.push(
-                `  Infil_${zn}_${i},        !- Name`
-            );
-            idf.push(
-                `  ${zn},                   !- Zone or ZoneList Name`
-            );
-            idf.push(
-                `  ${sch},                  !- Schedule Name`
-            );
+            idf.push(`ZoneInfiltration:DesignFlowRate,`);
+            idf.push(`  Infil_${zn}_${i},        !- Name`);
+            idf.push(`  ${zn},                   !- Zone or ZoneList Name`);
+            idf.push(`  ${sch},                  !- Schedule Name`);
             if (l.infiltration.ach) {
-                idf.push(
-                    `  ,                        !- Design Flow Rate {m3/s}`
-                );
-                idf.push(
-                    `  ,                        !- Flow per Zone Floor Area {m3/s-m2}`
-                );
-                idf.push(
-                    `  ,                        !- Flow per Exterior Surface Area {m3/s-m2}`
-                );
-                idf.push(
-                    `  ${
-                        l.infiltration.ach
-                    };   !- Air Changes per Hour {1/hr}`
-                );
+                idf.push(`  ,                        !- Design Flow Rate {m3/s}`);
+                idf.push(`  ,                        !- Flow per Zone Floor Area {m3/s-m2}`);
+                idf.push(`  ,                        !- Flow per Exterior Surface Area {m3/s-m2}`);
+                idf.push(`  ${l.infiltration.ach};   !- Air Changes per Hour {1/hr}`);
             } else {
-                idf.push(
-                    `  ,                        !- Design Flow Rate {m3/s}`
-                );
-                idf.push(
-                    `  ${
-                        l.infiltration.flowPerArea
-                    }, !- Flow per Zone Floor Area {m3/s-m2}`
-                );
-                idf.push(
-                    `  ,                        !- Flow per Exterior Surface Area {m3/s-m2}`
-                );
-                idf.push(
-                    `  ;                        !- Air Changes per Hour {1/hr}`
-                );
+                idf.push(`  ,                        !- Design Flow Rate {m3/s}`);
+                idf.push(`  ${l.infiltration.flowPerArea}, !- Flow per Zone Floor Area {m3/s-m2}`);
+                idf.push(`  ,                        !- Flow per Exterior Surface Area {m3/s-m2}`);
+                idf.push(`  ;                        !- Air Changes per Hour {1/hr}`);
             }
             idf.push('');
         }
@@ -1223,7 +1607,6 @@ function emitZoneLoads(idf, zones, loads = [], scheduleContext) {
 
 /**
  * DAYLIGHTING & OUTPUTS
- * Emit Daylighting:Controls, Output:IlluminanceMap, Output:Variable from daylighting config.
  */
 function emitDaylighting(idf, zones, daylighting = {}) {
     if (!daylighting) return;
@@ -1267,68 +1650,28 @@ function emitDaylighting(idf, zones, daylighting = {}) {
         const rp2 = refPoints[1];
 
         idf.push(`Daylighting:Controls,`);
-        idf.push(
-            `  DL_${zn}_${idx + 1},       !- Name`
-        );
-        idf.push(
-            `  ${zn},                    !- Zone Name`
-        );
-        idf.push(
-            `  ${ctrlType},              !- Daylighting System Control Type`
-        );
-        idf.push(
-            `  ,                         !- Availability Schedule Name`
-        );
-        idf.push(
-            `  ${frac},                  !- Lighting Control Throttling Range`
-        );
-        idf.push(
-            `  ${frac},                  !- Lighting Control Type Fraction`
-        );
-        idf.push(
-            `  0.2,                      !- Minimum Input Power Fraction for Continuous Dimming Control`
-        );
-        idf.push(
-            `  0.2,                      !- Minimum Light Output Fraction for Continuous Dimming Control`
-        );
-        idf.push(
-            `  1,                        !- Number of Daylighting Reference Points`
-        );
-
-        // Reference point 1
-        idf.push(
-            `  ${rp1.x},                 !- X-Coordinate of First Reference Point {m}`
-        );
-        idf.push(
-            `  ${rp1.y},                 !- Y-Coordinate of First Reference Point {m}`
-        );
-        idf.push(
-            `  ${rp1.z},                 !- Z-Coordinate of First Reference Point {m}`
-        );
-        idf.push(
-            `  ${c.setpoint},            !- Illuminance Setpoint at First Reference Point {lux}`
-        );
+        idf.push(`  DL_${zn}_${idx + 1},       !- Name`);
+        idf.push(`  ${zn},                    !- Zone Name`);
+        idf.push(`  ${ctrlType},              !- Daylighting System Control Type`);
+        idf.push(`  ,                         !- Availability Schedule Name`);
+        idf.push(`  ${frac},                  !- Lighting Control Throttling Range`);
+        idf.push(`  ${frac},                  !- Lighting Control Type Fraction`);
+        idf.push(`  0.2,                      !- Minimum Input Power Fraction for Continuous Dimming Control`);
+        idf.push(`  0.2,                      !- Minimum Light Output Fraction for Continuous Dimming Control`);
+        idf.push(`  1,                        !- Number of Daylighting Reference Points`);
+        idf.push(`  ${rp1.x},                 !- X-Coordinate of First Reference Point {m}`);
+        idf.push(`  ${rp1.y},                 !- Y-Coordinate of First Reference Point {m}`);
+        idf.push(`  ${rp1.z},                 !- Z-Coordinate of First Reference Point {m}`);
+        idf.push(`  ${c.setpoint},            !- Illuminance Setpoint at First Reference Point {lux}`);
 
         if (rp2) {
-            idf.push(
-                `  2,                      !- Number of Daylighting Reference Points`
-            );
-            idf.push(
-                `  ${rp2.x},               !- X-Coordinate of Second Reference Point {m}`
-            );
-            idf.push(
-                `  ${rp2.y},               !- Y-Coordinate of Second Reference Point {m}`
-            );
-            idf.push(
-                `  ${rp2.z},               !- Z-Coordinate of Second Reference Point {m}`
-            );
-            idf.push(
-                `  ${c.setpoint};          !- Illuminance Setpoint at Second Reference Point {lux}`
-            );
+            idf.push(`  2,                      !- Number of Daylighting Reference Points`);
+            idf.push(`  ${rp2.x},               !- X-Coordinate of Second Reference Point {m}`);
+            idf.push(`  ${rp2.y},               !- Y-Coordinate of Second Reference Point {m}`);
+            idf.push(`  ${rp2.z},               !- Z-Coordinate of Second Reference Point {m}`);
+            idf.push(`  ${c.setpoint};          !- Illuminance Setpoint at Second Reference Point {lux}`);
         } else {
-            idf.push(
-                `  ;                       !- (no second reference point)`
-            );
+            idf.push(`  ;                       !- (no second reference point)`);
         }
 
         idf.push('');
@@ -1339,7 +1682,7 @@ function emitDaylighting(idf, zones, daylighting = {}) {
     const maps = Array.isArray(outputs.illuminanceMaps)
         ? outputs.illuminanceMaps
         : [];
-    maps.forEach((m, idx) => {
+    maps.forEach((m) => {
         if (
             !m ||
             !m.name ||
@@ -1359,33 +1702,15 @@ function emitDaylighting(idf, zones, daylighting = {}) {
         if (!znIndex.has(zn)) return;
 
         idf.push(`Output:IlluminanceMap,`);
-        idf.push(
-            `  ${sanitize(m.name)},       !- Name`
-        );
-        idf.push(
-            `  ${zn},                    !- Zone Name`
-        );
-        idf.push(
-            `  ${m.xOrigin},             !- X-Origin {m}`
-        );
-        idf.push(
-            `  ${m.yOrigin},             !- Y-Origin {m}`
-        );
-        idf.push(
-            `  ${m.zHeight},             !- Z-Height {m}`
-        );
-        idf.push(
-            `  ${m.xNumPoints},          !- Number of X-Direction Grid Points`
-        );
-        idf.push(
-            `  ${m.xSpacing},            !- X-Direction Grid Spacing {m}`
-        );
-        idf.push(
-            `  ${m.yNumPoints},          !- Number of Y-Direction Grid Points`
-        );
-        idf.push(
-            `  ${m.ySpacing};            !- Y-Direction Grid Spacing {m}`
-        );
+        idf.push(`  ${sanitize(m.name)},       !- Name`);
+        idf.push(`  ${zn},                    !- Zone Name`);
+        idf.push(`  ${m.xOrigin},             !- X-Origin {m}`);
+        idf.push(`  ${m.yOrigin},             !- Y-Origin {m}`);
+        idf.push(`  ${m.zHeight},             !- Z-Height {m}`);
+        idf.push(`  ${m.xNumPoints},          !- Number of X-Direction Grid Points`);
+        idf.push(`  ${m.xSpacing},            !- X-Direction Grid Spacing {m}`);
+        idf.push(`  ${m.yNumPoints},          !- Number of Y-Direction Grid Points`);
+        idf.push(`  ${m.ySpacing};            !- Y-Direction Grid Spacing {m}`);
         idf.push('');
     });
 
@@ -1397,15 +1722,9 @@ function emitDaylighting(idf, zones, daylighting = {}) {
         if (!v || !v.key || !v.variableName) return;
         const freq = v.reportingFrequency || 'Hourly';
         idf.push(`Output:Variable,`);
-        idf.push(
-            `  ${v.key},                 !- Key Value`
-        );
-        idf.push(
-            `  ${v.variableName},        !- Variable Name`
-        );
-        idf.push(
-            `  ${freq};                  !- Reporting Frequency`
-        );
+        idf.push(`  ${v.key},                 !- Key Value`);
+        idf.push(`  ${v.variableName},        !- Variable Name`);
+        idf.push(`  ${freq};                  !- Reporting Frequency`);
         idf.push('');
     });
 }
@@ -1413,6 +1732,16 @@ function emitDaylighting(idf, zones, daylighting = {}) {
 /**
  * Try to infer a reasonable location from project metadata.
  */
+function isValidCustomLocation(loc) {
+    if (!loc) return false;
+    const { latitude, longitude, timeZone, elevation } = loc;
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) return false;
+    if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) return false;
+    if (!Number.isFinite(timeZone) || timeZone < -12 || timeZone > 14) return false;
+    if (!Number.isFinite(elevation)) return false;
+    return true;
+}
+
 function inferLocationFromProject() {
     try {
         const meta = project?.metadata || project?.getMetadata?.();
@@ -1426,11 +1755,8 @@ function inferLocationFromProject() {
                 elevation: meta.location.elevation,
             };
         }
-    } catch (e) {
-        console.warn(
-            'EnergyPlusModelBuilder: unable to infer location from project.',
-            e
-        );
+    } catch {
+        return null;
     }
     return null;
 }
@@ -1445,8 +1771,7 @@ function inferBuildingNameFromProject() {
 }
 
 /**
- * Try to infer zones from project.
- * For now, conservative: look for project.zones or project.getZones().
+ * Try to infer zones from project (conservative).
  */
 function inferZonesFromProject() {
     try {
@@ -1471,11 +1796,8 @@ function inferZonesFromProject() {
                 }));
             }
         }
-    } catch (e) {
-        console.warn(
-            'EnergyPlusModelBuilder: unable to infer zones from project.',
-            e
-        );
+    } catch {
+        return [];
     }
     return [];
 }

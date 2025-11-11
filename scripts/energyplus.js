@@ -2,7 +2,9 @@
 
 import { getDom } from './dom.js';
 import { project } from './project.js';
-import { buildEnergyPlusModel } from './energyplusModelBuilder.js';
+import { buildEnergyPlusModel, buildEnergyPlusDiagnostics } from './energyplusModelBuilder.js';
+import { validateEnergyPlusConfig, EnergyPlusValidationError } from './energyplusValidation.js';
+import { getConfig } from './energyplusConfigService.js';
 
 const dom = getDom();
 
@@ -27,8 +29,17 @@ function setupEventListeners() {
                 await generateAndStoreIdf();
                 alert('EnergyPlus IDF generated from current project and added to project files.');
             } catch (err) {
-                console.error('Failed to generate EnergyPlus IDF:', err);
-                alert('Failed to generate EnergyPlus IDF. Check console for details.');
+                if (err && err.name === 'EnergyPlusValidationError' && Array.isArray(err.issues)) {
+                    console.error('EnergyPlus IDF validation failed:', err.issues);
+                    const first = err.issues.find(i => i.severity === 'error') || err.issues[0];
+                    alert(
+                        (first ? first.message + '\n\n' : '') +
+                        'Open the EnergyPlus Diagnostics panel for details.'
+                    );
+                } else {
+                    console.error('Failed to generate EnergyPlus IDF:', err);
+                    alert('Failed to generate EnergyPlus IDF. Check console for details.');
+                }
             }
         });
     }
@@ -43,28 +54,53 @@ async function generateAndStoreIdf() {
         throw new Error('Project module not available.');
     }
 
-    // Try to pull any existing metadata we might have
-    const meta = (project.getMetadata && project.getMetadata()) || project.metadata || {};
+    const { config } = getConfig(project);
 
-    const ep = meta.energyPlusConfig || meta.energyplus || {};
+    const sim = config.simulationControl;
+    const weather = config.weather;
 
     const options = {
-        buildingName: meta.name || meta.projectName || 'Ray-Modeler Building',
-        location: meta.location || undefined,
-        timestep: ep.timestep,
-        runPeriod: ep.runPeriod,
-        northAxis: ep.northAxis,
-        terrain: ep.terrain,
-        weatherFilePath: ep.weatherFilePath,
-        // Extended configuration for materials / constructions / schedules / loads / ideal loads / thermostats
-        materials: ep.materials,
-        constructions: ep.constructions,
-        schedules: ep.schedules,
-        loads: ep.zoneLoads,
-        defaults: ep.defaults,
-        idealLoads: ep.idealLoads,
-        thermostats: ep.thermostats,
+        // Legacy-style flattened fields (kept for builder/backward compatibility)
+        buildingName: sim.building.name,
+        location: undefined, // Location from EPW/custom; meta.location deprecated
+        timestep: sim.timestep.timestepsPerHour,
+        runPeriod: sim.runPeriod,
+        northAxis: sim.building.northAxis,
+        terrain: sim.building.terrain,
+        weatherFilePath: weather.epwPath,
+
+        // Extended configuration from normalized config
+        materials: config.materials,
+        constructions: config.constructions,
+        schedules: config.schedules,
+        loads: config.zoneLoads,
+        defaults: config.defaults,
+        idealLoads: config.idealLoads,
+        thermostats: config.thermostats,
+        daylighting: config.daylighting,
+
+        // Canonical normalized blocks
+        simulationControl: sim,
+        weather,
     };
+
+    // Optional: attempt to reuse diagnostics when available to avoid duplicate work.
+    // If diagnostics generation fails we continue with structural checks only.
+    let diagnostics = null;
+    try {
+        diagnostics = await generateEnergyPlusDiagnostics();
+    } catch (e) {
+        console.debug('EnergyPlus: diagnostics unavailable during IDF validation', e);
+    }
+
+    // Run structured validation before building the IDF.
+    const validation = validateEnergyPlusConfig(options, diagnostics || undefined);
+    if (!validation.ok) {
+        throw new EnergyPlusValidationError(
+            'EnergyPlus configuration validation failed. Resolve the reported issues before generating the IDF.',
+            validation.issues
+        );
+    }
 
     const idfContent = buildEnergyPlusModel(options);
 
@@ -74,4 +110,45 @@ async function generateAndStoreIdf() {
     return idfContent;
 }
 
-export { initializeEnergyPlus, generateAndStoreIdf };
+/**
+ * Generate a diagnostics summary (no file writes) describing how the current
+ * project + energyPlusConfig would map into EnergyPlus objects.
+ *
+ * Used by the EnergyPlus Diagnostics / IDF Preview panel.
+ */
+async function generateEnergyPlusDiagnostics() {
+    if (!project) {
+        throw new Error('Project module not available.');
+    }
+
+    const { meta, config } = getConfig(project);
+    const sim = config.simulationControl;
+    const weather = config.weather;
+
+    const options = {
+        buildingName:
+            sim.building.name ||
+            meta.name ||
+            meta.projectName ||
+            'OfficeBuilding',
+
+        weather,
+        timestep: sim.timestep.timestepsPerHour,
+        northAxis: sim.building.northAxis,
+        terrain: sim.building.terrain,
+        weatherFilePath: weather.epwPath,
+
+        materials: config.materials,
+        constructions: config.constructions,
+        schedules: config.schedules,
+        loads: config.zoneLoads,
+        defaults: config.defaults,
+        idealLoads: config.idealLoads,
+        thermostats: config.thermostats,
+        daylighting: config.daylighting,
+    };
+
+    return buildEnergyPlusDiagnostics(options);
+}
+
+export { initializeEnergyPlus, generateAndStoreIdf, generateEnergyPlusDiagnostics };
