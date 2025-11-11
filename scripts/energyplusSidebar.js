@@ -483,10 +483,10 @@ function createMaterialsManagerPanel() {
             <div class="flex justify-between items-center gap-2">
                 <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Materials</span>
                 <button class="btn btn-xs btn-secondary" data-action="add-material">+ Add Material</button>
-            </div>
-            <div class="border border-gray-700/70 rounded bg-black/40 max-h-64 overflow-y-auto">
-                <table class="w-full text-[9px] materials-table">
-                    <thead>
+                </div>
+                <div class="border border-gray-700/70 rounded bg-black/40 max-h-64 overflow-y-auto **scrollable-panel-inner**">
+                    <table class="w-full text-[9px] materials-table">
+                        <thead>
                         <tr class="bg-black/40">
                             <th class="px-2 py-1 text-left">Name</th>
                             <th class="px-2 py-1 text-left">Type</th>
@@ -904,7 +904,7 @@ function createConstructionsManagerPanel() {
                 <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Constructions</span>
                 <button class="btn btn-xs btn-secondary" data-action="add-construction">+ Add Construction</button>
             </div>
-            <div class="border border-gray-700/70 rounded bg-black/40 max-h-64 overflow-y-auto">
+            <div class="border border-gray-700/70 rounded bg-black/40 max-h-64 overflow-y-auto **scrollable-panel-inner**">
                 <table class="w-full text-[9px] constructions-table">
                     <thead>
                         <tr class="bg-black/40">
@@ -1388,7 +1388,7 @@ function createSchedulesManagerPanel() {
                 <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Schedules (Compact)</span>
                 <button class="btn btn-xs btn-secondary" data-action="add-schedule">+ Add Schedule</button>
             </div>
-            <div class="border border-gray-700/70 rounded bg-black/40 max-h-64 overflow-y-auto">
+            <div class="border border-gray-700/70 rounded bg-black/40 max-h-64 overflow-y-auto **scrollable-panel-inner**">
                 <table class="w-full text-[9px] schedules-table">
                     <thead>
                         <tr class="bg-black/40">
@@ -1970,7 +1970,7 @@ function createZoneLoadsManagerPanel() {
                 </div>
             </div>
 
-            <div class="border border-gray-700/70 rounded bg-black/40 max-h-72 overflow-y-auto">
+            <div class="border border-gray-700/70 rounded bg-black/40 max-h-72 overflow-y-auto **scrollable-panel-inner**">
                 <table class="w-full text-[8px] zone-loads-table">
                     <thead class="bg-black/40">
                         <tr>
@@ -2665,7 +2665,7 @@ function createDaylightingManagerPanel() {
                 <div class="flex justify-between items-center">
                     <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Daylighting Controls (per zone)</span>
                 </div>
-                <div class="border border-gray-700/70 rounded bg-black/40 max-h-60 overflow-y-auto">
+                <div class="border border-gray-700/70 rounded bg-black/40 max-h-60 overflow-y-auto **scrollable-panel-inner**">
                     <table class="w-full text-[8px]">
                         <thead class="bg-black/40">
                             <tr>
@@ -2689,7 +2689,7 @@ function createDaylightingManagerPanel() {
                     <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Illuminance Maps</span>
                     <button class="btn btn-xxs btn-secondary" data-action="add-illum-map">+ Add Map</button>
                 </div>
-                <div class="border border-gray-700/70 rounded bg-black/40 max-h-40 overflow-y-auto">
+                <div class="border border-gray-700/70 rounded bg-black/40 max-h-40 overflow-y-auto **scrollable-panel-inner**">
                     <table class="w-full text-[8px]">
                         <thead class="bg-black/40">
                             <tr>
@@ -2711,7 +2711,7 @@ function createDaylightingManagerPanel() {
                     <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Output Variables</span>
                     <button class="btn btn-xxs btn-secondary" data-action="add-output-var">+ Add Variable</button>
                 </div>
-                <div class="border border-gray-700/70 rounded bg-black/40 max-h-40 overflow-y-auto">
+                <div class="border border-gray-700/70 rounded bg-black/40 max-h-40 overflow-y-auto **scrollable-panel-inner**">
                     <table class="w-full text-[8px]">
                         <thead class="bg-black/40">
                             <tr>

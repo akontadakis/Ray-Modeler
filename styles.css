@@ -912,6 +912,12 @@ html[data-theme="cyber"] .energyplus-help-box {
   overflow-x: hidden;
 }
 
+/* Ensure EnergyPlus configuration panel uses standard window-content scroll + scrollbar */
+#panel-energyplus .window-content {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 /* Ensure the scroll area is just content (no own scroll); outer window-content handles overflow */
 #panel-energyplus-help .energyplus-help-scroll {
   flex: 0 0 auto;
@@ -931,25 +937,43 @@ html[data-theme="cyber"] .energyplus-help-box {
 /* --- CUSTOM SCROLLBARS --- */
 /* Keep generic window-content scrollbars only for panels that actually scroll.
    The EnergyPlus help panel uses inner-box-only scrolling. */
+
+/* --- UNIFIED SCROLLBAR STYLES --- */
 .window-content::-webkit-scrollbar,
 .sidebar-content::-webkit-scrollbar,
 .energyplus-help-box::-webkit-scrollbar,
-#helios-capabilities-modal .ui-panel::-webkit-scrollbar {
+#helios-capabilities-modal .ui-panel::-webkit-scrollbar,
+.scrollable-panel-inner::-webkit-scrollbar {
   width: 6px;
 }
 
 .window-content::-webkit-scrollbar-track,
 .sidebar-content::-webkit-scrollbar-track,
 .energyplus-help-box::-webkit-scrollbar-track,
-#helios-capabilities-modal .ui-panel::-webkit-scrollbar-track {
+#helios-capabilities-modal .ui-panel::-webkit-scrollbar-track,
+.scrollable-panel-inner::-webkit-scrollbar-track {
   background: transparent;
 }
 
 .window-content::-webkit-scrollbar-thumb,
+.sidebar-content::-webkit-scrollbar-thumb, /* <-- This was the missing selector */
 .energyplus-help-box::-webkit-scrollbar-thumb,
-#helios-capabilities-modal .ui-panel::-webkit-scrollbar-thumb {
+#helios-capabilities-modal .ui-panel::-webkit-scrollbar-thumb,
+.scrollable-panel-inner::-webkit-scrollbar-thumb {
   background: var(--grid-color);
   border-radius: 3px;
+}
+
+/* FIX: Add missing thumb style for the main AI sidebar to match other panels */
+.sidebar-content::-webkit-scrollbar-thumb {
+  background: var(--grid-color);
+  border-radius: 3px;
+}
+
+/* Shared inner scroll region for EnergyPlus config tables and similar content */
+.scrollable-panel-inner {
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* --- UI FORM CONTROLS --- */
