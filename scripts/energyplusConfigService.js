@@ -497,6 +497,34 @@ export function setThermostatsAndIdealLoads(project, { thermostats, idealLoads }
     }));
 }
 
+/**
+ * Explicit helper for thermostat setpoint definitions.
+ * Stores an array of canonical setpoints:
+ *  [
+ *    {
+ *      name: string,
+ *      type: 'SingleHeating' | 'SingleCooling' | 'SingleHeatingOrCooling' | 'DualSetpoint',
+ *      heatingScheduleName?: string,
+ *      coolingScheduleName?: string,
+ *      singleScheduleName?: string
+ *    },
+ *    ...
+ *  ]
+ *
+ * Kept separate from zone/global thermostat mappings for clarity.
+ */
+export function setThermostatSetpoints(project, setpoints) {
+    const safe = Array.isArray(setpoints)
+        ? setpoints
+              .filter((sp) => sp && typeof sp.name === 'string' && sp.name.trim())
+              .map((sp) => ({ ...sp, name: sp.name.trim() }))
+        : [];
+    updateConfig(project, (ep) => ({
+        ...ep,
+        thermostatSetpoints: safe,
+    }));
+}
+
 export function setDaylighting(project, daylighting) {
     const safe = daylighting && typeof daylighting === 'object' ? { ...daylighting } : {};
     updateConfig(project, (ep) => ({

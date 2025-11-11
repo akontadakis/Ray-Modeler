@@ -821,7 +821,8 @@ function renderDiagnostics(container, diagnostics) {
         } else if (
             msg.includes('daylighting') ||
             msg.includes('illuminance map') ||
-            msg.includes('output:variable') && msg.includes('lighting')
+            (msg.includes('output:variable') && msg.includes('lighting')) ||
+            i.context?.domain === 'daylighting'
         ) {
             grouped.daylighting.push(entry);
         } else if (
@@ -834,7 +835,8 @@ function renderDiagnostics(container, diagnostics) {
         } else if (
             msg.includes('shading') ||
             msg.includes('overhang') ||
-            msg.includes('windowproperty:shadingcontrol')
+            msg.includes('windowproperty:shadingcontrol') ||
+            i.context?.domain === 'shading'
         ) {
             grouped.shading.push(entry);
         } else if (
@@ -848,7 +850,7 @@ function renderDiagnostics(container, diagnostics) {
         }
     });
 
-    const renderIssueList = (arr) => {
+    const renderIssueList = (arr, navDomain) => {
         if (!arr.length) {
             return `<div class="text-[8px] text-[--text-secondary]">No issues.</div>`;
         }
@@ -860,7 +862,30 @@ function renderDiagnostics(container, diagnostics) {
                         : i.severity === 'warning'
                         ? 'text-yellow-300'
                         : 'text-[--text-secondary]';
-                return `<div class="${color}">• [${i.severity}] ${i.message}</div>`;
+
+                const ctx = i.context || {};
+                const attrs = [];
+
+                if (navDomain === 'daylighting' || ctx.domain === 'daylighting') {
+                    attrs.push(`data-nav="daylighting"`);
+                    if (ctx.zoneName) {
+                        attrs.push(`data-target-zone="${String(ctx.zoneName)}"`);
+                    }
+                    if (ctx.mapName) {
+                        attrs.push(`data-target-map="${String(ctx.mapName)}"`);
+                    }
+                } else if (navDomain === 'shading' || ctx.domain === 'shading') {
+                    attrs.push(`data-nav="shading"`);
+                    if (ctx.surfaceName) {
+                        attrs.push(`data-target-surface="${String(ctx.surfaceName)}"`);
+                    }
+                    if (ctx.controlName) {
+                        attrs.push(`data-target-control="${String(ctx.controlName)}"`);
+                    }
+                }
+
+                const attrStr = attrs.length ? ' ' + attrs.join(' ') : '';
+                return `<div class="${color} cursor-pointer" ${attrStr}>• [${i.severity}] ${i.message}</div>`;
             })
             .join('');
     };
@@ -1055,7 +1080,7 @@ function renderDiagnostics(container, diagnostics) {
                         <button class="btn btn-xxs btn-secondary ml-1" data-nav="daylighting">Daylighting Panel</button>
                     </div>
                     <div class="text-[8px]">
-                        ${renderIssueList(grouped.daylighting)}
+                        ${renderIssueList(grouped.daylighting, 'daylighting')}
                     </div>
                 </div>
 
@@ -1077,7 +1102,7 @@ function renderDiagnostics(container, diagnostics) {
                         <button class="btn btn-xxs btn-secondary ml-1" data-nav="shading">Shading Panel</button>
                     </div>
                     <div class="text-[8px]">
-                        ${renderIssueList(grouped.shading)}
+                        ${renderIssueList(grouped.shading, 'shading')}
                     </div>
                 </div>
 
@@ -1096,10 +1121,14 @@ function renderDiagnostics(container, diagnostics) {
 
     // Wire quick navigation buttons
     container
-        .querySelectorAll('button[data-nav]')
-        .forEach((btn) => {
-            btn.addEventListener('click', (ev) => {
-                const nav = ev.currentTarget.getAttribute('data-nav');
+        .querySelectorAll('[data-nav]')
+        .forEach((el) => {
+            el.addEventListener('click', (ev) => {
+                const target = ev.currentTarget;
+                const nav = target.getAttribute('data-nav');
+                const targetZone = target.getAttribute('data-target-zone');
+                const targetMap = target.getAttribute('data-target-map');
+
                 if (nav === 'materials') {
                     openMaterialsManagerPanel();
                 } else if (nav === 'constructions') {
@@ -1116,6 +1145,38 @@ function renderDiagnostics(container, diagnostics) {
                     openSimulationControlManagerPanel();
                 } else if (nav === 'daylighting') {
                     openDaylightingManagerPanel();
+
+                    // If diagnostics provided a target zone/map, scroll/highlight in the Daylighting panel.
+                    const dp = document.getElementById('panel-energyplus-daylighting');
+                    if (dp) {
+                        // Target zone row in Daylighting controls
+                        if (targetZone) {
+                            const row =
+                                dp.querySelector(`.daylighting-controls-tbody tr[data-zone-name="${CSS.escape(targetZone)}"]`) ||
+                                Array.from(dp.querySelectorAll('.daylighting-controls-tbody tr')).find((tr) =>
+                                    tr.textContent.includes(targetZone)
+                                );
+                            if (row) {
+                                row.classList.add('diag-highlight');
+                                row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                                setTimeout(() => row.classList.remove('diag-highlight'), 2000);
+                            }
+                        }
+
+                        // Target illuminance map row
+                        if (targetMap) {
+                            const rows = dp.querySelectorAll('.illum-maps-tbody tr');
+                            const mapRow = Array.from(rows).find((tr) => {
+                                const nameInput = tr.querySelector('[data-field="name"]');
+                                return nameInput && nameInput.value === targetMap;
+                            });
+                            if (mapRow) {
+                                mapRow.classList.add('diag-highlight');
+                                mapRow.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                                setTimeout(() => mapRow.classList.remove('diag-highlight'), 2000);
+                            }
+                        }
+                    }
                 } else if (nav === 'outdoor-air') {
                     openOutdoorAirManagerPanel();
                 } else if (nav === 'shading') {
@@ -1615,31 +1676,65 @@ function openMaterialsManagerPanel() {
  * Safely get current metadata and normalized EnergyPlus config.
  */
 function getEnergyPlusConfig() {
+    // Preferred: centralized, normalized view via energyplusConfigService.
+    try {
+        const svc = window.require
+            ? window.require('./energyplusConfigService.js')
+            : null;
+        if (svc && typeof svc.getConfig === 'function') {
+            return svc.getConfig(project);
+        }
+    } catch (err) {
+        console.warn(
+            '[EnergyPlusSidebar] getEnergyPlusConfig: failed to load energyplusConfigService, using fallback',
+            err
+        );
+    }
+
+    // Fallback for non-Electron/browser builds: minimal equivalent to getConfig.
     const meta =
         (typeof project.getMetadata === 'function' && project.getMetadata()) ||
         project.metadata ||
         {};
     const ep = meta.energyPlusConfig || meta.energyplus || {};
-    const materials = Array.isArray(ep.materials) ? ep.materials.slice() : [];
-    const constructions = Array.isArray(ep.constructions)
-        ? ep.constructions
-        : [];
-    return { meta, ep, materials, constructions };
+
+    return {
+        meta,
+        ep,
+        config: {
+            materials: Array.isArray(ep.materials) ? ep.materials.slice() : [],
+            constructions: Array.isArray(ep.constructions) ? ep.constructions.slice() : [],
+            defaults: ep.defaults && typeof ep.defaults === 'object' ? { ...ep.defaults } : {},
+            schedules: ep.schedules || {},
+            zoneLoads: Array.isArray(ep.zoneLoads) ? ep.zoneLoads.slice() : [],
+            thermostats: Array.isArray(ep.thermostats) ? ep.thermostats.slice() : [],
+            idealLoads: ep.idealLoads && typeof ep.idealLoads === 'object' ? { ...ep.idealLoads } : {},
+            daylighting: ep.daylighting && typeof ep.daylighting === 'object' ? { ...ep.daylighting } : {},
+            weather: ep.weather || {},
+            simulationControl: ep.simulationControl || {},
+            sizing: ep.sizing && typeof ep.sizing === 'object' ? { ...ep.sizing } : {},
+            outdoorAir: ep.outdoorAir && typeof ep.outdoorAir === 'object' ? { ...ep.outdoorAir } : {},
+            naturalVentilation: ep.naturalVentilation && typeof ep.naturalVentilation === 'object'
+                ? { ...ep.naturalVentilation }
+                : {},
+            shading: ep.shading && typeof ep.shading === 'object' ? { ...ep.shading } : {},
+        },
+    };
 }
 
 function saveEnergyPlusConfig(meta, ep) {
-    const next = {
-        ...ep,
-    };
+    // Kept only as a narrow fallback for browser builds where energyplusConfigService
+    // cannot be loaded. Panels should prefer energyplusConfigService helpers.
+    if (!meta || !ep) return;
     if (typeof project.updateMetadata === 'function') {
         project.updateMetadata({
             ...meta,
-            energyPlusConfig: next,
+            energyPlusConfig: ep,
         });
     } else {
         project.metadata = {
             ...(project.metadata || meta),
-            energyPlusConfig: next,
+            energyPlusConfig: ep,
         };
     }
 }
@@ -1713,7 +1808,8 @@ function createMaterialsManagerPanel() {
     const addBtn = panel.querySelector('[data-action="add-material"]');
 
     function render() {
-        const { materials, constructions } = getEnergyPlusConfig();
+        const { config } = getEnergyPlusConfig();
+        const { materials, constructions } = config;
         tbody.innerHTML = '';
         if (!materials.length) {
             const tr = document.createElement('tr');
@@ -1758,7 +1854,8 @@ function createMaterialsManagerPanel() {
     }
 
     function deleteMaterial(index, constructions) {
-        const { meta, ep, materials } = getEnergyPlusConfig();
+        const { meta, ep, config } = getEnergyPlusConfig();
+        const materials = Array.isArray(config.materials) ? config.materials.slice() : [];
         const m = materials[index];
         if (!m) return;
 
@@ -1777,6 +1874,20 @@ function createMaterialsManagerPanel() {
         }
 
         materials.splice(index, 1);
+
+        try {
+            if (window.require) {
+                const { setMaterials } = window.require('./energyplusConfigService.js');
+                if (typeof setMaterials === 'function') {
+                    setMaterials(project, materials);
+                    return;
+                }
+            }
+        } catch (err) {
+            console.warn('[EnergyPlusSidebar] setMaterials via service failed, falling back', err);
+        }
+
+        // Fallback (non-Electron builds)
         saveEnergyPlusConfig(meta, { ...ep, materials });
     }
 
@@ -1975,7 +2086,10 @@ function openMaterialEditor(parentPanel, index) {
 
     if (saveBtn) {
         saveBtn.addEventListener('click', () => {
-            const { meta, ep, materials: currentMaterials } = getEnergyPlusConfig();
+            const { meta, ep, config } = getEnergyPlusConfig();
+            const currentMaterials = Array.isArray(config.materials)
+                ? config.materials.slice()
+                : [];
 
             const nameInput = editor.querySelector('[data-field="name"]');
             const tSelect = editor.querySelector('[data-field="type"]');
@@ -2034,12 +2148,26 @@ function openMaterialEditor(parentPanel, index) {
             }
 
             if (index != null) {
-                currentMaterials[index] = { ...currentMaterials[index], ...m };
+                currentMaterials[index] = { ...(currentMaterials[index] || {}), ...m };
             } else {
                 currentMaterials.push(m);
             }
 
-            saveEnergyPlusConfig(meta, { ...ep, materials: currentMaterials });
+            try {
+                if (window.require) {
+                    const { setMaterials } = window.require('./energyplusConfigService.js');
+                    if (typeof setMaterials === 'function') {
+                        setMaterials(project, currentMaterials);
+                    } else {
+                        saveEnergyPlusConfig(meta, { ...ep, materials: currentMaterials });
+                    }
+                } else {
+                    saveEnergyPlusConfig(meta, { ...ep, materials: currentMaterials });
+                }
+            } catch (err) {
+                console.error('MaterialsManager: save via service failed, falling back', err);
+                saveEnergyPlusConfig(meta, { ...ep, materials: currentMaterials });
+            }
 
             editor.remove();
             if (parentPanel._renderMaterials) {
@@ -2153,37 +2281,12 @@ function createConstructionsManagerPanel() {
     const addBtn = panel.querySelector('[data-action="add-construction"]');
     const defaultSelects = panel.querySelectorAll('select[data-default-key]');
 
-    function getEP() {
-        const meta =
-            (typeof project.getMetadata === 'function' && project.getMetadata()) ||
-            project.metadata ||
-            {};
-        const ep = meta.energyPlusConfig || meta.energyplus || {};
-        const constructions = Array.isArray(ep.constructions)
-            ? ep.constructions.slice()
-            : [];
-        const defaults = ep.defaults || {};
-        const materials = Array.isArray(ep.materials) ? ep.materials : [];
-        return { meta, ep, constructions, defaults, materials };
-    }
-
-    function saveEP(meta, ep) {
-        const next = { ...ep };
-        if (typeof project.updateMetadata === 'function') {
-            project.updateMetadata({
-                ...meta,
-                energyPlusConfig: next,
-            });
-        } else {
-            project.metadata = {
-                ...(project.metadata || meta),
-                energyPlusConfig: next,
-            };
-        }
-    }
-
     function render() {
-        const { constructions, defaults } = getEP();
+        const { config } = getEnergyPlusConfig();
+        const constructions = Array.isArray(config.constructions)
+            ? config.constructions.slice()
+            : [];
+        const defaults = config.defaults || {};
         tbody.innerHTML = '';
 
         if (!constructions.length) {
@@ -2239,7 +2342,11 @@ function createConstructionsManagerPanel() {
     }
 
     function renderDefaults() {
-        const { constructions, defaults } = getEP();
+        const { config } = getEnergyPlusConfig();
+        const constructions = Array.isArray(config.constructions)
+            ? config.constructions.slice()
+            : [];
+        const defaults = config.defaults || {};
         defaultSelects.forEach((sel) => {
             const key = sel.dataset.defaultKey;
             const current = defaults[key];
@@ -2255,7 +2362,11 @@ function createConstructionsManagerPanel() {
     }
 
     function deleteConstruction(index) {
-        const { meta, ep, constructions, defaults } = getEP();
+        const { config } = getEnergyPlusConfig();
+        const constructions = Array.isArray(config.constructions)
+            ? config.constructions.slice()
+            : [];
+        const defaults = config.defaults || {};
         const c = constructions[index];
         if (!c) return;
 
@@ -2273,7 +2384,36 @@ function createConstructionsManagerPanel() {
         }
 
         constructions.splice(index, 1);
-        saveEP(meta, { ...ep, constructions });
+
+        try {
+            if (window.require) {
+                const { setConstructions } = window.require('./energyplusConfigService.js');
+                if (typeof setConstructions === 'function') {
+                    setConstructions(project, constructions, defaults);
+                    return;
+                }
+            }
+        } catch (err) {
+            console.error('ConstructionsManager: setConstructions via service failed, falling back', err);
+        }
+
+        // Fallback: preserve prior behavior if service is unavailable.
+        const meta =
+            (typeof project.getMetadata === 'function' && project.getMetadata()) ||
+            project.metadata ||
+            {};
+        const ep = meta.energyPlusConfig || meta.energyplus || {};
+        if (typeof project.updateMetadata === 'function') {
+            project.updateMetadata({
+                ...meta,
+                energyPlusConfig: { ...ep, constructions },
+            });
+        } else {
+            project.metadata = {
+                ...(project.metadata || meta),
+                energyPlusConfig: { ...ep, constructions },
+            };
+        }
     }
 
     if (addBtn) {
@@ -2284,13 +2424,52 @@ function createConstructionsManagerPanel() {
 
     defaultSelects.forEach((sel) => {
         sel.addEventListener('change', () => {
-            const { meta, ep, defaults } = getEP();
+            const { config } = getEnergyPlusConfig();
+            const constructions = Array.isArray(config.constructions)
+                ? config.constructions.slice()
+                : [];
+            const defaults = { ...(config.defaults || {}) };
             const key = sel.dataset.defaultKey;
             const val = sel.value || undefined;
-            const nextDefaults = { ...defaults };
-            if (val) nextDefaults[key] = val;
-            else delete nextDefaults[key];
-            saveEP(meta, { ...ep, defaults: nextDefaults });
+
+            if (val) {
+                defaults[key] = val;
+            } else {
+                delete defaults[key];
+            }
+
+            try {
+                if (window.require) {
+                    const { setConstructions } = window.require('./energyplusConfigService.js');
+                    if (typeof setConstructions === 'function') {
+                        setConstructions(project, constructions, defaults);
+                    } else {
+                        throw new Error('setConstructions not available');
+                    }
+                } else {
+                    throw new Error('window.require not available');
+                }
+            } catch (err) {
+                console.error('ConstructionsManager: setConstructions via service failed, falling back', err);
+                const meta =
+                    (typeof project.getMetadata === 'function' && project.getMetadata()) ||
+                    project.metadata ||
+                    {};
+                const ep = meta.energyPlusConfig || meta.energyplus || {};
+                const nextEP = { ...ep, constructions, defaults };
+                if (typeof project.updateMetadata === 'function') {
+                    project.updateMetadata({
+                        ...meta,
+                        energyPlusConfig: nextEP,
+                    });
+                } else {
+                    project.metadata = {
+                        ...(project.metadata || meta),
+                        energyPlusConfig: nextEP,
+                    };
+                }
+            }
+
             render(); // re-render to update default badges
         });
     });
@@ -2306,40 +2485,16 @@ function createConstructionsManagerPanel() {
  * Open editor for a construction (index) or create new (index == null).
  */
 function openConstructionEditor(parentPanel, index) {
-    const getEP = () => {
-        const meta =
-            (typeof project.getMetadata === 'function' && project.getMetadata()) ||
-            project.metadata ||
-            {};
-        const ep = meta.energyPlusConfig || meta.energyplus || {};
-        const constructions = Array.isArray(ep.constructions)
-            ? ep.constructions.slice()
-            : [];
-        const defaults = ep.defaults || {};
-        const materials = Array.isArray(ep.materials) ? ep.materials : [];
-        return { meta, ep, constructions, defaults, materials };
-    };
-
-    const saveEP = (meta, ep) => {
-        const next = { ...ep };
-        if (typeof project.updateMetadata === 'function') {
-            project.updateMetadata({
-                ...meta,
-                energyPlusConfig: next,
-            });
-        } else {
-            project.metadata = {
-                ...(project.metadata || meta),
-                energyPlusConfig: next,
-            };
-        }
-    };
-
     // Remove existing editor if any
     let editor = parentPanel.querySelector('.constructions-editor');
     if (editor) editor.remove();
 
-    const { constructions, materials } = getEP();
+    const { config } = getEnergyPlusConfig();
+    const constructions = Array.isArray(config.constructions)
+        ? config.constructions.slice()
+        : [];
+    const defaults = config.defaults || {};
+    const materials = Array.isArray(config.materials) ? config.materials : [];
     const editing = index != null ? constructions[index] : null;
 
     editor = document.createElement('div');
@@ -2463,7 +2618,11 @@ function openConstructionEditor(parentPanel, index) {
 
     if (saveBtn) {
         saveBtn.addEventListener('click', () => {
-            const { meta, ep, constructions, defaults } = getEP();
+            const { config } = getEnergyPlusConfig();
+            const constructions = Array.isArray(config.constructions)
+                ? config.constructions.slice()
+                : [];
+            const defaults = config.defaults || {};
 
             const nameInput = editor.querySelector('[data-field="name"]');
             const consName = (nameInput.value || '').trim();
@@ -2519,11 +2678,41 @@ function openConstructionEditor(parentPanel, index) {
                 });
             }
 
-            saveEP(meta, {
-                ...ep,
-                constructions: nextConstructions,
-                defaults: nextDefaults,
-            });
+            try {
+                if (window.require) {
+                    const { setConstructions } = window.require('./energyplusConfigService.js');
+                    if (typeof setConstructions === 'function') {
+                        setConstructions(project, nextConstructions, nextDefaults);
+                    } else {
+                        throw new Error('setConstructions not available');
+                    }
+                } else {
+                    throw new Error('window.require not available');
+                }
+            } catch (err) {
+                console.error('ConstructionEditor: setConstructions via service failed, falling back', err);
+                const meta =
+                    (typeof project.getMetadata === 'function' && project.getMetadata()) ||
+                    project.metadata ||
+                    {};
+                const ep = meta.energyPlusConfig || meta.energyplus || {};
+                const nextEP = {
+                    ...ep,
+                    constructions: nextConstructions,
+                    defaults: nextDefaults,
+                };
+                if (typeof project.updateMetadata === 'function') {
+                    project.updateMetadata({
+                        ...meta,
+                        energyPlusConfig: nextEP,
+                    });
+                } else {
+                    project.metadata = {
+                        ...(project.metadata || meta),
+                        energyPlusConfig: nextEP,
+                    };
+                }
+            }
 
             editor.remove();
             if (parentPanel._renderConstructions) {
@@ -4050,6 +4239,27 @@ function openDaylightingManagerPanel() {
 }
 
 function createIdealLoadsManagerPanel() {
+    const { config = {}, ep = {}, meta = {} } =
+        (typeof window !== 'undefined' &&
+            window.require &&
+            (() => {
+                try {
+                    const { getConfig } = window.require('./energyplusConfigService.js');
+                    return getConfig(project) || {};
+                } catch (e) {
+                    console.warn('[IdealLoadsManager] Failed to load energyplusConfigService, falling back', e);
+                    return {};
+                }
+            })()) ||
+        (() => {
+            const metaLocal =
+                (typeof project.getMetadata === 'function' && project.getMetadata()) ||
+                project.metadata ||
+                {};
+            const epLocal = metaLocal.energyPlusConfig || metaLocal.energyplus || {};
+            return { meta: metaLocal, ep: epLocal, config: epLocal };
+        })();
+
     const panel = document.createElement('div');
     panel.id = 'panel-energyplus-ideal-loads';
     panel.className = 'floating-window ui-panel resizable-panel';
@@ -4086,7 +4296,7 @@ function createIdealLoadsManagerPanel() {
                     <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Thermostat Setpoints</span>
                     <button class="btn btn-xxs btn-secondary" data-action="add-tstat-setpoint">+ Add Setpoint</button>
                 </div>
-                <div class="border border-gray-700/70 rounded bg-black/60 max-h-32 overflow-y-auto **scrollable-panel-inner** mt-1">
+                <div class="border border-gray-700/70 rounded bg-black/60 max-h-32 overflow-y-auto scrollable-panel-inner mt-1">
                     <table class="w-full text-[8px]">
                         <thead class="bg-black/40">
                             <tr>
@@ -4101,7 +4311,8 @@ function createIdealLoadsManagerPanel() {
                 </div>
                 <div class="text-[7px] text-[--text-secondary]">
                     Defines ThermostatSetpoint:SingleHeating / SingleCooling / SingleHeatingOrCooling / DualSetpoint
-                    objects referenced by zone thermostat controls.
+                    objects referenced by zone thermostat controls. Setpoints are stored under
+                    <code>energyPlusConfig.thermostats</code> entries with <code>scope: "setpoint"</code>.
                 </div>
             </div>
 
@@ -4110,7 +4321,7 @@ function createIdealLoadsManagerPanel() {
                 <div class="flex justify-between items-center">
                     <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Zone Thermostat Controls</span>
                 </div>
-                <div class="border border-gray-700/70 rounded bg-black/60 max-h-40 overflow-y-auto **scrollable-panel-inner** mt-1">
+                <div class="border border-gray-700/70 rounded bg-black/60 max-h-40 overflow-y-auto scrollable-panel-inner mt-1">
                     <table class="w-full text-[8px]">
                         <thead class="bg-black/40">
                             <tr>
@@ -4126,7 +4337,8 @@ function createIdealLoadsManagerPanel() {
                     </table>
                 </div>
                 <div class="text-[7px] text-[--text-secondary]">
-                    Maps zones to ZoneControl:Thermostat using the setpoints above. Leave cells blank to inherit or skip.
+                    Select a Thermostat Setpoint for each zone (by type). These mappings are written to energyPlusConfig.thermostats
+                    and used to generate ZoneControl:Thermostat objects. Blank cells inherit or skip control.
                 </div>
             </div>
 
@@ -4375,7 +4587,7 @@ function createIdealLoadsManagerPanel() {
                 <div class="flex justify-between items-center">
                     <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Per-Zone IdealLoads Overrides</span>
                 </div>
-                <div class="max-h-40 overflow-y-auto **scrollable-panel-inner**">
+                <div class="border border-gray-700/70 rounded bg-black/60 max-h-40 overflow-y-auto scrollable-panel-inner mt-1">
                     <table class="w-full text-[8px]">
                         <thead class="bg-black/40">
                             <tr>
@@ -4390,6 +4602,9 @@ function createIdealLoadsManagerPanel() {
                         </thead>
                         <tbody class="ideal-perzone-tbody"></tbody>
                     </table>
+                </div>
+                <div class="text-[7px] text-[--text-secondary] mt-1">
+                    Blank cells inherit from Global IdealLoads. OA flows are entered in L/s and stored internally in m³/s.
                 </div>
             </div>
 
@@ -4408,17 +4623,28 @@ function createIdealLoadsManagerPanel() {
         }
     }
 
+    const tstatSetpointsTbody = panel.querySelector('.tstat-setpoints-tbody');
     const tstatsTbody = panel.querySelector('.tstats-tbody');
+    const tstatZoneControlsTbody = panel.querySelector('.tstat-zone-controls-tbody');
     const idealPerZoneTbody = panel.querySelector('.ideal-perzone-tbody');
     const saveBtn = panel.querySelector('[data-action="save-ideal-loads"]');
 
     function getMetaEp() {
-        const meta =
+        // Prefer already-normalized config from energyplusConfigService (inferred above)
+        if (config && Object.keys(config).length) {
+            return {
+                meta: meta || {},
+                ep: ep || {},
+                config,
+            };
+        }
+
+        const metaLocal =
             (typeof project.getMetadata === 'function' && project.getMetadata()) ||
             project.metadata ||
             {};
-        const ep = meta.energyPlusConfig || meta.energyplus || {};
-        return { meta, ep };
+        const epLocal = metaLocal.energyPlusConfig || metaLocal.energyplus || {};
+        return { meta: metaLocal, ep: epLocal, config: epLocal };
     }
 
     function getZones() {
@@ -4454,33 +4680,42 @@ function createIdealLoadsManagerPanel() {
         return Array.from(names);
     }
 
-    function buildState(ep) {
+    function buildState(ep, configOverride) {
         const zones = getZones();
-        const schedNames = getScheduleNames(ep);
+        const sourceEp = ep || {};
+        const sourceCfg = configOverride || config || sourceEp;
+        const schedNames = getScheduleNames(sourceEp);
 
-        // Thermostats
+        // Thermostats (zone mappings)
         let globalT = { heatingScheduleName: '', coolingScheduleName: '' };
         const perZoneT = new Map();
-        if (Array.isArray(ep.thermostats)) {
-            ep.thermostats.forEach((t) => {
-                if (!t) return;
-                const zn = (t.zoneName || '').toString();
-                if (!zn || zn.toUpperCase() === 'GLOBAL') {
-                    if (!globalT) globalT = {};
-                    if (t.heatingScheduleName) globalT.heatingScheduleName = t.heatingScheduleName;
-                    if (t.coolingScheduleName) globalT.coolingScheduleName = t.coolingScheduleName;
-                } else {
-                    perZoneT.set(zn, {
-                        zoneName: zn,
-                        heatingScheduleName: t.heatingScheduleName || '',
-                        coolingScheduleName: t.coolingScheduleName || '',
-                    });
-                }
-            });
-        }
+        const thermostatSource = Array.isArray(sourceCfg.thermostats)
+            ? sourceCfg.thermostats
+            : Array.isArray(sourceEp.thermostats)
+            ? sourceEp.thermostats
+            : [];
+
+        thermostatSource.forEach((t) => {
+            if (!t || t.scope === 'setpoint') return; // skip setpoint definitions
+            const zn = (t.zoneName || '').toString();
+            if (!zn || zn.toUpperCase() === 'GLOBAL') {
+                if (!globalT) globalT = {};
+                if (t.heatingScheduleName) globalT.heatingScheduleName = t.heatingScheduleName;
+                if (t.coolingScheduleName) globalT.coolingScheduleName = t.coolingScheduleName;
+            } else {
+                perZoneT.set(zn, {
+                    zoneName: zn,
+                    controlTypeSchedule: t.controlTypeSchedule || '',
+                    singleHeatingSetpoint: t.singleHeatingSetpoint || '',
+                    singleCoolingSetpoint: t.singleCoolingSetpoint || '',
+                    singleHeatCoolSetpoint: t.singleHeatCoolSetpoint || '',
+                    dualSetpoint: t.dualSetpoint || '',
+                });
+            }
+        });
 
         // IdealLoads
-        const ideal = ep.idealLoads || {};
+        const ideal = (sourceCfg && sourceCfg.idealLoads) || sourceEp.idealLoads || {};
         const g = ideal.global || {};
         const perZoneIdeal = new Map();
         if (Array.isArray(ideal.perZone)) {
@@ -4492,6 +4727,102 @@ function createIdealLoadsManagerPanel() {
         }
 
         return { zones, schedNames, globalT, perZoneT, idealGlobal: g, perZoneIdeal };
+    }
+
+    function getThermostatSetpoints(ep) {
+        const raw = ep && Array.isArray(ep.thermostatSetpoints)
+            ? ep.thermostatSetpoints
+            : [];
+        return raw
+            .filter((sp) => sp && typeof sp.name === 'string' && sp.name.trim())
+            .map((sp) => ({
+                name: sp.name.trim(),
+                type: sp.type || 'DualSetpoint',
+                heatingScheduleName: sp.heatingScheduleName || '',
+                coolingScheduleName: sp.coolingScheduleName || '',
+                singleScheduleName: sp.singleScheduleName || '',
+            }));
+    }
+
+    function renderThermostatSetpoints(ep, state) {
+        if (!tstatSetpointsTbody) return;
+
+        tstatSetpointsTbody.innerHTML = '';
+
+        const setpoints = getThermostatSetpoints(ep);
+
+        const schedOptions = (selected) => {
+            let html = '<option value="">(none)</option>';
+            state.schedNames.forEach((nm) => {
+                const sel = nm === selected ? ' selected' : '';
+                html += `<option value="${nm}"${sel}>${nm}</option>`;
+            });
+            return html;
+        };
+
+        if (!setpoints.length) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="px-1 py-1 text-[8px] text-[--text-secondary]" colspan="4">
+                    No thermostat setpoints defined. Click "Add Setpoint" to create one.
+                </td>
+            `;
+            tstatSetpointsTbody.appendChild(tr);
+        } else {
+            setpoints.forEach((sp, index) => {
+                const type = sp.type || 'DualSetpoint';
+                const tr = document.createElement('tr');
+                tr.dataset.index = String(index);
+                tr.innerHTML = `
+                    <td class="px-1 py-1 align-top">
+                        <input class="w-full text-[8px]" data-field="name" value="${sp.name || ''}">
+                    </td>
+                    <td class="px-1 py-1 align-top">
+                        <select class="w-full text-[8px]" data-field="type">
+                            <option value="SingleHeating"${type === 'SingleHeating' ? ' selected' : ''}>SingleHeating</option>
+                            <option value="SingleCooling"${type === 'SingleCooling' ? ' selected' : ''}>SingleCooling</option>
+                            <option value="SingleHeatingOrCooling"${
+                                type === 'SingleHeatingOrCooling' ? ' selected' : ''
+                            }>SingleHeatingOrCooling</option>
+                            <option value="DualSetpoint"${
+                                type === 'DualSetpoint' || !type ? ' selected' : ''
+                            }>DualSetpoint</option>
+                        </select>
+                    </td>
+                    <td class="px-1 py-1 align-top">
+                        <div class="grid grid-cols-2 gap-0.5">
+                            <div>
+                                <div class="text-[6px] text-[--text-secondary]">Heat / Single</div>
+                                <select class="w-full text-[8px]" data-field="heatSched">
+                                    ${schedOptions(sp.heatingScheduleName || sp.singleScheduleName || '')}
+                                </select>
+                            </div>
+                            <div>
+                                <div class="text-[6px] text-[--text-secondary]">Cool</div>
+                                <select class="w-full text-[8px]" data-field="coolSched">
+                                    ${schedOptions(sp.coolingScheduleName || '')}
+                                </select>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-1 py-1 align-top text-right">
+                        <button class="btn btn-xxs btn-danger" data-action="delete-setpoint">Delete</button>
+                    </td>
+                `;
+                tstatSetpointsTbody.appendChild(tr);
+            });
+        }
+
+        // Wire delete buttons
+        tstatSetpointsTbody
+            .querySelectorAll('button[data-action="delete-setpoint"]')
+            .forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const row = btn.closest('tr');
+                    if (!row) return;
+                    row.remove();
+                });
+            });
     }
 
     function fillGlobalThermostatUI(ep, state) {
@@ -4513,31 +4844,95 @@ function createIdealLoadsManagerPanel() {
     }
 
     function renderPerZoneThermostats(ep, state) {
-        tstatsTbody.innerHTML = '';
-        const schedOptions = (selected) => {
-            let html = '<option value="">(inherit)</option>';
+        if (!tstatZoneControlsTbody) return;
+        tstatZoneControlsTbody.innerHTML = '';
+
+        const setpoints = getThermostatSetpoints(ep);
+
+        const controlTypeSchedOptions = (selected) => {
+            let html = '<option value="">(none)</option>';
             state.schedNames.forEach((nm) => {
                 const sel = nm === selected ? ' selected' : '';
                 html += `<option value="${nm}"${sel}>${nm}</option>`;
             });
             return html;
         };
+
+        const setpointOptions = (selectedName, allowedTypes) => {
+            let html = '<option value="">(none)</option>';
+            setpoints.forEach((sp) => {
+                if (!allowedTypes || allowedTypes.includes(sp.type || 'DualSetpoint')) {
+                    const sel = sp.name === selectedName ? ' selected' : '';
+                    html += `<option value="${sp.name}"${sel}>${sp.name}</option>`;
+                }
+            });
+            return html;
+        };
+
         state.zones.forEach((z) => {
             const zn = String(z.name);
-            const t = state.perZoneT.get(zn) || {};
+            const existing = state.perZoneT.get(zn) || {};
             const tr = document.createElement('tr');
             tr.dataset.zoneName = zn;
             tr.innerHTML = `
                 <td class="px-1 py-1 align-top text-[--accent-color]">${zn}</td>
                 <td class="px-1 py-1 align-top">
-                    <select class="w-full text-[8px]" data-field="heatSched">${schedOptions(t.heatingScheduleName || '')}</select>
+                    <select class="w-full text-[8px]" data-field="ctrlSched">
+                        ${controlTypeSchedOptions(existing.controlTypeSchedule || '')}
+                    </select>
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <select class="w-full text-[8px]" data-field="coolSched">${schedOptions(t.coolingScheduleName || '')}</select>
+                    <select class="w-full text-[8px]" data-field="singleHeat">
+                        ${setpointOptions(existing.singleHeatingSetpoint || '', ['SingleHeating'])}
+                    </select>
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <select class="w-full text-[8px]" data-field="singleCool">
+                        ${setpointOptions(existing.singleCoolingSetpoint || '', ['SingleCooling'])}
+                    </select>
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <select class="w-full text-[8px]" data-field="singleHeatCool">
+                        ${setpointOptions(existing.singleHeatCoolSetpoint || '', ['SingleHeatingOrCooling'])}
+                    </select>
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <select class="w-full text-[8px]" data-field="dual">
+                        ${setpointOptions(existing.dualSetpoint || '', ['DualSetpoint'])}
+                    </select>
                 </td>
             `;
-            tstatsTbody.appendChild(tr);
+            tstatZoneControlsTbody.appendChild(tr);
         });
+
+        // Backwards compatibility UI (legacy per-zone heat/cool schedule overrides)
+        if (tstatsTbody) {
+            tstatsTbody.innerHTML = '';
+            const schedOptions = (selected) => {
+                let html = '<option value="">(inherit)</option>';
+                state.schedNames.forEach((nm) => {
+                    const sel = nm === selected ? ' selected' : '';
+                    html += `<option value="${nm}"${sel}>${nm}</option>`;
+                });
+                return html;
+            };
+            state.zones.forEach((z) => {
+                const zn = String(z.name);
+                const legacy = state.perZoneT.get(zn) || {};
+                const tr = document.createElement('tr');
+                tr.dataset.zoneName = zn;
+                tr.innerHTML = `
+                    <td class="px-1 py-1 align-top text-[--accent-color]">${zn}</td>
+                    <td class="px-1 py-1 align-top">
+                        <select class="w-full text-[8px]" data-field="heatSched">${schedOptions(legacy.heatingScheduleName || '')}</select>
+                    </td>
+                    <td class="px-1 py-1 align-top">
+                        <select class="w-full text-[8px]" data-field="coolSched">${schedOptions(legacy.coolingScheduleName || '')}</select>
+                    </td>
+                `;
+                tstatsTbody.appendChild(tr);
+            });
+        }
     }
 
     function fillGlobalIdealUI(ep, state) {
@@ -4574,7 +4969,10 @@ function createIdealLoadsManagerPanel() {
     }
 
     function renderPerZoneIdeal(state) {
+        if (!idealPerZoneTbody) return;
+
         idealPerZoneTbody.innerHTML = '';
+
         const schedOptions = (selected) => {
             let html = '<option value="">(inherit/global)</option>';
             state.schedNames.forEach((nm) => {
@@ -4583,6 +4981,7 @@ function createIdealLoadsManagerPanel() {
             });
             return html;
         };
+
         const oaMethodOptions = (selected) => {
             const methods = ['', 'None', 'Sum', 'Flow/Person', 'Flow/Area'];
             return methods
@@ -4599,37 +4998,42 @@ function createIdealLoadsManagerPanel() {
             const cfg = state.perZoneIdeal.get(zn) || {};
             const tr = document.createElement('tr');
             tr.dataset.zoneName = zn;
+
+            const heatCap = cfg.maxHeatingCapacity != null ? cfg.maxHeatingCapacity : '';
+            const coolCap = cfg.maxCoolingCapacity != null ? cfg.maxCoolingCapacity : '';
+            const oaMethod = cfg.outdoorAirMethod || '';
+            const oaPP_Ls =
+                cfg.outdoorAirFlowPerPerson != null
+                    ? (cfg.outdoorAirFlowPerPerson * 1000.0).toString()
+                    : '';
+            const oaPA_Ls =
+                cfg.outdoorAirFlowPerArea != null
+                    ? (cfg.outdoorAirFlowPerArea * 1000.0).toString()
+                    : '';
+
             tr.innerHTML = `
                 <td class="px-1 py-1 align-top text-[--accent-color]">${zn}</td>
                 <td class="px-1 py-1 align-top">
-                    <select class="w-full text-[8px]" data-field="il-avail">${schedOptions(cfg.availabilitySchedule || '')}</select>
-                </td>
-                <td class="px-1 py-1 align-top">
-                    <input type="number" class="w-full text-[8px]" data-field="il-heatcap" value="${cfg.maxHeatingCapacity ?? ''}">
-                </td>
-                <td class="px-1 py-1 align-top">
-                    <input type="number" class="w-full text-[8px]" data-field="il-coolcap" value="${cfg.maxCoolingCapacity ?? ''}">
-                </td>
-                <td class="px-1 py-1 align-top">
-                    <select class="w-full text-[8px]" data-field="il-oamethod">
-                        ${oaMethodOptions(cfg.outdoorAirMethod || '')}
+                    <select class="w-full text-[8px]" data-field="il-avail">
+                        ${schedOptions(cfg.availabilitySchedule || '')}
                     </select>
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <input type="number" step="0.001" class="w-full text-[8px]" data-field="il-oaperperson"
-                        value="${
-                            cfg.outdoorAirFlowPerPerson != null
-                                ? cfg.outdoorAirFlowPerPerson * 1000.0
-                                : ''
-                        }">
+                    <input type="number" class="w-full text-[8px]" data-field="il-heatcap" value="${heatCap}">
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <input type="number" step="0.001" class="w-full text-[8px]" data-field="il-oaperarea"
-                        value="${
-                            cfg.outdoorAirFlowPerArea != null
-                                ? cfg.outdoorAirFlowPerArea * 1000.0
-                                : ''
-                        }">
+                    <input type="number" class="w-full text-[8px]" data-field="il-coolcap" value="${coolCap}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <select class="w-full text-[8px]" data-field="il-oamethod">
+                        ${oaMethodOptions(oaMethod)}
+                    </select>
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input type="number" step="0.001" class="w-full text-[8px]" data-field="il-oaperperson" value="${oaPP_Ls}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input type="number" step="0.001" class="w-full text-[8px]" data-field="il-oaperarea" value="${oaPA_Ls}">
                 </td>
             `;
             idealPerZoneTbody.appendChild(tr);
@@ -4641,6 +5045,52 @@ function createIdealLoadsManagerPanel() {
         const state = buildState(ep);
         const zones = state.zones.map((z) => z.name);
         const zoneSet = new Set(zones);
+
+        // Collect thermostat setpoints (scope: "setpoint")
+        const nextThermostats = [];
+
+        if (tstatSetpointsTbody) {
+            tstatSetpointsTbody.querySelectorAll('tr').forEach((tr) => {
+                // Skip placeholder rows
+                if (tr.querySelector('td[colspan]')) return;
+
+                const name = (tr.querySelector('[data-field="name"]')?.value || '').trim();
+                if (!name) return;
+
+                const type = (tr.querySelector('[data-field="type"]')?.value || 'DualSetpoint').trim();
+                const heatSched = (tr.querySelector('[data-field="heatSched"]')?.value || '').trim();
+                const coolSched = (tr.querySelector('[data-field="coolSched"]')?.value || '').trim();
+
+                const sp = {
+                    scope: 'setpoint',
+                    name,
+                    type,
+                };
+
+                if (type === 'SingleHeating') {
+                    if (!heatSched) return;
+                    sp.heatingScheduleName = heatSched;
+                } else if (type === 'SingleCooling') {
+                    if (!coolSched) return;
+                    sp.coolingScheduleName = coolSched;
+                } else if (type === 'SingleHeatingOrCooling') {
+                    if (!heatSched && !coolSched) return;
+                    // For single heating/cooling we allow referencing one schedule; prefer heatSched if set.
+                    if (heatSched) {
+                        sp.singleScheduleName = heatSched;
+                    } else if (coolSched) {
+                        sp.singleScheduleName = coolSched;
+                    }
+                } else {
+                    // DualSetpoint
+                    if (!heatSched || !coolSched) return;
+                    sp.heatingScheduleName = heatSched;
+                    sp.coolingScheduleName = coolSched;
+                }
+
+                nextThermostats.push(sp);
+            });
+        }
 
         // Collect global thermostats
         const heatSel = panel.querySelector('[data-field="globalHeatSched"]');
@@ -4658,20 +5108,47 @@ function createIdealLoadsManagerPanel() {
             });
         }
 
-        // Collect per-zone tstat overrides
-        tstatsTbody.querySelectorAll('tr[data-zone-name]').forEach((tr) => {
-            const zn = tr.dataset.zoneName;
-            if (!zn || !zoneSet.has(zn)) return;
-            const heat = (tr.querySelector('[data-field="heatSched"]')?.value || '').trim();
-            const cool = (tr.querySelector('[data-field="coolSched"]')?.value || '').trim();
-            if (heat || cool) {
-                thermostats.push({
-                    zoneName: zn,
-                    heatingScheduleName: heat || undefined,
-                    coolingScheduleName: cool || undefined,
-                });
-            }
-        });
+        // Collect per-zone ThermostatSetpoint mappings from Zone Thermostat Controls
+        if (tstatZoneControlsTbody) {
+            tstatZoneControlsTbody.querySelectorAll('tr[data-zone-name]').forEach((tr) => {
+                const zn = tr.dataset.zoneName;
+                if (!zn || !zoneSet.has(zn)) return;
+
+                const controlTypeSchedule = (tr.querySelector('[data-field="ctrlSched"]')?.value || '').trim();
+                const singleHeat = (tr.querySelector('[data-field="singleHeat"]')?.value || '').trim();
+                const singleCool = (tr.querySelector('[data-field="singleCool"]')?.value || '').trim();
+                const singleHC = (tr.querySelector('[data-field="singleHeatCool"]')?.value || '').trim();
+                const dual = (tr.querySelector('[data-field="dual"]')?.value || '').trim();
+
+                if (controlTypeSchedule || singleHeat || singleCool || singleHC || dual) {
+                    thermostats.push({
+                        zoneName: zn,
+                        controlTypeSchedule: controlTypeSchedule || undefined,
+                        singleHeatingSetpoint: singleHeat || undefined,
+                        singleCoolingSetpoint: singleCool || undefined,
+                        singleHeatCoolSetpoint: singleHC || undefined,
+                        dualSetpoint: dual || undefined,
+                    });
+                }
+            });
+        }
+
+        // Backwards-compatible per-zone overrides table (if present)
+        if (tstatsTbody) {
+            tstatsTbody.querySelectorAll('tr[data-zone-name]').forEach((tr) => {
+                const zn = tr.dataset.zoneName;
+                if (!zn || !zoneSet.has(zn)) return;
+                const heat = (tr.querySelector('[data-field="heatSched"]')?.value || '').trim();
+                const cool = (tr.querySelector('[data-field="coolSched"]')?.value || '').trim();
+                if (heat || cool) {
+                    thermostats.push({
+                        zoneName: zn,
+                        heatingScheduleName: heat || undefined,
+                        coolingScheduleName: cool || undefined,
+                    });
+                }
+            });
+        }
 
         // Collect global IdealLoads
         const availSel = panel.querySelector('[data-field="il-global-avail"]');
@@ -4778,9 +5255,33 @@ function createIdealLoadsManagerPanel() {
             idealLoads.perZone = perZoneIdeal;
         }
 
+        // Merge existing non-setpoint thermostat records which are not overridden.
+        const existing = Array.isArray(ep.thermostats) ? ep.thermostats : [];
+        existing.forEach((t) => {
+            if (!t || t.scope === 'setpoint') return;
+            const zn = (t.zoneName || '').toString();
+            if (
+                zn === 'GLOBAL' &&
+                thermostats.some((x) => x.zoneName === 'GLOBAL')
+            ) {
+                return;
+            }
+            if (
+                zn &&
+                zn !== 'GLOBAL' &&
+                thermostats.some((x) => x.zoneName === zn)
+            ) {
+                return;
+            }
+            thermostats.push({ ...t });
+        });
+
+        // Prepend setpoint definitions so they are easy to find.
+        const mergedThermostats = [...nextThermostats, ...thermostats];
+
         const nextEp = {
             ...ep,
-            thermostats: thermostats,
+            thermostats: mergedThermostats,
             idealLoads: idealLoads,
         };
 
@@ -4797,18 +5298,155 @@ function createIdealLoadsManagerPanel() {
         }
     }
 
+    function collectThermostatSetpointsFromUI() {
+        if (!tstatSetpointsTbody) return [];
+
+        const rows = Array.from(tstatSetpointsTbody.querySelectorAll('tr'));
+        const setpoints = [];
+
+        rows.forEach((tr) => {
+            if (tr.querySelector('td[colspan]')) return;
+
+            const name = (tr.querySelector('[data-field="name"]')?.value || '').trim();
+            if (!name) return;
+
+            const type = (tr.querySelector('[data-field="type"]')?.value || 'DualSetpoint').trim();
+            const heatSched = (tr.querySelector('[data-field="heatSched"]')?.value || '').trim();
+            const coolSched = (tr.querySelector('[data-field="coolSched"]')?.value || '').trim();
+
+            const sp = { name, type };
+
+            if (type === 'SingleHeating') {
+                if (!heatSched) return;
+                sp.heatingScheduleName = heatSched;
+            } else if (type === 'SingleCooling') {
+                if (!coolSched) return;
+                sp.coolingScheduleName = coolSched;
+            } else if (type === 'SingleHeatingOrCooling') {
+                // Use either heat or cool schedule as single setpoint.
+                if (!heatSched && !coolSched) return;
+                sp.singleScheduleName = heatSched || coolSched;
+            } else {
+                // DualSetpoint
+                if (!heatSched || !coolSched) return;
+                sp.heatingScheduleName = heatSched;
+                sp.coolingScheduleName = coolSched;
+            }
+
+            setpoints.push(sp);
+        });
+
+        return setpoints;
+    }
+
     function renderAll() {
         const { ep } = getMetaEp();
         const state = buildState(ep);
+        renderThermostatSetpoints(ep, state);
         fillGlobalThermostatUI(ep, state);
         renderPerZoneThermostats(ep, state);
         fillGlobalIdealUI(ep, state);
         renderPerZoneIdeal(state);
+
+        // Ensure "Add Setpoint" is always wired once DOM is ready.
+        const addBtn = panel.querySelector('[data-action="add-tstat-setpoint"]');
+        if (addBtn && !addBtn._tstatSetpointBound) {
+            addBtn._tstatSetpointBound = true;
+            addBtn.addEventListener('click', () => {
+                if (!tstatSetpointsTbody) return;
+
+                const stateNow = buildState(getMetaEp().ep);
+                const schedOptions = (selected) => {
+                    let html = '<option value="">(none)</option>';
+                    stateNow.schedNames.forEach((nm) => {
+                        const sel = nm === selected ? ' selected' : '';
+                        html += `<option value="${nm}"${sel}>${nm}</option>`;
+                    });
+                    return html;
+                };
+
+                const first = tstatSetpointsTbody.children[0];
+                if (first && first.querySelector && first.querySelector('td[colspan]')) {
+                    tstatSetpointsTbody.innerHTML = '';
+                }
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-1 py-1 align-top">
+                        <input class="w-full text-[8px]" data-field="name" placeholder="Setpoint name">
+                    </td>
+                    <td class="px-1 py-1 align-top">
+                        <select class="w-full text-[8px]" data-field="type">
+                            <option value="DualSetpoint" selected>DualSetpoint</option>
+                            <option value="SingleHeating">SingleHeating</option>
+                            <option value="SingleCooling">SingleCooling</option>
+                            <option value="SingleHeatingOrCooling">SingleHeatingOrCooling</option>
+                        </select>
+                    </td>
+                    <td class="px-1 py-1 align-top">
+                        <div class="grid grid-cols-2 gap-0.5">
+                            <div>
+                                <div class="text-[6px] text-[--text-secondary]">Heat / Single</div>
+                                <select class="w-full text-[8px]" data-field="heatSched">
+                                    ${schedOptions('')}
+                                </select>
+                            </div>
+                            <div>
+                                <div class="text-[6px] text-[--text-secondary]">Cool</div>
+                                <select class="w-full text-[8px]" data-field="coolSched">
+                                    ${schedOptions('')}
+                                </select>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-1 py-1 align-top text-right">
+                        <button class="btn btn-xxs btn-danger" data-action="delete-setpoint">Delete</button>
+                    </td>
+                `;
+                tstatSetpointsTbody.appendChild(tr);
+
+                const del = tr.querySelector('button[data-action="delete-setpoint"]');
+                if (del) {
+                    del.addEventListener('click', () => tr.remove());
+                }
+            });
+        }
     }
 
     if (saveBtn) {
         saveBtn.addEventListener('click', () => {
             try {
+                const setpoints = collectThermostatSetpointsFromUI();
+                const { meta, ep } = getMetaEp();
+
+                // Persist setpoints via service when available
+                try {
+                    if (window.require) {
+                        const { setThermostatSetpoints } = window.require('./energyplusConfigService.js');
+                        if (typeof setThermostatSetpoints === 'function') {
+                            setThermostatSetpoints(project, setpoints);
+                        } else {
+                            throw new Error('setThermostatSetpoints not available');
+                        }
+                    } else {
+                        throw new Error('window.require not available');
+                    }
+                } catch (err) {
+                    console.warn('[IdealLoadsManager] setThermostatSetpoints via service failed, falling back', err);
+                    const nextEp = { ...ep, thermostatSetpoints: setpoints };
+                    if (typeof project.updateMetadata === 'function') {
+                        project.updateMetadata({
+                            ...meta,
+                            energyPlusConfig: nextEp,
+                        });
+                    } else {
+                        project.metadata = {
+                            ...(project.metadata || meta),
+                            energyPlusConfig: nextEp,
+                        };
+                    }
+                }
+
                 collectAndSave();
                 alert('Thermostats & IdealLoads configuration saved.');
             } catch (err) {
@@ -5451,40 +6089,42 @@ function openShadingManagerPanel() {
 
 /**
  * Shading & Solar Control Manager
- * Fully opt-in:
- *  - If energyPlusConfig.shading is missing/empty, builder behavior is unchanged.
- *  - Stores high-level hints only; model builder is responsible for mapping.
+ * Canonical schema (matches energyplusModelBuilder + energyplusConfigService.setShading):
  *
- * Schema (writer side):
  *  shading: {
- *    surfaces?: Array<{
- *      targetType: 'Surface' | 'SubSurface' | 'Zone',
- *      targetName: string,
- *      shortWaveReflectance?: number,
+ *    siteSurfaces?: Array<{
+ *      name: string,
+ *      type?: 'Site' | 'Building',
+ *      transmittanceScheduleName?: string,
+ *      vertices: Array<{ x: number, y: number, z: number }>
+ *    }>,
+ *    zoneSurfaces?: Array<{
+ *      name: string,
+ *      baseSurfaceName: string,
+ *      transmittanceScheduleName?: string,
+ *      vertices: Array<{ x: number, y: number, z: number }>
+ *    }>,
+ *    reflectance?: Array<{
+ *      shadingSurfaceName: string,
+ *      solarReflectance?: number,
  *      visibleReflectance?: number,
- *      longWaveEmissivity?: number
+ *      infraredHemisphericalEmissivity?: number,
+ *      infraredTransmittance?: number
  *    }>,
- *    windowControls?: Array<{
+ *    windowShadingControls?: Array<{
  *      name: string,
- *      windowGroup: string,
+ *      shadingType: string,
  *      controlType: string,
- *      shadingDeviceName?: string,
  *      scheduleName?: string,
- *      setpointSolar?: number,
- *      setpointIlluminance?: number,
- *      setpointTemp?: number,
- *      glareProtectionFraction?: number,
- *      typeHint?: string
- *    }>,
- *    overhangs?: Array<{
- *      name: string,
- *      windowGroup: string,
- *      depth: number,
- *      verticalOffset: number,
- *      leftExt?: number,
- *      rightExt?: number
+ *      setpoint1?: number,
+ *      setpoint2?: number,
+ *      glareControlIsActive?: boolean,
+ *      multipleSurfaceControlType?: string,
+ *      fenestrationSurfaceNames: string[]
  *    }>
  *  }
+ *
+ * If shading is empty/missing, builder behavior is unchanged.
  */
 function createShadingManagerPanel() {
     const panel = document.createElement('div');
@@ -5511,12 +6151,12 @@ function createShadingManagerPanel() {
             <div class="resize-handle-corner bottom-right"></div>
 
             <p class="info-box !text-[9px] !py-1.5 !px-2">
-                Configure optional shading and window solar control hints.
-                If left empty, Ray-Modeler will not emit any additional shading or shading controls.
-                All sections below are opt-in and safe to ignore for simple workflows.
+                Configure explicit shading geometry, reflectance, and window shading controls.
+                Settings are stored in <code>energyPlusConfig.shading</code> and consumed directly by the EnergyPlus model builder.
+                If left empty, no additional shading objects are emitted.
             </p>
 
-            <!-- Surface / Zone Optical Properties -->
+            <!-- Site / Building Shading Surfaces (Shading:Site:Detailed / Shading:Building:Detailed) -->
             <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
                 <div class="flex justify-between items-center">
                     <span class="font-semibold text-[9px] uppercase text-[--text-secondary]">
@@ -5530,24 +6170,82 @@ function createShadingManagerPanel() {
                     <table class="w-full text-[7px]">
                         <thead class="bg-black/40">
                             <tr>
-                                <th class="px-1 py-1 text-left">Target Type</th>
-                                <th class="px-1 py-1 text-left">Target Name</th>
-                                <th class="px-1 py-1 text-left">Short-wave Refl.</th>
-                                <th class="px-1 py-1 text-left">Visible Refl.</th>
-                                <th class="px-1 py-1 text-left">Long-wave Emiss.</th>
+                                <th class="px-1 py-1 text-left">Name</th>
+                                <th class="px-1 py-1 text-left">Type</th>
+                                <th class="px-1 py-1 text-left">Transmittance Schedule</th>
+                                <th class="px-1 py-1 text-left">#Vertices</th>
                                 <th class="px-1 py-1 text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody class="shading-surfaces-tbody"></tbody>
+                        <tbody class="shading-site-surfaces-tbody"></tbody>
                     </table>
                 </div>
                 <p class="text-[7px] text-[--text-secondary]">
-                    Use this to override optical properties for specific surfaces, subsurfaces, or zones.
-                    Values must be between 0 and 1. Incomplete rows are ignored on save.
+                    Defines <code>Shading:Site:Detailed</code> and <code>Shading:Building:Detailed</code> surfaces.
+                    Each surface requires a name, type, and at least 3 vertices.
                 </p>
             </div>
 
-            <!-- Window Shading Controls -->
+            <!-- Zone Shading Surfaces (Shading:Zone:Detailed) -->
+            <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                <div class="flex justify-between items-center">
+                    <span class="font-semibold text-[9px] uppercase text-[--text-secondary]">
+                        Zone Shading Surfaces (Shading:Zone:Detailed)
+                    </span>
+                    <button class="btn btn-xxs btn-secondary" data-action="add-zone-surface">
+                        + Add Zone Surface
+                    </button>
+                </div>
+                <div class="border border-gray-700/70 rounded bg-black/40 max-h-32 overflow-y-auto scrollable-panel-inner">
+                    <table class="w-full text-[7px]">
+                        <thead class="bg-black/40">
+                            <tr>
+                                <th class="px-1 py-1 text-left">Name</th>
+                                <th class="px-1 py-1 text-left">Base Surface</th>
+                                <th class="px-1 py-1 text-left">Transmittance Schedule</th>
+                                <th class="px-1 py-1 text-left">#Vertices</th>
+                                <th class="px-1 py-1 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="shading-zone-surfaces-tbody"></tbody>
+                    </table>
+                </div>
+                <p class="text-[7px] text-[--text-secondary]">
+                    Defines <code>Shading:Zone:Detailed</code> attached to existing base surfaces.
+                </p>
+            </div>
+
+            <!-- ShadingProperty:Reflectance -->
+            <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
+                <div class="flex justify-between items-center">
+                    <span class="font-semibold text-[9px] uppercase text-[--text-secondary]">
+                        Shading Surface Reflectance (ShadingProperty:Reflectance)
+                    </span>
+                    <button class="btn btn-xxs btn-secondary" data-action="add-reflectance">
+                        + Add Reflectance
+                    </button>
+                </div>
+                <div class="border border-gray-700/70 rounded bg-black/40 max-h-32 overflow-y-auto scrollable-panel-inner">
+                    <table class="w-full text-[7px]">
+                        <thead class="bg-black/40">
+                            <tr>
+                                <th class="px-1 py-1 text-left">Shading Surface Name</th>
+                                <th class="px-1 py-1 text-left">Solar Refl.</th>
+                                <th class="px-1 py-1 text-left">Visible Refl.</th>
+                                <th class="px-1 py-1 text-left">IR Emiss.</th>
+                                <th class="px-1 py-1 text-left">IR Trans.</th>
+                                <th class="px-1 py-1 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="shading-reflectance-tbody"></tbody>
+                    </table>
+                </div>
+                <p class="text-[7px] text-[--text-secondary]">
+                    Binds optical properties to named shading surfaces.
+                </p>
+            </div>
+
+            <!-- Window Shading Controls (WindowShadingControl) -->
             <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
                 <div class="flex justify-between items-center">
                     <span class="font-semibold text-[9px] uppercase text-[--text-secondary]">
@@ -5562,12 +6260,14 @@ function createShadingManagerPanel() {
                         <thead class="bg-black/40">
                             <tr>
                                 <th class="px-1 py-1 text-left">Name</th>
-                                <th class="px-1 py-1 text-left">Window Group</th>
+                                <th class="px-1 py-1 text-left">Shading Type</th>
                                 <th class="px-1 py-1 text-left">Control Type</th>
-                                <th class="px-1 py-1 text-left">Device / Sched</th>
-                                <th class="px-1 py-1 text-left">Setpoints (Solar / Lux / °C)</th>
-                                <th class="px-1 py-1 text-left">Glare Frac</th>
-                                <th class="px-1 py-1 text-left">Type Hint</th>
+                                <th class="px-1 py-1 text-left">Schedule</th>
+                                <th class="px-1 py-1 text-left">Setpoint 1</th>
+                                <th class="px-1 py-1 text-left">Setpoint 2</th>
+                                <th class="px-1 py-1 text-left">Glare Active</th>
+                                <th class="px-1 py-1 text-left">Multi-Surface Type</th>
+                                <th class="px-1 py-1 text-left">Fenestration Names (comma-separated)</th>
                                 <th class="px-1 py-1 text-right">Actions</th>
                             </tr>
                         </thead>
@@ -5575,42 +6275,9 @@ function createShadingManagerPanel() {
                     </table>
                 </div>
                 <p class="text-[7px] text-[--text-secondary]">
-                    High-level hints mapped by the model builder to WindowProperty:ShadingControl etc.
-                    Provide at minimum Name, Window Group, and Control Type.
+                    Directly defines <code>WindowShadingControl</code> objects. All referenced fenestration surfaces must exist in the IDF.
                 </p>
             </div>
-
-            <!-- Fixed Overhangs / Fins (optional, advanced) -->
-            <details class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
-                <summary class="font-semibold text-[9px] uppercase text-[--text-secondary] cursor-pointer">
-                    Fixed Overhangs (Advanced, optional)
-                </summary>
-                <div class="flex justify-end mb-1">
-                    <button class="btn btn-xxs btn-secondary" data-action="add-overhang">
-                        + Add Overhang
-                    </button>
-                </div>
-                <div class="border border-gray-700/70 rounded bg-black/40 max-h-32 overflow-y-auto scrollable-panel-inner">
-                    <table class="w-full text-[7px]">
-                        <thead class="bg-black/40">
-                            <tr>
-                                <th class="px-1 py-1 text-left">Name</th>
-                                <th class="px-1 py-1 text-left">Window Group</th>
-                                <th class="px-1 py-1 text-left">Depth [m]</th>
-                                <th class="px-1 py-1 text-left">Vert. Offset [m]</th>
-                                <th class="px-1 py-1 text-left">Left Ext [m]</th>
-                                <th class="px-1 py-1 text-left">Right Ext [m]</th>
-                                <th class="px-1 py-1 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="shading-overhangs-tbody"></tbody>
-                    </table>
-                </div>
-                <p class="text-[7px] text-[--text-secondary]">
-                    Overhang definitions are passed as hints. The builder may emit Shading:* objects where supported.
-                    Leave blank if you do not need geometric shading.
-                </p>
-            </details>
 
             <div class="flex justify-end">
                 <button class="btn btn-xxs btn-secondary" data-action="save-shading">
@@ -5629,29 +6296,38 @@ function createShadingManagerPanel() {
         }
     }
 
-    const surfacesTbody = panel.querySelector('.shading-surfaces-tbody');
+    const siteSurfacesTbody = panel.querySelector('.shading-site-surfaces-tbody');
+    const zoneSurfacesTbody = panel.querySelector('.shading-zone-surfaces-tbody');
+    const reflectanceTbody = panel.querySelector('.shading-reflectance-tbody');
     const windowControlsTbody = panel.querySelector('.shading-window-controls-tbody');
-    const overhangsTbody = panel.querySelector('.shading-overhangs-tbody');
-    const addSurfaceBtn = panel.querySelector('[data-action="add-surface-opt"]');
+    const addSiteSurfaceBtn = panel.querySelector('[data-action="add-surface-opt"]');
+    const addZoneSurfaceBtn = panel.querySelector('[data-action="add-zone-surface"]');
+    const addReflectanceBtn = panel.querySelector('[data-action="add-reflectance"]');
     const addWinCtrlBtn = panel.querySelector('[data-action="add-window-control"]');
-    const addOverhangBtn = panel.querySelector('[data-action="add-overhang"]');
     const saveBtn = panel.querySelector('[data-action="save-shading"]');
 
     function getShadingState() {
-        const meta =
-            (typeof project.getMetadata === 'function' && project.getMetadata()) ||
-            project.metadata ||
-            {};
-        const ep = meta.energyPlusConfig || meta.energyplus || {};
-        const shading = ep.shading || {};
+        const { config } = window.require
+            ? window.require('./energyplusConfigService.js').getConfig(project)
+            : (() => {
+                  // Fallback if require not available; mimic getConfig minimally
+                  const meta =
+                      (typeof project.getMetadata === 'function' && project.getMetadata()) ||
+                      project.metadata ||
+                      {};
+                  const ep = meta.energyPlusConfig || meta.energyplus || {};
+                  return { config: { shading: ep.shading || {} } };
+              })();
 
-        const surfaces = Array.isArray(shading.surfaces) ? shading.surfaces.slice() : [];
-        const windowControls = Array.isArray(shading.windowControls)
-            ? shading.windowControls.slice()
-            : [];
-        const overhangs = Array.isArray(shading.overhangs) ? shading.overhangs.slice() : [];
-
-        return { meta, ep, shading, surfaces, windowControls, overhangs };
+        const shading = config.shading || {};
+        return {
+            siteSurfaces: Array.isArray(shading.siteSurfaces) ? shading.siteSurfaces.slice() : [],
+            zoneSurfaces: Array.isArray(shading.zoneSurfaces) ? shading.zoneSurfaces.slice() : [],
+            reflectance: Array.isArray(shading.reflectance) ? shading.reflectance.slice() : [],
+            windowShadingControls: Array.isArray(shading.windowShadingControls)
+                ? shading.windowShadingControls.slice()
+                : [],
+        };
     }
 
     function clamp01(v) {
@@ -5661,55 +6337,50 @@ function createShadingManagerPanel() {
         return v;
     }
 
-    function renderSurfaces() {
-        const { surfaces } = getShadingState();
-        surfacesTbody.innerHTML = '';
+    function renderSiteSurfaces() {
+        const { siteSurfaces } = getShadingState();
+        siteSurfacesTbody.innerHTML = '';
 
-        if (!surfaces.length) {
+        if (!siteSurfaces.length) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="px-1 py-1 text-[7px] text-[--text-secondary]" colspan="6">
-                    No surface/zone shading overrides defined.
+                <td class="px-1 py-1 text-[7px] text-[--text-secondary]" colspan="5">
+                    No site/building shading surfaces defined.
                 </td>
             `;
-            surfacesTbody.appendChild(tr);
+            siteSurfacesTbody.appendChild(tr);
             return;
         }
 
-        surfaces.forEach((s, idx) => {
+        siteSurfaces.forEach((s, idx) => {
             const tr = document.createElement('tr');
             tr.dataset.index = String(idx);
+            const type = s.type === 'Building' ? 'Building' : 'Site';
+            const vertexCount = Array.isArray(s.vertices) ? s.vertices.length : 0;
             tr.innerHTML = `
                 <td class="px-1 py-1 align-top">
-                    <select class="w-full" data-field="targetType">
-                        ${['Surface','SubSurface','Zone'].map(t => `
-                            <option value="${t}"${(s.targetType || 'Surface') === t ? ' selected' : ''}>${t}</option>
-                        `).join('')}
+                    <input class="w-full" data-field="name" value="${s.name || ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <select class="w-full" data-field="type">
+                        <option value="Site"${type === 'Site' ? ' selected' : ''}>Site</option>
+                        <option value="Building"${type === 'Building' ? ' selected' : ''}>Building</option>
                     </select>
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <input class="w-full" data-field="targetName" value="${s.targetName || ''}">
+                    <input class="w-full" data-field="sched" value="${s.transmittanceScheduleName || ''}">
                 </td>
-                <td class="px-1 py-1 align-top">
-                    <input type="number" step="0.01" min="0" max="1" class="w-full"
-                        data-field="swRefl" value="${s.shortWaveReflectance ?? ''}">
-                </td>
-                <td class="px-1 py-1 align-top">
-                    <input type="number" step="0.01" min="0" max="1" class="w-full"
-                        data-field="visRefl" value="${s.visibleReflectance ?? ''}">
-                </td>
-                <td class="px-1 py-1 align-top">
-                    <input type="number" step="0.01" min="0" max="1" class="w-full"
-                        data-field="lwEmiss" value="${s.longWaveEmissivity ?? ''}">
+                <td class="px-1 py-1 align-top text-[--text-secondary]">
+                    ${vertexCount || 0} (edit in JSON)
                 </td>
                 <td class="px-1 py-1 align-top text-right">
-                    <button class="btn btn-xxs btn-danger" data-action="delete-surface">Delete</button>
+                    <button class="btn btn-xxs btn-danger" data-action="delete-site-surface">Delete</button>
                 </td>
             `;
-            surfacesTbody.appendChild(tr);
+            siteSurfacesTbody.appendChild(tr);
         });
 
-        surfacesTbody.querySelectorAll('button[data-action="delete-surface"]').forEach((btn) => {
+        siteSurfacesTbody.querySelectorAll('button[data-action="delete-site-surface"]').forEach((btn) => {
             btn.addEventListener('click', () => {
                 const row = btn.closest('tr');
                 if (row) row.remove();
@@ -5717,61 +6388,217 @@ function createShadingManagerPanel() {
         });
     }
 
-    function addSurfaceRow() {
-        // Remove placeholder row if present
-        if (surfacesTbody.children.length === 1) {
-            const only = surfacesTbody.children[0];
+    function addSiteSurfaceRow() {
+        if (siteSurfacesTbody.children.length === 1) {
+            const only = siteSurfacesTbody.children[0];
             if (only && only.querySelector('td[colspan]')) {
-                surfacesTbody.innerHTML = '';
+                siteSurfacesTbody.innerHTML = '';
             }
         }
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td class="px-1 py-1 align-top">
-                <select class="w-full" data-field="targetType">
-                    <option value="Surface">Surface</option>
-                    <option value="SubSurface">SubSurface</option>
-                    <option value="Zone">Zone</option>
+                <input class="w-full" data-field="name" placeholder="Name">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <select class="w-full" data-field="type">
+                    <option value="Site">Site</option>
+                    <option value="Building">Building</option>
                 </select>
             </td>
             <td class="px-1 py-1 align-top">
-                <input class="w-full" data-field="targetName" placeholder="Name">
+                <input class="w-full" data-field="sched" placeholder="Transmittance schedule">
             </td>
-            <td class="px-1 py-1 align-top">
-                <input type="number" step="0.01" min="0" max="1" class="w-full" data-field="swRefl">
-            </td>
-            <td class="px-1 py-1 align-top">
-                <input type="number" step="0.01" min="0" max="1" class="w-full" data-field="visRefl">
-            </td>
-            <td class="px-1 py-1 align-top">
-                <input type="number" step="0.01" min="0" max="1" class="w-full" data-field="lwEmiss">
+            <td class="px-1 py-1 align-top text-[--text-secondary]">
+                0 (edit vertices in JSON)
             </td>
             <td class="px-1 py-1 align-top text-right">
-                <button class="btn btn-xxs btn-danger" data-action="delete-surface">Delete</button>
+                <button class="btn btn-xxs btn-danger" data-action="delete-site-surface">Delete</button>
             </td>
         `;
-        surfacesTbody.appendChild(tr);
-        tr.querySelector('button[data-action="delete-surface"]').addEventListener('click', () => {
+        siteSurfacesTbody.appendChild(tr);
+        tr.querySelector('button[data-action="delete-site-surface"]').addEventListener('click', () => {
+            tr.remove();
+        });
+    }
+
+    function renderZoneSurfaces() {
+        const { zoneSurfaces } = getShadingState();
+        zoneSurfacesTbody.innerHTML = '';
+
+        if (!zoneSurfaces.length) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="px-1 py-1 text-[7px] text-[--text-secondary]" colspan="5">
+                    No zone shading surfaces defined.
+                </td>
+            `;
+            zoneSurfacesTbody.appendChild(tr);
+            return;
+        }
+
+        zoneSurfaces.forEach((s, idx) => {
+            const tr = document.createElement('tr');
+            tr.dataset.index = String(idx);
+            const vertexCount = Array.isArray(s.vertices) ? s.vertices.length : 0;
+            tr.innerHTML = `
+                <td class="px-1 py-1 align-top">
+                    <input class="w-full" data-field="name" value="${s.name || ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input class="w-full" data-field="base" value="${s.baseSurfaceName || ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input class="w-full" data-field="sched" value="${s.transmittanceScheduleName || ''}">
+                </td>
+                <td class="px-1 py-1 align-top text-[--text-secondary]">
+                    ${vertexCount || 0} (edit in JSON)
+                </td>
+                <td class="px-1 py-1 align-top text-right">
+                    <button class="btn btn-xxs btn-danger" data-action="delete-zone-surface">Delete</button>
+                </td>
+            `;
+            zoneSurfacesTbody.appendChild(tr);
+        });
+
+        zoneSurfacesTbody.querySelectorAll('button[data-action="delete-zone-surface"]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const row = btn.closest('tr');
+                if (row) row.remove();
+            });
+        });
+    }
+
+    function addZoneSurfaceRow() {
+        if (zoneSurfacesTbody.children.length === 1) {
+            const only = zoneSurfacesTbody.children[0];
+            if (only && only.querySelector('td[colspan]')) {
+                zoneSurfacesTbody.innerHTML = '';
+            }
+        }
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="px-1 py-1 align-top">
+                <input class="w-full" data-field="name" placeholder="Name">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input class="w-full" data-field="base" placeholder="Base Surface Name">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input class="w-full" data-field="sched" placeholder="Transmittance schedule">
+            </td>
+            <td class="px-1 py-1 align-top text-[--text-secondary]">
+                0 (edit vertices in JSON)
+            </td>
+            <td class="px-1 py-1 align-top text-right">
+                <button class="btn btn-xxs btn-danger" data-action="delete-zone-surface">Delete</button>
+            </td>
+        `;
+        zoneSurfacesTbody.appendChild(tr);
+        tr.querySelector('button[data-action="delete-zone-surface"]').addEventListener('click', () => {
+            tr.remove();
+        });
+    }
+
+    function renderReflectance() {
+        const { reflectance } = getShadingState();
+        reflectanceTbody.innerHTML = '';
+
+        if (!reflectance.length) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="px-1 py-1 text-[7px] text-[--text-secondary]" colspan="6">
+                    No ShadingProperty:Reflectance entries defined.
+                </td>
+            `;
+            reflectanceTbody.appendChild(tr);
+            return;
+        }
+
+        reflectance.forEach((r, idx) => {
+            const tr = document.createElement('tr');
+            tr.dataset.index = String(idx);
+            tr.innerHTML = `
+                <td class="px-1 py-1 align-top">
+                    <input class="w-full" data-field="name" value="${r.shadingSurfaceName || ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input type="number" step="0.01" min="0" max="1" class="w-full" data-field="solar" value="${r.solarReflectance ?? ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input type="number" step="0.01" min="0" max="1" class="w-full" data-field="vis" value="${r.visibleReflectance ?? ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input type="number" step="0.01" min="0" max="1" class="w-full" data-field="irem" value="${r.infraredHemisphericalEmissivity ?? ''}">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input type="number" step="0.01" min="0" max="1" class="w-full" data-field="irtr" value="${r.infraredTransmittance ?? ''}">
+                </td>
+                <td class="px-1 py-1 align-top text-right">
+                    <button class="btn btn-xxs btn-danger" data-action="delete-reflectance">Delete</button>
+                </td>
+            `;
+            reflectanceTbody.appendChild(tr);
+        });
+
+        reflectanceTbody.querySelectorAll('button[data-action="delete-reflectance"]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const row = btn.closest('tr');
+                if (row) row.remove();
+            });
+        });
+    }
+
+    function addReflectanceRow() {
+        if (reflectanceTbody.children.length === 1) {
+            const only = reflectanceTbody.children[0];
+            if (only && only.querySelector('td[colspan]')) {
+                reflectanceTbody.innerHTML = '';
+            }
+        }
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="px-1 py-1 align-top">
+                <input class="w-full" data-field="name" placeholder="Shading surface name">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input type="number" step="0.01" min="0" max="1" class="w-full" data-field="solar">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input type="number" step="0.01" min="0" max="1" class="w-full" data-field="vis">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input type="number" step="0.01" min="0" max="1" class="w-full" data-field="irem">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input type="number" step="0.01" min="0" max="1" class="w-full" data-field="irtr">
+            </td>
+            <td class="px-1 py-1 align-top text-right">
+                <button class="btn btn-xxs btn-danger" data-action="delete-reflectance">Delete</button>
+            </td>
+        `;
+        reflectanceTbody.appendChild(tr);
+        tr.querySelector('button[data-action="delete-reflectance"]').addEventListener('click', () => {
             tr.remove();
         });
     }
 
     function renderWindowControls() {
-        const { windowControls } = getShadingState();
+        const { windowShadingControls } = getShadingState();
         windowControlsTbody.innerHTML = '';
 
-        if (!windowControls.length) {
+        if (!windowShadingControls.length) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="px-1 py-1 text-[7px] text-[--text-secondary]" colspan="8">
-                    No window shading controls defined.
+                <td class="px-1 py-1 text-[7px] text-[--text-secondary]" colspan="10">
+                    No WindowShadingControl entries defined.
                 </td>
             `;
             windowControlsTbody.appendChild(tr);
             return;
         }
 
-        windowControls.forEach((c, idx) => {
+        windowShadingControls.forEach((c, idx) => {
             const tr = document.createElement('tr');
             tr.dataset.index = String(idx);
             tr.innerHTML = `
@@ -5779,52 +6606,28 @@ function createShadingManagerPanel() {
                     <input class="w-full" data-field="name" value="${c.name || ''}">
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <input class="w-full" data-field="windowGroup" value="${c.windowGroup || ''}" placeholder="Group/tag">
+                    <input class="w-full" data-field="shadingType" value="${c.shadingType || ''}" placeholder="InteriorShade, ExteriorScreen, etc.">
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <select class="w-full" data-field="controlType">
-                        ${[
-                            '',
-                            'AlwaysOn',
-                            'OnIfHighSolar',
-                            'OnIfHighGlare',
-                            'OnIfHighT',
-                            'OnIfHighSolarOrT',
-                        ].map((t) => `
-                            <option value="${t}"${(c.controlType || '') === t ? ' selected' : ''}>
-                                ${t || '(select)'}
-                            </option>
-                        `).join('')}
-                    </select>
+                    <input class="w-full" data-field="controlType" value="${c.controlType || ''}" placeholder="OnIfHighSolar, Schedule, etc.">
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <input class="w-full mb-0.5" data-field="device" placeholder="Shading device"
-                        value="${c.shadingDeviceName || ''}">
-                    <input class="w-full" data-field="schedule" placeholder="Schedule"
-                        value="${c.scheduleName || ''}">
+                    <input class="w-full" data-field="scheduleName" value="${c.scheduleName || ''}">
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <div class="grid grid-cols-3 gap-0.5">
-                        <input type="number" step="1" class="w-full" data-field="setSolar"
-                            placeholder="W/m²" value="${c.setpointSolar ?? ''}">
-                        <input type="number" step="1" class="w-full" data-field="setLux"
-                            placeholder="lux" value="${c.setpointIlluminance ?? ''}">
-                        <input type="number" step="0.1" class="w-full" data-field="setTemp"
-                            placeholder="°C" value="${c.setpointTemp ?? ''}">
-                    </div>
+                    <input type="number" step="0.01" class="w-full" data-field="setpoint1" value="${c.setpoint1 ?? ''}">
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <input type="number" step="0.05" min="0" max="1" class="w-full"
-                        data-field="glareFrac" value="${c.glareProtectionFraction ?? ''}">
+                    <input type="number" step="0.01" class="w-full" data-field="setpoint2" value="${c.setpoint2 ?? ''}">
+                </td>
+                <td class="px-1 py-1 align-top text-center">
+                    <input type="checkbox" data-field="glareActive" ${c.glareControlIsActive ? 'checked' : ''}>
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <select class="w-full" data-field="typeHint">
-                        ${['','Blind','Shade','Screen','SwitchableGlazing'].map((t) => `
-                            <option value="${t}"${(c.typeHint || '') === t ? ' selected' : ''}>
-                                ${t || '(auto)'}
-                            </option>
-                        `).join('')}
-                    </select>
+                    <input class="w-full" data-field="multiType" value="${c.multipleSurfaceControlType || ''}" placeholder="Sequential/Group">
+                </td>
+                <td class="px-1 py-1 align-top">
+                    <input class="w-full" data-field="fenestration" value="${Array.isArray(c.fenestrationSurfaceNames) ? c.fenestrationSurfaceNames.join(', ') : ''}">
                 </td>
                 <td class="px-1 py-1 align-top text-right">
                     <button class="btn btn-xxs btn-danger" data-action="delete-window-control">Delete</button>
@@ -5842,6 +6645,216 @@ function createShadingManagerPanel() {
                 });
             });
     }
+
+    function addWindowControlRow() {
+        if (windowControlsTbody.children.length === 1) {
+            const only = windowControlsTbody.children[0];
+            if (only && only.querySelector('td[colspan]')) {
+                windowControlsTbody.innerHTML = '';
+            }
+        }
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="px-1 py-1 align-top">
+                <input class="w-full" data-field="name" placeholder="Control name">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input class="w-full" data-field="shadingType" placeholder="InteriorShade, ExteriorBlind, etc.">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input class="w-full" data-field="controlType" placeholder="OnIfHighSolar, Schedule, etc.">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input class="w-full" data-field="scheduleName" placeholder="Schedule name">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input type="number" step="0.01" class="w-full" data-field="setpoint1" placeholder="Setpoint 1">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input type="number" step="0.01" class="w-full" data-field="setpoint2" placeholder="Setpoint 2">
+            </td>
+            <td class="px-1 py-1 align-top text-center">
+                <input type="checkbox" data-field="glareActive">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input class="w-full" data-field="multiType" placeholder="Sequential/Group">
+            </td>
+            <td class="px-1 py-1 align-top">
+                <input class="w-full" data-field="fenestration" placeholder="Win1, Win2, ...">
+            </td>
+            <td class="px-1 py-1 align-top text-right">
+                <button class="btn btn-xxs btn-danger" data-action="delete-window-control">Delete</button>
+            </td>
+        `;
+        windowControlsTbody.appendChild(tr);
+        tr.querySelector('button[data-action="delete-window-control"]').addEventListener('click', () => {
+            tr.remove();
+        });
+    }
+
+    function collectAndSaveShading() {
+        const { meta, ep } =
+            (typeof project.getMetadata === 'function' || project.metadata)
+                ? (() => {
+                      const meta =
+                          (typeof project.getMetadata === 'function' && project.getMetadata()) ||
+                          project.metadata ||
+                          {};
+                      const ep = meta.energyPlusConfig || meta.energyplus || {};
+                      return { meta, ep };
+                  })()
+                : { meta: {}, ep: {} };
+
+        // Site surfaces
+        const siteSurfaces = [];
+        siteSurfacesTbody.querySelectorAll('tr').forEach((tr) => {
+            if (tr.querySelector('td[colspan]')) return;
+            const name = (tr.querySelector('[data-field="name"]')?.value || '').trim();
+            if (!name) return;
+            const type = (tr.querySelector('[data-field="type"]')?.value || 'Site').trim();
+            const sched = (tr.querySelector('[data-field="sched"]')?.value || '').trim();
+            const entry = { name, type: type === 'Building' ? 'Building' : 'Site' };
+            if (sched) entry.transmittanceScheduleName = sched;
+            siteSurfaces.push(entry);
+        });
+
+        // Zone surfaces
+        const zoneSurfaces = [];
+        zoneSurfacesTbody.querySelectorAll('tr').forEach((tr) => {
+            if (tr.querySelector('td[colspan]')) return;
+            const name = (tr.querySelector('[data-field="name"]')?.value || '').trim();
+            const base = (tr.querySelector('[data-field="base"]')?.value || '').trim();
+            if (!name || !base) return;
+            const sched = (tr.querySelector('[data-field="sched"]')?.value || '').trim();
+            const entry = { name, baseSurfaceName: base };
+            if (sched) entry.transmittanceScheduleName = sched;
+            zoneSurfaces.push(entry);
+        });
+
+        // Reflectance
+        const reflectance = [];
+        reflectanceTbody.querySelectorAll('tr').forEach((tr) => {
+            if (tr.querySelector('td[colspan]')) return;
+            const sName = (tr.querySelector('[data-field="name"]')?.value || '').trim();
+            if (!sName) return;
+            const num = (sel) => {
+                const el = tr.querySelector(sel);
+                if (!el) return undefined;
+                const v = parseFloat(el.value);
+                return Number.isFinite(v) ? clamp01(v) : undefined;
+            };
+            const item = {
+                shadingSurfaceName: sName,
+            };
+            const s = num('[data-field="solar"]');
+            const v = num('[data-field="vis"]');
+            const ie = num('[data-field="irem"]');
+            const it = num('[data-field="irtr"]');
+            if (s != null) item.solarReflectance = s;
+            if (v != null) item.visibleReflectance = v;
+            if (ie != null) item.infraredHemisphericalEmissivity = ie;
+            if (it != null) item.infraredTransmittance = it;
+            reflectance.push(item);
+        });
+
+        // WindowShadingControls
+        const windowShadingControls = [];
+        windowControlsTbody.querySelectorAll('tr').forEach((tr) => {
+            if (tr.querySelector('td[colspan]')) return;
+            const name = (tr.querySelector('[data-field="name"]')?.value || '').trim();
+            const shadingType = (tr.querySelector('[data-field="shadingType"]')?.value || '').trim();
+            const controlType = (tr.querySelector('[data-field="controlType"]')?.value || '').trim();
+            if (!name || !shadingType || !controlType) return;
+
+            const scheduleName = (tr.querySelector('[data-field="scheduleName"]')?.value || '').trim() || undefined;
+            const num = (sel) => {
+                const el = tr.querySelector(sel);
+                if (!el) return undefined;
+                const v = parseFloat(el.value);
+                return Number.isFinite(v) ? v : undefined;
+            };
+            const setpoint1 = num('[data-field="setpoint1"]');
+            const setpoint2 = num('[data-field="setpoint2"]');
+            const glareActive = tr.querySelector('[data-field="glareActive"]')?.checked || false;
+            const multiType = (tr.querySelector('[data-field="multiType"]')?.value || '').trim() || undefined;
+            const fenStr = (tr.querySelector('[data-field="fenestration"]')?.value || '').trim();
+            const fenestrationSurfaceNames = fenStr
+                ? fenStr.split(',').map((s) => s.trim()).filter(Boolean)
+                : [];
+
+            const ctrl = {
+                name,
+                shadingType,
+                controlType,
+                fenestrationSurfaceNames,
+            };
+            if (scheduleName) ctrl.scheduleName = scheduleName;
+            if (setpoint1 != null) ctrl.setpoint1 = setpoint1;
+            if (setpoint2 != null) ctrl.setpoint2 = setpoint2;
+            if (glareActive) ctrl.glareControlIsActive = true;
+            if (multiType) ctrl.multipleSurfaceControlType = multiType;
+
+            if (fenestrationSurfaceNames.length) {
+                windowShadingControls.push(ctrl);
+            }
+        });
+
+        const shading = {};
+        if (siteSurfaces.length) shading.siteSurfaces = siteSurfaces;
+        if (zoneSurfaces.length) shading.zoneSurfaces = zoneSurfaces;
+        if (reflectance.length) shading.reflectance = reflectance;
+        if (windowShadingControls.length) shading.windowShadingControls = windowShadingControls;
+
+        const nextEP = { ...ep };
+        if (Object.keys(shading).length) {
+            nextEP.shading = shading;
+        } else {
+            delete nextEP.shading;
+        }
+
+        if (typeof project.updateMetadata === 'function') {
+            project.updateMetadata({
+                ...meta,
+                energyPlusConfig: nextEP,
+            });
+        } else {
+            project.metadata = {
+                ...(project.metadata || meta),
+                energyPlusConfig: nextEP,
+            };
+        }
+    }
+
+    if (addSiteSurfaceBtn) {
+        addSiteSurfaceBtn.addEventListener('click', () => addSiteSurfaceRow());
+    }
+    if (addZoneSurfaceBtn) {
+        addZoneSurfaceBtn.addEventListener('click', () => addZoneSurfaceRow());
+    }
+    if (addReflectanceBtn) {
+        addReflectanceBtn.addEventListener('click', () => addReflectanceRow());
+    }
+    if (addWinCtrlBtn) {
+        addWinCtrlBtn.addEventListener('click', () => addWindowControlRow());
+    }
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            try {
+                collectAndSaveShading();
+                alert('Shading & Solar Control configuration saved.');
+            } catch (err) {
+                console.error('ShadingManager: save failed', err);
+                alert('Failed to save Shading & Solar Control configuration. Check console for details.');
+            }
+        });
+    }
+
+    renderSiteSurfaces();
+    renderZoneSurfaces();
+    renderReflectance();
+    renderWindowControls();
+
+    return panel;
 
     function addWindowControlRow() {
         if (windowControlsTbody.children.length === 1) {

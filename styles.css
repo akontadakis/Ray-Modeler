@@ -48,6 +48,12 @@
   --select-arrow-icon: url('data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns="http://www.w3.org/2000/svg" width="292.4" height="292.4"%3E%3Cpath fill="%23343434" d="M287 69.4a17.6 17.6 0 0 0-13-5.4H18.4c-5 0-9.3 1.8-12.9 5.4A17.6 17.6 0 0 0 0 82.2c0 5 1.8 9.3 5.4 12.9l128 127.9c3.6 3.6 7.8 5.4 12.8 5.4s9.2-1.8 12.8-5.4L287 95c3.5-3.5 5.4-7.8 5.4-12.8 0-5-1.9-9.2-5.5-12.8z"%2F%3E%3C/svg%3E');
 }
 
+.diag-highlight {
+  outline: 1px solid var(--accent-color, #38bdf8);
+  background-color: rgba(56, 189, 248, 0.06);
+  transition: background-color 0.25s ease-out, outline-color 0.25s ease-out;
+}
+
 html[data-theme="dark"] {
   /* Dark Theme - Base RGB Values */
   --bg-main-rgb: 33, 33, 33;
@@ -266,7 +272,7 @@ canvas {
 .table-dense {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.75rem;
+  font-size: 0.75rem; /* Revert inside-box text to original size */
 }
 
 .table-dense th,
@@ -1037,7 +1043,7 @@ html[data-theme="cyber"] .energyplus-help-box {
 .label {
   display: block;
   color: var(--text-secondary);
-  font-size: 0.75rem;
+  font-size: 0.8rem; /* Slightly larger outside-box labels */
   font-weight: 500;
   text-transform: uppercase;
   margin-bottom: 0.5rem;
@@ -1046,7 +1052,7 @@ html[data-theme="cyber"] .energyplus-help-box {
 .data-value {
   color: var(--text-primary);
   font-weight: 500;
-  font-size: 0.85rem;
+  font-size: 0.85rem; /* Slightly larger for outside-box values */
 }
 
 input[type=range] {

@@ -279,6 +279,44 @@ export function buildEnergyPlusModel(options = {}) {
     }
 
     // 11) Shading & Solar Control (opt-in)
+    //
+    // Canonical schema (single source of truth for shading configuration):
+    //   options.shading = {
+    //     siteSurfaces?: Array<{
+    //       name: string,
+    //       // 'Site' → Shading:Site:Detailed, 'Building' → Shading:Building:Detailed
+    //       type?: 'Site' | 'Building',
+    //       transmittanceScheduleName?: string,
+    //       vertices: Array<{ x: number, y: number, z: number }>
+    //     }>,
+    //     zoneSurfaces?: Array<{
+    //       name: string,
+    //       baseSurfaceName: string,
+    //       transmittanceScheduleName?: string,
+    //       vertices: Array<{ x: number, y: number, z: number }>
+    //     }>,
+    //     reflectance?: Array<{
+    //       shadingSurfaceName: string,
+    //       solarReflectance?: number,
+    //       visibleReflectance?: number,
+    //       infraredHemisphericalEmissivity?: number,
+    //       infraredTransmittance?: number
+    //     }>,
+    //     windowShadingControls?: Array<{
+    //       name: string,
+    //       shadingType: string,
+    //       controlType: string,
+    //       scheduleName?: string,
+    //       setpoint1?: number,
+    //       setpoint2?: number,
+    //       glareControlIsActive?: boolean,
+    //       multipleSurfaceControlType?: string,
+    //       fenestrationSurfaceNames: string[]
+    //     }>
+    //   }
+    //
+    // This schema is edited by the "Shading & Solar Control" panel via energyplusConfigService.setShading.
+    // Legacy hint-style fields (surfaces/windowControls/overhangs) are intentionally ignored here.
     if (options.shading) {
         const hasSite = Array.isArray(options.shading.siteSurfaces) && options.shading.siteSurfaces.length;
         const hasZone = Array.isArray(options.shading.zoneSurfaces) && options.shading.zoneSurfaces.length;
@@ -675,6 +713,7 @@ function computeDaylightingDiagnostics(daylighting, zoneNames, scheduleCtx, issu
             issues.push({
                 severity: 'warning',
                 message: `Daylighting.zones entry references unknown zone "${cfg.zoneName}".`,
+                context: { domain: 'daylighting', type: 'zone', zoneName: cfg.zoneName },
             });
         }
 
@@ -693,6 +732,7 @@ function computeDaylightingDiagnostics(daylighting, zoneNames, scheduleCtx, issu
             issues.push({
                 severity: 'warning',
                 message: `Daylighting for zone "${cfg.zoneName}" has no valid reference points configured.`,
+                context: { domain: 'daylighting', type: 'zone', zoneName: cfg.zoneName },
             });
         }
 
@@ -713,6 +753,7 @@ function computeDaylightingDiagnostics(daylighting, zoneNames, scheduleCtx, issu
                     message: `Daylighting fractions for zone "${cfg.zoneName}" look inconsistent (sum=${sum.toFixed(
                         3
                     )}).`,
+                    context: { domain: 'daylighting', type: 'zone', zoneName: cfg.zoneName },
                 });
             }
         }
@@ -729,6 +770,7 @@ function computeDaylightingDiagnostics(daylighting, zoneNames, scheduleCtx, issu
             issues.push({
                 severity: 'warning',
                 message: `Legacy daylighting.controls entry references unknown zone "${c.zoneName}".`,
+                context: { domain: 'daylighting', type: 'legacyControl', zoneName: c.zoneName },
             });
         }
         const refs = Array.isArray(c.refPoints)
@@ -744,6 +786,7 @@ function computeDaylightingDiagnostics(daylighting, zoneNames, scheduleCtx, issu
             issues.push({
                 severity: 'warning',
                 message: `Legacy daylighting control for zone "${c.zoneName}" is incomplete (missing refPoints or setpoint).`,
+                context: { domain: 'daylighting', type: 'legacyControl', zoneName: c.zoneName },
             });
         }
     });
@@ -777,6 +820,12 @@ function computeDaylightingDiagnostics(daylighting, zoneNames, scheduleCtx, issu
             issues.push({
                 severity: 'warning',
                 message: `Illuminance map "${m.name || '(unnamed)'}" references unknown zone "${m.zoneName}".`,
+                context: {
+                    domain: 'daylighting',
+                    type: 'illuminanceMap',
+                    mapName: m.name || '(unnamed)',
+                    zoneName: m.zoneName,
+                },
             });
         }
         const requiredNums = [
@@ -792,6 +841,12 @@ function computeDaylightingDiagnostics(daylighting, zoneNames, scheduleCtx, issu
             issues.push({
                 severity: 'warning',
                 message: `Illuminance map "${m.name || '(unnamed)'}" for zone "${m.zoneName}" has invalid or missing numeric fields.`,
+                context: {
+                    domain: 'daylighting',
+                    type: 'illuminanceMap',
+                    mapName: m.name || '(unnamed)',
+                    zoneName: m.zoneName,
+                },
             });
         }
     });
@@ -905,6 +960,32 @@ function computeShadingDiagnostics(shading = {}, scheduleCtx, issues) {
             issues.push({
                 severity: 'warning',
                 message: `WindowShadingControl "${c.name}" has non-numeric setpoint2.`,
+            });
+        }
+
+        // Additional sanity checks for obvious misconfigurations (non-fatal).
+        const ct = String(c.controlType || '').toLowerCase();
+
+        // Setpoint-based control types should have at least one numeric setpoint.
+        if (
+            /setpoint|onifhighsolar|onifhighglare|onifhight|onifhighsola|onifhightemp/.test(ct) &&
+            c.setpoint1 == null
+        ) {
+            issues.push({
+                severity: 'warning',
+                message: `WindowShadingControl "${c.name}" uses a setpoint-based controlType "${c.controlType}" but setpoint1 is not defined.`,
+            });
+        }
+
+        // MultipleSurfaceControlType is only meaningful when controlling multiple fenestration surfaces.
+        if (
+            c.multipleSurfaceControlType &&
+            Array.isArray(c.fenestrationSurfaceNames) &&
+            c.fenestrationSurfaceNames.length <= 1
+        ) {
+            issues.push({
+                severity: 'warning',
+                message: `WindowShadingControl "${c.name}" specifies Multiple Surface Control Type "${c.multipleSurfaceControlType}" but controls only one fenestration surface.`,
             });
         }
     });
