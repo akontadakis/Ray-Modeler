@@ -44,25 +44,69 @@ class ReportGenerator {
     async _gatherData() {
         const projectData = await project.gatherAllProjectData();
 
-        // Determine the most relevant dataset for the report.
-        // Prioritize the active view, but fall back gracefully if it's 'diff' or empty.
+        // Select the dataset key for the report:
+        // 1) Prefer activeView when not 'diff' and has stats.
+        // 2) Else prefer 'a' if it has stats, else 'b'.
         let reportDataKey = resultsManager.activeView;
-        if (reportDataKey === 'diff' || !resultsManager.datasets[reportDataKey]?.stats) {
-            reportDataKey = resultsManager.datasets.a?.stats ? 'a' : 'b';
+        if (
+            reportDataKey === 'diff' ||
+            !resultsManager.datasets[reportDataKey] ||
+            !resultsManager.datasets[reportDataKey].stats
+        ) {
+            if (resultsManager.datasets.a?.stats) {
+                reportDataKey = 'a';
+            } else if (resultsManager.datasets.b?.stats) {
+                reportDataKey = 'b';
+            } else {
+                reportDataKey = 'a'; // fallback, will error below if truly empty
+            }
         }
 
         const activeDataset = resultsManager.datasets[reportDataKey];
-
         if (!activeDataset) {
             throw new Error("No active dataset found to generate a report from.");
         }
 
+        // Annual metrics (only if annual-illuminance present)
+        const hasAnnual = resultsManager.hasResult(reportDataKey, 'annual-illuminance');
+        const annualMetrics = hasAnnual
+            ? resultsManager.calculateAnnualMetrics(reportDataKey, {})
+            : null;
+
+        // Circadian summary (if present)
+        const circadianMetrics = resultsManager.hasResult(reportDataKey, 'circadian-summary')
+            ? resultsManager.getResult(reportDataKey, 'circadian-summary')
+            : activeDataset.circadianMetrics || null;
+
+        // Glare PIT (evalglare) from chosen dataset
+        const glareResult = resultsManager.hasResult(reportDataKey, 'evalglare-pit')
+            ? resultsManager.getResult(reportDataKey, 'evalglare-pit')
+            : activeDataset.glareResult || null;
+
+        // Latest EnergyPlus KPIs (global)
+        const epKpis = resultsManager.getEnergyPlusKpisForUi(null);
+
+        // Climate summaries (if EPW loaded)
+        const climate = resultsManager.hasResult(null, 'epw-climate')
+            ? {
+                monthlySolar: resultsManager.getMonthlySolarData(),
+                monthlyTemp: resultsManager.getMonthlyTemperatureData(),
+                windRose: resultsManager.getWindRoseData()
+            }
+            : null;
+
+        // Lighting metrics (if computed for the chosen dataset)
+        const lightingMetrics = activeDataset.lightingMetrics || null;
+
         this.data = {
             projectData,
-            stats: activeDataset.stats,
-            annualMetrics: resultsManager.hasAnnualData(reportDataKey) ? resultsManager.calculateAnnualMetrics(reportDataKey, {}) : null,
-            glareResult: activeDataset.glareResult,
-            circadianMetrics: activeDataset.circadianMetrics,
+            stats: activeDataset.stats || null,
+            annualMetrics,
+            glareResult,
+            circadianMetrics,
+            epKpis,
+            climate,
+            lightingMetrics,
             charts: getDashboardChartsAsBase64(),
             sceneImage: captureSceneSnapshot(),
             generationDate: new Date().toLocaleString(),
@@ -115,6 +159,9 @@ class ReportGenerator {
                         ${this._buildProjectInfoSection()}
                         ${this._buildSceneSnapshotSection()}
                         ${this._buildKeyMetricsSection()}
+                        ${this._buildEnergyPlusSection()}
+                        ${this._buildClimateSection()}
+                        ${this._buildLightingSection()}
                         ${this._buildChartsSection()}
                     </main>
                     ${this._buildFooter()}
@@ -208,6 +255,195 @@ class ReportGenerator {
                     ${circadianMetrics ? this._buildMetricCard('Avg. Circadian Stimulus', circadianMetrics.avg_cs.toFixed(3)) : ''}
                     ${circadianMetrics ? this._buildMetricCard('Avg. EML', circadianMetrics.avg_eml.toFixed(0), 'lux') : ''}
                 </div>
+            </div>`;
+    }
+
+    /** @private */
+    _buildEnergyPlusSection() {
+        const { epKpis } = this.data;
+        if (!epKpis) return '';
+
+        const {
+            label,
+            status,
+            eui,
+            heating,
+            cooling,
+            lighting,
+            fans,
+            pumps,
+            other,
+            unmetHeat,
+            unmetCool,
+            peakHeatKw,
+            peakCoolKw
+        } = epKpis;
+
+        const fmt = (v, unit = '', digits = 1) =>
+            (v || v === 0 || v === 0.0)
+                ? `${v.toFixed(digits)}${unit}`
+                : '--';
+
+        const endUses = [
+            { label: 'Heating', val: heating },
+            { label: 'Cooling', val: cooling },
+            { label: 'Lighting', val: lighting },
+            { label: 'Fans', val: fans },
+            { label: 'Pumps', val: pumps },
+            { label: 'Other', val: other },
+        ].filter(e => e.val != null);
+
+        const totalEndUse = endUses.reduce((sum, e) => sum + (e.val || 0), 0);
+        const endUseRows = endUses.length
+            ? endUses.map(e => {
+                const share = totalEndUse > 0 ? (e.val / totalEndUse) * 100 : 0;
+                return `
+                    <tr>
+                        <td>${e.label}</td>
+                        <td class="text-right">${fmt(e.val, '', 1)}</td>
+                        <td class="text-right">${totalEndUse > 0 ? share.toFixed(1) + '%' : '--'}</td>
+                    </tr>`;
+            }).join('')
+            : `
+                <tr>
+                    <td colspan="3" class="text-muted">
+                        No end-use breakdown available.
+                    </td>
+                </tr>`;
+
+        return `
+            <div class="section">
+                <h2>EnergyPlus Summary (Latest Run)</h2>
+                <ul>
+                    <li><strong>Run:</strong> ${label || epKpis.runId || 'N/A'}</li>
+                    <li><strong>Status:</strong> ${status || 'unknown'}</li>
+                </ul>
+                <div class="metric-grid">
+                    ${this._buildMetricCard('EUI', fmt(eui, ' kWh/m²·yr'), '')}
+                    ${this._buildMetricCard('Heating Unmet Hours', fmt(unmetHeat, ' h', 0))}
+                    ${this._buildMetricCard('Cooling Unmet Hours', fmt(unmetCool, ' h', 0))}
+                    ${this._buildMetricCard('Peak Heating Load', fmt(peakHeatKw, ' kW', 1))}
+                    ${this._buildMetricCard('Peak Cooling Load', fmt(peakCoolKw, ' kW', 1))}
+                </div>
+                <div class="section" style="margin-top:15px;">
+                    <h3 style="margin:0 0 8px 0;font-size:1em;">End Use Breakdown (kWh/m²·yr)</h3>
+                    <table style="width:100%;border-collapse:collapse;font-size:0.85em;">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left;padding:4px 6px;border-bottom:1px solid #ddd;">End Use</th>
+                                <th style="text-align:right;padding:4px 6px;border-bottom:1px solid #ddd;">kWh/m²·yr</th>
+                                <th style="text-align:right;padding:4px 6px;border-bottom:1px solid #ddd;">Share</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${endUseRows}
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+    }
+
+    /** @private */
+    _buildClimateSection() {
+        const { climate } = this.data;
+        if (!climate) return '';
+
+        const { monthlySolar, monthlyTemp, windRose } = climate;
+        if (!monthlySolar && !monthlyTemp && !windRose) return '';
+
+        const monthLabels = monthlySolar?.labels || monthlyTemp?.labels || [];
+
+        const solarRows = monthlySolar
+            ? monthLabels.map((m, i) => `
+                <tr>
+                    <td>${m}</td>
+                    <td class="text-right">${(monthlySolar.dni[i] || 0).toFixed(2)}</td>
+                    <td class="text-right">${(monthlySolar.dhi[i] || 0).toFixed(2)}</td>
+                </tr>`).join('')
+            : '';
+
+        const tempRows = monthlyTemp
+            ? monthLabels.map((m, i) => `
+                <tr>
+                    <td>${m}</td>
+                    <td class="text-right">${(monthlyTemp.min[i] || 0).toFixed(1)}</td>
+                    <td class="text-right">${(monthlyTemp.avg[i] || 0).toFixed(1)}</td>
+                    <td class="text-right">${(monthlyTemp.max[i] || 0).toFixed(1)}</td>
+                </tr>`).join('')
+            : '';
+
+        const hasSolar = !!monthlySolar;
+        const hasTemp = !!monthlyTemp;
+        const hasWind = !!windRose;
+
+        return `
+            <div class="section">
+                <h2>Climate Summary (from EPW)</h2>
+                ${hasSolar ? `
+                    <h3 style="margin:10px 0 4px 0;font-size:1em;">Monthly Average Daily Solar Radiation</h3>
+                    <table style="width:100%;border-collapse:collapse;font-size:0.8em;margin-bottom:10px;">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left;padding:4px 6px;border-bottom:1px solid #ddd;">Month</th>
+                                <th style="text-align:right;padding:4px 6px;border-bottom:1px solid #ddd;">Direct DNI (kWh/m²·day)</th>
+                                <th style="text-align:right;padding:4px 6px;border-bottom:1px solid #ddd;">Diffuse DHI (kWh/m²·day)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${solarRows}
+                        </tbody>
+                    </table>
+                ` : ''}
+
+                ${hasTemp ? `
+                    <h3 style="margin:10px 0 4px 0;font-size:1em;">Monthly Temperature Statistics</h3>
+                    <table style="width:100%;border-collapse:collapse;font-size:0.8em;margin-bottom:10px;">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left;padding:4px 6px;border-bottom:1px solid #ddd;">Month</th>
+                                <th style="text-align:right;padding:4px 6px;border-bottom:1px solid #ddd;">Min (°C)</th>
+                                <th style="text-align:right;padding:4px 6px;border-bottom:1px solid #ddd;">Avg (°C)</th>
+                                <th style="text-align:right;padding:4px 6px;border-bottom:1px solid #ddd;">Max (°C)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tempRows}
+                        </tbody>
+                    </table>
+                ` : ''}
+
+                ${hasWind ? `
+                    <p style="font-size:0.8em;color:#555;margin-top:8px;">
+                        Wind rose statistics are available in the interactive dashboard and can be referenced
+                        alongside this summary for prevailing wind directions and speeds.
+                    </p>
+                ` : ''}
+            </div>`;
+    }
+
+    /** @private */
+    _buildLightingSection() {
+        const { lightingMetrics } = this.data;
+        if (!lightingMetrics) return '';
+
+        const { avgPower, savings, lpd, annualEnergy } = lightingMetrics;
+
+        const hasLpd = typeof lpd === 'number';
+        const hasAnnual = typeof annualEnergy === 'number';
+
+        return `
+            <div class="section">
+                <h2>Lighting Performance Summary</h2>
+                <div class="metric-grid">
+                    ${this._buildMetricCard('Average Lighting Power Fraction', (avgPower * 100).toFixed(1), '%')}
+                    ${this._buildMetricCard('Estimated Lighting Energy Savings', savings.toFixed(1), '%')}
+                    ${hasLpd ? this._buildMetricCard('Installed LPD', lpd.toFixed(2), ' W/m²') : ''}
+                    ${hasAnnual ? this._buildMetricCard('Estimated Annual Lighting Energy', annualEnergy.toFixed(0), ' kWh/m²') : ''}
+                </div>
+                <p style="font-size:0.8em;color:#555;margin-top:6px;">
+                    Lighting control performance is estimated from the daylight autonomy-based control model
+                    configured in the project, using occupied hours consistent with sDA/ASE calculations.
+                </p>
             </div>`;
     }
 

@@ -6,6 +6,23 @@ import { updateScene } from './geometry.js';
 import { recreateSimulationPanels } from './simulation.js';
 import { lightingManager } from './lighting.js';
 import { generateScripts } from './scriptGenerator.js';
+import { getRecipeById } from './recipes/RecipeRegistry.js';
+import { getActiveRecipeSelection, buildRecipeConfig } from './recipes/configMappers.js';
+import './recipes/illuminanceRecipe.js';
+import './recipes/renderingRecipe.js';
+import './recipes/daylightFactorRecipe.js';
+import './recipes/annual3PhaseRecipe.js';
+import './recipes/dgpRecipe.js';
+import './recipes/sdaAseRecipe.js';
+import './recipes/annual5PhaseRecipe.js';
+import './recipes/imagelessGlareRecipe.js';
+import './recipes/enIlluminanceRecipe.js';
+import './recipes/enUgrRecipe.js';
+import './recipes/en17037Recipe.js';
+import './recipes/lightingEnergyRecipe.js';
+import './recipes/facadeIrradiationRecipe.js';
+import './recipes/annualRadiationRecipe.js';
+import './recipes/spectralLarkRecipe.js';
 
 class Project {
     constructor() {
@@ -49,13 +66,13 @@ class Project {
             simParams.global = panelData;
         }
 
-        // 2. Gather parameters from ALL open recipe panels
+        // 2. Gather parameters from ALL legacy floating recipe panels (backwards compatibility)
         document.querySelectorAll('.floating-window[data-template-id^="template-recipe-"]').forEach(panel => {
             const templateId = panel.dataset.templateId;
             const panelIdSuffix = panel.id.split('-').pop();
 
             const recipeData = {
-                templateId: templateId,
+                templateId,
                 values: {}
             };
 
@@ -72,11 +89,63 @@ class Project {
                         recipeData.values[key] = null;
                     }
                 } else {
-                    recipeData.values[key] = (input.type === 'checkbox' || input.type === 'radio') ? input.checked : input.value;
+                    recipeData.values[key] =
+                        (input.type === 'checkbox' || input.type === 'radio')
+                            ? input.checked
+                            : input.value;
                 }
             });
-            simParams.recipes.push(recipeData);
+
+            if (Object.keys(recipeData.values).length > 0) {
+                simParams.recipes.push(recipeData);
+            }
         });
+
+        // 3. New canonical: capture the single active recipe from the sidebar container, if present.
+        const sidebarContainer = document.querySelector('#recipe-parameters-container');
+        const activeTemplateId = sidebarContainer?.dataset?.activeRecipeTemplate;
+        const activePanel = sidebarContainer ? sidebarContainer.firstElementChild : null;
+
+        if (activeTemplateId && activePanel) {
+            const panelIdSuffix = activePanel.id.split('-').pop();
+            const activeValues = {};
+
+            activePanel.querySelectorAll('input, select').forEach(input => {
+                const key = input.id.replace(`-${panelIdSuffix}`, '');
+                if (!key) return;
+
+                if (input.type === 'file') {
+                    if (this.simulationFiles[key]) {
+                        activeValues[key] = { name: this.simulationFiles[key].name };
+                    } else {
+                        activeValues[key] = null;
+                    }
+                } else {
+                    activeValues[key] =
+                        (input.type === 'checkbox' || input.type === 'radio')
+                            ? input.checked
+                            : input.value;
+                }
+            });
+
+            // Only set activeRecipe if we actually collected something.
+            if (Object.keys(activeValues).length > 0) {
+                simParams.activeRecipe = {
+                    templateId: activeTemplateId,
+                    values: activeValues
+                };
+            }
+
+            // For backwards compatibility, ensure recipes[] contains this active recipe as first entry.
+            if (simParams.activeRecipe) {
+                // Remove previous entries for this templateId
+                simParams.recipes = simParams.recipes.filter(r => r.templateId !== activeTemplateId);
+                simParams.recipes.unshift({
+                    templateId: activeTemplateId,
+                    values: activeValues
+                });
+            }
+        }
 
         return simParams;
     }
@@ -367,31 +436,69 @@ class Project {
         const projectName = projectData.projectInfo['project-name']?.replace(/\s+/g, '_') || 'scene';
         this.projectName = projectName;
     
-        const globalParams = projectData.simulationParameters.global || {};
+        const simParams = projectData.simulationParameters || { global: {}, recipes: [] };
+        const globalParams = simParams.global || {};
         const recipeOverrides = {};
         const recipeContainer = panelElement.querySelector('#recipe-parameters-container');
         const activeRecipePanel = recipeContainer ? recipeContainer.firstElementChild : null;
-        
+
         if (activeRecipePanel) {
             const panelIdSuffix = activeRecipePanel.id.split('-').pop();
             activeRecipePanel.querySelectorAll('input, select').forEach(input => {
                 const key = input.id.replace(`-${panelIdSuffix}`, '');
                 if (!key) return;
-                
+
                 if (input.type === 'file') {
                     if (this.simulationFiles[key]) {
-                        recipeOverrides[key] = { name: this.simulationFiles[key].name, content: this.simulationFiles[key].content };
+                        recipeOverrides[key] = {
+                            name: this.simulationFiles[key].name,
+                            content: this.simulationFiles[key].content
+                        };
                     } else {
                         recipeOverrides[key] = null;
                     }
                 } else {
-                    recipeOverrides[key] = (input.type === 'checkbox' || input.type === 'radio') ? input.checked : input.value;
+                    recipeOverrides[key] =
+                        input.type === 'checkbox' || input.type === 'radio'
+                            ? input.checked
+                            : input.value;
                 }
             });
         }
-    
+
+        // Keep legacy mergedSimParams for non-registry recipes.
         projectData.mergedSimParams = { ...globalParams, ...recipeOverrides };
-        
+
+        // Sync the active recipe overrides into simulationParameters so that
+        // configMappers + RecipeRegistry see the same values the user edits
+        // in the sidebar. This enforces "one package = one active recipe".
+        const recipeType = panelElement.dataset.templateId;
+        if (recipeType) {
+            const syncedSimParams = {
+                global: globalParams,
+                recipes: Array.isArray(simParams.recipes) ? [...simParams.recipes] : []
+            };
+
+            // Remove any existing entry for this recipeType
+            for (let i = syncedSimParams.recipes.length - 1; i >= 0; i--) {
+                if (syncedSimParams.recipes[i].templateId === recipeType) {
+                    syncedSimParams.recipes.splice(i, 1);
+                }
+            }
+
+            // Add current active overrides as the canonical entry (single active recipe per run)
+            const activeEntry = {
+                templateId: recipeType,
+                values: recipeOverrides
+            };
+            syncedSimParams.recipes.push(activeEntry);
+
+            // Also expose canonical activeRecipe for configMappers / registry consumers
+            syncedSimParams.activeRecipe = activeEntry;
+
+            projectData.simulationParameters = syncedSimParams;
+        }
+
         // --- Add uniqueId to projectData for generateScripts ---
         if (uniqueId) {
             projectData.uniqueId = uniqueId;
@@ -407,9 +514,44 @@ class Project {
         const taskPtsContent = await this._generateSensorPointsContent('task');
         const surroundingPtsContent = await this._generateSensorPointsContent('surrounding');
         const rayContent = await generateRayFileContent();
-    
-        const recipeType = panelElement.dataset.templateId;
-        const scriptsToGenerate = generateScripts(projectData, recipeType);
+
+        // Determine active recipe definition (if any) from the registry.
+        const recipeDef = getRecipeById(recipeType);
+
+        let scriptsToGenerate;
+        if (recipeDef) {
+            // New path: use RecipeRegistry-based definition (non-breaking).
+            // Build config from current simulation parameters and active selection.
+            const simParamsForConfig = projectData.simulationParameters || { global: {}, recipes: [] };
+            const activeSelection = getActiveRecipeSelection(panelElement, simParamsForConfig);
+            const config = buildRecipeConfig(
+                recipeDef,
+                projectData,
+                simParamsForConfig,
+                this.simulationFiles,
+                activeSelection
+            );
+
+            const validation = recipeDef.validate(projectData, config);
+            if (validation.errors && validation.errors.length > 0) {
+                const { showAlert } = await import('./ui.js');
+                const errorHtml =
+                    '<p>The selected simulation recipe configuration is invalid:</p>' +
+                    '<ul class="list-disc pl-5 space-y-1">' +
+                    validation.errors.map(e => `<li>${e}</li>`).join('') +
+                    '</ul>';
+                showAlert(errorHtml, 'Cannot Generate Package: Invalid Configuration');
+                return null;
+            }
+            if (validation.warnings && validation.warnings.length > 0) {
+                console.warn('Simulation recipe warnings:', validation.warnings);
+            }
+
+            scriptsToGenerate = recipeDef.generateScripts(projectData, config);
+        } else {
+            // Fallback to legacy behavior for recipes not yet migrated.
+            scriptsToGenerate = generateScripts(projectData, recipeType);
+        }
     
         if (scriptsToGenerate.length === 0) {
             showAlert('Could not generate any scripts for this recipe.', 'Generation Failed');
@@ -497,6 +639,17 @@ class Project {
         try {
             const projectData = await this.gatherAllProjectData();
         const projectName = this.projectName || 'project';
+
+            // Ensure the canonical activeRecipe is present for persisted settings
+            if (projectData.simulationParameters && projectData.simulationParameters.activeRecipe) {
+                const { templateId, values } = projectData.simulationParameters.activeRecipe;
+                if (templateId && values) {
+                    projectData.simulationParameters.recipes = Array.isArray(projectData.simulationParameters.recipes)
+                        ? projectData.simulationParameters.recipes.filter(r => r.templateId !== templateId)
+                        : [];
+                    projectData.simulationParameters.recipes.unshift({ templateId, values });
+                }
+            }
 
             // 2. Generate all file contents in memory first.
             const { materials, geometry } = await generateRadFileContent(projectData);

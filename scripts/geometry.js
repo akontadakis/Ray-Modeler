@@ -776,88 +776,122 @@ function createNorthArrow() {
 }
 
 /**
+ * Returns the outward normal vector for a given wall orientation in ROOM-LOCAL coordinates
+ * (before the global room rotation is applied).
+ *
+ * Conventions (room-local, origin at room center, Z forward):
+ * - 'N' (north wall): outward = (0, 0, -1)
+ * - 'S' (south wall): outward = (0, 0, 1)
+ * - 'W' (west wall):  outward = (-1, 0, 0)
+ * - 'E' (east wall):  outward = (1, 0, 0)
+ */
+function getWallOutwardNormal(orientation) {
+    switch (orientation) {
+        case 'N': return new THREE.Vector3(0, 0, -1);
+        case 'S': return new THREE.Vector3(0, 0, 1);
+        case 'W': return new THREE.Vector3(-1, 0, 0);
+        case 'E': return new THREE.Vector3(1, 0, 0);
+        default: return new THREE.Vector3(0, 0, 0);
+    }
+}
+
+/**
  * Creates all shading devices based on UI settings.
+ * Uses explicit outward normals for consistent external/internal placement across orientations.
  */
 export function createShadingDevices() {
     clearGroup(shadingObject);
     const allWindows = getAllWindowParams();
     const allShading = getAllShadingParams();
 
-    if (Object.keys(allWindows).length === 0 || Object.keys(allShading).length === 0) return;
+    if (!allWindows || !allShading) return;
 
     const shadeColor = getComputedStyle(document.documentElement).getPropertyValue('--shading-color').trim();
     const { W, L } = readParams();
+
     const shadingContainer = new THREE.Group();
+    // Room-local origin at (-W/2, 0, -L/2) to match wall/window construction
     shadingContainer.position.set(-W / 2, 0, -L / 2);
 
     for (const [orientation, winParams] of Object.entries(allWindows)) {
-        const { ww, wh, sh, winCount, mode, wallWidth, winDepthPos } = winParams;
         const shadeParams = allShading[orientation];
+        if (!winParams || !shadeParams) continue;
 
-        // Invert depth for E/W walls to match the glazing position
-        // Place shading externally by always using a negative depth offset
-        const effectiveWinDepthPos = -winDepthPos;
+        const { ww, wh, sh, winCount, mode, wallWidth, winDepthPos } = winParams;
+        if (!ww || !wh || !winCount) continue;
 
-        if (!shadeParams || winCount === 0 || ww === 0 || wh === 0) continue;
+        const outward = getWallOutwardNormal(orientation);
+        if (outward.lengthSq() === 0) continue;
 
         const spacing = mode === 'wwr' ? 0.1 : ww / 2;
         const groupWidth = winCount * ww + Math.max(0, winCount - 1) * spacing;
         const startOffset = (wallWidth - groupWidth) / 2;
 
+        // Glass center lies at winDepthPos along outward (positive: towards exterior)
+        const glassOffset = outward.clone().multiplyScalar(winDepthPos);
+
         for (let i = 0; i < winCount; i++) {
             const winStartPos = startOffset + i * (ww + spacing);
-            let deviceGroup;
+            const windowCenterLocal = (() => {
+                switch (orientation) {
+                    case 'N': return new THREE.Vector3(winStartPos + ww / 2, sh, 0);
+                    case 'S': return new THREE.Vector3(winStartPos + ww / 2, sh, L);
+                    case 'W': return new THREE.Vector3(0, sh, winStartPos + ww / 2);
+                    case 'E': return new THREE.Vector3(W, sh, winStartPos + ww / 2);
+                    default: return new THREE.Vector3(0, sh, 0);
+                }
+            })();
+
+            let deviceGroup = null;
 
             if (shadeParams.type === 'overhang' && shadeParams.overhang) {
-                deviceGroup = createOverhang(ww, wh, shadeParams.overhang, shadeColor, orientation);
+                deviceGroup = createOverhang(ww, wh, shadeParams.overhang, shadeColor, outward);
+            } else if (shadeParams.type === 'lightshelf' && shadeParams.lightshelf) {
+                deviceGroup = createLightShelf(ww, wh, sh, shadeParams.lightshelf, shadeColor, outward);
+            } else if (shadeParams.type === 'louver' && shadeParams.louver) {
+                deviceGroup = createLouvers(ww, wh, shadeParams.louver, shadeColor, outward);
+            } else if (shadeParams.type === 'roller' && shadeParams.roller) {
+                deviceGroup = createRoller(ww, wh, shadeParams.roller, shadeColor, outward);
             } else if (shadeParams.type === 'imported_obj' && shadeParams.imported_obj) {
                 deviceGroup = createImportedShading(shadeParams.imported_obj, shadeColor, orientation, i);
-            } else if (shadeParams.type === 'lightshelf' && shadeParams.lightshelf) {
-                deviceGroup = createLightShelf(ww, wh, sh, shadeParams.lightshelf, shadeColor, orientation);
-            } else if (shadeParams.type === 'louver' && shadeParams.louver) {
-                deviceGroup = createLouvers(ww, wh, shadeParams.louver, shadeColor);
-            } else if (shadeParams.type === 'roller' && shadeParams.roller) {
-                deviceGroup = createRoller(ww, wh, shadeParams.roller, shadeColor);
             }
 
-        if (deviceGroup) {
-            // The original creation logic is correct for E/W walls but inverted for N/S.
-            // This block corrects the N/S placement by flipping the device's local z-axis.
-            if ((orientation === 'N' || orientation === 'S') && deviceGroup.userData.shadingType !== 'overhang' && deviceGroup.userData.shadingType !== 'lightshelf') {
-                deviceGroup.children.forEach(child => {
-                    child.position.z *= -1;
-                });
-            }
+            if (!deviceGroup) continue;
 
-            // Position and rotate the device to match its parent wall, then translate to the glazing depth.
-            if (orientation === 'N') {
-                deviceGroup.position.set(winStartPos + ww / 2, sh, 0);
-                deviceGroup.rotation.y = Math.PI; // Match North wall's rotation
-                deviceGroup.translateZ(-effectiveWinDepthPos);
-            } else if (orientation === 'S') {
-                deviceGroup.position.set(winStartPos + ww / 2, sh, L);
-                deviceGroup.rotation.y = 0; // Match South wall's rotation (which is 0)
-                deviceGroup.translateZ(-effectiveWinDepthPos);
-            } else if (orientation === 'W') {
-                deviceGroup.position.set(0, sh, winStartPos + ww / 2);
-                deviceGroup.rotation.y = Math.PI / 2; // Match West wall's rotation
-                deviceGroup.translateZ(effectiveWinDepthPos);
-            } else if (orientation === 'E') {
-                deviceGroup.position.set(W, sh, winStartPos + ww / 2);
-                deviceGroup.rotation.y = -Math.PI / 2; // Match East wall's rotation
-                deviceGroup.translateZ(effectiveWinDepthPos);
-                }
+            // Place deviceGroup origin at window center, then offset relative to glass position
+            const base = windowCenterLocal.clone().add(glassOffset);
+            deviceGroup.position.copy(base);
+
             shadingContainer.add(deviceGroup);
+
+            // Dev-only sanity check (guarded to avoid errors in browser-only environments):
+            const isDevEnv =
+                typeof process !== 'undefined' &&
+                process.env &&
+                process.env.NODE_ENV === 'development';
+
+            if (isDevEnv && shadeParams.type !== 'roller') {
+                const sample = deviceGroup.position.clone();
+                const rel = sample.clone().sub(windowCenterLocal);
+                const dot = rel.dot(outward);
+                if (dot < -1e-3) {
+                    console.warn('[shading] Shading device appears on interior side of glazing.', {
+                        orientation,
+                        deviceIndex: i,
+                        dotProduct: dot.toFixed(4)
+                    });
+                }
             }
         }
     }
+
     shadingObject.add(shadingContainer);
 }
 
 /**
  * Creates a single overhang device.
  */
-function createOverhang(winWidth, winHeight, params, color, orientation) {
+function createOverhang(winWidth, winHeight, params, color, outward) {
     const { distAbove, tilt, depth, extension, thick } = params;
     if (depth <= 0) return null;
 
@@ -875,12 +909,11 @@ function createOverhang(winWidth, winHeight, params, color, orientation) {
     applyClippingToMaterial(overhangMesh.material, renderer.clippingPlanes);
 
     overhangMesh.position.y = thick / 2;
-    // For North/South walls, the default placement is internal. This reverses it to be external.
-    if (orientation === 'N' || orientation === 'S') {
-        overhangMesh.position.z = depth / 2;
-    } else {
-        overhangMesh.position.z = -depth / 2;
-    }
+
+    // Place overhang outward from the pivot along the outward normal.
+    // We work in local coordinates where +Z of pivot is "forward"; map outward's sign onto Z.
+    const sign = outward.z !== 0 ? Math.sign(outward.z) : -1;
+    overhangMesh.position.z = sign * depth / 2;
     pivot.add(overhangMesh);
     return assembly;
 }
@@ -888,32 +921,36 @@ function createOverhang(winWidth, winHeight, params, color, orientation) {
 /**
  * Creates a light shelf assembly.
  */
-function createLightShelf(winWidth, winHeight, sillHeight, params, color, orientation) {
+function createLightShelf(winWidth, winHeight, sillHeight, params, color, outward) {
     const assembly = new THREE.Group();
     const { placeExt, placeInt, placeBoth, depthExt, depthInt, tiltExt, tiltInt, distBelowExt, distBelowInt, thickExt, thickInt } = params;
     const material = shared.shadeMat.clone();
     material.color.set(color);
     applyClippingToMaterial(material, renderer.clippingPlanes);
 
-    const isNS = orientation === 'N' || orientation === 'S';
+    const outwardSign = (outward.z !== 0 || outward.x !== 0) ? 1 : 1;
 
- if ((placeExt || placeBoth) && depthExt > 0) {
+    if ((placeExt || placeBoth) && depthExt > 0) {
         const pivot = new THREE.Group();
         const shelfMesh = new THREE.Mesh(new THREE.BoxGeometry(winWidth, thickExt, depthExt), material);
         shelfMesh.userData.surfaceType = SURFACE_TYPES.SHADING_DEVICE;
-        // Reverse the Z position for N/S walls to ensure correct external placement
-        shelfMesh.position.z = isNS ? depthExt / 2 : -depthExt / 2;
+
+        // External shelf: along outward
+        const sign = outward.z !== 0 ? Math.sign(outward.z) : (outward.x !== 0 ? Math.sign(outward.x) : 1);
+        shelfMesh.position.z = sign * depthExt / 2;
         pivot.position.y = winHeight - distBelowExt;
         pivot.rotation.x = THREE.MathUtils.degToRad(tiltExt);
         pivot.add(shelfMesh);
         assembly.add(pivot);
     }
- if ((placeInt || placeBoth) && depthInt > 0) {
+    if ((placeInt || placeBoth) && depthInt > 0) {
         const pivot = new THREE.Group();
         const shelfMesh = new THREE.Mesh(new THREE.BoxGeometry(winWidth, thickInt, depthInt), material);
         shelfMesh.userData.surfaceType = SURFACE_TYPES.SHADING_DEVICE;
-        // Reverse the Z position for N/S walls to ensure correct internal placement
-        shelfMesh.position.z = isNS ? -depthInt / 2 : depthInt / 2;
+
+        // Internal shelf: opposite outward
+        const sign = outward.z !== 0 ? -Math.sign(outward.z) : (outward.x !== 0 ? -Math.sign(outward.x) : -1);
+        shelfMesh.position.z = sign * depthInt / 2;
         pivot.position.y = winHeight - distBelowInt;
         pivot.rotation.x = THREE.MathUtils.degToRad(tiltInt);
         pivot.add(shelfMesh);
@@ -925,7 +962,7 @@ function createLightShelf(winWidth, winHeight, sillHeight, params, color, orient
 /**
  * Creates a louver assembly.
  */
-function createLouvers(winWidth, winHeight, params, color) {
+function createLouvers(winWidth, winHeight, params, color, outward) {
     const { isExterior, isHorizontal, slatWidth, slatSep, slatThick, slatAngle, distToGlass } = params;
     if (slatWidth <= 0 || slatSep <= 0) return null;
 
@@ -933,7 +970,8 @@ function createLouvers(winWidth, winHeight, params, color) {
     const material = shared.shadeMat.clone();
    material.color.set(color);
     applyClippingToMaterial(material, renderer.clippingPlanes);
-    const zOffset = isExterior ? -distToGlass : distToGlass;
+    const baseSign = (outward.z !== 0 ? Math.sign(outward.z) : (outward.x !== 0 ? Math.sign(outward.x) : 1));
+    const zOffset = (isExterior ? baseSign : -baseSign) * distToGlass;
     const angleRad = THREE.MathUtils.degToRad(slatAngle);
 
     if (isHorizontal) {

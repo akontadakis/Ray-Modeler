@@ -3,13 +3,18 @@
 import { showAlert, makeDraggable, makeResizable, ensureWindowInView, getNewZIndex, setupFileListenersForPanel, initializePanelControls } from './ui.js';
 import { getDom } from './dom.js';
 import { project } from './project.js'; // Import project to access its state
+import { getRecipeById } from './recipes/RecipeRegistry.js';
+import { getRuntimeEnvironment, getRecipeExecutionSupport } from './recipes/runtimeEnvironment.js';
 
 // --- MODULE-LEVEL VARIABLES ---
 let panelCounter = 0;
 let globalParametersCache = {}; // Cache for global parameters that persists across accordion state changes
 
 const availableModules = [
+    // Global panel (not shown in recipes dropdown)
     { id: 'template-global-sim-params', name: 'Global Simulation Parameters' },
+    // Recipe entries are now effectively mirrored from RecipeRegistry + DOM templates.
+    // This array is kept for legacy button-based UI; the dropdown itself is Registry/DOM-driven.
     { id: 'template-recipe-illuminance', name: 'Recipe: Illuminance Map' },
     { id: 'template-recipe-rendering', name: 'Recipe: Photorealistic Rendering' },
     { id: 'template-recipe-dgp', name: 'Recipe: Daylight Glare Probability' },
@@ -52,25 +57,39 @@ export function setupSimulationSidebar() {
     });
     
     recipeSelector.addEventListener('change', (e) => {
-    const templateId = e.target.value;
-    const container = document.getElementById('recipe-parameters-container');
-    const generateBtn = document.querySelector('#panel-simulation-modules [data-action="generate"]');
-    const runBtn = document.querySelector('#panel-simulation-modules [data-action="run"]');
-    const commandCenter = document.querySelector('#panel-simulation-modules .command-center');
+        const templateId = e.target.value;
+        const container = document.getElementById('recipe-parameters-container');
+        const generateBtn = document.querySelector('#panel-simulation-modules [data-action="generate"]');
+        const runBtn = document.querySelector('#panel-simulation-modules [data-action="run"]');
+        const commandCenter = document.querySelector('#panel-simulation-modules .command-center');
+        const infoBox = document.getElementById('recipe-info');
 
-    if (!container || !generateBtn) return;
+        if (!container || !generateBtn) return;
 
-    // Clear previous recipe and hide execution details
-    container.innerHTML = '';
-    runBtn.disabled = true;
-    commandCenter.classList.add('hidden');
+        // Clear previous recipe and hide execution details
+        container.innerHTML = '';
+        if (runBtn) runBtn.disabled = true;
+        if (commandCenter) commandCenter.classList.add('hidden');
+        delete container.dataset.activeRecipeTemplate;
 
+        if (!templateId) {
+            // If "-- Select --" is chosen, show placeholder text and disable button
+            container.innerHTML = `<p class="text-sm text-center text-[--text-secondary] p-4">Select a recipe from the dropdown above to configure a simulation.</p>`;
+            generateBtn.textContent = 'Generate Package';
+            generateBtn.disabled = true;
+            if (infoBox) infoBox.innerHTML = '';
+            return;
+        }
 
-    if (templateId) {
         const template = document.getElementById(templateId);
-        if (template) {
+        if (!template) {
+            if (infoBox) infoBox.innerHTML = `<p class="text-xs text-[--text-secondary]">No template found for selected recipe.</p>`;
+            generateBtn.textContent = 'Generate Package';
+            generateBtn.disabled = true;
+            return;
+        }
+
         const fullClone = template.content.cloneNode(true);
-        // Find the content inside the cloned template
         const contentClone = fullClone.querySelector('.window-content');
 
         if (contentClone) {
@@ -86,19 +105,46 @@ export function setupSimulationSidebar() {
         }
 
         // Update the generate button text and enable it
-        const recipeName = availableModules.find(m => m.id === templateId)?.name || 'Package';
-        generateBtn.textContent = `Generate ${recipeName.replace('Recipe: ', '')} Package`;
+        const recipeDef = getRecipeById(templateId);
+        const fallbackName = availableModules.find(m => m.id === templateId)?.name || 'Package';
+        const recipeLabel = recipeDef?.name || fallbackName;
+        generateBtn.textContent = `Generate ${recipeLabel.replace('Recipe: ', '')} Package`;
         generateBtn.disabled = false;
 
+        // Surface basic recipe metadata / requirements (if available)
+        if (infoBox) {
+            if (recipeDef) {
+                const env = recipeDef.environment || {};
+                const req = recipeDef.inputSchema?.requiredResources || {};
+                const deps = env.dependencies || [];
+
+                const lines = [];
+
+                if (recipeDef.description) {
+                    lines.push(`<div class="text-xs text-[--text-secondary]">${recipeDef.description}</div>`);
+                }
+
+                const reqParts = [];
+                if (req.needsSensorGrid) reqParts.push('sensor grid');
+                if (req.needsView) reqParts.push('view/camera');
+                if (req.needsBSDF) reqParts.push('BSDF file');
+                if (recipeDef.inputSchema?.requiredFiles?.length) {
+                    reqParts.push(...recipeDef.inputSchema.requiredFiles.map(f => `file: ${f}`));
+                }
+                if (reqParts.length) {
+                    lines.push(`<div class="text-[0.65rem] text-[--text-secondary]">Requires: ${reqParts.join(', ')}</div>`);
+                }
+
+                if (deps.length) {
+                    lines.push(`<div class="text-[0.65rem] text-[--text-secondary]">Toolchain: ${deps.join(', ')}</div>`);
+                }
+
+                infoBox.innerHTML = lines.join('') || '';
+            } else {
+                infoBox.innerHTML = `<div class="text-[0.65rem] text-[--text-secondary]">Legacy recipe. Generation uses the classic script generator.</div>`;
+            }
         }
-    } else {
-        // If "-- Select --" is chosen, show placeholder text and disable button
-        container.innerHTML = `<p class="text-sm text-center text-[--text-secondary] p-4">Select a recipe from the dropdown above to configure a simulation.</p>`;
-        generateBtn.textContent = 'Generate Package';
-        generateBtn.disabled = true;
-        delete container.dataset.activeRecipeTemplate;
-    }
-});
+    });
 }
 
 /**
@@ -110,24 +156,37 @@ export function setupSimulationSidebar() {
 export function recreateSimulationPanels(simSettings, loadedFiles, ui) {
     const panelContainer = document.getElementById('window-container');
     const moduleList = document.getElementById('simulation-module-list');
+    const recipeSelector = document.getElementById('recipe-selector');
+    const sidebarContainer = document.getElementById('recipe-parameters-container');
 
-    // Clear all existing dynamically generated simulation panels
-    panelContainer.querySelectorAll('.floating-window[data-template-id^="template-recipe-"]').forEach(panel => {
-        const templateId = panel.dataset.templateId;
-        const button = moduleList.querySelector(`[data-template="${templateId}"]`);
-        if (panel.parentElement) {
-            panel.parentElement.removeChild(panel);
-        }
-        if (button) {
-            button.innerHTML = '+';
-            button.title = `Add ${button.previousElementSibling.textContent} Panel`;
-        }
-    });
+    // Clear all existing dynamically generated simulation panels (legacy floating windows)
+    if (panelContainer && moduleList) {
+        panelContainer.querySelectorAll('.floating-window[data-template-id^="template-recipe-"]').forEach(panel => {
+            const templateId = panel.dataset.templateId;
+            const button = moduleList.querySelector(`[data-template="${templateId}"]`);
+            if (panel.parentElement) {
+                panel.parentElement.removeChild(panel);
+            }
+            if (button) {
+                button.innerHTML = '+';
+                button.title = `Add ${button.previousElementSibling.textContent} Panel`;
+            }
+        });
+    }
+
+    // Clear sidebar recipe container UI
+    if (sidebarContainer) {
+        sidebarContainer.innerHTML = '';
+        delete sidebarContainer.dataset.activeRecipeTemplate;
+    }
+    if (recipeSelector) {
+        recipeSelector.value = '';
+    }
 
     if (!simSettings) return;
 
-    // 1. Recreate and populate the Global Parameters panel if it exists in settings
-    if (simSettings.global && Object.keys(simSettings.global).length > 0) {
+    // 1. Recreate and populate the Global Parameters panel if it exists in settings (legacy floating panel)
+    if (simSettings.global && Object.keys(simSettings.global).length > 0 && moduleList) {
         const templateId = 'template-global-sim-params';
         const button = moduleList.querySelector(`[data-template="${templateId}"]`);
         if (button) {
@@ -138,17 +197,100 @@ export function recreateSimulationPanels(simSettings, loadedFiles, ui) {
         }
     }
 
-    // 2. Recreate and populate each recipe panel from the settings
-    if (simSettings.recipes && Array.isArray(simSettings.recipes)) {
+    // 2. Determine the active recipe from canonical shape or legacy recipes[]
+    let activeRecipe = null;
+
+    if (simSettings.activeRecipe && simSettings.activeRecipe.templateId) {
+        activeRecipe = simSettings.activeRecipe;
+    } else if (Array.isArray(simSettings.recipes) && simSettings.recipes.length > 0) {
+        // Backwards compatibility: fall back to the first stored recipe
+        const first = simSettings.recipes[0];
+        if (first && first.templateId) {
+            activeRecipe = { templateId: first.templateId, values: first.values || {} };
+        }
+    }
+
+    // 3. Restore the active recipe into the new dropdown + sidebar container
+    if (activeRecipe && recipeSelector && sidebarContainer) {
+        const { templateId, values } = activeRecipe;
+
+        // Select the recipe in the dropdown if present
+        const optionExists = Array.from(recipeSelector.options).some(opt => opt.value === templateId);
+        if (optionExists) {
+            recipeSelector.value = templateId;
+        }
+
+        // Inject template content into sidebar container
+        const template = document.getElementById(templateId);
+        if (template) {
+            const fullClone = template.content.cloneNode(true);
+            const contentClone = fullClone.querySelector('.window-content');
+
+            if (contentClone) {
+                sidebarContainer.append(...contentClone.children);
+                sidebarContainer.dataset.activeRecipeTemplate = templateId;
+
+                // Initialize logic and file listeners for the restored recipe UI
+                initializePanelLogic(sidebarContainer);
+                setupFileListenersForPanel(sidebarContainer);
+
+                // Populate restored UI with saved values, matching the ID-mapping logic
+                const activePanel = sidebarContainer.firstElementChild;
+                if (activePanel && values && typeof values === 'object') {
+                    const panelIdSuffix = activePanel.id.split('-').pop();
+                    activePanel.querySelectorAll('input, select').forEach(input => {
+                        const baseId = input.id.replace(`-${panelIdSuffix}`, '');
+                        if (!baseId) return;
+                        if (!(baseId in values)) return;
+
+                        const savedValue = values[baseId];
+                        if (input.type === 'file') {
+                            if (savedValue && savedValue.name && project.simulationFiles[baseId]) {
+                                let display = activePanel.querySelector(`[data-file-display-for="${input.id}"]`);
+                                if (!display) {
+                                    display = document.createElement('span');
+                                    display.className = 'text-sm text-gray-500 ml-4 truncate max-w-[150px]';
+                                    display.dataset.fileDisplayFor = input.id;
+                                    input.parentElement.insertBefore(display, input.nextSibling);
+                                }
+                                display.textContent = savedValue.name;
+                                display.title = savedValue.name;
+                            }
+                        } else if (input.type === 'checkbox' || input.type === 'radio') {
+                            input.checked = !!savedValue;
+                        } else {
+                            input.value = savedValue;
+                        }
+
+                        input.dispatchEvent(new Event('change', { bubbles: true }));
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                    });
+                }
+
+                // Update Generate button label to match active recipe
+                const generateBtn = document.querySelector('#panel-simulation-modules [data-action="generate"]');
+                if (generateBtn) {
+                    const recipeDef = getRecipeById(templateId);
+                    const recipeLabel = recipeDef?.name || availableModules.find(m => m.id === templateId)?.name || 'Package';
+                    generateBtn.textContent = `Generate ${recipeLabel.replace('Recipe: ', '')} Package`;
+                    generateBtn.disabled = false;
+                }
+            }
+        }
+    }
+
+    // 4. For any remaining legacy recipes (beyond the active one), optionally recreate floating panels
+    if (Array.isArray(simSettings.recipes) && moduleList && panelContainer) {
         simSettings.recipes.forEach(recipeData => {
             const { templateId, values } = recipeData;
-            if (templateId && values) {
-                const button = moduleList.querySelector(`[data-template="${templateId}"]`);
-                if (button) {
-                    const newPanel = _createSimulationPanel(templateId, button);
-                    if (newPanel) {
-                        _populatePanel(newPanel, values);
-                    }
+            if (!templateId || !values) return;
+            if (activeRecipe && templateId === activeRecipe.templateId) return; // already handled via sidebar
+
+            const button = moduleList.querySelector(`[data-template="${templateId}"]`);
+            if (button) {
+                const newPanel = _createSimulationPanel(templateId, button);
+                if (newPanel) {
+                    _populatePanel(newPanel, values);
                 }
             }
         });
@@ -482,32 +624,53 @@ export function initializePanelLogic(panel) {
     }
 
     if (runBtn) {
-    runBtn.addEventListener('click', () => {
-        const isWindows = navigator.platform.toUpperCase().indexOf('WIN') !== -1;
-        const scriptFile = isWindows ? generatedScriptFiles.bat : generatedScriptFiles.sh;
+        runBtn.addEventListener('click', () => {
+            const isWindows = navigator.platform.toUpperCase().indexOf('WIN') !== -1;
+            const scriptFile = isWindows ? generatedScriptFiles.bat : generatedScriptFiles.sh;
 
-        if (!scriptFile) {
-            showAlert('No script has been generated for this recipe yet. Click "Generate Package" first.', 'Error');
-            return;
-        }
+            if (!scriptFile) {
+                showAlert('No script has been generated for this recipe yet. Click "Generate Package" first.', 'Error');
+                return;
+            }
 
-        const command = isWindows ? `${scriptFile}` : `./${scriptFile}`;
+            const recipeType = panel.dataset.templateId || panel.dataset.activeRecipeTemplate;
+            const recipeDef = recipeType ? getRecipeById(recipeType) : null;
+            const runtimeEnv = getRuntimeEnvironment();
+            const support = getRecipeExecutionSupport(recipeDef, runtimeEnv);
 
-        // If in Electron, run directly. Otherwise, show instructions.
-        if (window.electronAPI && project.dirHandle) {
-            const commandCenter = panel.querySelector('.command-center');
-            const outputConsole = commandCenter?.querySelector('.simulation-output-console');
+            const command = isWindows ? `${scriptFile}` : `./${scriptFile}`;
 
-            window.electronAPI.runScript({
-              projectPath: project.dirHandle.name,
-              scriptName: scriptFile
-          });
-      } else {
-          // --- Browser Fallback: Show instructions ---
-          _showBrowserRunInstructions(scriptFile);
-      }
-    });
-}
+            // If this environment/recipe combo cannot auto-run, show instructions instead.
+            if (!support.canAutoRun) {
+                _showBrowserRunInstructions(scriptFile);
+
+                // Optionally surface reasons in a separate info alert for clarity.
+                if (support.reasons && support.reasons.length) {
+                    showAlert(
+                        `<div class="text-xs text-[--text-secondary] space-y-1">${support.reasons.map(r => `<div>${r}</div>`).join('')}</div>`,
+                        'Execution Information'
+                    );
+                }
+                return;
+            }
+
+            // Auto-run via Electron when supported.
+            if (window.electronAPI && (project.dirPath || project.dirHandle)) {
+                const commandCenter = panel.querySelector('.command-center');
+                if (commandCenter) {
+                    commandCenter.classList.remove('hidden');
+                }
+
+                window.electronAPI.runScript({
+                    projectPath: project.dirPath || project.dirHandle?.name,
+                    scriptName: scriptFile
+                });
+            } else {
+                // Fallback: show instructions if Electron is not available.
+                _showBrowserRunInstructions(scriptFile);
+            }
+        });
+    }
 
     // Add logic to handle the simulation output console
     const commandCenter = panel.querySelector('.command-center');

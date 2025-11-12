@@ -9,7 +9,12 @@ import { _parseAndBinSpectralData } from './radiance.js';
 * @param {object} simulationFiles - The project's collection of simulation file data.
 * @returns {string} A string containing Radiance light source definitions. 
 */ 
-    function generateLightSourceDefinitions(lightingData, roomData, simulationFiles) { if (!lightingData || !lightingData.type) { return '# No artificial lighting enabled in the scene.'; }
+    function generateLightSourceDefinitions(lightingData, roomData, simulationFiles) {
+        // lightingData comes from lightingManager.getCurrentState() (see scripts/lighting.js)
+        // roomData is expected to be { W, L, H, rotationY } from projectData.geometry.room
+        if (!lightingData || !lightingData.type) {
+            return '# No artificial lighting enabled in the scene.';
+        }
 
     // Apply the Maintenance Factor (MF) to the luminaire output
     const mf = lightingData.maintenance_factor || 1.0;
@@ -180,18 +185,33 @@ export function generateScripts(projectData, recipeType) {
                 scripts.push(...scriptSet);
             }
             return scripts;
-        default:
-            console.warn(`Unknown recipe type provided to generateScripts: ${recipeType}`);
-            return scripts;
+
         case 'template-recipe-en-illuminance':
             scriptSet = createEnIlluminanceScript(projectData);
             break;
+
         case 'template-recipe-en-ugr':
             scriptSet = createEnUgrScript(projectData);
             break;
+
         case 'template-recipe-annual-radiation':
             scriptSet = createAnnualRadiationScript(projectData);
             break;
+
+        case 'template-recipe-en17037':
+            scriptSet = createEn17037ComplianceScript(projectData);
+            if (Array.isArray(scriptSet)) {
+                scripts.push(...scriptSet);
+            }
+            return scripts;
+
+        case 'template-recipe-facade-irradiation':
+            scriptSet = createFacadeIrradiationScript(projectData);
+            break;
+
+        default:
+            console.warn(`Unknown recipe type provided to generateScripts: ${recipeType}`);
+            return scripts;
     }
 
     if (scriptSet) {
@@ -1797,9 +1817,9 @@ function createImagelessGlareScript(projectData) {
     const ab = sp['ab'] || 8;
     const ad = sp['ad'] || 4096;
     const as = sp['as'] || 1024;
-    const ar = p['ar'] || 512;
-    const aa = p['aa'] || 0.1;
-    const lw = p['lw'] || 0.001;
+    const ar = sp['ar'] || 512;
+    const aa = sp['aa'] || 0.1;
+    const lw = sp['lw'] || 0.001;
     const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room, projectData.simulationFiles);
 
     const scheduleFlag = scheduleFile ? `-sff ../10_schedules/${scheduleFile}` : '';
@@ -3022,10 +3042,10 @@ function createLightingEnergyScript(projectData) {
  * @returns {object} An object containing the shell and bat script files.
  */
 function createFacadeIrradiationScript(projectData) {
-    const { projectInfo: pi, mergedSimParams: p, geometry } = projectData;
+    const { projectInfo: pi, mergedSimParams: p } = projectData;
     const projectName = pi['project-name'].replace(/\s+/g, '_') || 'scene';
     const epwFileName = p['weather-file']?.name || 'weather.epw';
-    
+
     const ab = p['ab'] || 5;
     const ad = p['ad'] || 2048;
     const as = p['as'] || 1024;
@@ -3033,68 +3053,8 @@ function createFacadeIrradiationScript(projectData) {
     const aa = p['aa'] || 0.15;
     const lw = p['lw'] || 0.005;
 
-    // --- Generate Façade Points File ---
-    const { W, L, H, rotationY } = geometry.room;
-    const { 'facade-selection': facade, 'facade-offset': offset, 'facade-grid-spacing': spacing } = p;
-
-    const points = [];
-    let start, vecU, vecV, normal, numU, numV;
-
-    // Define plane based on facade, accounting for room rotation
-    const rotRad = (rotationY * Math.PI) / 180;
-    const cosR = Math.cos(rotRad);
-    const sinR = Math.sin(rotRad);
-
-    const rotate = (v) => ({ x: v.x * cosR - v.y * sinR, y: v.x * sinR + v.y * cosR });
-
-    switch (facade) {
-        case 'S':
-            start = rotate({ x: -W / 2, y: L / 2 + offset });
-            vecU = rotate({ x: 1, y: 0 }); // Along width
-            vecV = { x: 0, y: 0, z: 1 }; // Vertical
-            normal = rotate({ x: 0, y: -1 }); // Pointing towards building
-            numU = Math.floor(W / spacing);
-            numV = Math.floor(H / spacing);
-            break;
-        case 'N':
-            start = rotate({ x: W/2, y: -L/2 - offset });
-            vecU = rotate({ x: -1, y: 0 });
-            vecV = { x: 0, y: 0, z: 1 };
-            normal = rotate({ x: 0, y: 1 });
-            numU = Math.floor(W / spacing);
-            numV = Math.floor(H / spacing);
-            break;
-        case 'E':
-            start = rotate({ x: W / 2 + offset, y: L / 2 });
-            vecU = rotate({ x: 0, y: -1 });
-            vecV = { x: 0, y: 0, z: 1 };
-            normal = rotate({ x: -1, y: 0 });
-            numU = Math.floor(L / spacing);
-            numV = Math.floor(H / spacing);
-            break;
-        case 'W':
-            start = rotate({ x: -W / 2 - offset, y: -L/2 });
-            vecU = rotate({ x: 0, y: 1 });
-            vecV = { x: 0, y: 0, z: 1 };
-            normal = rotate({ x: 1, y: 0 });
-            numU = Math.floor(L / spacing);
-            numV = Math.floor(H / spacing);
-            break;
-    }
-
-    for (let i = 0; i <= numU; i++) {
-        for (let j = 0; j <= numV; j++) {
-            const px = start.x + i * spacing * vecU.x;
-            const py = start.y + i * spacing * vecU.y;
-            const pz = j * spacing * vecV.z;
-            points.push(`${px.toFixed(4)} ${py.toFixed(4)} ${pz.toFixed(4)} ${normal.x.toFixed(4)} ${normal.y.toFixed(4)} 0.0`);
-        }
-    }
-    const facadePtsContent = points.join('\n');
-    project.addSimulationFile('facade-grid-file', 'facade_grid.pts', facadePtsContent);
-    // --- End of Points File Generation ---
-    
     const shContent = `#!/bin/bash
+>>>>>>>>
     # RUN_Facade_Irradiation.sh
     # Calculates annual solar irradiation on a facade, including shading effects.
 

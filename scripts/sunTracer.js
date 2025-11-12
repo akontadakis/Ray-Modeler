@@ -84,16 +84,36 @@ export function traceSunRays(params) {
     }
 
     const dom = getDom();
-    const sunParams = {
-        date: params.date,
-        time: params.time,
-        latitude: parseFloat(dom.latitude.value),
-        longitude: parseFloat(dom.longitude.value)
-    };
+    const latitude = parseFloat(dom.latitude.value);
+    const longitude = parseFloat(dom.longitude.value);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        console.warn('[sunTracer] Invalid latitude/longitude. Skipping sun ray tracing.');
+        return;
+    }
 
     // 1. Calculate Sun Position and create the visual helper
-    const { sunVector } = _calculateSunVector(sunParams);
-    const sunHelper = _createSunPositionHelper(sunVector);
+    const solarPosition = computeSolarPosition({
+        date: params.date,
+        time: params.time,
+        latitude,
+        longitude
+    });
+
+    if (!solarPosition) {
+        console.warn('[sunTracer] Failed to compute solar position. Skipping sun ray tracing.');
+        return;
+    }
+
+    const { direction: sunToSunVector, altitudeDeg } = solarPosition;
+
+    // Skip visualization when sun is below horizon
+    if (altitudeDeg <= 0) {
+        console.warn('[sunTracer] Sun below horizon for given time/location. Skipping sun ray tracing.');
+        return;
+    }
+
+    const sunHelper = _createSunPositionHelper(sunToSunVector);
     if (sunHelper) {
         scene.add(sunHelper);
     }
@@ -102,11 +122,12 @@ export function traceSunRays(params) {
     const { panels: glazingPanels, totalArea: totalGlazingArea } = _findGlazingPanels();
 
 if (glazingPanels.length === 0) {
-        console.warn("Could not find any glazing surfaces to trace rays through.");
+        console.warn('[sunTracer] Could not find any glazing surfaces to trace rays through.');
         return;
     }
 
-    const sunDirection = sunVector.clone().negate();
+    // Ray direction from sun towards the scene (opposite of vector from origin to sun)
+    const sunDirection = sunToSunVector.clone().negate();
     const raycaster = new THREE.Raycaster();
     const allObjects = [roomObject, wallSelectionGroup, shadingObject, furnitureObject, vegetationObject];
 
@@ -238,31 +259,118 @@ function _getSolarDataFromEpw(epwContent, date, time) {
     return null;
 }
 
-function _calculateSunVector(params) {
+/**
+ * Compute solar position for visualization.
+ *
+ * Conventions:
+ * - Input time is interpreted as local civil time.
+ * - Time zone is approximated from longitude using LSTM (visualization only).
+ * - Azimuth:
+ *   - 0° = North, 90° = East, clockwise.
+ * - Returned direction is a unit vector from the origin TOWARDS the sun.
+ *
+ * This is intentionally local to the visualization and does not override the
+ * EPW/time handling used by Simulation Recipes.
+ *
+ * @param {Object} params
+ * @param {Date} params.date - JS Date instance (local or UTC; day/month/year are used via UTC).
+ * @param {string} params.time - "HH:MM" local civil time string.
+ * @param {number} params.latitude
+ * @param {number} params.longitude
+ * @returns {{ altitudeDeg: number, azimuthDeg: number, direction: THREE.Vector3 }|null}
+ */
+export function computeSolarPosition(params) {
     const { date, time, latitude, longitude } = params;
-    const dayOfYear = (Date.UTC(date.getFullYear(), date.getUTCMonth(), date.getUTCDate()) - Date.UTC(date.getFullYear(), 0, 0)) / (24 * 60 * 60 * 1000);
-    const [hour, minute] = time.split(':').map(Number);
-    const fractionalHour = hour + minute / 60;
-    const lstm = 15 * Math.round(longitude / 15);
-    const b = (360 / 365) * (dayOfYear - 81) * (Math.PI / 180);
-    const eot = 9.87 * Math.sin(2 * b) - 7.53 * Math.cos(b) - 1.5 * Math.sin(b);
-    const tc = 4 * (longitude - lstm) + eot;
-    const lst = fractionalHour + tc / 60;
-    const h_rad = (15 * (lst - 12)) * (Math.PI / 180);
-    const lat_rad = latitude * (Math.PI / 180);
-    const decl_rad = -23.45 * Math.cos((360 / 365) * (dayOfYear + 10) * (Math.PI / 180)) * (Math.PI / 180);
-    const altitude_rad = Math.asin(Math.sin(decl_rad) * Math.sin(lat_rad) + Math.cos(decl_rad) * Math.cos(lat_rad) * Math.cos(h_rad));
-    let azimuth_rad = Math.acos((Math.sin(decl_rad) * Math.cos(lat_rad) - Math.cos(decl_rad) * Math.sin(lat_rad) * Math.cos(h_rad)) / Math.cos(altitude_rad));
-    if (h_rad > 0) {
-        azimuth_rad = 2 * Math.PI - azimuth_rad;
+
+    if (!(date instanceof Date) || typeof time !== 'string') {
+        console.warn('[sunTracer] Invalid date/time supplied to computeSolarPosition.');
+        return null;
     }
-    const sunVector = new THREE.Vector3();
-    sunVector.setFromSphericalCoords(1, Math.PI / 2 - altitude_rad, azimuth_rad + Math.PI);
-    return {
-        sunVector,
-        altitude: THREE.MathUtils.radToDeg(altitude_rad),
-        azimuth: THREE.MathUtils.radToDeg(azimuth_rad)
-    };
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        console.warn('[sunTracer] Invalid latitude/longitude supplied to computeSolarPosition.');
+        return null;
+    }
+
+    const [hour, minute] = time.split(':').map(Number);
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
+        console.warn('[sunTracer] Invalid time format supplied to computeSolarPosition.');
+        return null;
+    }
+
+    // Day of year using UTC date to avoid local DST shifts
+    const dayOfYear =
+        (Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) -
+            Date.UTC(date.getUTCFullYear(), 0, 0)) /
+        (24 * 60 * 60 * 1000);
+
+    // Latitude/longitude in radians
+    const latRad = THREE.MathUtils.degToRad(latitude);
+
+    // Approximate time zone from longitude (LSTM).
+    // NOTE: This is for visualization only and may not match EPW timezone.
+    const lstm = 15 * Math.round(longitude / 15);
+
+    // Equation of Time (in minutes)
+    const b = THREE.MathUtils.degToRad((360 / 365) * (dayOfYear - 81));
+    const eot =
+        9.87 * Math.sin(2 * b) -
+        7.53 * Math.cos(b) -
+        1.5 * Math.sin(b);
+
+    // Time correction in minutes
+    const tc = 4 * (longitude - lstm) + eot;
+
+    // Local solar time (hours)
+    const fractionalHour = hour + minute / 60;
+    const lst = fractionalHour + tc / 60;
+
+    // Hour angle (radians)
+    const hRad = THREE.MathUtils.degToRad(15 * (lst - 12));
+
+    // Solar declination (degrees -> radians), using common approximation
+    const declDeg = -23.45 * Math.cos(THREE.MathUtils.degToRad((360 / 365) * (dayOfYear + 10)));
+    const declRad = THREE.MathUtils.degToRad(declDeg);
+
+    // Solar altitude (elevation) angle
+    const altitudeRad = Math.asin(
+        Math.sin(declRad) * Math.sin(latRad) +
+        Math.cos(declRad) * Math.cos(latRad) * Math.cos(hRad)
+    );
+
+    // Guard against numerical issues (e.g. cos(alt) ~ 0)
+    const cosAlt = Math.cos(altitudeRad);
+    if (cosAlt <= 0) {
+        // At or below horizon; caller is expected to handle as "no sun".
+        return {
+            altitudeDeg: THREE.MathUtils.radToDeg(altitudeRad),
+            azimuthDeg: 0,
+            direction: new THREE.Vector3(0, 0, 0)
+        };
+    }
+
+    // Solar azimuth (0° = North, 90° = East, clockwise)
+    let azimuthRad = Math.acos(
+        (Math.sin(declRad) * Math.cos(latRad) -
+            Math.cos(declRad) * Math.sin(latRad) * Math.cos(hRad)) /
+        cosAlt
+    );
+
+    if (hRad > 0) {
+        azimuthRad = 2 * Math.PI - azimuthRad;
+    }
+
+    const altitudeDeg = THREE.MathUtils.radToDeg(altitudeRad);
+    const azimuthDeg = THREE.MathUtils.radToDeg(azimuthRad);
+
+    // Build direction vector from origin TOWARDS the sun
+    const direction = new THREE.Vector3().setFromSphericalCoords(
+        1,
+        Math.PI / 2 - altitudeRad,
+        azimuthRad
+    );
+
+    return { altitudeDeg, azimuthDeg, direction };
 }
 
 export function toggleSunRaysVisibility(visible) {

@@ -302,6 +302,10 @@ export function openHdrViewer(texture, glareResult = null) {
         console.error("HDR Viewer: No texture provided.");
         return;
     }
+    if (!scene || !camera || !renderer || !material || !planeMesh || !controls) {
+        console.error("HDR Viewer: Viewer has not been initialized. Call initHdrViewer() before openHdrViewer().");
+        return;
+    }
     currentTexture = texture;
     if (glareOverlayContainer) {
         glareOverlayContainer.innerHTML = ''; // Clear previous overlays

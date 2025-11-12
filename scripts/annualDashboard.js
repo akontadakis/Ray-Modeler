@@ -36,7 +36,7 @@ export async function openClimateAnalysisDashboard() {
         initializePanelControls(climateAnalysisPanel);
     }
     
-    if (!resultsManager.climateData) {
+    if (!resultsManager.hasResult(null, 'epw-climate')) {
         showAlert('No climate data has been loaded. Please load an EPW file via the Project Setup or Analysis panel.', 'No Data');
         return;
     }
@@ -212,44 +212,109 @@ function createHumidityChart() {
 }
 
 /**
- * Creates and renders the sun path diagram.
+ * Creates and renders the sun path diagram using a polar scatter/line chart.
+ * Uses getSunPathData() conventions:
+ * - t: azimuth [deg], 0° = North, clockwise.
+ * - r: zenith angle [deg] = 90 - altitude.
  */
 function createSunPathChart() {
     const chartData = resultsManager.getSunPathData();
     if (!chartData) return;
-    
+
     const canvas = document.getElementById('sun-path-canvas');
     if (!canvas) return;
     if (sunPathChart) sunPathChart.destroy();
 
-    sunPathChart = new Chart(canvas, {
-        type: 'polarArea',
+    const ctx = canvas.getContext('2d');
+
+    const style = getComputedStyle(document.documentElement);
+    const textColor = style.getPropertyValue('--text-secondary').trim() || '#e5e7eb';
+    const gridColor = style.getPropertyValue('--grid-color').trim() || 'rgba(75,85,99,0.4)';
+
+    // Utility to convert {r, t} into Chart.js radialLinear-friendly points.
+    const mapPath = (pts) => pts.map(p => ({
+        // For radialLinear: r is radius, and angle (theta) is derived from index.
+        // We keep r directly; azimuth is shown via tooltip.
+        r: p.r,
+        t: p.t
+    }));
+
+    sunPathChart = new Chart(ctx, {
+        type: 'scatter',
         data: {
-            labels: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'],
+            // We use separate datasets per key day; angle semantics handled in tooltip.
             datasets: [
-                { label: 'Summer Solstice', data: chartData.summerSolstice, backgroundColor: 'rgba(239, 68, 68, 0.7)', pointStyle: 'circle', radius: 3 },
-                { label: 'Equinox', data: chartData.equinox, backgroundColor: 'rgba(34, 197, 94, 0.7)', pointStyle: 'rect', radius: 3 },
-                { label: 'Winter Solstice', data: chartData.winterSolstice, backgroundColor: 'rgba(59, 130, 246, 0.7)', pointStyle: 'triangle', radius: 3 },
+                {
+                    label: 'Summer Solstice',
+                    data: mapPath(chartData.summerSolstice || []),
+                    borderColor: 'rgba(239, 68, 68, 0.9)',
+                    backgroundColor: 'rgba(239, 68, 68, 0.5)',
+                    showLine: true,
+                    pointRadius: 2,
+                    tension: 0.2
+                },
+                {
+                    label: 'Equinox',
+                    data: mapPath(chartData.equinox || []),
+                    borderColor: 'rgba(34, 197, 94, 0.9)',
+                    backgroundColor: 'rgba(34, 197, 94, 0.5)',
+                    showLine: true,
+                    pointRadius: 2,
+                    tension: 0.2
+                },
+                {
+                    label: 'Winter Solstice',
+                    data: mapPath(chartData.winterSolstice || []),
+                    borderColor: 'rgba(59, 130, 246, 0.9)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                    showLine: true,
+                    pointRadius: 2,
+                    tension: 0.2
+                }
             ]
         },
         options: {
-            responsive: true, maintainAspectRatio: false,
+            responsive: true,
+            maintainAspectRatio: false,
             plugins: {
-                legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 }, usePointStyle: true } },
-                tooltip: { callbacks: { label: ctx => ` Azimuth: ${ctx.raw.t.toFixed(1)}°, Altitude: ${(90 - ctx.raw.r).toFixed(1)}°` } }
-            },
-            scales: {
-                r: {
-                    type: 'linear', max: 90, min: 0, startAngle: -90,
-                    ticks: {
-                        stepSize: 30, backdropColor: 'transparent',
-                        callback: value => `${90 - value}°` // Display as altitude
+                legend: {
+                    position: 'bottom',
+                    labels: { boxWidth: 10, font: { size: 9 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => {
+                            const raw = ctx.raw || {};
+                            const az = typeof raw.t === 'number' ? raw.t : 0;
+                            const alt = 90 - (typeof raw.r === 'number' ? raw.r : 0);
+                            return ` Azimuth: ${az.toFixed(1)}°, Altitude: ${alt.toFixed(1)}°`;
+                        }
                     }
                 }
             },
-            elements: { line: { show: true, tension: 0.1, borderWidth: 2 } },
-            // Re-map the data to use line elements instead of area fills
-            datasets: { polarArea: { showLine: true } }
+            scales: {
+                r: {
+                    type: 'linear',
+                    min: 0,
+                    max: 90,
+                    angleLines: { color: gridColor },
+                    grid: { color: gridColor },
+                    ticks: {
+                        stepSize: 30,
+                        backdropColor: 'transparent',
+                        color: textColor,
+                        callback: (value) => `${90 - value}°` // Show altitude on radial ticks
+                    },
+                    pointLabels: {
+                        display: true,
+                        color: textColor,
+                        centerPointLabels: true,
+                        font: { size: 9 }
+                    }
+                }
+            },
+            // Render as polar by using radialLinear scale on 'r' axis
+            indexAxis: 'r'
         }
     });
 }
@@ -264,8 +329,11 @@ export async function openGlareRoseDiagram() {
     // Dynamic import to break circular dependency
     const { showAlert, getNewZIndex, ensureWindowInView, initializePanelControls } = await import('./ui.js');
 
-    if (!resultsManager.hasAnnualGlareData('a')) {
-        showAlert('Please load an annual glare results file (.dgp) first.', 'No Data');
+    const hasGlareDgp = resultsManager.hasResult('a', 'annual-glare-dgp');
+    const hasGlareGa = resultsManager.hasResult('a', 'annual-glare-ga');
+
+    if (!hasGlareDgp && !hasGlareGa && !resultsManager.hasAnnualGlareData('a')) {
+        showAlert('Please load an annual glare results file (.dgp or .ga) first.', 'No Data');
         return;
     }
 
@@ -376,11 +444,21 @@ export async function openCombinedAnalysisPanel() {
     // Dynamic import to break circular dependency
     const { showAlert, getNewZIndex, ensureWindowInView, initializePanelControls } = await import('./ui.js');
 
-    const hasIll = resultsManager.hasAnnualData('a') || resultsManager.hasAnnualData('b');
-    const hasDgp = resultsManager.hasAnnualGlareData('a') || resultsManager.hasAnnualGlareData('b');
+    const hasIll =
+        resultsManager.hasResult('a', 'annual-illuminance') ||
+        resultsManager.hasResult('b', 'annual-illuminance');
 
-    if (!hasIll || !hasDgp) {
-        showAlert('Please load both an annual illuminance (.ill) file and an annual DGP (.dgp) file to use this feature.', 'Data Missing');
+    const hasGlare =
+        resultsManager.hasResult('a', 'annual-glare-dgp') ||
+        resultsManager.hasResult('b', 'annual-glare-dgp') ||
+        resultsManager.hasResult('a', 'annual-glare-ga') ||
+        resultsManager.hasResult('b', 'annual-glare-ga');
+
+    if (!hasIll || !hasGlare) {
+        showAlert(
+            'Please load both an annual illuminance (.ill) file and an annual glare results file (.dgp or .ga) to use this feature.',
+            'Data Missing'
+        );
         return;
     }
     

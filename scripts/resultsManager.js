@@ -2,7 +2,7 @@
 
 import { showAlert } from './ui.js';
 import { project } from './project.js';
-
+import { ResultsRegistry } from './results/ResultsRegistry.js';
 
 export const palettes = {
     // Viridis - from https://waldyrious.net/viridis-palette-generator/
@@ -19,14 +19,37 @@ export const palettes = {
 
 class ResultsManager {
     constructor() {
-        this.datasets = { a: null, b: null };
         this.differenceData = { data: null, stats: null };
         this.hdrResult = null; // Stays global for now
 
         // Annual / spectral datasets for A and B views
         this.datasets = {
-            a: { annualData: [], annualDirectData: [] },
-            b: { annualData: [], annualDirectData: [] }
+            a: {
+                fileName: null,
+                data: [],
+                annualData: [],
+                annualDirectData: [],
+                glareResult: null,
+                annualGlareResults: {},
+                spectralResults: {},
+                circadianMetrics: null,
+                lightingEnergyMetrics: null,
+                lightingMetrics: null,
+                stats: null
+            },
+            b: {
+                fileName: null,
+                data: [],
+                annualData: [],
+                annualDirectData: [],
+                glareResult: null,
+                annualGlareResults: {},
+                spectralResults: {},
+                circadianMetrics: null,
+                lightingEnergyMetrics: null,
+                lightingMetrics: null,
+                stats: null
+            }
         };
 
         this.activeView = 'a'; // 'a', 'b', or 'diff'
@@ -291,8 +314,13 @@ class ResultsManager {
 
         const exitCode = typeof options.statusFromRunner === 'number' ? options.statusFromRunner : 0;
 
+        // Derive severity flags from parsed errors
+        const hasFatal = errors.fatal && errors.fatal.length > 0;
+        const hasSevere = errors.severe && errors.severe.length > 0;
+        const hasWarning = errors.warning && errors.warning.length > 0;
+
         let status = 'success';
-        if (exitCode !== 0 || errors.hasFatal) {
+        if (exitCode !== 0 || hasFatal) {
             status = 'error';
         }
 
@@ -311,11 +339,11 @@ class ResultsManager {
         if (status === 'error') {
             // Surface a concise message to user; detailed list is in dashboard
             const message =
-                errors.fatal[0] ||
-                errors.severe[0] ||
+                (errors.fatal && errors.fatal[0]) ||
+                (errors.severe && errors.severe[0]) ||
                 'EnergyPlus reported errors. See EnergyPlus Results panel for details.';
             showAlert(message, 'EnergyPlus Run Error');
-        } else if (errors.hasWarning || errors.hasSevere) {
+        } else if (hasWarning || hasSevere) {
             // Non-fatal issues: notify but do not mark as error
             const message = `EnergyPlus run completed with ${errors.severe.length} severe and ${errors.warning.length} warning message(s).`;
             showAlert(message, 'EnergyPlus Run Warnings');
@@ -329,66 +357,113 @@ class ResultsManager {
      * @param {'a' | 'b'} key - The dataset to clear.
      */
     clearDataset(key) {
-    if (key in this.datasets) {
-        this.datasets[key] = {
-            fileName: null,
-            data: [], // This will hold the "active" data for display
-            annualData: [],
-            annualDirectData: [],
-            glareResult: null,
-            annualGlareResults: {},
-            spectralResults: {}, // Will store photopic, eml, cs, cct arrays
-            circadianMetrics: null, // Will store summary JSON object
-            lightingEnergyMetrics: null,
-            lightingMetrics: null,
-            stats: null
-        };
-    }
-    // If we clear B, the difference map is no longer valid.
+        if (key in this.datasets) {
+            this.datasets[key] = {
+                fileName: null,
+                data: [],
+                annualData: [],
+                annualDirectData: [],
+                glareResult: null,
+                annualGlareResults: {},
+                spectralResults: {},
+                circadianMetrics: null,
+                lightingEnergyMetrics: null,
+                lightingMetrics: null,
+                stats: null
+            };
+        }
+        // If we clear B, the difference map is no longer valid.
         if (key === 'b') {
             this.differenceData = { data: null, stats: null };
         }
     }
 
     /**
-     * Processes the parsed data from the web worker and updates the dataset.
+     * Processes the parsed data from the web worker using ResultsRegistry descriptors.
+     * This is the new, typed entrypoint. It is designed to be non-breaking:
+     * - If no descriptor matches, a generic handler is used.
+     * - Legacy field expectations (datasets.a/b.*) are preserved.
      * @param {object} result - The parsed data from the worker.
      * @param {string} fileName - The name of the original file.
      * @param {'a' | 'b'} key - The dataset key.
      * @private
      */
     _processWorkerResult(result, fileName, key) {
+        if (!(key in this.datasets)) {
+            console.warn(`ResultsManager: invalid dataset key '${key}' in _processWorkerResult.`);
+            return;
+        }
         if (!this.datasets[key]) {
             this.clearDataset(key);
         }
-        this.datasets[key].fileName = fileName;
 
-        const lowerFileName = fileName.toLowerCase();
+        const descriptor = ResultsRegistry.findDescriptor(fileName, result);
 
-        if (result.circadianMetrics) {
-            this.datasets[key].circadianMetrics = result.circadianMetrics;
-        } else if (result.perPointCircadianData) {
-            this.datasets[key].spectralResults = result.perPointCircadianData;
-            this.datasets[key].data = result.perPointCircadianData.Photopic_lux;
-            this.activeMetricType = 'Photopic_lux';
-        } else if (lowerFileName.includes('_direct.ill')) {
-            this.datasets[key].annualDirectData = result.annualData || [];
-            this.datasets[key].data = result.data || [];
-            this.datasets[key].spectralResults['illuminance'] = result.data || [];
-            this.activeMetricType = 'illuminance';
-        } else if (result.lightingEnergyMetrics) {
-            this.datasets[key].lightingEnergyMetrics = result.lightingEnergyMetrics;
-        } else {
-            const illuminanceData = result.data || [];
-            this.datasets[key].data = illuminanceData;
-            this.datasets[key].spectralResults['illuminance'] = illuminanceData;
-            this.activeMetricType = 'illuminance';
-            this.datasets[key].annualData = result.annualData || [];
-            this.datasets[key].glareResult = result.glareResult || null;
-            this.datasets[key].annualGlareResults = result.annualGlareResults || {};
+        if (!descriptor) {
+            console.warn('ResultsManager: No matching descriptor; using legacy generic handler.', fileName);
+            this._processGenericResult(result, fileName, key);
+            return;
         }
 
-        this.datasets[key].lightingMetrics = result.lightingMetrics || null;
+        try {
+            if (descriptor.storage && typeof descriptor.storage.apply === 'function') {
+                descriptor.storage.apply(this, key, result, { fileName });
+            } else {
+                console.warn('ResultsManager: Descriptor has no storage.apply; falling back to generic.', descriptor.id);
+                this._processGenericResult(result, fileName, key);
+            }
+        } catch (err) {
+            console.error('ResultsManager: Error applying descriptor', descriptor.id, 'for', fileName, err);
+            this._processGenericResult(result, fileName, key);
+        }
+    }
+
+    /**
+     * Legacy-style generic processor kept as a safe fallback for unknown shapes.
+     * This mirrors the previous behavior for simple scalar/annual results.
+     * @param {object} result
+     * @param {string} fileName
+     * @param {'a'|'b'} key
+     * @private
+     */
+    _processGenericResult(result, fileName, key) {
+        if (!this.datasets[key]) {
+            this.clearDataset(key);
+        }
+        const dataset = this.datasets[key];
+        dataset.fileName = dataset.fileName || fileName;
+
+        // Prefer explicit arrays; fall back cautiously.
+        if (result.annualData && Array.isArray(result.annualData)) {
+            dataset.annualData = result.annualData;
+        }
+        if (Array.isArray(result.data)) {
+            dataset.data = result.data;
+        } else if (!dataset.data || dataset.data.length === 0) {
+            // If worker returned a flat array, treat it as data.
+            if (Array.isArray(result)) {
+                dataset.data = result;
+            }
+        }
+
+        // Preserve any existing specialized fields if not explicitly overwritten.
+        if (result.glareResult && !dataset.glareResult) {
+            dataset.glareResult = result.glareResult;
+        }
+        if (result.annualGlareResults && !dataset.annualGlareResults) {
+            dataset.annualGlareResults = result.annualGlareResults;
+        }
+        if (result.circadianMetrics && !dataset.circadianMetrics) {
+            dataset.circadianMetrics = result.circadianMetrics;
+        }
+        if (result.perPointCircadianData && !dataset.spectralResults) {
+            dataset.spectralResults = result.perPointCircadianData;
+        }
+        if (result.lightingEnergyMetrics && !dataset.lightingEnergyMetrics) {
+            dataset.lightingEnergyMetrics = result.lightingEnergyMetrics;
+        }
+
+        return dataset;
     }
 
     /**
@@ -509,6 +584,7 @@ class ResultsManager {
             dni: [],     // Direct Normal Radiation (Wh/m^2) - Column 14
             dhi: [],     // Diffuse Horizontal Radiation (Wh/m^2) - Column 15
             windDir: [], // Wind Direction (°) - Column 20
+            windSpd: []  // Wind Speed (m/s) - Column 21
         };
 
         for (const line of dataLines) {
@@ -520,6 +596,7 @@ class ResultsManager {
             hourlyData.dni.push(parseFloat(values[14]));
             hourlyData.dhi.push(parseFloat(values[15]));
             hourlyData.windDir.push(parseFloat(values[20]));
+            hourlyData.windSpd.push(parseFloat(values[21]));
         }
 
         if (hourlyData.temp.length !== 8760) {
@@ -623,7 +700,28 @@ class ResultsManager {
 
     /**
      * Calculates the sun path for key days of the year for a sun path diagram.
-     * @returns {object|null} Data formatted for Chart.js or null if no project data.
+     *
+     * Returned structure:
+     * {
+     *   summerSolstice: [{ r, t }, ...],
+     *   equinox:        [{ r, t }, ...],
+     *   winterSolstice: [{ r, t }, ...]
+     * }
+     *
+     * Conventions (for use with polar charts):
+     * - t (theta): azimuth in degrees,
+     *      0° at North, increasing clockwise (N=0, E=90, S=180, W=270).
+     * - r (radius): zenith angle in degrees,
+     *      r = 90 - altitude,
+     *      so points near the center are high-altitude sun positions.
+     *
+     * Consumers (e.g. annualDashboard sun-path chart) should:
+     * - Treat t as the polar angle (deg).
+     * - Treat r as the radial coordinate (deg from zenith).
+     * - Prefer a polar scatter/line implementation over polarArea,
+     *   using these explicit r/t mappings.
+     *
+     * @returns {object|null} Data for polar plotting or null if no project data.
      */
     getSunPathData() {
         if (!project || !project.projectData) return null;
@@ -682,6 +780,49 @@ class ResultsManager {
     }
 
     /**
+     * Builds an occupied-hours mask of length 8760 based on an optional schedule file and default hours.
+     * If a valid 8760-line occupancy schedule is found in project.simulationFiles['occupancy-schedule'], it is used.
+     * Otherwise, a default 8-18 Monday-Friday schedule is applied.
+     * @param {{ start:number, end:number }} [defaultHours={start:8,end:18}]
+     * @returns {{ mask:boolean[], total:number }}
+     * @private
+     */
+    _buildOccupiedMask(defaultHours = { start: 8, end: 18 }) {
+        const scheduleFile = project.simulationFiles?.['occupancy-schedule'];
+        const mask = new Array(8760).fill(false);
+
+        if (scheduleFile?.content) {
+            const scheduleValues = scheduleFile.content
+                .trim()
+                .split(/\r?\n/)
+                .map(v => parseInt(v, 10));
+            if (scheduleValues.length === 8760 && scheduleValues.every(v => v === 0 || v === 1)) {
+                for (let h = 0; h < 8760; h++) {
+                    mask[h] = scheduleValues[h] === 1;
+                }
+                return { mask, total: mask.reduce((a, v) => a + (v ? 1 : 0), 0) };
+            }
+            console.warn('Occupancy schedule file does not have 8760 valid entries. Using default schedule.');
+        }
+
+        // Default: 8-18, Monday-Friday, typical year starting Jan 1st.
+        for (let h = 0; h < 8760; h++) {
+            const dayIndex = Math.floor(h / 24);
+            const date = new Date(2023, 0, 1 + dayIndex);
+            const dayOfWeek = date.getDay(); // 0=Sun, 6=Sat
+            const hourOfDay = h % 24;
+            const isWeekday = dayOfWeek > 0 && dayOfWeek < 6;
+            const isWorkHour = hourOfDay >= defaultHours.start && hourOfDay < defaultHours.end;
+            if (isWeekday && isWorkHour) {
+                mask[h] = true;
+            }
+        }
+
+        const total = mask.reduce((a, v) => a + (v ? 1 : 0), 0);
+        return { mask, total };
+    }
+
+    /**
      * Calculates annual daylight metrics (sDA, ASE, UDI) from loaded .ill data.
      * @param {object} options - Thresholds for the calculations.
      * @returns {object|null} An object with sDA, ASE, and UDI results, or null if no data.
@@ -712,21 +853,8 @@ class ResultsManager {
         let asePoints = 0;
         const allUdiPercentages = [];
 
-        let occupiedMask = null;
-        const scheduleFile = project.simulationFiles['occupancy-schedule'];
-
-        if (scheduleFile?.content) {
-            const scheduleValues = scheduleFile.content.trim().split(/\r?\n/).map(v => parseInt(v, 10));
-            if (scheduleValues.length === 8760) {
-                occupiedMask = scheduleValues.map(v => v === 1);
-            } else {
-                console.warn('Occupancy schedule file does not have 8760 entries. Using default schedule.');
-            }
-        }
-
-        const totalOccupiedHoursInYear = occupiedMask 
-            ? occupiedMask.reduce((acc, val) => acc + (val ? 1 : 0), 0)
-            : (occupiedHours.end - occupiedHours.start) * 260; 
+        const { mask: occupiedMask, total: totalOccupiedHoursInYear } =
+            this._buildOccupiedMask(occupiedHours);
 
         for (let p = 0; p < numPoints; p++) {
           let hoursMeetingSda = 0;
@@ -737,9 +865,7 @@ class ResultsManager {
           const hasDirectData = dataset.annualDirectData && dataset.annualDirectData.length > 0;
 
           for (let h = 0; h < 8760; h++) {
-              const isOccupied = occupiedMask ? occupiedMask[h] : (h % 24 >= occupiedHours.start && h % 24 < occupiedHours.end && new Date(2023, 0, 1 + Math.floor(h/24)).getDay() % 6 !== 0);
-
-              if (isOccupied) {
+              if (occupiedMask[h]) {
               const totalIlluminance = annualData[p][h];
 
               if (totalIlluminance >= sDA_illuminance) hoursMeetingSda++;
@@ -821,7 +947,7 @@ class ResultsManager {
      */
     getIlluminanceForHour(hour, key = 'a') {
         const dataset = this.datasets[key];
-        if (!dataset || !dataset.annualData || !dataset.annualData.length === 0) return null;
+        if (!dataset || !dataset.annualData || dataset.annualData.length === 0) return null;
 
         const annualData = dataset.annualData;
         const numPoints = annualData.length;
@@ -952,23 +1078,135 @@ class ResultsManager {
     }
 
     /**
+     * Typed result presence check using ResultsRegistry semantics.
+     * @param {'a'|'b'|null} key - Dataset key, or null for global/epRun where applicable.
+     * @param {string} typeId - ResultsRegistry descriptor id.
+     * @returns {boolean}
+     */
+    hasResult(key, typeId) {
+        switch (typeId) {
+            case 'annual-illuminance': {
+                const ds = this.datasets[key];
+                return !!(ds && Array.isArray(ds.annualData) && ds.annualData.length > 0);
+            }
+            case 'annual-direct-illuminance': {
+                const ds = this.datasets[key];
+                return !!(ds && Array.isArray(ds.annualDirectData) && ds.annualDirectData.length > 0);
+            }
+            case 'annual-glare-dgp': {
+                const ds = this.datasets[key];
+                return !!(ds && ds.annualGlareResults && Array.isArray(ds.annualGlareResults?.dgp) && ds.annualGlareResults.dgp.length > 0);
+            }
+            case 'annual-glare-ga': {
+                const ds = this.datasets[key];
+                return !!(ds && ds.annualGlareResults && Array.isArray(ds.annualGlareResults?.ga) && ds.annualGlareResults.ga.length > 0);
+            }
+            case 'evalglare-pit': {
+                const ds = this.datasets[key];
+                return !!(ds && ds.glareResult);
+            }
+            case 'circadian-summary': {
+                const ds = this.datasets[key];
+                return !!(ds && ds.circadianMetrics);
+            }
+            case 'circadian-per-point': {
+                const ds = this.datasets[key];
+                return !!(ds && ds.spectralResults && Object.keys(ds.spectralResults).length > 0);
+            }
+            case 'lighting-energy': {
+                const ds = this.datasets[key];
+                return !!(ds && ds.lightingEnergyMetrics);
+            }
+            case 'epw-climate': {
+                return !!this.climateData;
+            }
+            case 'ep-results': {
+                return !!this.getLatestSuccessfulEnergyPlusRun();
+            }
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Typed result accessor using stable typeIds.
+     * Returns a thin, read-only view of the underlying data shape.
+     * @param {'a'|'b'|null} key
+     * @param {string} typeId
+     * @returns {any|null}
+     */
+    getResult(key, typeId) {
+        switch (typeId) {
+            case 'annual-illuminance': {
+                const ds = this.datasets[key];
+                if (!ds || !ds.annualData) return null;
+                return {
+                    annualData: ds.annualData,
+                    data: ds.data,
+                    units: ds.units || 'lux'
+                };
+            }
+            case 'annual-direct-illuminance': {
+                const ds = this.datasets[key];
+                if (!ds || !ds.annualDirectData) return null;
+                return { annualDirectData: ds.annualDirectData, units: 'lux' };
+            }
+            case 'annual-glare-dgp': {
+                const ds = this.datasets[key];
+                if (!ds?.annualGlareResults?.dgp) return null;
+                return { annualGlareResults: { dgp: ds.annualGlareResults.dgp } };
+            }
+            case 'annual-glare-ga': {
+                const ds = this.datasets[key];
+                if (!ds?.annualGlareResults?.ga) return null;
+                return { annualGlareResults: { ga: ds.annualGlareResults.ga } };
+            }
+            case 'evalglare-pit': {
+                const ds = this.datasets[key];
+                return ds?.glareResult || null;
+            }
+            case 'circadian-summary': {
+                const ds = this.datasets[key];
+                return ds?.circadianMetrics || null;
+            }
+            case 'circadian-per-point': {
+                const ds = this.datasets[key];
+                return ds?.spectralResults || null;
+            }
+            case 'lighting-energy': {
+                const ds = this.datasets[key];
+                return ds?.lightingEnergyMetrics || null;
+            }
+            case 'epw-climate': {
+                return this.climateData || null;
+            }
+            case 'ep-results': {
+                return this.getLatestSuccessfulEnergyPlusRun();
+            }
+            default:
+                return null;
+        }
+    }
+
+    /**
      * Checks if a given dataset has parsed annual (.ill) data.
+     * Backwards-compatible wrapper over hasResult('annual-illuminance').
      * @param {string} [key='a'] - The dataset key to check.
      * @returns {boolean} True if annual data exists.
      */
     hasAnnualData(key = 'a') {
-        const dataset = this.datasets[key];
-        return !!(dataset && dataset.annualData && dataset.annualData.length > 0);
+        return this.hasResult(key, 'annual-illuminance');
     }
 
     /**
      * Checks if a given dataset has parsed annual glare (.dgp or .ga) data.
+     * Backwards-compatible convenience.
      * @param {string} [key='a'] - The dataset key to check.
      * @returns {boolean} True if annual glare data exists.
      */
     hasAnnualGlareData(key = 'a') {
-        const dataset = this.datasets[key];
-        return !!(dataset && dataset.annualGlareResults && Object.keys(dataset.annualGlareResults).length > 0);
+        const ds = this.datasets[key];
+        return !!(ds && ds.annualGlareResults && Object.keys(ds.annualGlareResults).length > 0);
     }
 
     /**
@@ -983,7 +1221,14 @@ class ResultsManager {
             return null;
         }
 
-        const dgpPointData = this.datasets[key].annualGlareResults.dgp; // This is [point][hour]
+        const agr = this.datasets[key].annualGlareResults || {};
+        const glareKey = agr.dgp ? 'dgp' : (agr.ga ? 'ga' : null);
+        if (!glareKey) {
+            console.warn(`Annual glare data found for dataset '${key}' but no supported metric key (dgp/ga).`);
+            return null;
+        }
+
+        const dgpPointData = agr[glareKey]; // [point][hour]
         const numPoints = dgpPointData.length;
         if (numPoints === 0) return null;
         
@@ -1025,26 +1270,38 @@ class ResultsManager {
      */
     getCombinedDaylightGlareData(dgpThreshold) {
         let illDataset = null;
-        let dgpDataset = null;
+        let glareDataset = null;
+        let glareKey = null;
 
-        // Find which dataset has which data type
+        // Find matching datasets:
         ['a', 'b'].forEach(key => {
-            if (this.datasets[key]?.annualData?.length > 0) illDataset = this.datasets[key];
-            if (this.datasets[key]?.annualGlareResults?.dgp?.length > 0) dgpDataset = this.datasets[key];
+            const ds = this.datasets[key];
+            if (ds?.annualData?.length > 0) {
+                illDataset = illDataset || ds;
+            }
+            if (ds?.annualGlareResults && !glareDataset) {
+                if (ds.annualGlareResults.dgp?.length > 0) {
+                    glareDataset = ds;
+                    glareKey = 'dgp';
+                } else if (ds.annualGlareResults.ga?.length > 0) {
+                    glareDataset = ds;
+                    glareKey = 'ga';
+                }
+            }
         });
 
-        if (!illDataset || !dgpDataset) {
-            console.warn("Both annual illuminance (.ill) and annual DGP (.dgp) files must be loaded.");
+        if (!illDataset || !glareDataset || !glareKey) {
+            console.warn("Both annual illuminance (.ill) and annual glare (.dgp or .ga) files must be loaded.");
             return null;
         }
 
-        const illData = illDataset.annualData; // Expected: [point][hour]
-        const dgpData = dgpDataset.annualGlareResults.dgp; // Expected: [point][hour]
+        const illData = illDataset.annualData; // [point][hour]
+        const glareData = glareDataset.annualGlareResults[glareKey]; // [point][hour]
         const numPoints = illData.length;
 
-        if (dgpData.length !== numPoints) {
-            console.error(`Mismatch between number of points in .ill (${numPoints}) and .dgp (${dgpData.length}) files.`);
-            showAlert("The number of sensor points in the loaded .ill and .dgp files do not match.", "Data Mismatch");
+        if (glareData.length !== numPoints) {
+            console.error(`Mismatch between number of points in .ill (${numPoints}) and glare file (${glareData.length}) files.`);
+            showAlert("The number of sensor points in the loaded .ill and glare files do not match.", "Data Mismatch");
             return null;
         }
 
@@ -1072,7 +1329,7 @@ class ResultsManager {
 
             for (let h = 0; h < 8760; h++) {
                 if (occupiedMask[h]) {
-                    if (dgpData[p][h] > dgpThreshold) glareHours++;
+                    if (glareData[p][h] > dgpThreshold) glareHours++;
 
                     const illuminance = illData[p][h];
                     if (illuminance >= 500 && illuminance < 2000) udiAutonomousHours++;
@@ -1108,32 +1365,8 @@ class ResultsManager {
         const numPoints = annualData.length;
         const daPercentages = new Array(numPoints).fill(0);
 
-        // Get occupancy mask
-        let occupiedMask = null;
-        const scheduleFile = project.simulationFiles['occupancy-schedule'];
-        const occupiedHoursDefault = { start: 8, end: 18 };
-
-        if (scheduleFile?.content) {
-            const scheduleValues = scheduleFile.content.trim().split(/\r?\n/).map(v => parseInt(v, 10));
-            if (scheduleValues.length === 8760) {
-                occupiedMask = scheduleValues.map(v => v === 1);
-            }
-        }
-
-        // Fallback to default if no mask was created
-        if (!occupiedMask) {
-            occupiedMask = new Array(8760).fill(false);
-            for (let h = 0; h < 8760; h++) {
-                const date = new Date(2023, 0, 1 + Math.floor(h / 24));
-                const dayOfWeek = date.getDay(); // 0=Sun, 6=Sat
-                const hourOfDay = h % 24;
-                if (hourOfDay >= occupiedHoursDefault.start && hourOfDay < occupiedHoursDefault.end && dayOfWeek > 0 && dayOfWeek < 6) {
-                    occupiedMask[h] = true;
-                }
-            }
-        }
-
-        const totalOccupiedHours = occupiedMask.reduce((acc, val) => acc + (val ? 1 : 0), 0);
+        // Get occupancy mask (shared logic; DA uses the same default hours as annual metrics)
+        const { mask: occupiedMask, total: totalOccupiedHours } = this._buildOccupiedMask({ start: 8, end: 18 });
         if (totalOccupiedHours === 0) {
             console.warn("No occupied hours found in schedule; cannot calculate DA.");
             return daPercentages; // Return array of zeros
