@@ -485,6 +485,104 @@ export function setZoneLoads(project, zoneLoads) {
     }));
 }
 
+/**
+ * Map canonical zone-level loads to EnergyPlus config.
+ * This is a minimal, focused helper intended for Helios tools.
+ *
+ * Input shape (example):
+ * [
+ *   {
+ *     zoneName: "Office_1",
+ *     peoplePerArea: 0.08,
+ *     lightsPerArea: 8.0,
+ *     equipmentPerArea: 10.0,
+ *     occupancySchedule: "OccWorkday",
+ *     lightingSchedule: "LightWorkday",
+ *     equipmentSchedule: "EquipWorkday"
+ *   },
+ *   ...
+ * ]
+ */
+export function setZoneLoadsCanonical(project, zoneLoads) {
+    const safe = Array.isArray(zoneLoads)
+        ? zoneLoads
+              .filter((z) => z && z.zoneName)
+              .map((z) => ({ ...z }))
+        : [];
+    updateConfig(project, (ep) => ({
+        ...ep,
+        zoneLoads: safe,
+    }));
+}
+
+/**
+ * Minimal helper for thermostat-to-zone assignments.
+ *
+ * Input shape:
+ * [
+ *   {
+ *     zoneName: "Office_1",
+ *     thermostatName: "Office_TStat"
+ *   },
+ *   ...
+ * ]
+ *
+ * The modelBuilder is responsible for turning this into the appropriate
+ * ZoneControl:Thermostat objects.
+ */
+export function setZoneThermostatAssignments(project, assignments) {
+    const safe = Array.isArray(assignments)
+        ? assignments
+              .filter((a) => a && a.zoneName && a.thermostatName)
+              .map((a) => ({
+                  zoneName: String(a.zoneName),
+                  thermostatName: String(a.thermostatName),
+              }))
+        : [];
+
+    updateConfig(project, (ep) => ({
+        ...ep,
+        zoneThermostatAssignments: safe,
+    }));
+}
+
+/**
+ * Minimal helper for IdealLoads-like HVAC parameters at zone level.
+ *
+ * Input shape:
+ * {
+ *   defaults?: { ... },
+ *   perZone?: [
+ *     {
+ *       zoneName: "Office_1",
+ *       coolingLimit?: string|number,
+ *       heatingLimit?: string|number,
+ *       outdoorAirMethod?: string,
+ *       ...
+ *     },
+ *     ...
+ *   ]
+ * }
+ *
+ * The builder interprets these into ZoneHVAC:IdealLoadsAirSystem objects.
+ */
+export function setIdealLoadsParameters(project, idealLoadsConfig) {
+    const cfg = idealLoadsConfig && typeof idealLoadsConfig === 'object'
+        ? { ...idealLoadsConfig }
+        : {};
+
+    if (Array.isArray(cfg.perZone)) {
+        cfg.perZone = cfg.perZone
+            .filter((z) => z && z.zoneName)
+            .map((z) => ({ ...z }));
+    }
+
+    updateConfig(project, (ep) => ({
+        ...ep,
+        idealLoads: cfg,
+    }));
+}
+
 export function setThermostatsAndIdealLoads(project, { thermostats, idealLoads }) {
     const next = {};
     if (Array.isArray(thermostats)) next.thermostats = thermostats.slice();
@@ -676,6 +774,69 @@ export function setSimulationControl(project, simControl) {
     updateConfig(project, (ep) => ({
         ...ep,
         simulationControl: sc,
+    }));
+}
+
+/**
+ * Minimal RunPeriod/calendar helper:
+ * - Ensures a single canonical runPeriod block under ep.simulationControl.
+ * - Optionally aligns with the EPW year if provided.
+ *
+ * Input shape:
+ * {
+ *   beginMonth: number,
+ *   beginDayOfMonth: number,
+ *   endMonth: number,
+ *   endDayOfMonth: number,
+ *   dayOfWeekForStart?: string,
+ *   useWeatherFileDaylightSaving?: boolean,
+ *   useWeatherFileHolidays?: boolean
+ * }
+ */
+export function setRunPeriod(project, runPeriod) {
+    if (!runPeriod || typeof runPeriod !== 'object') return;
+
+    const rp = {
+        name: runPeriod.name || 'UserDefinedRunPeriod',
+        beginMonth: isNum(runPeriod.beginMonth) ? runPeriod.beginMonth : 1,
+        beginDayOfMonth: isNum(runPeriod.beginDayOfMonth) ? runPeriod.beginDayOfMonth : 1,
+        endMonth: isNum(runPeriod.endMonth) ? runPeriod.endMonth : 12,
+        endDayOfMonth: isNum(runPeriod.endDayOfMonth) ? runPeriod.endDayOfMonth : 31,
+        dayOfWeekForStart: runPeriod.dayOfWeekForStart || 'UseWeatherFile',
+        useWeatherFileHolidays:
+            typeof runPeriod.useWeatherFileHolidays === 'boolean'
+                ? runPeriod.useWeatherFileHolidays
+                : true,
+        useWeatherFileDaylightSaving:
+            typeof runPeriod.useWeatherFileDaylightSaving === 'boolean'
+                ? runPeriod.useWeatherFileDaylightSaving
+                : true,
+        applyWeekendHolidayRule:
+            typeof runPeriod.applyWeekendHolidayRule === 'boolean'
+                ? runPeriod.applyWeekendHolidayRule
+                : true,
+        useWeatherFileRain:
+            typeof runPeriod.useWeatherFileRain === 'boolean'
+                ? runPeriod.useWeatherFileRain
+                : true,
+        useWeatherFileSnow:
+            typeof runPeriod.useWeatherFileSnow === 'boolean'
+                ? runPeriod.useWeatherFileSnow
+                : true,
+        numTimesRunperiodToBeRepeated:
+            isNum(runPeriod.numTimesRunperiodToBeRepeated)
+                ? runPeriod.numTimesRunperiodToBeRepeated
+                : 1,
+    };
+
+    updateConfig(project, (ep) => ({
+        ...ep,
+        simulationControl: {
+            ...(ep.simulationControl && typeof ep.simulationControl === 'object'
+                ? ep.simulationControl
+                : {}),
+            runPeriod: rp,
+        },
     }));
 }
 

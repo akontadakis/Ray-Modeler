@@ -81,12 +81,6 @@ const keyMap = {
     'Digit7': 'toggleViewpointPanel',
     'Digit8': 'toggleScenePanel',
     'Digit9': 'toggleEnergyPlusPanel',
-    'Digit9': 'toggleEnergyPlusPanel',
-
-    // Gizmo modes
-    'gizmoTranslate': () => setAndDisplayGizmoMode('translate'),
-    'gizmoRotate': () => setAndDisplayGizmoMode('rotate'),
-    'gizmoScale': () => setAndDisplayGizmoMode('scale'),
     'KeyQ': 'toggleQuadView',
     'KeyV': 'toggleFpv',
     'KeyG': 'toggleGizmo',
@@ -868,30 +862,88 @@ function setupTaskAreaVisualizer() {
 function setupHeliosPanel() {
     const dom = getDom();
 
+    const optimizationTab = dom['helios-optimization-tab-btn'];          // Radiance / daylight optimization
+    const epOptimizationTab = dom['helios-ep-optimization-tab-btn'];    // EnergyPlus optimization
+    const heliosToggle = dom['helios-mode-toggle'];
+    const aiPanel = dom['panel-ai-assistant'];
+    const chatTab = dom['ai-chat-tab-1'];
+    const chatContent = dom['ai-chat-content-1'];
+    const optimizationContent = dom['helios-optimization-content'];
+    const epOptimizationContent = dom['helios-ep-optimization-content'];
+
+    // Initialize tabs based on current Helios mode at startup
+    const isGeneratorModeInit = heliosToggle ? heliosToggle.checked : false;
+
+    if (isGeneratorModeInit) {
+        // Generator mode:
+        // - Show daylight/Radiance optimization tab
+        // - Hide EP optimization tab
+        aiPanel?.classList.add('generator-mode');
+        aiPanel?.classList.remove('helios-mode');
+
+        if (optimizationTab) optimizationTab.classList.remove('hidden');
+        if (epOptimizationTab) epOptimizationTab.classList.add('hidden');
+
+        // Do NOT hide optimizationContent here; ai-assistant.js controls its visibility
+    } else {
+        // Helios/master mode:
+        // - Hide daylight/Radiance optimization tab
+        // - Show EP optimization tab
+        aiPanel?.classList.remove('generator-mode');
+        aiPanel?.classList.add('helios-mode');
+
+        if (optimizationTab) optimizationTab.classList.add('hidden');
+        if (epOptimizationTab) epOptimizationTab.classList.remove('hidden');
+
+        // IMPORTANT:
+        // Leave optimizationContent / epOptimizationContent visibility management
+        // to ai-assistant.js. Do not force-hide them here, to avoid breaking daylight optimization UI.
+    }
+
+    // Ensure there is always at least one active tab (chat) if none is set yet
+    if (chatTab && chatContent && dom['ai-chat-tabs'] && !dom['ai-chat-tabs'].querySelector('.ai-chat-tab.active')) {
+        chatTab.classList.add('active');
+        chatContent.classList.remove('hidden');
+    }
+
     // Helios Mode Toggle
     dom['helios-mode-toggle']?.addEventListener('change', (e) => {
         const isGeneratorMode = e.target.checked;
         const aiPanel = dom['panel-ai-assistant'];
-        const optimizationTab = dom['helios-optimization-tab-btn'];
         const chatTab = dom['ai-chat-tab-1'];
         const chatContent = dom['ai-chat-content-1'];
         const optimizationContent = dom['helios-optimization-content'];
+        const epOptimizationContent = dom['helios-ep-optimization-content'];
 
         if (isGeneratorMode) {
+            // Generator mode: Radiance optimization visible, EnergyPlus optimization hidden
             aiPanel.classList.add('generator-mode');
             aiPanel.classList.remove('helios-mode');
-            optimizationTab.classList.remove('hidden');
+
+            if (optimizationTab) optimizationTab.classList.remove('hidden');
+            if (epOptimizationTab) epOptimizationTab.classList.add('hidden');
+
+            // If EP tab was active, revert to chat
+            if (epOptimizationTab && epOptimizationTab.classList.contains('active')) {
+                epOptimizationTab.classList.remove('active');
+                if (epOptimizationContent) epOptimizationContent.classList.add('hidden');
+                if (chatTab) chatTab.classList.add('active');
+                if (chatContent) chatContent.classList.remove('hidden');
+            }
         } else {
+            // Helios/master mode: EnergyPlus optimization visible, Radiance optimization hidden
             aiPanel.classList.remove('generator-mode');
             aiPanel.classList.add('helios-mode');
-            optimizationTab.classList.add('hidden');
 
-            // If the optimization tab was active, switch back to the chat tab
-            if (optimizationTab.classList.contains('active')) {
+            if (optimizationTab) optimizationTab.classList.add('hidden');
+            if (epOptimizationTab) epOptimizationTab.classList.remove('hidden');
+
+            // If Radiance opt tab was active, revert to chat
+            if (optimizationTab && optimizationTab.classList.contains('active')) {
                 optimizationTab.classList.remove('active');
-                chatTab.classList.add('active');
-                optimizationContent.classList.add('hidden');
-                chatContent.classList.remove('hidden');
+                if (optimizationContent) optimizationContent.classList.add('hidden');
+                if (chatTab) chatTab.classList.add('active');
+                if (chatContent) chatContent.classList.remove('hidden');
             }
         }
     });
@@ -901,9 +953,13 @@ function setupHeliosPanel() {
         const clickedTab = e.target.closest('.ai-chat-tab');
         if (!clickedTab) return;
 
-        // --- FIX: Defer to ai-assistant.js for optimization tab logic ---
-        if (clickedTab.id === 'helios-optimization-tab-btn') {
-            return; 
+        const id = clickedTab.id;
+
+        // Defer optimization-specific tabs to ai-assistant.js:
+        // - Helios Radiance/MOGA (helios-optimization-tab-btn)
+        // - EnergyPlus optimization (helios-ep-optimization-tab-btn)
+        if (id === 'helios-optimization-tab-btn' || id === 'helios-ep-optimization-tab-btn') {
+            return;
         }
 
         const tabId = clickedTab.dataset.tab;
@@ -919,6 +975,9 @@ function setupHeliosPanel() {
             activeContent.classList.remove('hidden');
         }
     });
+
+    // Ensure both optimization tabs exist but are controlled by ai-assistant.js
+    // and not re-wired here.
 }
 
 export async function setupEventListeners() {
@@ -1097,17 +1156,6 @@ export async function setupEventListeners() {
         dom[`sun-ray-tracing-toggle-${dir}`]?.addEventListener('change', handleSunRayToggle);
     });
 
-    dom['sun-rays-visibility-toggle']?.addEventListener('change', async (e) => {
-        const { toggleSunRaysVisibility } = await import('./sunTracer.js');
-        toggleSunRaysVisibility(e.target.checked);
-    });
-
-    dom['ground-plane-toggle']?.addEventListener('change', (e) => {
-        dom['ground-grid-controls']?.classList.toggle('hidden', !e.target.checked);
-        scheduleUpdate();
-    });
-    dom['world-axes-toggle']?.addEventListener('change', scheduleUpdate);
-
     // Set initial state for ground grid controls
     if (dom['ground-grid-controls'] && dom['ground-plane-toggle']) {
         dom['ground-grid-controls'].classList.toggle('hidden', !dom['ground-plane-toggle'].checked);
@@ -1130,23 +1178,6 @@ export async function setupEventListeners() {
                 setGizmoVisibility(dom['gizmo-toggle'].checked);
         }
     });
-
-    // Add listeners for the new sun ray tracing toggles in the aperture panel
-    ['n', 's', 'e', 'w'].forEach(dir => {
-        dom[`sun-ray-tracing-toggle-${dir}`]?.addEventListener('change', handleSunRayToggle);
-    });
-
-    dom['sun-rays-visibility-toggle']?.addEventListener('change', async (e) => {
-        const { toggleSunRaysVisibility } = await import('./sunTracer.js');
-        toggleSunRaysVisibility(e.target.checked);
-    });
-
-    dom['ground-plane-toggle']?.addEventListener('change', (e) => {
-        dom['ground-grid-controls']?.classList.toggle('hidden', !e.target.checked);
-        scheduleUpdate();
-    });
-    dom['world-axes-toggle']?.addEventListener('change', scheduleUpdate);
-
 
     setupTaskAreaVisualizer(); // Initialize the new visualizer
     setupDaylightingZoneVisualizer(); // Initialize the new zone visualizer
@@ -1847,12 +1878,34 @@ function updateMetricSelector(spectralData) {
 * @param {string} panelId The ID of the panel to toggle.
 * @param {string} btnId The ID of the button that controls the panel.
 */
+const PANEL_BUTTON_MAP = {
+    'panel-project': 'toggle-panel-project-btn',
+    'panel-dimensions': 'toggle-panel-dimensions-btn',
+    'panel-aperture': 'toggle-panel-aperture-btn',
+    'panel-lighting': 'toggle-panel-lighting-btn',
+    'panel-materials': 'toggle-panel-materials-btn',
+    'panel-sensor': 'toggle-panel-sensor-btn',
+    'panel-viewpoint': 'toggle-panel-viewpoint-btn',
+    'panel-scene-elements': 'toggle-panel-scene-btn',
+    'panel-info': 'info-button',
+    'panel-recipe-guides': 'recipe-guides-btn',
+    'panel-ai-assistant': 'ai-assistant-button',
+    'panel-simulation-modules': 'toggle-modules-btn',
+    'panel-analysis-modules': 'toggle-analysis-btn',
+    'panel-energyplus': 'toggle-panel-energyplus-btn'
+};
+
+export function getPanelToggleButtonId(panelId) {
+    return PANEL_BUTTON_MAP[panelId] || null;
+}
+
 export function togglePanelVisibility(panelId, btnId) {
     const dom = getDom();
 
     const panel = document.getElementById(panelId);
-    const btn = document.getElementById(btnId);
-    if (!panel || !btn) return;
+    const resolvedBtnId = btnId || getPanelToggleButtonId(panelId);
+    const btn = resolvedBtnId ? document.getElementById(resolvedBtnId) : null;
+    if (!panel) return;
 
     const isHidden = panel.classList.contains('hidden');
 
@@ -3212,7 +3265,6 @@ function setProjectionMode(mode, updateViewButtons = true) {
     }
 }
 
-updateViewpointFromSliders
 
 export function setWindowMode(dir, mode, triggerUpdate = true) {
     const dom = getDom();
