@@ -126,6 +126,7 @@ const ids = [
     'ai-chat-input-container', 'ai-info-btn', 'helios-capabilities-modal',
     'helios-capabilities-close-btn', 'helios-panel-content', 'ai-chat-tabs',
     'helios-optimization-tab-btn', 'helios-optimization-content',
+    'helios-ep-optimization-tab-btn', 'helios-ep-optimization-content', 'template-ep-optimization-panel',
     'opt-target-wall', 'opt-shading-type', 'opt-params-container', 'opt-simulation-recipe',
     'opt-goal-metric', 'opt-constraint', 'opt-population-size', 'opt-generations', 
     'opt-quality', 'start-optimization-btn', 'resume-optimization-btn', 

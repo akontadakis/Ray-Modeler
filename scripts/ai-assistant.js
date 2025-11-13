@@ -27,6 +27,7 @@ import * as THREE from 'three';
 // Module-level cache for DOM elements
 let dom;
 let chatContainer;
+let panelContentContainer; // New variable for clarity
 
 // State management for tabbed conversations
 let conversations = {};
@@ -1100,7 +1101,9 @@ Initializes the AI Assistant, setting up all necessary event listeners.
 */
 function initAiAssistant() {
     dom = getDom();
-    chatContainer = dom['ai-chat-messages']?.parentElement;
+    // Target the main flex container that holds all tab views
+    panelContentContainer = dom['helios-panel-content']; 
+    chatContainer = dom['ai-chat-messages']?.parentElement; // Keep for backward compat if needed locally
 
     // --- Settings Modal ---
     dom['ai-settings-btn']?.addEventListener('click', () => {
@@ -1138,45 +1141,48 @@ function initAiAssistant() {
     // --- Chat Form Submission ---
     dom['ai-chat-form']?.addEventListener('submit', handleSendMessage);
 
-    // --- Inspector & Critique Action Buttons ---
+    // Inspector & Critique Action Buttons ---
     dom['ai-inspector-results']?.addEventListener('click', handleInspectorActionClick);
     dom['ai-critique-results']?.addEventListener('click', handleCritiqueActionClick);
 
-    // --- Event listener for the Radiance Optimization tab ---
-    const optTab = dom['helios-optimization-tab-btn'];
+    // Optimization tab behavior
+    // Use getElementById to ensure we find them even if cache is stale during init
+    const optTab = document.getElementById('helios-optimization-tab-btn');
     if (optTab) {
-        optTab.addEventListener('click', (e) => {
-            if (!chatContainer) return;
+        optTab.addEventListener('click', () => {
+            if (!panelContentContainer) return;
 
-            const tabs = dom['ai-chat-tabs']?.querySelectorAll('.ai-chat-tab') || [];
-
-            // Deactivate all tabs
-            tabs.forEach(t => t.classList.remove('active'));
-
-            // Hide all known content areas
-            dom['ai-chat-messages']?.classList.add('hidden');
-            dom['ai-inspector-results']?.classList.add('hidden');
-            dom['ai-critique-results']?.classList.add('hidden');
-            chatContainer.querySelector('#helios-optimization-content')?.classList.add('hidden');
-            chatContainer.querySelector('#helios-ep-optimization-content')?.classList.add('hidden');
-
-            // Activate this tab
+            // 1. Visual Tab State
+            const allTabs = dom['ai-chat-tabs']?.querySelectorAll('.ai-chat-tab') || [];
+            allTabs.forEach(t => t.classList.remove('active'));
             optTab.classList.add('active');
 
-            // Ensure Radiance optimization panel exists
-            let optPanel = chatContainer.querySelector('#helios-optimization-content');
-            if (!optPanel) {
+            // 2. Content Visibility: Hide ALL panels first
+            Array.from(panelContentContainer.children).forEach(child => {
+                child.classList.add('hidden');
+            });
+
+            // 3. Initialize/Show Radiance Optimization Panel
+            let optPanel = document.getElementById('helios-optimization-content');
+            
+            // Populate from template if empty
+            if (optPanel && optPanel.children.length === 0) {
                 const template = document.getElementById('template-optimization-panel');
                 if (template) {
-                    const clone = template.content.cloneNode(true);
-                    chatContainer.appendChild(clone);
-                    optPanel = chatContainer.querySelector('#helios-optimization-content');
+                    const templateContent = template.content.cloneNode(true);
+                    const templateRoot = templateContent.querySelector('#helios-optimization-content');
+                    if (templateRoot) {
+                        while (templateRoot.firstChild) optPanel.appendChild(templateRoot.firstChild);
+                        optPanel.classList.add('flex-grow', 'p-4', 'space-y-4', 'overflow-y-auto');
+                    } else {
+                        optPanel.appendChild(templateContent);
+                    }
                 }
             }
 
             if (optPanel) {
                 optPanel.classList.remove('hidden');
-
+                // Lazy load JS
                 if (!optPanel.dataset.initialized) {
                     import('./optimizationOrchestrator.js')
                         .then(({ initOptimizationUI }) => {
@@ -1187,46 +1193,45 @@ function initAiAssistant() {
                 }
             }
 
-            // Hide the chat input when optimization tab is active
+            // Hide chat input
             dom['ai-chat-input-container']?.classList.add('hidden');
         });
     }
 
-    // --- Event listener for the EnergyPlus Optimization tab ---
-    const epOptTab = dom['helios-ep-optimization-tab-btn'];
+    const epOptTab = document.getElementById('helios-ep-optimization-tab-btn');
     if (epOptTab) {
-        epOptTab.addEventListener('click', (e) => {
-            if (!chatContainer) return;
+        epOptTab.addEventListener('click', () => {
+            if (!panelContentContainer) return;
 
-            const tabs = dom['ai-chat-tabs']?.querySelectorAll('.ai-chat-tab') || [];
-
-            // Deactivate all tabs
-            tabs.forEach(t => t.classList.remove('active'));
-
-            // Hide all known content areas
-            dom['ai-chat-messages']?.classList.add('hidden');
-            dom['ai-inspector-results']?.classList.add('hidden');
-            dom['ai-critique-results']?.classList.add('hidden');
-            chatContainer.querySelector('#helios-optimization-content')?.classList.add('hidden');
-            chatContainer.querySelector('#helios-ep-optimization-content')?.classList.add('hidden');
-
-            // Activate this tab
+            // 1. Visual Tab State
+            const allTabs = dom['ai-chat-tabs']?.querySelectorAll('.ai-chat-tab') || [];
+            allTabs.forEach(t => t.classList.remove('active'));
             epOptTab.classList.add('active');
 
-            // Ensure EP optimization panel exists
-            let epPanel = chatContainer.querySelector('#helios-ep-optimization-content');
-            if (!epPanel) {
+            // 2. Content Visibility
+            Array.from(panelContentContainer.children).forEach(child => {
+                child.classList.add('hidden');
+            });
+
+            // 3. Initialize/Show EP Optimization Panel
+            let epPanel = document.getElementById('helios-ep-optimization-content');
+            
+            if (epPanel && epPanel.children.length === 0) {
                 const template = document.getElementById('template-ep-optimization-panel');
                 if (template) {
-                    const clone = template.content.cloneNode(true);
-                    chatContainer.appendChild(clone);
-                    epPanel = chatContainer.querySelector('#helios-ep-optimization-content');
+                    const templateContent = template.content.cloneNode(true);
+                    const templateRoot = templateContent.querySelector('#helios-ep-optimization-content');
+                    if (templateRoot) {
+                        while (templateRoot.firstChild) epPanel.appendChild(templateRoot.firstChild);
+                        epPanel.classList.add('flex-grow', 'p-4', 'space-y-4', 'overflow-y-auto');
+                    } else {
+                        epPanel.appendChild(templateContent);
+                    }
                 }
             }
 
             if (epPanel) {
                 epPanel.classList.remove('hidden');
-
                 if (!epPanel.dataset.initialized) {
                     import('./energyplusOptimizationOrchestrator.js')
                         .then(({ initEpOptimizationUI }) => {
@@ -1237,7 +1242,7 @@ function initAiAssistant() {
                 }
             }
 
-            // Hide the chat input when EP optimization tab is active
+            // Hide chat input
             dom['ai-chat-input-container']?.classList.add('hidden');
         });
     }
@@ -1336,30 +1341,16 @@ function closeConversation(event, conversationId) {
 */
 function renderTabs() {
     const tabsContainer = dom['ai-chat-tabs'];
-
     if (!tabsContainer) return;
 
-    // Preserve the Optimization tabs (static elements)
-    const optTab = dom['helios-optimization-tab-btn'];
-    const epOptTab = dom['helios-ep-optimization-tab-btn'];
+    // Capture references to static optimization tabs by ID
+    const optTab = document.getElementById('helios-optimization-tab-btn');
+    const epOptTab = document.getElementById('helios-ep-optimization-tab-btn');
 
-    let optTabWasActive = false;
-    let epOptTabWasActive = false;
-
-    if (optTab && optTab.parentNode === tabsContainer) {
-        optTabWasActive = optTab.classList.contains('active');
-        tabsContainer.removeChild(optTab);
-    }
-
-    if (epOptTab && epOptTab.parentNode === tabsContainer) {
-        epOptTabWasActive = epOptTab.classList.contains('active');
-        tabsContainer.removeChild(epOptTab);
-    }
-
-    // Clear all conversation tabs
+    // Clear all existing children
     tabsContainer.innerHTML = '';
 
-    // Add conversation tabs
+    // Rebuild conversation tabs
     Object.values(conversations).forEach(conv => {
         const tab = document.createElement('button');
         tab.className = 'ai-chat-tab';
@@ -1380,23 +1371,15 @@ function renderTabs() {
         tabsContainer.appendChild(tab);
     });
 
-    // Re-add the Radiance Optimization tab at the end, if present
+    // Append static optimization tabs at the end, if present
     if (optTab) {
-        if (optTabWasActive) {
-            optTab.classList.add('active');
-        } else {
-            optTab.classList.remove('active');
-        }
+        optTab.classList.remove('hidden');
+        optTab.style.display = '';
         tabsContainer.appendChild(optTab);
     }
-
-    // Re-add the EnergyPlus Optimization tab at the end, if present
     if (epOptTab) {
-        if (epOptTabWasActive) {
-            epOptTab.classList.add('active');
-        } else {
-            epOptTab.classList.remove('active');
-        }
+        epOptTab.classList.remove('hidden');
+        epOptTab.style.display = '';
         tabsContainer.appendChild(epOptTab);
     }
 }
@@ -1416,17 +1399,29 @@ function renderActiveConversation() {
         return;
     }
 
-    // In master mode, always show the chat interface
-    // Hide inspector/critique specific UI elements since they're handled through chat
+    // 1. Ensure the main chat content container is visible and others are hidden
+    const chatContent = document.getElementById('ai-chat-content-1');
+    
+    if (panelContentContainer) {
+        Array.from(panelContentContainer.children).forEach(child => {
+            if (child.id === 'ai-chat-content-1') {
+                child.classList.remove('hidden');
+            } else {
+                child.classList.add('hidden');
+            }
+        });
+    }
+
+    // 2. Show/Hide internal chat elements
     dom['ai-chat-messages']?.classList.remove('hidden');
     dom['ai-chat-form']?.classList.remove('hidden');
     dom['ai-inspector-results']?.classList.add('hidden');
     dom['run-inspector-btn']?.classList.add('hidden');
     dom['ai-critique-results']?.classList.add('hidden');
     dom['run-critique-btn']?.classList.add('hidden');
-    // Hide the optimization panel if it exists
-    // Hide the optimization panel if it exists
-    chatContainer?.querySelector('#helios-optimization-content')?.classList.add('hidden');
+    
+    // 3. Ensure chat input is visible
+    dom['ai-chat-input-container']?.classList.remove('hidden');
 
     // Show the chat input container when a chat tab is active
     if (dom['ai-chat-input-container']) {

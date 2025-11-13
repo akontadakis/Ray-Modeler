@@ -864,41 +864,12 @@ function setupHeliosPanel() {
 
     const optimizationTab = dom['helios-optimization-tab-btn'];          // Radiance / daylight optimization
     const epOptimizationTab = dom['helios-ep-optimization-tab-btn'];    // EnergyPlus optimization
-    const heliosToggle = dom['helios-mode-toggle'];
-    const aiPanel = dom['panel-ai-assistant'];
     const chatTab = dom['ai-chat-tab-1'];
     const chatContent = dom['ai-chat-content-1'];
-    const optimizationContent = dom['helios-optimization-content'];
-    const epOptimizationContent = dom['helios-ep-optimization-content'];
 
-    // Initialize tabs based on current Helios mode at startup
-    const isGeneratorModeInit = heliosToggle ? heliosToggle.checked : false;
-
-    if (isGeneratorModeInit) {
-        // Generator mode:
-        // - Show daylight/Radiance optimization tab
-        // - Hide EP optimization tab
-        aiPanel?.classList.add('generator-mode');
-        aiPanel?.classList.remove('helios-mode');
-
-        if (optimizationTab) optimizationTab.classList.remove('hidden');
-        if (epOptimizationTab) epOptimizationTab.classList.add('hidden');
-
-        // Do NOT hide optimizationContent here; ai-assistant.js controls its visibility
-    } else {
-        // Helios/master mode:
-        // - Hide daylight/Radiance optimization tab
-        // - Show EP optimization tab
-        aiPanel?.classList.remove('generator-mode');
-        aiPanel?.classList.add('helios-mode');
-
-        if (optimizationTab) optimizationTab.classList.add('hidden');
-        if (epOptimizationTab) epOptimizationTab.classList.remove('hidden');
-
-        // IMPORTANT:
-        // Leave optimizationContent / epOptimizationContent visibility management
-        // to ai-assistant.js. Do not force-hide them here, to avoid breaking daylight optimization UI.
-    }
+    // Always make both optimization tabs available; content visibility is managed by ai-assistant.js
+    if (optimizationTab) optimizationTab.classList.remove('hidden');
+    if (epOptimizationTab) epOptimizationTab.classList.remove('hidden');
 
     // Ensure there is always at least one active tab (chat) if none is set yet
     if (chatTab && chatContent && dom['ai-chat-tabs'] && !dom['ai-chat-tabs'].querySelector('.ai-chat-tab.active')) {
@@ -906,84 +877,20 @@ function setupHeliosPanel() {
         chatContent.classList.remove('hidden');
     }
 
-    // Helios Mode Toggle
-    dom['helios-mode-toggle']?.addEventListener('change', (e) => {
-        const isGeneratorMode = e.target.checked;
-        const aiPanel = dom['panel-ai-assistant'];
-        const chatTab = dom['ai-chat-tab-1'];
-        const chatContent = dom['ai-chat-content-1'];
-        const optimizationContent = dom['helios-optimization-content'];
-        const epOptimizationContent = dom['helios-ep-optimization-content'];
-
-        if (isGeneratorMode) {
-            // Generator mode: Radiance optimization visible, EnergyPlus optimization hidden
-            aiPanel.classList.add('generator-mode');
-            aiPanel.classList.remove('helios-mode');
-
-            if (optimizationTab) optimizationTab.classList.remove('hidden');
-            if (epOptimizationTab) epOptimizationTab.classList.add('hidden');
-
-            // If EP tab was active, revert to chat
-            if (epOptimizationTab && epOptimizationTab.classList.contains('active')) {
-                epOptimizationTab.classList.remove('active');
-                if (epOptimizationContent) epOptimizationContent.classList.add('hidden');
-                if (chatTab) chatTab.classList.add('active');
-                if (chatContent) chatContent.classList.remove('hidden');
-            }
-        } else {
-            // Helios/master mode: EnergyPlus optimization visible, Radiance optimization hidden
-            aiPanel.classList.remove('generator-mode');
-            aiPanel.classList.add('helios-mode');
-
-            if (optimizationTab) optimizationTab.classList.add('hidden');
-            if (epOptimizationTab) epOptimizationTab.classList.remove('hidden');
-
-            // If Radiance opt tab was active, revert to chat
-            if (optimizationTab && optimizationTab.classList.contains('active')) {
-                optimizationTab.classList.remove('active');
-                if (optimizationContent) optimizationContent.classList.add('hidden');
-                if (chatTab) chatTab.classList.add('active');
-                if (chatContent) chatContent.classList.remove('hidden');
-            }
-        }
-    });
+    // NOTE: Former helios-mode-toggle behavior has been removed.
+    // Both optimization tabs are always available; tab click handlers manage active content.
 
     // AI Panel Tab Switching
+    // AI Panel Tab Switching
+    // Logic moved entirely to ai-assistant.js to handle dynamic chat tabs and optimization tabs unification.
+    // This listener is neutralized to prevent conflicts (blank content issues).
     dom['ai-chat-tabs']?.addEventListener('click', (e) => {
-        const clickedTab = e.target.closest('.ai-chat-tab');
-        if (!clickedTab) return;
-
-        const id = clickedTab.id;
-
-        // Defer optimization-specific tabs to ai-assistant.js:
-        // - Helios Radiance/MOGA (helios-optimization-tab-btn)
-        // - EnergyPlus optimization (helios-ep-optimization-tab-btn)
-        if (id === 'helios-optimization-tab-btn' || id === 'helios-ep-optimization-tab-btn') {
-            return;
-        }
-
-        const tabId = clickedTab.dataset.tab;
-        const allTabs = dom['ai-chat-tabs'].querySelectorAll('.ai-chat-tab');
-        const allContent = dom['helios-panel-content'].querySelectorAll('.ai-chat-content');
-
-        allTabs.forEach(tab => tab.classList.remove('active'));
-        allContent.forEach(content => content.classList.add('hidden'));
-
-        clickedTab.classList.add('active');
-        const activeContent = dom[`ai-chat-content-${tabId}`] || dom[`helios-${tabId}-content`];
-        if (activeContent) {
-            activeContent.classList.remove('hidden');
-        }
+        // no-op: ai-assistant.js handles all click events for these tabs
     });
-
-    // Ensure both optimization tabs exist but are controlled by ai-assistant.js
-    // and not re-wired here.
 }
 
 export async function setupEventListeners() {
     const dom = getDom();
-
-    setupHeliosPanel();
 
     // Global listener for all keyboard shortcuts
     window.addEventListener('keydown', handleKeyDown);
