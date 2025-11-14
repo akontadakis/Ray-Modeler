@@ -3808,84 +3808,172 @@
         </div>
     </div>
    <!-- EnergyPlus Optimization Info Modal -->
-        <div id="ep-optimization-info-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[10002] hidden items-center justify-center">
-        <div class="ui-panel p-6 w-full max-w-xl mx-auto bg-[--bg-main] relative" style="max-height: 80vh; overflow-y: auto;">
+    <div id="ep-optimization-info-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[10002] hidden items-center justify-center">
+        <div class="ui-panel p-6 w-full max-w-3xl mx-auto bg-[--bg-main] relative" style="max-height: 80vh; display: flex; flex-direction: column;">
             <button id="ep-opt-info-modal-close-btn" class="absolute top-3 right-3 text-[--text-secondary] hover:text-[--text-primary]" aria-label="Close EnergyPlus Optimization Info">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
-            <h3 class="text-lg font-bold mb-3">EnergyPlus Optimization</h3>
-                <p class="text-sm mb-3">
-                This panel runs a genetic search over a small set of EnergyPlus configuration parameters (thermostat setpoints, internal loads, ventilation, schedules) using EnergyPlus runs as the evaluation engine. It is single-objective for now, with built-in caching and an explicit “Apply Best” flow.
-                </p>
-            <h4 class="font-semibold text-sm mt-4 mb-1">1. Workflow Overview</h4>
-            <ul class="list-disc list-inside text-sm space-y-1 mb-3">
-            <li>Select a KPI (e.g. site EUI, heating, cooling, lighting).</li>
-            <li>Pick up to 3 parameters from the list and define ranges/options.</li>
-            <li>Choose population size and max evaluations (or use Quick mode).</li>
-            <li>Start the optimization; each design triggers an EP run and KPI extraction.</li>
-            <li>Review the reported “Best” design and apply it explicitly to the EP config.</li>
-            </ul>
-
-            <h4 class="font-semibold text-sm mt-3 mb-1">2. Parameters</h4>
-                <p class="text-sm mb-2">
-                The parameter list is predefined and scoped to robust global controls:
-                </p>
-                <ul class="list-disc list-inside text-xs space-y-1 mb-3">
-                <li><strong>Cooling/Heating Setpoints</strong>: Global thermostat targets.</li>
-                <li><strong>LPD / EPD / Occupancy Multipliers</strong>: Simple scaling of internal loads.</li>
-                <li><strong>Outdoor Air per Person</strong>: Ventilation rate control.</li>
-                <li><strong>Schedule Profiles</strong>: Discrete choices for occupancy/lighting behavior.</li>
-                </ul>
-                <p class="text-xs text-[--text-secondary] mb-3">
-                At most 3 parameters can be active at once to keep the search tractable.
-                </p>
-
-                <h4 class="font-semibold text-sm mt-3 mb-1">3. Metrics & Fitness</h4>
-                <p class="text-sm mb-2">
-                Metrics are derived from <code>resultsManager.getEnergyPlusKpisForUi(runId)</code>:
-                </p>
-                <ul class="list-disc list-inside text-xs space-y-1 mb-3">
-                <li>Minimize total site energy (kWh/m² or kWh).</li>
-                <li>Minimize heating / cooling / lighting energy.</li>
-                </ul>
-                <p class="text-xs mb-2">
-                Goal types:
-                <strong>minimize</strong> (score = -value),
-                <strong>maximize</strong> (score = value),
-                <strong>set-target</strong> (score = -|value - target|).
-                </p>
-                <p class="text-xs mb-3">
-                An optional constraint (e.g.
-                <code>minimize_total_site_energy < 120</code>) is evaluated against the metric set; violating designs are given <code>-Infinity</code> fitness and logged.
-                </p>
-
-                <h4 class="font-semibold text-sm mt-3 mb-1">4. Execution Pipeline</h4>
-                <ol class="list-decimal list-inside text-xs space-y-1 mb-3">
-                <li>Clone current EP config from <code>energyplusConfigService</code> / <code>project</code>.</li>
-                <li>Apply chosen parameters via their <code>apply(config, value)</code> handlers.</li>
-                <li>Persist config back through the config service or <code>project.energyPlusConfig</code>.</li>
-                <li>Call <code>generateAndStoreIdf(project)</code> to write <code>model.idf</code>.</li>
-                <li>Run EnergyPlus via <code>window.electronAPI.runEnergyPlus</code> with a unique <code>runId</code>.</li>
-                <li>On <code>onEnergyPlusExit</code>, parse results, extract KPIs, compute fitness.</li>
-                <li>Cache results by design key to avoid re-running identical configurations.</li>
+            <div class="window-content prose" style="max-height: 100%; overflow-y: auto;">
+                <h2>Guide for Performing the E+ Optimization</h2>
+                <p>The "E+ Optimization" tab in the Helios panel is a dedicated interface for running Generative Optimization studies specifically for **EnergyPlus configuration parameters**. Its purpose is to automatically find the best possible set of E+ settings (like thermostat setpoints, internal loads, or ventilation rates) by running many EnergyPlus simulations in the background. You define the goals (e.g., "minimize total site energy") and constraints, and the optimizer "evolves" solutions to find the best-performing parameters.</p>
+                <p>This guide explains how to use this feature, covering both the manual process and how Helios (the AI) can assist you.</p>
+                
+                <hr class="my-6 border-[--grid-color]">
+                
+                <h2 class="text-lg font-bold mb-4">About Generative Optimization (for EnergyPlus)</h2>
+                <p>This panel uses a <strong>Genetic Algorithm (GA)</strong> to automatically find high-performing EnergyPlus configurations. Unlike the Radiance-based "Optimization" tab (which optimizes shading geometry), this tab optimizes the *operational parameters* of your building model.</p>
+                <p>It works by modifying your project's <code>energyPlusConfig</code>, generating a new <code>model.idf</code> for each design, running a full EnergyPlus simulation, and extracting the performance metric (KPI) from the results. It is ideal for tuning your model to find the best balance of performance and efficiency.</p>
+                
+                <h2>How to Run an E+ Optimization (Step-by-Step)</h2>
+                <ol>
+                    <li><strong>Define Your Goal(s)</strong>:
+                        <ul>
+                            <li><strong>Metric:</strong> Select the Key Performance Indicator (KPI) you want to optimize from the **Metric** dropdown (e.g., <code>minimize_total_site_energy</code>, <code>minimize_heating_kwh</code>).</li>
+                            <li><strong>Goal Type:</strong> Choose how to optimize this metric (<code>Minimize</code>, <code>Maximize</code>, or <code>Set Target</code>).</li>
+                            <li><strong>Constraint (Optional):</strong> Set a "pass/fail" rule for your goal (e.g., <code>minimize_total_site_energy < 120</code>). Designs that fail this constraint are discarded.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Define Parameters (The "Genes")</strong>:
+                        <ul>
+                            <li>Click the **"Select parameters..."** dropdown.</li>
+                            <li>Check the box next to the parameters you want the algorithm to change (e.g., <code>tset_cool</code>, <code>lpd_multiplier</code>). **You can select a maximum of 3.**</li>
+                            <li>For each parameter you add, a card will appear. Set a valid <strong>Min</strong>, <strong>Max</strong>, and <strong>Step</strong> range. This defines the "search space" for the optimizer.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Configure Run Settings</strong>:
+                        <ul>
+                            <li><strong>Population:</strong> The number of designs to test in each "generation." (e.g., 6-10).</li>
+                            <li><strong>Max Evals:</strong> The total number of EnergyPlus simulations to run. More evaluations take longer but produce better results.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Run the Optimization</strong>:
+                        <ul>
+                            <li>Click <strong>"Start Optimization."</strong> The "Progress Log" will show the status. Each evaluation involves a full EnergyPlus run, so this process can take time.</li>
+                            <li><strong>Quick Optimize</strong> runs with smaller settings for a fast, preliminary result.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Analyze and Apply Results</strong>:
+                        <ul>
+                            <li>As the optimization runs, the <strong>Results</strong> list will fill with the best solution found so far.</li>
+                            <li>Click the best design in the list to select it.</li>
+                            <li>Click <strong>"Apply Best Design"</strong> to permanently update your project's <code>energyPlusConfig</code> with the winning parameters. This change is **not** automatic.</li>
+                        </ul>
+                    </li>
                 </ol>
 
-                <h4 class="font-semibold text-sm mt-3 mb-1">5. Requirements & Safety</h4>
-                <ul class="list-disc list-inside text-xs space-y-1 mb-3">
-                <li>Electron environment with <code>window.electronAPI.runEnergyPlus</code> and <code>onEnergyPlusExit</code>.</li>
-                <li>Saved project directory and valid EPW + EnergyPlus executable paths.</li>
-                <li>Built-in 10-minute timeout per run with clear error messages on failure.</li>
-                <li>No auto-apply: best solutions must be confirmed via “Apply Best Design”.</li>
+                <h4>✨ How to Use Helios (The AI) for E+ Optimization</h4>
+                <p>Instead of (or in addition to) using the manual form, you can use Helios in the <strong>Chat</strong> tab to assist you.</p>
+                <ol>
+                    <li><strong>AI-Powered Setup</strong>
+                        <p>You can ask Helios to configure the entire optimization for you. Go to the "Chat" tab and ask:</p>
+                        <blockquote>"Helios, set up an E+ optimization to minimize total site energy by testing cooling setpoints between 24 and 26 and heating setpoints between 19 and 21."</blockquote>
+                        <p>Helios will use its <code>configureEnergyPlusOptimization</code> tool to fill out the entire form in the E+ Optimization tab. It will then ask you to review the settings and click "Start Optimization" when you are ready.</p>
+                    </li>
+                    <li><strong>AI-Powered Execution</strong>
+                        <p>Once configured (either manually or by the AI), you can start the run from the chat tab:</p>
+                        <blockquote>"Start the EnergyPlus optimization in quick mode."</blockquote>
+                        <p>Helios will use the <code>startEnergyPlusOptimization</code> tool to begin the run.</p>
+                    </li>
+                    <li><strong>AI-Powered Trend Analysis (After a Run)</strong>
+                        <p>After your optimization is complete, go to the "Chat" tab and ask:</p>
+                        <blockquote>"Helios, please analyze my last E+ optimization run."</blockquote>
+                        <p>Helios will use its <code>analyzeEnergyPlusOptimizationResults</code> tool to get the data from <em>every single simulation it ran</em>. It will then provide a high-level summary of trends and insights, such as:</p>
+                        <ul>
+                            <li>"I found that <strong>'tset_cool' was the most critical parameter</strong> for minimizing energy."</li>
+                            <li>"Performance for 'lpd_multiplier' improved down to 0.7, but had diminishing returns after that."</li>
+                        </ul>
+                    </li>
+                </ol>
+                
+                <hr class="my-6 border-[--grid-color]">
+                
+                <h2>Optimization Methodologies (EnergyPlus)</h2>
+                <h3>Single-Objective (SSGA)</h3>
+                <p>This panel uses a <strong>Steady-State Genetic Algorithm (SSGA)</strong>. It is efficient for finding the single best solution for one goal (e.g., "Minimize Site Energy").</p>
+                <ol>
+                    <li><strong>Initialization:</strong> Creates an initial "population" (e.g., 6) of random designs.</li>
+                    <li><strong>Evaluation (Fitness):</strong> Each design (e.g., <code>{"tset_cool": 25, "lpd_multiplier": 0.8}</code>) is passed to the evaluation function.</li>
+                    <li><strong>Selection:</strong> Selects two "parent" designs using <strong>Tournament Selection</strong>.</li>
+                    <li><strong>Crossover & Mutation:</strong> The two parents are "bred" to create two new "child" designs, with a small chance of random mutation.</li>
+                    <li><strong>Replacement:</strong> The two new children are evaluated. They are added to the population, and the two <strong>worst-performing</strong> designs are removed.</li>
+                    <li><strong>Repeat:</strong> This "select, breed, evaluate, replace" loop repeats until the <strong>Max Evaluations</strong> is reached.</li>
+                </ol>
+                <h3>Key Feature: Fitness Caching</h3>
+                <p>The optimizer uses an <code>epFitnessCache</code> to store the result for every design it tests (e.g., <code>{"tset_cool": 25, "lpd_multiplier": 0.8} -> {fitness: -118.4}</code>). If the algorithm generates a design it has already simulated, it retrieves the score from this memory instead of running a new, time-consuming EnergyPlus simulation. This is also what powers the AI's Trend Analysis tool.</p>
+                
+                <h2>Configuration Options Explained</h2>
+                <ul>
+                    <li><strong>Metric (The "What"):</strong> This selects the raw data point you want to track. The word "Minimize" in the label is just a hint; this dropdown only selects the <em>data source</em>.
+                        <ul style="list-style-type: disc; margin-left: 20px; margin-top: 8px;">
+                            <li><strong>Minimize Site EUI (kWh/m²):</strong> This is your **Total Energy Consumption** (heating, cooling, lighting, equipment) normalized by the building's floor area. This is the best metric for overall energy efficiency.</li>
+                            <li><strong>Minimize Heating EUI (kWh/m²):</strong> The **Heating Energy** (e.g., from gas or electric heating) normalized by area. Use this to focus specifically on improving winter performance.</li>
+                            <li><strong>Minimize Cooling EUI (kWh/m²):</strong> The **Cooling Energy** (from chillers or AC) normalized by area. Use this to focus on reducing summer energy use, often by testing setpoints or ventilation.</li>
+                            <li><strong>Minimize Lighting EUI (kWh/m²):</strong> The **Lighting Energy** normalized by area. Use this to test the impact of different lighting power densities or schedules.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Goal (The "How"):</strong> This is the **actual instruction** for the optimizer. It tells the algorithm what to do with the "Metric" data you selected.
+                        <ul style="list-style-type: disc; margin-left: 20px; margin-top: 8px;">
+                            <li><strong>Minimize:</strong> Find the design with the *lowest* metric value.</li>
+                            <li><strong>Maximize:</strong> Find the design with the *highest* metric value.</li>
+                            <li><strong>Set Target:</strong> Find the design *closest* to your target value.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Parameters (Max 3):</strong> These are the "genes" or variables that the optimizer is allowed to change.
+                        <ul style="list-style-type: disc; margin-left: 20px; margin-top: 8px;">
+                            <li><strong>What they are:</strong> You select up to 3 parameters from the dropdown (e.g., 'Cooling Setpoint', 'Lighting Power Multiplier').</li>
+                            <li><strong>How they work:</strong> For each parameter, you must define a **Min** and **Max** range (the "search space"). The optimizer will intelligently test different combinations of values *within these ranges* (e.g., "try a cooling setpoint of 25°C with a lighting multiplier of 0.8").</li>
+                            <li><strong>Impact:</strong> The optimizer's job is to find the *combination* of parameter values that best achieves your stated "Goal" (e.g., `Minimize`) while still passing your "Constraint."</li>
+                        </ul>
+                    </li>
+                    <li><strong>Constraint (Optional):</strong> This is a "pass/fail" filter that every design *must* pass to be considered. If a design fails this test, it is immediately discarded, even if it has a great "Goal" score.
+                        <ul style="list-style-type: disc; margin-left: 20px; margin-top: 8px;">
+                            <li><strong>Why use it?</strong> It prevents the optimizer from "cheating." For example, if you just `Minimize Heating EUI`, the optimizer might "solve" this by setting the heating setpoint to 0°C (an uninhabitable space). A constraint prevents this.</li>
+                            <li><strong>How to write it:</strong> Use the **Metric ID** from the code (e.g., `minimize_cooling_eui`), an operator (`<`, `>`, `<=`, `>=`), and a value.</li>
+                            <li><strong>Example 1 (Balanced Design):</strong>
+                                <ul style="list-style-type: circle; margin-left: 20px;">
+                                    <li><strong>Metric:</strong> `Minimize Site EUI (kWh/m²)`</li>
+                                    <li><strong>Goal:</strong> `Minimize`</li>
+                                    <li><strong>Constraint:</strong> `unmet_heating_hours < 50` (Find the most efficient design *that is also comfortable*. Note: `unmet_heating_hours` would need to be added as a metric in the code first.)</li>
+                                </ul>
+                            </li>
+                            <li><strong>Example 2 (Targeted Savings):</strong>
+                                <ul style="list-style-type: circle; margin-left: 20px;">
+                                    <li><strong>Metric:</strong> `Minimize Heating EUI (kWh/m²)`</li>
+                                    <li><strong>Goal:</strong> `Minimize`</li>
+                                    <li><strong>Constraint:</strong> `minimize_cooling_eui < 40` (Find the most heating-efficient design that *also* keeps cooling energy below 40 kWh/m²).</li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </li>
+                    <li><strong>Population / Max Evals:</strong> Standard GA settings. A <strong>Max Evals</strong> of 12-20 is often sufficient for 2-3 parameters.</li>
+                </ul>
+                
+                <h2>Benefits & Limitations</h2>
+                <ul>
+                    <li><strong>Benefit:</strong> Automates the tedious task of finding optimal *configuration settings* for your E+ model.</li>
+                    <li><strong>Benefit:</strong> Can find non-obvious, high-performing combinations of parameters.</li>
+                    <li><strong>Limitation:</strong> This is a stochastic (random) process. It is not <em>guaranteed</em> to find the absolute single best solution, but it is very good at finding globally "good" solutions.</li>
+                    <li><strong>Limitation:</strong> The process is computationally expensive. Each evaluation is a full EnergyPlus simulation. Use "Quick Optimize" for exploration.</li>
+                    <li><strong>Limitation:</strong> Currently limited to 3 parameters and a predefined list of options.</li>
                 </ul>
 
-                <p class="text-xs text-[--text-secondary]">
-                This optimizer is intentionally conservative: small, explainable parameter sets,explicit precondition checks, caching, and a clear log to keep EnergyPlus runs observable and reversible.
-                </p>
+                <h2>What Happens When You Click "Start"</h2>
+                <p>The <code>_evaluateEpDesignHeadless</code> function orchestrates the entire process for each design:</p>
+                <ol>
+                    <li>Clones the current <code>energyPlusConfig</code> from the project.</li>
+                    <li>Applies the new design parameters (e.g., <code>tset_cool: 25</code>, <code>lpd_multiplier: 0.8</code>).</li>
+                    <li>Calls <code>generateAndStoreIdf(project)</code> to create a new <strong>model.idf</strong> file reflecting these changes.</li>
+                    <li>Calls <code>window.electronAPI.runEnergyPlus</code> with a unique <code>runId</code> to simulate this specific <strong>model.idf</strong>.</li>
+                    <li>Waits for the <code>onEnergyPlusExit</code> event from the Electron backend.</li>
+                    <li>Calls <code>resultsManager.parseEnergyPlusResults</code> to read the simulation outputs.</li>
+                    <li>Extracts the target KPI (e.g., <code>resultsManager.getEnergyPlusKpisForUi(runId).siteEui</code>).</li>
+                    <li>Calculates a fitness score from this KPI (e.g., <code>score = -siteEui</code> for minimization).</li>
+                    <li>Returns this score to the optimizer, which then repeats the loop.</li>
+                </ol>
+                <p class="mt-4"><strong>Final Result:</strong> When the process is complete, the results list will show the best solution. You must click **"Apply Best Design"** to save these parameters to your main project configuration.</p>
             </div>
         </div>
+    </div>
     <template id="template-optimization-panel">
         <div id="helios-optimization-content" class="flex-grow p-4 space-y-4 overflow-y-auto">
         <div class="flex justify-between items-center mb-2">

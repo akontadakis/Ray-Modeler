@@ -137,43 +137,55 @@ const MASTER_EP_PARAMETER_CONFIG = {
 const EP_METRICS = {
   minimize_total_site_energy: {
     id: 'minimize_total_site_energy',
-    label: 'Minimize Site Energy (kWh/m²)',
+    label: 'Minimize Site EUI (kWh/m²)',
     unit: 'kWh/m²',
     direction: 'minimize',
     extract: (runId) => {
       const k = resultsManager.getEnergyPlusKpisForUi?.(runId) || null;
-      return k?.siteEui ?? k?.totalSiteEnergy ?? null;
+      // EUI is already per-area, so just return it.
+      return k?.siteEui ?? null;
     }
   },
-  minimize_heating_kwh: {
-    id: 'minimize_heating_kwh',
-    label: 'Minimize Heating (kWh)',
-    unit: 'kWh',
+  minimize_heating_eui: {
+    id: 'minimize_heating_eui',
+    label: 'Minimize Heating EUI (kWh/m²)',
+    unit: 'kWh/m²',
     direction: 'minimize',
     extract: (runId) => {
       const k = resultsManager.getEnergyPlusKpisForUi?.(runId) || null;
-      return k?.heating ?? null;
+      // Check for valid numbers and non-zero area
+      if (k?.heating === null || k?.heating === undefined || k?.totalArea === null || k?.totalArea === undefined || k.totalArea === 0) {
+        return null;
+      }
+      return k.heating / k.totalArea;
     }
   },
-  minimize_cooling_kwh: {
-    id: 'minimize_cooling_kwh',
-    label: 'Minimize Cooling (kWh)',
-    unit: 'kWh',
+  minimize_cooling_eui: {
+    id: 'minimize_cooling_eui',
+    label: 'Minimize Cooling EUI (kWh/m²)',
+    unit: 'kWh/m²',
     direction: 'minimize',
     extract: (runId) => {
       const k = resultsManager.getEnergyPlusKpisForUi?.(runId) || null;
-      return k?.cooling ?? null;
+      // Check for valid numbers and non-zero area
+      if (k?.cooling === null || k?.cooling === undefined || k?.totalArea === null || k?.totalArea === undefined || k.totalArea === 0) {
+        return null;
+      }
+      return k.cooling / k.totalArea;
     }
   },
-  minimize_lighting_kwh: {
-    id: 'minimize_lighting_kwh',
-    label: 'Minimize Lighting (kWh)',
-    unit: 'kWh',
+  minimize_lighting_eui: {
+    id: 'minimize_lighting_eui',
+    label: 'Minimize Lighting EUI (kWh/m²)',
+    unit: 'kWh/m²',
     direction: 'minimize',
     extract: (runId) => {
       const k = resultsManager.getEnergyPlusKpisForUi?.(runId) || null;
-      // Prefer dedicated lighting metric if exposed; fallback to 0
-      return k?.lighting ?? null;
+      // Check for valid numbers and non-zero area
+      if (k?.lighting === null || k?.lighting === undefined || k?.totalArea === null || k?.totalArea === undefined || k.totalArea === 0) {
+        return null;
+      }
+      return k.lighting / k.totalArea;
     }
   }
   // Extend with additional KPIs (CO2, discomfort hours, etc.) as needed.
