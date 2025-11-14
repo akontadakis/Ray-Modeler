@@ -1006,7 +1006,9 @@ html[data-theme="cyber"] .energyplus-help-box {
 .sidebar-content::-webkit-scrollbar,
 .energyplus-help-box::-webkit-scrollbar,
 #helios-capabilities-modal .ui-panel::-webkit-scrollbar,
-.scrollable-panel-inner::-webkit-scrollbar {
+.scrollable-panel-inner::-webkit-scrollbar,
+#helios-optimization-content::-webkit-scrollbar,
+#helios-ep-optimization-content::-webkit-scrollbar {
   width: 6px;
 }
 
@@ -1014,7 +1016,9 @@ html[data-theme="cyber"] .energyplus-help-box {
 .sidebar-content::-webkit-scrollbar-track,
 .energyplus-help-box::-webkit-scrollbar-track,
 #helios-capabilities-modal .ui-panel::-webkit-scrollbar-track,
-.scrollable-panel-inner::-webkit-scrollbar-track {
+.scrollable-panel-inner::-webkit-scrollbar-track,
+#helios-optimization-content::-webkit-scrollbar-track,
+#helios-ep-optimization-content::-webkit-scrollbar-track {
   background: transparent;
 }
 
@@ -1022,7 +1026,9 @@ html[data-theme="cyber"] .energyplus-help-box {
 .sidebar-content::-webkit-scrollbar-thumb, /* <-- This was the missing selector */
 .energyplus-help-box::-webkit-scrollbar-thumb,
 #helios-capabilities-modal .ui-panel::-webkit-scrollbar-thumb,
-.scrollable-panel-inner::-webkit-scrollbar-thumb {
+.scrollable-panel-inner::-webkit-scrollbar-thumb,
+#helios-optimization-content::-webkit-scrollbar-thumb,
+#helios-ep-optimization-content::-webkit-scrollbar-thumb {
   background: var(--grid-color);
   border-radius: 3px;
 }

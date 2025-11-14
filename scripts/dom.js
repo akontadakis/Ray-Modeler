@@ -242,7 +242,10 @@ const ids = [
     'optimization-summary-list', 'opt-summary-placeholder', 'apply-best-design-btn',
 
     // Optimization Info Modal
-    'opt-info-btn', 'optimization-info-modal', 'opt-info-modal-close-btn'
+    'opt-info-btn', 'optimization-info-modal', 'opt-info-modal-close-btn',
+
+    // EP Optimization Info Modal
+    'ep-optimization-info-modal', 'ep-opt-info-modal-close-btn'
   ];
 
   const wallDirections = ['n', 's', 'e', 'w'];

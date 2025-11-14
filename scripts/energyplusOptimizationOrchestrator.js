@@ -198,7 +198,9 @@ export function initEpOptimizationUI(panel) {
   const cancelBtn = panel.querySelector('#ep-cancel-optimization-btn');
   const applyBestBtn = panel.querySelector('#ep-apply-best-design-btn');
   const infoBtn = panel.querySelector('#ep-opt-info-btn');
-  const paramsContainer = panel.querySelector('#ep-opt-params-container') || panel.querySelector('#ep-dynamic-opt-params-list');
+  const paramsDropdownList = panel.querySelector('#ep-opt-param-dropdown-list');
+  const paramsDropdownBtn = panel.querySelector('#ep-opt-param-dropdown-btn');
+  const activeParamsContainer = panel.querySelector('#ep-opt-active-params-container');
   const warningRuntime = panel.querySelector('#ep-opt-warning-runtime');
 
   // Populate goal metric dropdown
@@ -220,76 +222,131 @@ export function initEpOptimizationUI(panel) {
     });
   }
 
-  // Populate parameter entries (simple static list based on MASTER_EP_PARAMETER_CONFIG)
-  if (paramsContainer) {
-    paramsContainer.innerHTML = '';
+  // === 1. Parameters Dropdown Logic ===
+  if (paramsDropdownList && activeParamsContainer && paramsDropdownBtn) {
+    // Toggle dropdown visibility
+    paramsDropdownBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        paramsDropdownList.classList.toggle('hidden');
+    });
 
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!paramsDropdownList.contains(e.target) && !paramsDropdownBtn.contains(e.target)) {
+            paramsDropdownList.classList.add('hidden');
+        }
+    });
+
+    // Render Dropdown Options
+    paramsDropdownList.innerHTML = '';
     Object.values(MASTER_EP_PARAMETER_CONFIG).forEach(p => {
-      const row = document.createElement('div');
-      row.className = 'flex items-center gap-2 text-xs border-b border-[--border-subtle] py-1';
-      row.dataset.paramId = p.id;
+        const row = document.createElement('label');
+        row.className = 'flex items-center gap-2 text-xs p-2 hover:bg-[--grid-color] cursor-pointer border-b border-[--grid-color] last:border-0';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = p.id;
+        checkbox.className = 'ep-opt-param-select-checkbox';
 
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.className = 'ep-opt-param-toggle';
+        const text = document.createElement('span');
+        text.textContent = p.name;
 
-      const label = document.createElement('span');
-      label.className = 'ep-opt-param-name flex-1';
-      label.textContent = p.name;
+        row.appendChild(checkbox);
+        row.appendChild(text);
+        paramsDropdownList.appendChild(row);
 
-      const controls = document.createElement('div');
-      controls.className = 'flex items-center gap-1 ep-opt-param-controls hidden';
-
-      if (p.type === 'continuous') {
-        const minInput = document.createElement('input');
-        minInput.type = 'number';
-        minInput.className = 'ep-opt-param-min w-16';
-        minInput.value = p.default.min;
-        minInput.step = p.default.step;
-
-        const maxInput = document.createElement('input');
-        maxInput.type = 'number';
-        maxInput.className = 'ep-opt-param-max w-16';
-        maxInput.value = p.default.max;
-        maxInput.step = p.default.step;
-
-        const stepInput = document.createElement('input');
-        stepInput.type = 'number';
-        stepInput.className = 'ep-opt-param-step w-14';
-        stepInput.value = p.default.step;
-        stepInput.step = p.default.step / 10 || 0.0001;
-        stepInput.min = stepInput.step;
-
-        controls.append('min', minInput, 'max', maxInput, 'step', stepInput);
-      } else if (p.type === 'discrete') {
-        const select = document.createElement('select');
-        select.className = 'ep-opt-param-options text-xs';
-        (p.default.options || []).forEach(o => {
-          const opt = document.createElement('option');
-          opt.value = o;
-          opt.textContent = o;
-          select.appendChild(opt);
+        // Handle Selection
+        checkbox.addEventListener('change', () => {
+            const allChecked = paramsDropdownList.querySelectorAll('.ep-opt-param-select-checkbox:checked');
+            
+            if (checkbox.checked) {
+                if (allChecked.length > 3) {
+                    checkbox.checked = false;
+                    showAlert('Maximum 3 parameters allowed.', 'Limit Reached');
+                    return;
+                }
+                // Add configuration card
+                _addEpParamCard(p, activeParamsContainer);
+            } else {
+                // Remove configuration card
+                _removeEpParamCard(p.id, activeParamsContainer);
+            }
+            
+            _updateEpParamCount();
         });
-        controls.appendChild(select);
+    });
+  }
+
+    function _addEpParamCard(config, container, values = {}) {
+      if (container.querySelector(`[data-param-id="${config.id}"]`)) return;
+
+      const card = document.createElement('div');
+      card.className = 'ep-opt-param-card p-3 bg-[--grid-color] border border-[--grid-color] rounded';
+      card.dataset.paramId = config.id;
+
+      // Header
+      const header = document.createElement('div');
+      header.className = 'flex justify-between items-center mb-2';
+      header.innerHTML = `<span class="font-semibold truncate" title="${config.name}">${config.name}</span>`;
+      
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'text-[--text-secondary] hover:text-[--danger-color] font-bold px-1';
+      removeBtn.innerHTML = '&times;';
+      removeBtn.onclick = () => {
+          // Uncheck in dropdown
+          const cb = paramsDropdownList.querySelector(`input[value="${config.id}"]`);
+          if (cb) {
+              cb.checked = false;
+              cb.dispatchEvent(new Event('change'));
+          }
+      };
+      header.appendChild(removeBtn);
+      card.appendChild(header);
+
+      // Inputs
+      const controls = document.createElement('div');
+      controls.className = 'grid grid-cols-3 gap-2 ep-opt-param-controls';
+
+      if (config.type === 'continuous') {
+        const createInput = (label, cls, def, val) => {
+            const wrap = document.createElement('div');
+            wrap.innerHTML = `<label class="label text-xs mb-0.5">${label}</label>`;
+            const inp = document.createElement('input');
+            inp.type = 'number';
+            inp.className = `${cls} w-full text-xs p-1 rounded border border-[--grid-color] bg-[--bg-main]`;
+            inp.value = val !== undefined ? val : def;
+            inp.step = (label === 'Step') ? (def/10 || 0.0001) : config.default.step;
+              wrap.appendChild(inp);
+              return wrap;
+          };
+
+          controls.appendChild(createInput('Min', 'ep-opt-param-min', config.default.min, values.min));
+          controls.appendChild(createInput('Max', 'ep-opt-param-max', config.default.max, values.max));
+          controls.appendChild(createInput('Step', 'ep-opt-param-step', config.default.step, values.step));
+      } else if (config.type === 'discrete') {
+          const wrap = document.createElement('div');
+          wrap.className = 'col-span-3';
+        wrap.innerHTML = `<label class="label text-xs mb-0.5">Options</label>`;
+        const select = document.createElement('select');
+        select.className = 'ep-opt-param-options w-full text-xs p-1 rounded border border-[--grid-color] bg-[--bg-main]';
+        select.disabled = true; // Fixed options for now
+        (config.default.options || []).forEach(o => {
+              const opt = document.createElement('option');
+              opt.value = o;
+              opt.textContent = o;
+              select.appendChild(opt);
+          });
+          wrap.appendChild(select);
+          controls.appendChild(wrap);
       }
 
-      checkbox.addEventListener('change', () => {
-        // Enforce max 3 selected
-        const checked = paramsContainer.querySelectorAll('.ep-opt-param-toggle:checked').length;
-        if (checkbox.checked && checked > 3) {
-          checkbox.checked = false;
-          showAlert('Maximum 3 parameters allowed for EnergyPlus optimization.', 'Error');
-          return;
-        }
-        controls.classList.toggle('hidden', !checkbox.checked);
-        _updateEpParamCount();
-      });
+      card.appendChild(controls);
+      container.appendChild(card);
+  }
 
-      row.appendChild(checkbox);
-      row.appendChild(label);
-      row.appendChild(controls);
-      paramsContainer.appendChild(row);
-    });
+  function _removeEpParamCard(id, container) {
+      const card = container.querySelector(`[data-param-id="${id}"]`);
+      if (card) card.remove();
   }
 
   // Wire buttons
@@ -383,18 +440,19 @@ export function getEpOptimizationSummaryForTools() {
 export async function applyEpParameterConfigFromTool(panel, parameters) {
   if (!panel || !Array.isArray(parameters)) return;
 
-  const container =
-    panel.querySelector('#ep-opt-params-container') ||
-    panel.querySelector('#ep-dynamic-opt-params-list');
-  if (!container) throw new Error('EP optimization parameter container not found.');
+  const dropdownList = panel.querySelector('#ep-opt-param-dropdown-list');
+  const activeParamsContainer = panel.querySelector('#ep-opt-active-params-container');
+  if (!dropdownList || !activeParamsContainer) throw new Error('EP optimization UI components not found.');
 
   // Clear existing selections
-  container.querySelectorAll('.ep-opt-param-toggle').forEach(cb => {
-    cb.checked = false;
+  dropdownList.querySelectorAll('.ep-opt-param-select-checkbox').forEach(cb => {
+      if (cb.checked) {
+          cb.checked = false;
+          // Manually trigger removal logic via event dispatch or helper if exposed, 
+          // but simpler to just clear container and checkboxes here since we control it.
+      }
   });
-  container.querySelectorAll('.ep-opt-param-controls').forEach(ctrl => {
-    ctrl.classList.add('hidden');
-  });
+  activeParamsContainer.innerHTML = '';
 
   let selectedCount = 0;
 
@@ -405,32 +463,41 @@ export async function applyEpParameterConfigFromTool(panel, parameters) {
       _logEp(`(Tool) Unknown EP optimization parameter id: ${p.id}`);
       continue;
     }
-    const row = container.querySelector(`[data-param-id="${p.id}"]`);
-    if (!row) {
-      _logEp(`(Tool) No DOM row found for EP parameter: ${p.id}`);
+
+    const checkbox = dropdownList.querySelector(`input[value="${p.id}"]`);
+    if (!checkbox) {
+      _logEp(`(Tool) No dropdown item found for EP parameter: ${p.id}`);
       continue;
     }
-    const toggle = row.querySelector('.ep-opt-param-toggle');
-    const controls = row.querySelector('.ep-opt-param-controls');
-    if (!toggle || !controls) continue;
 
     if (selectedCount >= 3) {
       _logEp('(Tool) Skipping extra parameter; max 3 allowed.');
       break;
     }
 
-    toggle.checked = true;
-    controls.classList.remove('hidden');
+    // Activate checkbox
+    checkbox.checked = true;
+    
+    // Programmatically trigger change event to render the card? 
+    // Or just manually render card with custom values to be safe/clean.
+    // We'll manually render to inject the specific values directly.
+    
+    // Re-use internal helper if we can, or replicate logic. 
+    // Since _addEpParamCard is internal scope in init, we replicate the DOM creation 
+    // or dispatch event and THEN update values. 
+    // Dispatching event is safer to reuse logic.
+    checkbox.dispatchEvent(new Event('change'));
 
-    if (cfg.type === 'continuous') {
-      const minInput = row.querySelector('.ep-opt-param-min');
-      const maxInput = row.querySelector('.ep-opt-param-max');
-      const stepInput = row.querySelector('.ep-opt-param-step');
-      if (minInput && typeof p.min === 'number') minInput.value = p.min;
-      if (maxInput && typeof p.max === 'number') maxInput.value = p.max;
-      if (stepInput && typeof p.step === 'number') stepInput.value = p.step;
+    // Now find the created card and update values if continuous
+    const card = activeParamsContainer.querySelector(`[data-param-id="${p.id}"]`);
+    if (card && cfg.type === 'continuous') {
+        const minInput = card.querySelector('.ep-opt-param-min');
+        const maxInput = card.querySelector('.ep-opt-param-max');
+        const stepInput = card.querySelector('.ep-opt-param-step');
+        if (minInput && typeof p.min === 'number') minInput.value = p.min;
+        if (maxInput && typeof p.max === 'number') maxInput.value = p.max;
+        if (stepInput && typeof p.step === 'number') stepInput.value = p.step;
     }
-    // For discrete, we keep allowed options as defined in MASTER_EP_PARAMETER_CONFIG
 
     selectedCount++;
   }
@@ -602,7 +669,7 @@ function _gatherEpSettings(mode = 'full') {
   const paramsContainer =
     epOptimizationPanel.querySelector('#ep-opt-params-container') ||
     epOptimizationPanel.querySelector('#ep-dynamic-opt-params-list');
-
+  const activeParamsContainer = epOptimizationPanel.querySelector('#ep-opt-active-params-container');
   const goalId = goalMetricSelect?.value || 'minimize_total_site_energy';
   const goalType = goalTypeSelect?.value || 'minimize';
   const targetValue = parseFloat(targetValueInput?.value || '0');
@@ -627,28 +694,24 @@ function _gatherEpSettings(mode = 'full') {
 
   const selectedParams = [];
 
-  if (paramsContainer) {
-    paramsContainer.querySelectorAll('[data-param-id]').forEach(row => {
-      const id = row.dataset.paramId;
+  if (activeParamsContainer) {
+    // Iterate over the configuration cards, not the checkboxes
+    activeParamsContainer.querySelectorAll('.ep-opt-param-card').forEach(card => {
+      const id = card.dataset.paramId;
       const cfg = MASTER_EP_PARAMETER_CONFIG[id];
       if (!cfg) return;
 
-      const toggle = row.querySelector('.ep-opt-param-toggle');
-      if (!toggle || !toggle.checked) return;
-
       if (cfg.type === 'continuous') {
-        let min = parseFloat(row.querySelector('.ep-opt-param-min')?.value ?? cfg.default.min);
-        let max =
-          parseFloat(row.querySelector('.ep-opt-param-max')?.value ?? cfg.default.max);
-        let step =
-          parseFloat(row.querySelector('.ep-opt-param-step')?.value ?? cfg.default.step);
+        let min = parseFloat(card.querySelector('.ep-opt-param-min')?.value ?? cfg.default.min);
+        let max = parseFloat(card.querySelector('.ep-opt-param-max')?.value ?? cfg.default.max);
+        let step = parseFloat(card.querySelector('.ep-opt-param-step')?.value ?? cfg.default.step);
 
         if (!Number.isFinite(min)) min = cfg.default.min;
         if (!Number.isFinite(max)) max = cfg.default.max;
         if (!Number.isFinite(step) || step <= 0) step = cfg.default.step;
 
         if (min >= max) {
-          throw new Error(`Invalid range for ${id}: min must be less than max.`);
+          throw new Error(`Invalid range for ${cfg.name}: min must be less than max.`);
         }
 
         selectedParams.push({ id, type: 'continuous', min, max, step });
@@ -988,13 +1051,11 @@ function _setEpControlsLocked(locked) {
 
 function _updateEpParamCount() {
   if (!epOptimizationPanel) return;
-  const container =
-    epOptimizationPanel.querySelector('#ep-opt-params-container') ||
-    epOptimizationPanel.querySelector('#ep-dynamic-opt-params-list');
+  const dropdownList = epOptimizationPanel.querySelector('#ep-opt-param-dropdown-list');
   const countEl = epOptimizationPanel.querySelector('#ep-opt-param-count');
-  if (!container || !countEl) return;
+  if (!dropdownList || !countEl) return;
 
-  const checked = container.querySelectorAll('.ep-opt-param-toggle:checked').length;
+  const checked = dropdownList.querySelectorAll('.ep-opt-param-select-checkbox:checked').length;
   countEl.textContent = `${checked} / 3 selected`;
-  countEl.classList.toggle('text-[--danger-color]', checked > 3);
+  countEl.classList.toggle('text-[--danger-color]', checked >= 3);
 }
