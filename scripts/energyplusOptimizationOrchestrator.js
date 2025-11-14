@@ -126,7 +126,48 @@ const MASTER_EP_PARAMETER_CONFIG = {
     default: { options: ['auto', 'conservative', 'aggressive'] },
     apply: (config, value) => {
       if (!config.schedules) config.schedules = {};
-      config.schedules.lightingProfile = value;
+      schedules.lightingProfile = value;
+    }
+  },
+
+  // --- New Envelope & Infiltration Parameters ---
+  'window_u_value': {
+    id: 'window_u_value',
+    name: 'Window U-Value (W/m²K)',
+    domain: 'Envelope',
+    type: 'continuous',
+    default: { min: 1.0, max: 3.5, step: 0.1 },
+    apply: (config, value) => {
+      if (!config.envelope) config.envelope = {};
+      // This assumes the config service/builder knows how to find
+      // and update the U-value of the default window construction.
+      config.envelope.windowUValue = value;
+    }
+  },
+  'window_shgc': {
+    id: 'window_shgc',
+    name: 'Window SHGC',
+    domain: 'Envelope',
+    type: 'continuous',
+    default: { min: 0.2, max: 0.8, step: 0.05 },
+    apply: (config, value) => {
+      if (!config.envelope) config.envelope = {};
+      // This assumes the config service/builder knows how to find
+      // and update the SHGC of the default window construction.
+      config.envelope.windowShgc = value;
+    }
+  },
+  'infiltration_ach': {
+    id: 'infiltration_ach',
+    name: 'Infiltration (ACH)',
+    domain: 'Ventilation',
+    type: 'continuous',
+    default: { min: 0.2, max: 1.5, step: 0.05 },
+    apply: (config, value) => {
+      if (!config.ventilation) config.ventilation = {};
+      // This assumes the config service/builder will apply this
+      // as a global infiltration load (ZoneInfiltration:DesignFlowRate).
+      config.ventilation.infiltrationAch = value;
     }
   }
 };
@@ -186,6 +227,30 @@ const EP_METRICS = {
         return null;
       }
       return k.lighting / k.totalArea;
+    }
+  },
+
+  // --- New Comfort Metrics (Good for Constraints) ---
+  'unmet_heating_hours': {
+    id: 'unmet_heating_hours',
+    label: 'Unmet Heating Hours',
+    unit: 'hrs',
+    direction: 'minimize',
+    extract: (runId) => {
+      const k = resultsManager.getEnergyPlusKpisForUi?.(runId) || null;
+      // Assumes resultsManager provides unmetHeating
+      return k?.unmetHeating ?? null;
+    }
+  },
+  'unmet_cooling_hours': {
+    id: 'unmet_cooling_hours',
+    label: 'Unmet Cooling Hours',
+    unit: 'hrs',
+    direction: 'minimize',
+    extract: (runId) => {
+      const k = resultsManager.getEnergyPlusKpisForUi?.(runId) || null;
+      // Assumes resultsManager provides unmetCooling
+      return k?.unmetCooling ?? null;
     }
   }
   // Extend with additional KPIs (CO2, discomfort hours, etc.) as needed.

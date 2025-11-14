@@ -3407,6 +3407,34 @@
                                 <strong>Example:</strong> "Find the best overhang depth between 0.5m and 2.0m that maximizes sDA while keeping ASE below 10%."
                             </div>
                         </div>
+
+                        <div>
+                            <h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
+                                EnergyPlus Integration
+                            </h4>
+                            <p class="text-sm text-[--text-secondary] mb-3">Generate, run, and critique EnergyPlus simulations directly from your model configuration.</p>
+                            <div class="bg-[--grid-color] rounded-lg p-3 text-sm">
+                                <strong>Examples:</strong><br>
+                                • "Generate an EnergyPlus IDF from my project."<br>
+                                • "What is the total Site EUI for my last E+ run?"<br>
+                                • "Critique my EnergyPlus results and suggest improvements."
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
+                                EnergyPlus Optimization
+                            </h4>
+                            <p class="text-sm text-[--text-secondary] mb-3">Use a genetic algorithm to find optimal EnergyPlus operational **and** envelope parameters for your building.</p>
+                            <div class="bg-[--grid-color] rounded-lg p-3 text-sm">
+                                <strong>Examples:</strong><br>
+                                • "Set up an E+ optimization to minimize total site energy."<br>
+                                • "Find the best Window U-Value (from 1.0 to 3.0) and SHGC (from 0.2 to 0.7)."<br>
+                                • "Optimize heating/cooling setpoints, but **constrain unmet heating hours to be less than 150**."<br>
+                                • "Test different infiltration rates (ACH) vs. lighting power."<br>
+                                • "Analyze my E+ optimization results."
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="mt-8 pt-6 border-t border-[--grid-color]">
@@ -3909,6 +3937,8 @@
                             <li><strong>Minimize Heating EUI (kWh/m²):</strong> The **Heating Energy** (e.g., from gas or electric heating) normalized by area. Use this to focus specifically on improving winter performance.</li>
                             <li><strong>Minimize Cooling EUI (kWh/m²):</strong> The **Cooling Energy** (from chillers or AC) normalized by area. Use this to focus on reducing summer energy use, often by testing setpoints or ventilation.</li>
                             <li><strong>Minimize Lighting EUI (kWh/m²):</strong> The **Lighting Energy** normalized by area. Use this to test the impact of different lighting power densities or schedules.</li>
+                            <li><strong>Unmet Heating Hours (hrs):</strong> The total number of hours in the year when the heating system could not maintain the heating setpoint. **This is an excellent metric for a *Constraint*** (e.g., `unmet_heating_hours < 150`) to ensure your energy-saving designs are still comfortable.</li>
+                            <li><strong>Unmet Cooling Hours (hrs):</strong> The total number of hours when the cooling system could not maintain the cooling setpoint. Also a perfect candidate for a **Constraint** (e.g., `unmet_cooling_hours < 150`).</li>
                         </ul>
                     </li>
                     <li><strong>Goal (The "How"):</strong> This is the **actual instruction** for the optimizer. It tells the algorithm what to do with the "Metric" data you selected.
@@ -3923,6 +3953,9 @@
                             <li><strong>What they are:</strong> You select up to 3 parameters from the dropdown (e.g., 'Cooling Setpoint', 'Lighting Power Multiplier').</li>
                             <li><strong>How they work:</strong> For each parameter, you must define a **Min** and **Max** range (the "search space"). The optimizer will intelligently test different combinations of values *within these ranges* (e.g., "try a cooling setpoint of 25°C with a lighting multiplier of 0.8").</li>
                             <li><strong>Impact:</strong> The optimizer's job is to find the *combination* of parameter values that best achieves your stated "Goal" (e.g., `Minimize`) while still passing your "Constraint."</li>
+                            <li><strong>Window U-Value (W/m²K):</strong> Optimizes the thermal conductance of the main window construction. Lower values mean better insulation (less heat loss in winter) but can impact passive gains.</li>
+                            <li><strong>Window SHGC:</strong> Optimizes the Solar Heat Gain Coefficient of the main window construction. Lower values block more solar heat (reducing cooling loads), while higher values allow more passive heating (reducing heating loads).</li>
+                            <li><strong>Infiltration (ACH):</strong> Optimizes the building's airtightness, defined in Air Changes per Hour (ACH). Lower values (e.g., 0.2) represent a very airtight building, while higher values (e.g., 1.5) are leakier, increasing both heating and cooling loads.</li>
                         </ul>
                     </li>
                     <li><strong>Constraint (Optional):</strong> This is a "pass/fail" filter that every design *must* pass to be considered. If a design fails this test, it is immediately discarded, even if it has a great "Goal" score.
@@ -3933,7 +3966,7 @@
                                 <ul style="list-style-type: circle; margin-left: 20px;">
                                     <li><strong>Metric:</strong> `Minimize Site EUI (kWh/m²)`</li>
                                     <li><strong>Goal:</strong> `Minimize`</li>
-                                    <li><strong>Constraint:</strong> `unmet_heating_hours < 50` (Find the most efficient design *that is also comfortable*. Note: `unmet_heating_hours` would need to be added as a metric in the code first.)</li>
+                                    <li><strong>Constraint:</strong> `unmet_heating_hours < 150` (Find the most efficient design *that is also comfortable*. You can also chain constraints, though the UI only supports one: `unmet_heating_hours < 150 AND unmet_cooling_hours < 150`).</li>
                                 </ul>
                             </li>
                             <li><strong>Example 2 (Targeted Savings):</strong>
