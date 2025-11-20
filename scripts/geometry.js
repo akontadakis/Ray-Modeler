@@ -342,11 +342,11 @@ function createGroundPlane() {
         };
         img.src = imageUrl;
     } else {
-    // --- Create Default Flat Grid ---
-    // Use the values from the UI sliders
-    const size = gridSize;
-    const gridHelper = new THREE.GridHelper(size, gridDivisions, shared.lineColor, shared.gridMinorColor);
-    gridHelper.position.set(0, -0.001, 0);
+        // --- Create Default Flat Grid ---
+        // Use the values from the UI sliders
+        const size = gridSize;
+        const gridHelper = new THREE.GridHelper(size, gridDivisions, shared.lineColor, shared.gridMinorColor);
+        gridHelper.position.set(0, -0.001, 0);
 
         const mat = new THREE.MeshBasicMaterial({
             color: 0xdddddd,
@@ -367,7 +367,7 @@ function createGroundPlane() {
  * Creates the entire room geometry, including walls, floor, ceiling, windows, and frames.
  * Walls are now individual, selectable meshes.
  */
-function createRoomGeometry() {    
+function createRoomGeometry() {
     // If an imported model is active, do not generate parametric geometry.
     if (currentImportedModel) {
         clearGroup(roomObject);
@@ -419,7 +419,7 @@ function _createCeiling(roomContainer, { W, L, H, ceilingThickness, wallThicknes
     const surfaceOpacity = isTransparent ? parseFloat(getDom()['surface-opacity'].value) : 1.0;
     const materialProperties = { side: THREE.DoubleSide, clippingPlanes: renderer.clippingPlanes, clipIntersection: true, transparent: isTransparent, opacity: surfaceOpacity };
     const ceilingMaterial = new THREE.MeshBasicMaterial({ ...materialProperties, color: new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--ceiling-color').trim()) });
-    
+
     const ceilingGeom = new THREE.BoxGeometry(W + 2 * wallThickness, L + 2 * wallThickness, ceilingThickness);
     const ceilingGroup = new THREE.Group();
     ceilingGroup.rotation.x = -Math.PI / 2;
@@ -441,10 +441,10 @@ function _createWalls({ W, L, H, wallThickness }) {
     const walls = {
         n: { s: [W, H], p: [W / 2, H / 2, 0], r: [0, Math.PI, 0] },
         s: { s: [W, H], p: [W / 2, H / 2, L], r: [0, 0, 0] },
-        w: { s: [L, H], p: [0, H / 2, L / 2], r: [0, Math.PI / 2, 0] },
+        w: { s: [L, H], p: [0, H / 2, L / 2], r: [0, -Math.PI / 2, 0] },
         e: { s: [L, H], p: [W, H / 2, L / 2], r: [0, -Math.PI / 2, 0] },
     };
-    
+
     for (const [key, props] of Object.entries(walls)) {
         const wallSegment = _createWallSegment(key, props, allWindows[key.toUpperCase()], { H, wallThickness });
         wallContainer.add(wallSegment);
@@ -492,9 +492,11 @@ function _createWallSegment(key, props, winParams, { H, wallThickness }) {
         const spacing = mode === 'wwr' ? 0.1 : ww / 2;
         const groupWidth = winCount * ww + Math.max(0, winCount - 1) * spacing;
         const startX = -groupWidth / 2;
-        const addFrame = dom['frame-toggle'].checked;
-        const ft = addFrame ? parseFloat(dom['frame-thick'].value) : 0;
-        const frameDepth = addFrame ? parseFloat(dom['frame-depth'].value) : 0;
+
+        // Safely check for frame toggle and values
+        const addFrame = dom['frame-toggle']?.checked ?? false;
+        const ft = addFrame ? (parseFloat(dom['frame-thick']?.value) || 0) : 0;
+        const frameDepth = addFrame ? (parseFloat(dom['frame-depth']?.value) || 0) : 0;
 
         for (let i = 0; i < winCount; i++) {
             const winCenterX = startX + ww / 2 + i * (ww + spacing);
@@ -823,12 +825,17 @@ export function createShadingDevices() {
         const outward = getWallOutwardNormal(orientation);
         if (outward.lengthSq() === 0) continue;
 
+        // Determine if East or West wall
+        const isEW = (orientation === 'E' || orientation === 'W');
+        // Apply same inversion logic as windows for consistent positioning
+        const effectiveWinDepthPos = isEW ? -winDepthPos : winDepthPos;
+
         const spacing = mode === 'wwr' ? 0.1 : ww / 2;
         const groupWidth = winCount * ww + Math.max(0, winCount - 1) * spacing;
         const startOffset = (wallWidth - groupWidth) / 2;
 
-        // Glass center lies at winDepthPos along outward (positive: towards exterior)
-        const glassOffset = outward.clone().multiplyScalar(winDepthPos);
+        // Glass center lies at effectiveWinDepthPos along outward (positive: towards exterior)
+        const glassOffset = outward.clone().multiplyScalar(effectiveWinDepthPos);
 
         for (let i = 0; i < winCount; i++) {
             const winStartPos = startOffset + i * (ww + spacing);
@@ -845,7 +852,7 @@ export function createShadingDevices() {
             let deviceGroup = null;
 
             if (shadeParams.type === 'overhang' && shadeParams.overhang) {
-                deviceGroup = createOverhang(ww, wh, shadeParams.overhang, shadeColor, outward);
+                deviceGroup = createOverhang(ww, wh, shadeParams.overhang, shadeColor, outward, orientation);
             } else if (shadeParams.type === 'lightshelf' && shadeParams.lightshelf) {
                 deviceGroup = createLightShelf(ww, wh, sh, shadeParams.lightshelf, shadeColor, outward);
             } else if (shadeParams.type === 'louver' && shadeParams.louver) {
@@ -858,8 +865,23 @@ export function createShadingDevices() {
 
             if (!deviceGroup) continue;
 
+            // Define wall rotations (must match _createWallSegment)
+            const wallRotations = {
+                N: [0, Math.PI, 0],
+                S: [0, 0, 0],
+                W: [0, -Math.PI / 2, 0],
+                E: [0, Math.PI / 2, 0]
+            };
+
+            // Apply the correct wall rotation to the shading device
+            const rotation = wallRotations[orientation];
+            if (rotation) {
+                deviceGroup.rotation.set(...rotation);
+            }
+
             // Place deviceGroup origin at window center, then offset relative to glass position
-            const base = windowCenterLocal.clone().add(glassOffset);
+            // Subtract glassOffset to invert positioning as requested
+            const base = windowCenterLocal.clone().sub(glassOffset);
             deviceGroup.position.copy(base);
 
             shadingContainer.add(deviceGroup);
@@ -874,6 +896,7 @@ export function createShadingDevices() {
                 const sample = deviceGroup.position.clone();
                 const rel = sample.clone().sub(windowCenterLocal);
                 const dot = rel.dot(outward);
+
                 if (dot < -1e-3) {
                     console.warn('[shading] Shading device appears on interior side of glazing.', {
                         orientation,
@@ -891,29 +914,32 @@ export function createShadingDevices() {
 /**
  * Creates a single overhang device.
  */
-function createOverhang(winWidth, winHeight, params, color, outward) {
-    const { distAbove, tilt, depth, extension, thick } = params;
-    if (depth <= 0) return null;
+function createOverhang(winWidth, winHeight, params, color, outward, orientation) {
+    const { distAbove, tilt, depth, leftExtension, rightExtension, thick } = params; if (depth <= 0) return null;
 
     const assembly = new THREE.Group();
     const pivot = new THREE.Group();
     pivot.position.y = winHeight + distAbove;
-    pivot.rotation.x = THREE.MathUtils.degToRad(tilt);
+    // Adjust rotation: 90° is flat (parallel to ground), 0° is vertical down.
+    pivot.rotation.x = THREE.MathUtils.degToRad(tilt - 90);
     assembly.add(pivot);
 
-    const overhangGeom = new THREE.BoxGeometry(winWidth + 2 * extension, thick, depth);
+    const overhangGeom = new THREE.BoxGeometry(winWidth + leftExtension + rightExtension, thick, depth);
     const material = shared.shadeMat.clone();
     material.color.set(color);
     const overhangMesh = new THREE.Mesh(overhangGeom, material);
+    // Adjust horizontal position based on asymmetric extensions
+    overhangMesh.position.x = (rightExtension - leftExtension) / 2;
     overhangMesh.userData.surfaceType = SURFACE_TYPES.SHADING_DEVICE;
     applyClippingToMaterial(overhangMesh.material, renderer.clippingPlanes);
 
     overhangMesh.position.y = thick / 2;
 
-    // Place overhang outward from the pivot along the outward normal.
-    // We work in local coordinates where +Z of pivot is "forward"; map outward's sign onto Z.
-    const sign = outward.z !== 0 ? Math.sign(outward.z) : -1;
-    overhangMesh.position.z = sign * depth / 2;
+    // The parent group is rotated so its local Z-axis always points outward.
+    // A positive Z translation in local space will always move the device outward.
+    // The overhang's geometry is centered, so we shift it by half its depth.
+    overhangMesh.position.z = depth / 2;
+
     pivot.add(overhangMesh);
     return assembly;
 }
@@ -928,16 +954,14 @@ function createLightShelf(winWidth, winHeight, sillHeight, params, color, outwar
     material.color.set(color);
     applyClippingToMaterial(material, renderer.clippingPlanes);
 
-    const outwardSign = (outward.z !== 0 || outward.x !== 0) ? 1 : 1;
-
     if ((placeExt || placeBoth) && depthExt > 0) {
         const pivot = new THREE.Group();
         const shelfMesh = new THREE.Mesh(new THREE.BoxGeometry(winWidth, thickExt, depthExt), material);
         shelfMesh.userData.surfaceType = SURFACE_TYPES.SHADING_DEVICE;
 
-        // External shelf: along outward
-        const sign = outward.z !== 0 ? Math.sign(outward.z) : (outward.x !== 0 ? Math.sign(outward.x) : 1);
-        shelfMesh.position.z = sign * depthExt / 2;
+        // External shelf: position it outward along the local +Z axis.
+        shelfMesh.position.z = depthExt / 2;
+
         pivot.position.y = winHeight - distBelowExt;
         pivot.rotation.x = THREE.MathUtils.degToRad(tiltExt);
         pivot.add(shelfMesh);
@@ -948,9 +972,9 @@ function createLightShelf(winWidth, winHeight, sillHeight, params, color, outwar
         const shelfMesh = new THREE.Mesh(new THREE.BoxGeometry(winWidth, thickInt, depthInt), material);
         shelfMesh.userData.surfaceType = SURFACE_TYPES.SHADING_DEVICE;
 
-        // Internal shelf: opposite outward
-        const sign = outward.z !== 0 ? -Math.sign(outward.z) : (outward.x !== 0 ? -Math.sign(outward.x) : -1);
-        shelfMesh.position.z = sign * depthInt / 2;
+        // Internal shelf: position it inward along the local -Z axis.
+        shelfMesh.position.z = -depthInt / 2;
+
         pivot.position.y = winHeight - distBelowInt;
         pivot.rotation.x = THREE.MathUtils.degToRad(tiltInt);
         pivot.add(shelfMesh);
@@ -968,10 +992,12 @@ function createLouvers(winWidth, winHeight, params, color, outward) {
 
     const assembly = new THREE.Group();
     const material = shared.shadeMat.clone();
-   material.color.set(color);
+    material.color.set(color);
     applyClippingToMaterial(material, renderer.clippingPlanes);
-    const baseSign = (outward.z !== 0 ? Math.sign(outward.z) : (outward.x !== 0 ? Math.sign(outward.x) : 1));
-    const zOffset = (isExterior ? baseSign : -baseSign) * distToGlass;
+
+    // The parent group is rotated so its local Z-axis always points outward.
+    // A positive Z is outward, a negative Z is inward.
+    const zOffset = isExterior ? distToGlass : -distToGlass;
     const angleRad = THREE.MathUtils.degToRad(slatAngle);
 
     if (isHorizontal) {
@@ -1031,7 +1057,8 @@ function createRoller(winWidth, winHeight, params, color) {
     // The origin (0,0,0) of this assembly is the window's bottom-center.
     const posX = (leftOpening - rightOpening) / 2;
     const posY = bottomOpening + rollerHeight / 2;
-    const posZ = distToGlass + rollerThickness / 2; // Positioned inside the room
+    // Positioned inside the room (negative local Z is inward)
+    const posZ = -distToGlass - (rollerThickness / 2);
 
     rollerMesh.position.set(posX, posY, posZ);
 
@@ -1293,8 +1320,8 @@ export function updateDaylightingSensorVisuals() {
         daylightingSensorMeshes.push(sensorGroup);
     }
 
-        // Attach the gizmo to the appropriate sensor based on the current UI toggle state.
-        attachGizmoToSelectedSensor();
+    // Attach the gizmo to the appropriate sensor based on the current UI toggle state.
+    attachGizmoToSelectedSensor();
 }
 
 /**
@@ -1683,10 +1710,10 @@ export function getContextObjectProperties(id) {
             volume = Math.PI * object.userData.radius * object.userData.radius * object.userData.height;
             break;
         case 'sphere':
-            volume = (4/3) * Math.PI * object.userData.radius * object.userData.radius * object.userData.radius;
+            volume = (4 / 3) * Math.PI * object.userData.radius * object.userData.radius * object.userData.radius;
             break;
         case 'pyramid':
-            volume = (1/3) * Math.PI * object.userData.radius * object.userData.radius * object.userData.height;
+            volume = (1 / 3) * Math.PI * object.userData.radius * object.userData.radius * object.userData.height;
             break;
     }
 
@@ -1824,11 +1851,11 @@ export function createResizeHandles() {
     const { wallThickness } = readParams();
     const handles = [
         // Positions are now calculated to be outside the wall thickness
-        { name: 'wall-handle-east',  w: L, h: H, pos: [W/2 + wallThickness + 0.01, H/2, 0],    axis: 'x', dir: 1  },
-        { name: 'wall-handle-west',  w: L, h: H, pos: [-W/2 - wallThickness - 0.01, H/2, 0],   axis: 'x', dir: -1 },
-        { name: 'wall-handle-south', w: W, h: H, pos: [0, H/2, L/2 + wallThickness + 0.01],    axis: 'z', dir: 1  },
-        { name: 'wall-handle-north', w: W, h: H, pos: [0, H/2, -L/2 - wallThickness - 0.01],   axis: 'z', dir: -1 },
-        { name: 'wall-handle-top',   w: W, h: L, pos: [0, H + 0.01, 0],                        axis: 'y', dir: 1  },
+        { name: 'wall-handle-east', w: L, h: H, pos: [W / 2 + wallThickness + 0.01, H / 2, 0], axis: 'x', dir: 1 },
+        { name: 'wall-handle-west', w: L, h: H, pos: [-W / 2 - wallThickness - 0.01, H / 2, 0], axis: 'x', dir: -1 },
+        { name: 'wall-handle-south', w: W, h: H, pos: [0, H / 2, L / 2 + wallThickness + 0.01], axis: 'z', dir: 1 },
+        { name: 'wall-handle-north', w: W, h: H, pos: [0, H / 2, -L / 2 - wallThickness - 0.01], axis: 'z', dir: -1 },
+        { name: 'wall-handle-top', w: W, h: L, pos: [0, H + 0.01, 0], axis: 'y', dir: 1 },
     ];
 
     handles.forEach(h => {
@@ -1837,7 +1864,7 @@ export function createResizeHandles() {
         plane.position.set(...h.pos);
         if (h.axis === 'x') plane.rotation.y = Math.PI / 2;
         if (h.axis === 'y') plane.rotation.x = -Math.PI / 2;
-        
+
         plane.userData = {
             isResizeHandle: true,
             axis: h.axis, // 'x', 'y', or 'z'

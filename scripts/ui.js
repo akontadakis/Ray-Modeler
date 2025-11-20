@@ -168,7 +168,7 @@ let isDraggingZoneDivider = false;
 // Debounce utility to prevent rapid-fire updates from sliders
 let debounceTimer;
 function debounce(func, delay) {
-    return function(...args) {
+    return function (...args) {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
             func.apply(this, args);
@@ -327,7 +327,7 @@ const glareHighlighter = {
         this.clear(); // Clear previous highlight first
 
         if (!object || !object.material) return;
-        
+
         // Don't highlight invisible objects or helpers
         if (!object.visible || object.type === 'CameraHelper' || object.type === 'LineSegments') return;
 
@@ -346,7 +346,7 @@ const glareHighlighter = {
             this.originalMaterial = null;
         }
     },
-    
+
     dispose() {
         this.highlightMaterial.dispose();
     }
@@ -425,7 +425,7 @@ export function scheduleUpdate(id = null) {
 
 // --- INITIALIZATION and EVENT LISTENERS ---
 const wallDirections = ['n', 's', 'e', 'w'];
-let windowModes = {'n': 'wwr', 's': 'wwr', 'e': 'wwr', 'w': 'wwr'};
+let windowModes = { 'n': 'wwr', 's': 'wwr', 'e': 'wwr', 'w': 'wwr' };
 
 /**
 * Sets up a MutationObserver to automatically initialize controls
@@ -506,7 +506,7 @@ export function highlightSensorPoint(type) {
         const color = (type === 'min') ? 0x0000ff : 0xff0000; // Blue for min, Red for max
         highlightPointsByIndices(indices, color);
     } else {
-         console.warn(`Could not find index for ${type} value: ${targetValue}`);
+        console.warn(`Could not find index for ${type} value: ${targetValue}`);
     }
 }
 
@@ -519,17 +519,17 @@ export function highlightPointsByIndices(indices, color = 0xffa500) {
     if (!resultsManager.getActiveData() || resultsManager.getActiveData().length === 0) {
         return;
     }
-    
+
     // Clear existing highlights before applying new ones.
     clearSensorHighlights();
-    
+
     if (!indices || indices.length === 0) {
         return; // Nothing to highlight
     }
-    
+
     let cumulativeIndex = 0;
     for (const mesh of sensorMeshes) {
-        if (!mesh.instanceColor) continue; 
+        if (!mesh.instanceColor) continue;
 
         let needsUpdate = false;
         for (const index of indices) {
@@ -539,11 +539,11 @@ export function highlightPointsByIndices(indices, color = 0xffa500) {
                 needsUpdate = true;
             }
         }
-        
+
         if (needsUpdate) {
             mesh.instanceColor.needsUpdate = true;
         }
-        
+
         cumulativeIndex += mesh.count;
     }
 }
@@ -584,22 +584,22 @@ function updateFovControlsForViewType(viewType) {
     fovContainer.classList.toggle('hidden', isParallel);
 
     if (isFisheye) {
-    // Lock FOV to 180 for Fisheye views
-    if (fovSlider.value !== '180') {
-    fovSlider.dataset.lastFov = fovSlider.value;
-    }
-    fovSlider.value = 180;
-    fovSlider.disabled = true;
+        // Lock FOV to 180 for Fisheye views
+        if (fovSlider.value !== '180') {
+            fovSlider.dataset.lastFov = fovSlider.value;
+        }
+        fovSlider.value = 180;
+        fovSlider.disabled = true;
     } else if (!isParallel) {
-    // For other views (Perspective, Cylindrical), ensure slider is enabled and restore previous value
-    fovSlider.disabled = false;
-    fovSlider.value = fovSlider.dataset.lastFov || 60;
+        // For other views (Perspective, Cylindrical), ensure slider is enabled and restore previous value
+        fovSlider.disabled = false;
+        fovSlider.value = fovSlider.dataset.lastFov || 60;
     }
 
     // Only update the label and dispatch the event if the control is visible
     if (!isParallel) {
-    updateValueLabel(dom['view-fov-val'], fovSlider.value, '°', 'view-fov');
-    fovSlider.dispatchEvent(new Event('input', { bubbles: true }));
+        updateValueLabel(dom['view-fov-val'], fovSlider.value, '°', 'view-fov');
+        fovSlider.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
     // Update the 3D scene's camera and effects
@@ -769,7 +769,7 @@ function onTaskAreaMouseDown(e) {
         isDraggingTaskArea = true;
     }
 
-    if(isDraggingTaskArea || isResizingTaskArea) {
+    if (isDraggingTaskArea || isResizingTaskArea) {
         dragStartPos = { x: e.offsetX, y: e.offsetY };
         initialTaskRect = { x, z, w, d };
     }
@@ -841,7 +841,7 @@ function setupTaskAreaVisualizer() {
     });
 
     dom['task-area-toggle']?.addEventListener('change', () => {
-        if(dom['task-area-toggle'].checked) {
+        if (dom['task-area-toggle'].checked) {
             drawTaskAreaVisualizer();
         }
     });
@@ -849,7 +849,7 @@ function setupTaskAreaVisualizer() {
     taskAreaCanvas.addEventListener('mousedown', onTaskAreaMouseDown);
     taskAreaCanvas.addEventListener('mousemove', onTaskAreaMouseMove);
     taskAreaCanvas.addEventListener('mouseup', onTaskAreaMouseUp);
-    taskAreaCanvas.addEventListener('mouseleave', onTaskAreaMouseUp); 
+    taskAreaCanvas.addEventListener('mouseleave', onTaskAreaMouseUp);
 
     new ResizeObserver(drawTaskAreaVisualizer).observe(dom['task-area-visualizer-container']);
 }
@@ -896,21 +896,21 @@ export async function setupEventListeners() {
     window.addEventListener('keydown', handleKeyDown);
 
     // Add the event listener for the lock button
-  dom['wall-select-lock-btn']?.addEventListener('click', () => {
-      isWallSelectionLocked = !isWallSelectionLocked;
-      updateLockIcon();
-  });
+    dom['wall-select-lock-btn']?.addEventListener('click', () => {
+        isWallSelectionLocked = !isWallSelectionLocked;
+        updateLockIcon();
+    });
 
-  // Add listener for the new globals toggle in the simulation panel
-  dom['globals-toggle']?.addEventListener('change', (e) => {
-      dom['globals-controls']?.classList.toggle('hidden', !e.target.checked);
-      if (e.target.checked) {
-          const panel = e.target.closest('.floating-window');
-          if (panel) {
-              ensureWindowInView(panel);
-          }
-      }
-  });
+    // Add listener for the new globals toggle in the simulation panel
+    dom['globals-toggle']?.addEventListener('change', (e) => {
+        dom['globals-controls']?.classList.toggle('hidden', !e.target.checked);
+        if (e.target.checked) {
+            const panel = e.target.closest('.floating-window');
+            if (panel) {
+                ensureWindowInView(panel);
+            }
+        }
+    });
 
     // The import from annualDashboard is updated to include the new functions
     initHdrViewer(); // Initialize the HDR viewer
@@ -926,7 +926,7 @@ export async function setupEventListeners() {
         const el = dom[id];
         if (el && (el.tagName === 'INPUT' || el.tagName === 'SELECT')) {
             // Exclude project info, file inputs, buttons, and sun path controls which are handled separately
-           if (id.startsWith('project-') || id.includes('latitude') || id.includes('longitude') || id.includes('-btn') || el.type === 'file' || id.startsWith('solar-')) return;
+            if (id.startsWith('project-') || id.includes('latitude') || id.includes('longitude') || id.includes('-btn') || el.type === 'file' || id.startsWith('solar-')) return;
 
             el.addEventListener('input', handleInputChange);
         }
@@ -934,7 +934,7 @@ export async function setupEventListeners() {
 
     if (dom['bsdf-file']) {
         dom['bsdf-file'].addEventListener('change', (event) => {
-        handleFileSelection(event.target.files[0], 'bsdf-file');
+            handleFileSelection(event.target.files[0], 'bsdf-file');
         });
     }
 
@@ -974,7 +974,16 @@ export async function setupEventListeners() {
         });
     });
 
-    dom['frame-toggle']?.addEventListener('change', () => { dom['frame-controls']?.classList.toggle('hidden', !dom['frame-toggle'].checked); scheduleUpdate(); });
+    if (dom['frame-toggle']) {
+        // Sync initial visibility state on load
+        dom['frame-controls']?.classList.toggle('hidden', !dom['frame-toggle'].checked);
+
+        dom['frame-toggle'].addEventListener('change', () => {
+            dom['frame-controls']?.classList.toggle('hidden', !dom['frame-toggle'].checked);
+            scheduleUpdate();
+        });
+    }
+
     dom['bsdf-toggle']?.addEventListener('change', async (e) => {
         const isEnabled = e.target.checked;
         dom['bsdf-controls']?.classList.toggle('hidden', !isEnabled);
@@ -1035,7 +1044,7 @@ export async function setupEventListeners() {
         _updateLivePreviewVisibility();
         scheduleUpdate();
     });
-        dom['v-section-toggle']?.addEventListener('change', () => {
+    dom['v-section-toggle']?.addEventListener('change', () => {
         dom['v-section-controls']?.classList.toggle('hidden', !dom['v-section-toggle'].checked);
         _updateLivePreviewVisibility();
         scheduleUpdate();
@@ -1069,20 +1078,20 @@ export async function setupEventListeners() {
     }
 
     dom['fpv-toggle-btn']?.addEventListener('click', () => {
-            const viewType = dom['view-type'].value;
-            const fpvActive = sceneToggleFPV(viewType); // sceneToggleFPV now returns the state
+        const viewType = dom['view-type'].value;
+        const fpvActive = sceneToggleFPV(viewType); // sceneToggleFPV now returns the state
 
-            // Handle UI changes here, separated from scene logic
-            const btnText = dom['fpv-toggle-btn']?.querySelector('span');
-            if (btnText) {
-                btnText.textContent = fpvActive ? 'Exit Viewpoint' : 'Enter Viewpoint';
-            }
-            if (fpvActive) {
-                dom['fpv-toggle-btn']?.classList.replace('btn-primary', 'btn-secondary');
-            } else {
-                dom['fpv-toggle-btn']?.classList.replace('btn-secondary', 'btn-primary');
-                // When exiting FPV, update gizmo visibility based on the checkbox.
-                setGizmoVisibility(dom['gizmo-toggle'].checked);
+        // Handle UI changes here, separated from scene logic
+        const btnText = dom['fpv-toggle-btn']?.querySelector('span');
+        if (btnText) {
+            btnText.textContent = fpvActive ? 'Exit Viewpoint' : 'Enter Viewpoint';
+        }
+        if (fpvActive) {
+            dom['fpv-toggle-btn']?.classList.replace('btn-primary', 'btn-secondary');
+        } else {
+            dom['fpv-toggle-btn']?.classList.replace('btn-secondary', 'btn-primary');
+            // When exiting FPV, update gizmo visibility based on the checkbox.
+            setGizmoVisibility(dom['gizmo-toggle'].checked);
         }
     });
 
@@ -1126,7 +1135,7 @@ export async function setupEventListeners() {
             updateCombinedAnalysisChart();
         }
     });
-    
+
     // --- Climate Analysis Listener ---
     dom['climate-dashboard-btn']?.addEventListener('click', async () => {
         const { openClimateAnalysisDashboard } = await import('./annualDashboard.js');
@@ -1151,41 +1160,41 @@ export async function setupEventListeners() {
     });
 
     // --- Interactive Data Table Listeners ---
-  dom['data-table-body']?.addEventListener('click', (e) => {
-      const row = e.target.closest('tr');
-      if (row && row.dataset.pointIndex !== undefined) {
-          const index = parseInt(row.dataset.pointIndex, 10);
-          highlightSensorByIndex(index);
+    dom['data-table-body']?.addEventListener('click', (e) => {
+        const row = e.target.closest('tr');
+        if (row && row.dataset.pointIndex !== undefined) {
+            const index = parseInt(row.dataset.pointIndex, 10);
+            highlightSensorByIndex(index);
 
-          // Highlight the clicked row in the table
-          dom['data-table-body'].querySelectorAll('tr').forEach(r => r.classList.remove('active'));
-          row.classList.add('active');
-      }
-  });
+            // Highlight the clicked row in the table
+            dom['data-table-body'].querySelectorAll('tr').forEach(r => r.classList.remove('active'));
+            row.classList.add('active');
+        }
+    });
 
-  dom['data-table-head']?.addEventListener('click', (e) => {
-      const th = e.target.closest('th');
-      if (th && th.dataset.column) {
-          const column = th.dataset.column;
-          if (currentSort.column === column) {
-              currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
-          } else {
-              currentSort.column = column;
-              currentSort.direction = 'asc';
-          }
-          populateDataTable(); // Re-sort and re-populate the table
-      }
-  });
+    dom['data-table-head']?.addEventListener('click', (e) => {
+        const th = e.target.closest('th');
+        if (th && th.dataset.column) {
+            const column = th.dataset.column;
+            if (currentSort.column === column) {
+                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSort.column = column;
+                currentSort.direction = 'asc';
+            }
+            populateDataTable(); // Re-sort and re-populate the table
+        }
+    });
 
-  dom['data-table-filter-input']?.addEventListener('input', filterDataTable);
+    dom['data-table-filter-input']?.addEventListener('input', filterDataTable);
 
     // --- HDR Viewer Button Listener ---
     dom['view-hdr-btn']?.addEventListener('click', () => {
         if (resultsManager.hdrResult) {
             // Also pass any available glare data from the active dataset
             const glareResult = resultsManager.getActiveGlareResult();
-                openHdrViewer(resultsManager.hdrResult.texture, glareResult);
-            }
+            openHdrViewer(resultsManager.hdrResult.texture, glareResult);
+        }
     });
 
     dom['generate-report-btn']?.addEventListener('click', async () => {
@@ -1208,12 +1217,12 @@ export async function setupEventListeners() {
 
     // Add listeners for the material reflectance mode buttons
     const materialTypes = ['wall', 'floor', 'ceiling']; // Expand this array to add spectral controls to other materials
-        materialTypes.forEach(type => {
-            const reflBtn = dom[`${type}-mode-refl`];
-            const srdBtn = dom[`${type}-mode-srd`];
-            const reflControls = dom[`${type}-refl-controls`];
-            const srdControls = dom[`${type}-srd-controls`];
-            const srdFileInput = dom[`${type}-srd-file`];
+    materialTypes.forEach(type => {
+        const reflBtn = dom[`${type}-mode-refl`];
+        const srdBtn = dom[`${type}-mode-srd`];
+        const reflControls = dom[`${type}-refl-controls`];
+        const srdControls = dom[`${type}-srd-controls`];
+        const srdFileInput = dom[`${type}-srd-file`];
 
         reflBtn?.addEventListener('click', () => {
             reflBtn.classList.add('active');
@@ -1230,7 +1239,7 @@ export async function setupEventListeners() {
         });
 
         srdFileInput?.addEventListener('change', (event) => {
-            const baseId = `${type}-srd-file`; 
+            const baseId = `${type}-srd-file`;
             handleFileSelection(event.target.files[0], baseId);
         });
     });
@@ -1248,9 +1257,9 @@ export async function setupEventListeners() {
     dom['render-container'].addEventListener('pointermove', onPointerMove, false);
     dom['render-container'].addEventListener('pointerup', onPointerUp, false);
 
-    if(dom['view-type']) updateLiveViewType(dom['view-type'].value);
+    if (dom['view-type']) updateLiveViewType(dom['view-type'].value);
 
-   // --- Gizmo Mode Listeners ---
+    // --- Gizmo Mode Listeners ---
     dom['gizmo-mode-translate']?.addEventListener('click', () => setAndDisplayGizmoMode('translate'));
     dom['gizmo-mode-rotate']?.addEventListener('click', () => setAndDisplayGizmoMode('rotate'));
     dom['gizmo-mode-scale']?.addEventListener('click', () => setAndDisplayGizmoMode('scale'));
@@ -1258,7 +1267,7 @@ export async function setupEventListeners() {
     // --- Shortcut Help Modal Listeners ---
     dom['shortcut-help-btn']?.addEventListener('click', openShortcutHelp);
     dom['shortcut-modal-close-btn']?.addEventListener('click', () => {
-    dom['shortcut-help-modal']?.classList.replace('flex', 'hidden');
+        dom['shortcut-help-modal']?.classList.replace('flex', 'hidden');
     });
 
     // Listener for the new optimization info modal
@@ -1281,18 +1290,18 @@ export async function setupEventListeners() {
                 let unit = '';
                 if (id.startsWith('obj-pos')) unit = 'm';
                 else if (id.startsWith('obj-rot')) unit = '°';
-                
+
                 updateValueLabel(label, slider.value, unit, id);
                 _updateObjectFromTransformSliders();
             });
         }
     });
-    
+
     // Listener for updates from the transform gizmo in the 3D scene
     renderer.domElement.addEventListener('transformGizmoChange', (e) => {
-      if (e.detail.object) {
-          _updateTransformSlidersFromObject(e.detail.object);
-      }
+        if (e.detail.object) {
+            _updateTransformSlidersFromObject(e.detail.object);
+        }
     });
 
     // Listener for the remove object button
@@ -1339,9 +1348,9 @@ export async function setupEventListeners() {
     });
 
     dom['heatmap-mode-selector']?.addEventListener('change', () => {
-    const isDaMode = dom['heatmap-mode-selector'].value === 'da';
-    dom['da-threshold-controls']?.classList.toggle('hidden', !isDaMode);
-    render2DHeatmap();
+        const isDaMode = dom['heatmap-mode-selector'].value === 'da';
+        dom['da-threshold-controls']?.classList.toggle('hidden', !isDaMode);
+        render2DHeatmap();
     });
 
     dom['da-threshold-slider']?.addEventListener('input', (e) => {
@@ -1422,7 +1431,7 @@ export async function setupEventListeners() {
         const canvas = dom['heatmap-canvas'];
         const sensorGroup = scene.getObjectByName('sensorPoints');
         if (!canvas || !sensorGroup) {
-        return;
+            return;
         }
 
         // Determine which data to render based on the heatmap mode selector
@@ -1430,16 +1439,16 @@ export async function setupEventListeners() {
         let heatmapData;
 
         if (mode === 'da' && resultsManager.hasAnnualData(resultsManager.activeView)) {
-        const threshold = parseFloat(dom['da-threshold-slider'].value);
-        heatmapData = await resultsManager.calculateDaylightAutonomy(threshold);
+            const threshold = parseFloat(dom['da-threshold-slider'].value);
+            heatmapData = await resultsManager.calculateDaylightAutonomy(threshold);
         } else {
-        heatmapData = resultsManager.getActiveData();
+            heatmapData = resultsManager.getActiveData();
         }
 
         if (!heatmapData || heatmapData.length === 0) {
-        const ctxClear = canvas.getContext('2d');
-        ctxClear.clearRect(0, 0, canvas.width, canvas.height);
-        return;
+            const ctxClear = canvas.getContext('2d');
+            ctxClear.clearRect(0, 0, canvas.width, canvas.height);
+            return;
         }
 
         const ctx = canvas.getContext('2d');
@@ -1464,13 +1473,13 @@ export async function setupEventListeners() {
                 // We only want points near the floor (y ≈ 0 in room container space)
                 // Use a small tolerance for floating point inaccuracies
                 if (Math.abs(pos.y - parseFloat(dom['floor-grid-offset'].value)) < 0.01) {
-                floorPoints.push({
-                    x: pos.x,
-                    z: pos.z,
-                    value: heatmapData[dataIndex]
-                });
-            }
-            dataIndex++;
+                    floorPoints.push({
+                        x: pos.x,
+                        z: pos.z,
+                        value: heatmapData[dataIndex]
+                    });
+                }
+                dataIndex++;
             }
         });
 
@@ -1532,7 +1541,7 @@ export async function setupEventListeners() {
     });
     scaleMaxNum?.addEventListener('change', (e) => {
         scaleMaxSlider.value = e.target.value;
-    syncAndUpdateColorScale();
+        syncAndUpdateColorScale();
     });
 
     // --- Analysis Tools Listeners ---
@@ -1545,79 +1554,79 @@ export async function setupEventListeners() {
         const hour = parseInt(e.target.value, 10);
         updateTimeScrubberDisplay(hour);
 
-    // --- Daylighting Sensor Gizmo Listener ---
-    sensorTransformControls.addEventListener('dragging-changed', (event) => {
-        // Only update the UI when the user has finished dragging the gizmo.
-        if (event.value === false) {
-            if (!sensorTransformControls.object) return;
+        // --- Daylighting Sensor Gizmo Listener ---
+        sensorTransformControls.addEventListener('dragging-changed', (event) => {
+            // Only update the UI when the user has finished dragging the gizmo.
+            if (event.value === false) {
+                if (!sensorTransformControls.object) return;
 
-            const controlledObject = sensorTransformControls.object;
-            const isSensor1 = controlledObject.name === 'daylightingSensor1';
-            const isSensor2 = controlledObject.name === 'daylightingSensor2';
+                const controlledObject = sensorTransformControls.object;
+                const isSensor1 = controlledObject.name === 'daylightingSensor1';
+                const isSensor2 = controlledObject.name === 'daylightingSensor2';
 
-            if (!isSensor1 && !isSensor2) return;
+                if (!isSensor1 && !isSensor2) return;
 
-            const W = parseFloat(dom.width.value);
-            const L = parseFloat(dom.length.value);
-            const sensorIndex = isSensor1 ? 1 : 2;
-            const finalPosition = controlledObject.position;
+                const W = parseFloat(dom.width.value);
+                const L = parseFloat(dom.length.value);
+                const sensorIndex = isSensor1 ? 1 : 2;
+                const finalPosition = controlledObject.position;
 
-            // Convert from the scene's corner-based coordinate system to the slider's center-based system.
-            const sliderX = finalPosition.x - W / 2;
-            const sliderZ = finalPosition.z - L / 2;
+                // Convert from the scene's corner-based coordinate system to the slider's center-based system.
+                const sliderX = finalPosition.x - W / 2;
+                const sliderZ = finalPosition.z - L / 2;
 
-            // Update the slider values with the final position.
-            if (dom[`daylight-sensor${sensorIndex}-x`]) dom[`daylight-sensor${sensorIndex}-x`].value = sliderX.toFixed(2);
-            if (dom[`daylight-sensor${sensorIndex}-y`]) dom[`daylight-sensor${sensorIndex}-y`].value = finalPosition.y.toFixed(2);
-            if (dom[`daylight-sensor${sensorIndex}-z`]) dom[`daylight-sensor${sensorIndex}-z`].value = sliderZ.toFixed(2);
+                // Update the slider values with the final position.
+                if (dom[`daylight-sensor${sensorIndex}-x`]) dom[`daylight-sensor${sensorIndex}-x`].value = sliderX.toFixed(2);
+                if (dom[`daylight-sensor${sensorIndex}-y`]) dom[`daylight-sensor${sensorIndex}-y`].value = finalPosition.y.toFixed(2);
+                if (dom[`daylight-sensor${sensorIndex}-z`]) dom[`daylight-sensor${sensorIndex}-z`].value = sliderZ.toFixed(2);
 
-            // Manually update the text labels next to the sliders.
-            updateAllLabels();
+                // Manually update the text labels next to the sliders.
+                updateAllLabels();
 
-            // Programmatically trigger an 'input' event on one of the sliders.
-            // This is crucial to notify the rest of the application (e.g., updateScene) of the change.
-            if (dom[`daylight-sensor${sensorIndex}-x`]) {
-                dom[`daylight-sensor${sensorIndex}-x`].dispatchEvent(new Event('input', { bubbles: true }));
+                // Programmatically trigger an 'input' event on one of the sliders.
+                // This is crucial to notify the rest of the application (e.g., updateScene) of the change.
+                if (dom[`daylight-sensor${sensorIndex}-x`]) {
+                    dom[`daylight-sensor${sensorIndex}-x`].dispatchEvent(new Event('input', { bubbles: true }));
+                }
             }
-        }
+        });
     });
-});
 
-// Make toolbars draggable
-const leftToolbarContainer = dom['left-controls-container'];
-const viewControlsContainer = dom['view-controls'];
+    // Make toolbars draggable
+    const leftToolbarContainer = dom['left-controls-container'];
+    const viewControlsContainer = dom['view-controls'];
 
-if (leftToolbarContainer) {
-    // Use the whole container as the handle
-    makeDraggable(leftToolbarContainer, leftToolbarContainer);
-    // Bring to front on click
-    leftToolbarContainer.addEventListener('mousedown', () => {
-        leftToolbarContainer.style.zIndex = getNewZIndex();
-    });
-}
+    if (leftToolbarContainer) {
+        // Use the whole container as the handle
+        makeDraggable(leftToolbarContainer, leftToolbarContainer);
+        // Bring to front on click
+        leftToolbarContainer.addEventListener('mousedown', () => {
+            leftToolbarContainer.style.zIndex = getNewZIndex();
+        });
+    }
 
-if (viewControlsContainer) {
-    // Use the whole container as the handle
-    makeDraggable(viewControlsContainer, viewControlsContainer);
-    // Bring to front on click
-    viewControlsContainer.addEventListener('mousedown', () => {
-        viewControlsContainer.style.zIndex = getNewZIndex();
-    });
-}
+    if (viewControlsContainer) {
+        // Use the whole container as the handle
+        makeDraggable(viewControlsContainer, viewControlsContainer);
+        // Bring to front on click
+        viewControlsContainer.addEventListener('mousedown', () => {
+            viewControlsContainer.style.zIndex = getNewZIndex();
+        });
+    }
 
-setupRecipeGuidesPanel();
+    setupRecipeGuidesPanel();
 
-promptForProjectDirectory();
+    promptForProjectDirectory();
 
     // Defer initial state settings until the 3D scene is fully initialized.
-dom['render-container'].addEventListener('sceneReady', () => {
+    dom['render-container'].addEventListener('sceneReady', () => {
         // Set the camera helper's visibility based on the default checkbox state.
         setGizmoVisibility(dom['gizmo-toggle'].checked);
-        }, { once: true }); // The event should only fire once.
+    }, { once: true }); // The event should only fire once.
 
-// --- Electron-Specific Listeners ---
-        // Listen for the 'run-simulation-button' which is dynamically created
-        document.body.addEventListener('click', async (event) => {
+    // --- Electron-Specific Listeners ---
+    // Listen for the 'run-simulation-button' which is dynamically created
+    document.body.addEventListener('click', async (event) => {
         const button = event.target.closest('[data-action="run"]');
         if (button && project.dirHandle) {
             const panel = button.closest('.floating-window');
@@ -1672,12 +1681,12 @@ dom['render-container'].addEventListener('sceneReady', () => {
                     dom['simulation-status'].classList.remove('text-yellow-500', 'text-green-500');
                 }
             }
-    });
-}
+        });
+    }
 
-dom['view-bsdf-btn']?.addEventListener('click', openBsdfViewer);
+    dom['view-bsdf-btn']?.addEventListener('click', openBsdfViewer);
 
-// --- Saved Views Listeners ---
+    // --- Saved Views Listeners ---
     setupContextControls();
     dom['save-view-btn']?.addEventListener('click', saveCurrentView);
     dom['saved-views-list']?.addEventListener('click', (e) => {
@@ -1739,7 +1748,7 @@ export function setUiValue(id, value) {
     } else {
         element.value = value;
     }
-    
+
     // Dispatch events to ensure labels and other listeners update
     element.dispatchEvent(new Event('input', { bubbles: true }));
     element.dispatchEvent(new Event('change', { bubbles: true }));
@@ -1768,11 +1777,11 @@ function updateMetricSelector(spectralData) {
     };
 
     for (const key in spectralData) {
-    if (metricMap[key]) {
-    const option = document.createElement('option');
-        option.value = key;
-        option.textContent = metricMap[key];
-        selector.appendChild(option);
+        if (metricMap[key]) {
+            const option = document.createElement('option');
+            option.value = key;
+            option.textContent = metricMap[key];
+            selector.appendChild(option);
         }
     }
 
@@ -1834,7 +1843,7 @@ export function togglePanelVisibility(panelId, btnId) {
         if (!panel.dataset.positioned) {
             // Count how many panels are already open to calculate the new position
             const panelCount = document.querySelectorAll('#window-container > .floating-window:not(.hidden)').length;
-            
+
             // Use panelCount - 1 because the current panel is already visible at this point.
             // A 40px offset provides a clear diagonal stagger for new panels.
             const offset = ((panelCount - 1) % 8) * 40;
@@ -1842,12 +1851,12 @@ export function togglePanelVisibility(panelId, btnId) {
             const yPos = 60 + offset;
             panel.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
             panel.dataset.positioned = 'true';
-    }
+        }
 
-    initializePanelControls(panel);
+        initializePanelControls(panel);
 
-    // Make sure the panel is within the viewport
-    ensureWindowInView(panel);
+        // Make sure the panel is within the viewport
+        ensureWindowInView(panel);
         ensureWindowInView(panel);
 
         // Special case for the map in the project panel
@@ -1862,27 +1871,27 @@ export function togglePanelVisibility(panelId, btnId) {
 }
 
 // --- Delegated Event Listeners for All Floating Panels ---
-    document.body.addEventListener('click', (e) => {
-        const collapseBtn = e.target.closest('.collapse-icon');
-        if (collapseBtn) {
-            const win = collapseBtn.closest('.floating-window');
-            if (win) {
-                e.stopPropagation();
-                handlePanelCollapse(win);
-                return; // Stop further processing
-            }
+document.body.addEventListener('click', (e) => {
+    const collapseBtn = e.target.closest('.collapse-icon');
+    if (collapseBtn) {
+        const win = collapseBtn.closest('.floating-window');
+        if (win) {
+            e.stopPropagation();
+            handlePanelCollapse(win);
+            return; // Stop further processing
         }
+    }
 
-        const maxBtn = e.target.closest('.window-icon-max');
-        if (maxBtn) {
-            const win = maxBtn.closest('.floating-window');
-            if (win) {
-                e.stopPropagation();
-                handlePanelMaximize(win);
-                return; // Stop further processing
-            }
+    const maxBtn = e.target.closest('.window-icon-max');
+    if (maxBtn) {
+        const win = maxBtn.closest('.floating-window');
+        if (win) {
+            e.stopPropagation();
+            handlePanelMaximize(win);
+            return; // Stop further processing
         }
-    });
+    }
+});
 
 /**
 * Sets up the click listeners for the new left toolbar buttons.
@@ -1934,7 +1943,7 @@ function setupAperturePanel() {
         dom[`mode-wwr-btn-${dir}`]?.addEventListener('click', () => setWindowMode(dir, 'wwr'));
         dom[`mode-manual-btn-${dir}`]?.addEventListener('click', () => setWindowMode(dir, 'manual'));
         dom[`shading-type-${dir}`]?.addEventListener('change', () => handleShadingTypeChange(dir));
-        
+
         // Set the initial state for button groups and device-specific controls
         setupShadingPanelButtonGroups(dir);
         handleShadingTypeChange(dir, false); // `false` prevents an unnecessary scene update on load
@@ -1990,14 +1999,14 @@ export function initializePanelControls(win) {
     // Bring to front on click
     win.addEventListener('mousedown', () => { maxZ++; win.style.zIndex = maxZ; }, true);
 
-   // Close button
+    // Close button
     if (closeIcon) {
         closeIcon.addEventListener('click', (e) => {
             e.stopPropagation();
             // Dynamically created panels (from templates) are removed entirely
             if (win.dataset.templateId) {
                 win.remove();
-            } 
+            }
             // Static, built-in panels are hidden and their toolbar button is deactivated
             else {
                 win.classList.add('hidden');
@@ -2174,24 +2183,24 @@ export function makeDraggable(element, handle) {
             offsetX = e.pageX - rect.left;
             offsetY = e.pageY - rect.top;
             element.dataset.transformPositioned = 'true';
-       }
+        }
 
         element.classList.add('is-dragging'); // Add dragging class
         controls.enabled = false;
 
         // On the first drag, we switch the element to a pure transform-based positioning
         if (!element.dataset.transformPositioned) {
-             element.style.left = '0px';
-             element.style.top = '0px';
-             element.style.transform = `translate3d(${rect.left}px, ${rect.top}px, 0)`;
-        element.dataset.transformPositioned = 'true';
+            element.style.left = '0px';
+            element.style.top = '0px';
+            element.style.transform = `translate3d(${rect.left}px, ${rect.top}px, 0)`;
+            element.dataset.transformPositioned = 'true';
         }
 
         controls.enabled = false;
-        document.onmouseup = () => { 
-            document.onmouseup = null; 
-            document.onmousemove = null; 
-            controls.enabled = true; 
+        document.onmouseup = () => {
+            document.onmouseup = null;
+            document.onmousemove = null;
+            controls.enabled = true;
             element.classList.remove('is-dragging'); // Remove dragging class
         };
         document.onmousemove = (e) => {
@@ -2216,7 +2225,7 @@ export function makeDraggable(element, handle) {
 
 export function makeResizable(element, handles) {
     handles.forEach(handle => {
-        handle.onmousedown = function(e) {
+        handle.onmousedown = function (e) {
             e.preventDefault();
             e.stopPropagation();
 
@@ -2245,7 +2254,7 @@ export function makeResizable(element, handles) {
 
             controls.enabled = false;
 
-            document.onmousemove = function(moveEvent) {
+            document.onmousemove = function (moveEvent) {
                 const dx = moveEvent.clientX - initialMouseX;
                 const dy = moveEvent.clientY - initialMouseY;
 
@@ -2296,7 +2305,7 @@ export function makeResizable(element, handles) {
                 element.style.transform = `translate3d(${newLeft}px, ${newTop}px, 0)`;
             };
 
-            document.onmouseup = function() {
+            document.onmouseup = function () {
                 // Remove global classes and styles
                 document.body.classList.remove('is-resizing');
                 document.body.style.cursor = '';
@@ -2317,7 +2326,7 @@ export function makeResizable(element, handles) {
 function makeSidebarResizable(sidebar, handle) {
     const dom = getDom();
 
-    handle.onmousedown = function(e) {
+    handle.onmousedown = function (e) {
         e.preventDefault();
         e.stopPropagation();
 
@@ -2327,7 +2336,7 @@ function makeSidebarResizable(sidebar, handle) {
         document.body.style.cursor = 'ew-resize';
         document.body.style.userSelect = 'none';
 
-        document.onmousemove = function(moveEvent) {
+        document.onmousemove = function (moveEvent) {
             const dx = initialMouseX - moveEvent.clientX;
             let newWidth = initialWidth + dx;
 
@@ -2340,7 +2349,7 @@ function makeSidebarResizable(sidebar, handle) {
             debouncedWindowResize();
         };
 
-        document.onmouseup = function() {
+        document.onmouseup = function () {
             document.onmousemove = null;
             document.onmouseup = null;
             document.body.classList.remove('is-resizing-sidebar');
@@ -2360,16 +2369,16 @@ function makeChatInputResizable() {
     const container = dom['ai-chat-input-container'];
     if (!handle || !container) return;
 
-    handle.onmousedown = function(e) {
-    e.preventDefault();
-    e.stopPropagation();
+    handle.onmousedown = function (e) {
+        e.preventDefault();
+        e.stopPropagation();
 
-    const startY = e.clientY;
-    const startHeight = container.offsetHeight;
+        const startY = e.clientY;
+        const startHeight = container.offsetHeight;
         document.body.style.cursor = 'ns-resize';
         document.body.style.userSelect = 'none';
 
-        document.onmousemove = function(moveEvent) {
+        document.onmousemove = function (moveEvent) {
             const dy = startY - moveEvent.clientY;
             let newHeight = startHeight + dy;
 
@@ -2380,7 +2389,7 @@ function makeChatInputResizable() {
             container.style.height = `${newHeight}px`;
         };
 
-        document.onmouseup = function() {
+        document.onmouseup = function () {
             document.onmousemove = null;
             document.onmouseup = null;
             document.body.style.cursor = '';
@@ -2433,7 +2442,7 @@ function setupProjectPanel() {
 
         const lightTiles = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
         const darkTiles = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-        
+
         // Set initial tiles based on current theme
         const initialTheme = document.documentElement.getAttribute('data-theme') || 'light';
         const initialTiles = initialTheme === 'dark' ? darkTiles : lightTiles;
@@ -2481,17 +2490,17 @@ function setupEpwUploadModal() {
             fileNameDisplay.title = file.name;
 
             const reader = new FileReader();
-           reader.onload = async function(e) {
-            try {
-                const epwContent = e.target.result;
-                await project.setEpwData(epwContent);
-                
-                // Also parse the file for climate analysis
-                await resultsManager.loadAndProcessFile(file, 'a');
-                dom['climate-analysis-controls']?.classList.remove('hidden');
+            reader.onload = async function (e) {
+                try {
+                    const epwContent = e.target.result;
+                    await project.setEpwData(epwContent);
 
-                const lines = epwContent.split('\n');
-                const locationLine = lines.find(line => line.startsWith('LOCATION'));
+                    // Also parse the file for climate analysis
+                    await resultsManager.loadAndProcessFile(file, 'a');
+                    dom['climate-analysis-controls']?.classList.remove('hidden');
+
+                    const lines = epwContent.split('\n');
+                    const locationLine = lines.find(line => line.startsWith('LOCATION'));
 
                     if (locationLine) {
                         const parts = locationLine.split(',');
@@ -2514,7 +2523,7 @@ function setupEpwUploadModal() {
                     }
                     modal.classList.replace('flex', 'hidden');
                     // START: Dispatch custom event
-                   // This allows other modules to know that a new EPW has been loaded
+                    // This allows other modules to know that a new EPW has been loaded
                     dom['upload-epw-btn'].dispatchEvent(new CustomEvent('epwLoaded'));
 
                     _updateLivePreviewVisibility();
@@ -2524,7 +2533,7 @@ function setupEpwUploadModal() {
                     triggerProactiveSuggestion('epw_loaded');
 
                     if (dom['location-inputs-container']) dom['location-inputs-container'].style.display = 'block';
-                    
+
                 } catch (error) {
                     console.error("Error parsing EPW file:", error);
                     showAlert(`Failed to parse EPW file's location data. The file might be corrupt or malformed. Please set the location manually. \nError: ${error.message}`, "EPW Parsing Error");
@@ -2688,7 +2697,7 @@ async function handleInputChange(e) {
         else if (id.startsWith('wwr-') && !id.includes('sill')) unit = '%';
         else if (id.includes('fov') || id.includes('orientation') || id.includes('tilt') || id.includes('angle')) unit = '°';
         updateValueLabel(valEl, val, unit, id);
-        }
+    }
 
     // Add specific handler for viewpoint sliders to update the gizmo in real-time
     if (id.startsWith('view-pos-') || id.startsWith('view-dir-') || id === 'view-fov' || id === 'view-dist') {
@@ -2965,7 +2974,7 @@ export function getWindowParamsForWall(orientation) {
     const winDepthPos = parseFloat(dom[winDepthPosId]?.value || 0);
     let ww, wh, sh;
 
-   if (mode === 'wwr') {
+    if (mode === 'wwr') {
         const wwr = parseFloat(dom[`wwr-${dir}`].value);
         sh = parseFloat(dom[`wwr-sill-height-${dir}`].value);
         const aspectRatio = 1.5, max_wh = H - sh;
@@ -2988,10 +2997,10 @@ export function getWindowParamsForWall(orientation) {
         if (wh > max_wh) wh = max_wh;
         return { ww: Math.max(0, ww), wh: Math.max(0, wh), sh, wallWidth, winCount, mode, winDepthPos };
     } else {
-        return { 
+        return {
             ww: parseFloat(dom[`win-width-${dir}`].value),
-            wh: parseFloat(dom[`win-height-${dir}`].value), 
-            sh: parseFloat(dom[`sill-height-${dir}`].value), 
+            wh: parseFloat(dom[`win-height-${dir}`].value),
+            sh: parseFloat(dom[`sill-height-${dir}`].value),
             wallWidth, winCount, mode, winDepthPos
         };
     }
@@ -3022,9 +3031,10 @@ export function getAllShadingParams() {
         if (type === 'overhang') {
             shadeParams.overhang = {
                 depth: parseFloat(dom[`overhang-depth-${dir}`]?.value || 0),
-                tilt: parseFloat(dom[`overhang-tilt-${dir}`]?.value || 0),
+                tilt: parseFloat(dom[`overhang-tilt-${dir}`]?.value || 90),
                 distAbove: parseFloat(dom[`overhang-dist-above-${dir}`]?.value || 0),
-                extension: parseFloat(dom[`overhang-extension-${dir}`]?.value || 0),
+                leftExtension: parseFloat(dom[`overhang-left-extension-${dir}`]?.value || 0),
+                rightExtension: parseFloat(dom[`overhang-right-extension-${dir}`]?.value || 0),
                 thick: parseFloat(dom[`overhang-thick-${dir}`]?.value || 0.01)
             };
         } else if (type === 'lightshelf') {
@@ -3066,7 +3076,7 @@ export function getAllShadingParams() {
                 irTrans: parseFloat(dom[`roller-ir-trans-${dir}`]?.value || 0),
                 thickness: parseFloat(dom[`roller-thickness-${dir}`]?.value || 0.001),
                 conductivity: parseFloat(dom[`roller-conductivity-${dir}`]?.value || 0),
-        };
+            };
         } else if (type === 'generative') {
             // Retrieve the stored generative pattern type, its parameters, and bounding box
             if (project.generativeShadingParams && project.generativeShadingParams[dir]) {
@@ -3085,7 +3095,7 @@ export function getAllShadingParams() {
         params[dir.toUpperCase()] = shadeParams;
 
     });
-    
+
     return params;
 }
 
@@ -3094,7 +3104,7 @@ export function getAllShadingParams() {
  * @returns {object} An object containing illuminance and view grid parameters.
  */
 export function getSensorGridParams() {
-    const dom = getDom(); 
+    const dom = getDom();
 
     const getFloat = (id, defaultValue = 0) => dom[id] ? parseFloat(dom[id].value) : defaultValue;
     const getInt = (id, defaultValue = 0) => dom[id] ? parseInt(dom[id].value, 10) : defaultValue;
@@ -3204,8 +3214,8 @@ export async function handleShadingTypeChange(dir, triggerUpdate = true) {
 
     const type = dom[`shading-type-${dir}`]?.value;
     if (type === undefined) return;
-        ['overhang', 'lightshelf', 'louver', 'roller', 'imported_obj'].forEach(t => {
-            const controlEl = dom[`shading-controls-${t}-${dir}`];
+    ['overhang', 'lightshelf', 'louver', 'roller', 'imported_obj'].forEach(t => {
+        const controlEl = dom[`shading-controls-${t}-${dir}`];
         if (controlEl) controlEl.classList.toggle('hidden', type !== t);
     });
     // Show/Hide Topology specific controls
@@ -3444,7 +3454,7 @@ export function setupThemeSwitcher() {
         // Re-render Mermaid diagrams with the new theme
         if (typeof mermaid !== 'undefined' && mermaid.run) {
             const style = getComputedStyle(document.documentElement);
-        mermaid.initialize({
+            mermaid.initialize({
                 startOnLoad: false,
                 theme: 'base',
                 fontFamily: 'Inter, sans-serif',
@@ -3529,15 +3539,15 @@ export async function clearAllResultsDisplay() {
     if (dom['generate-report-btn']) dom['generate-report-btn'].classList.add('hidden');
 
     const { clearAnnualDashboard, clearLightingEnergyDashboard } = await import('./annualDashboard.js');
-        clearAnnualDashboard();
-        clearTimeSeriesExplorer();
-        // NEW: Also clear the lighting energy dashboard
-        clearLightingEnergyDashboard();
-        updateSpectralMetricsDashboard(null); // Clear the spectral dashboard
+    clearAnnualDashboard();
+    clearTimeSeriesExplorer();
+    // NEW: Also clear the lighting energy dashboard
+    clearLightingEnergyDashboard();
+    updateSpectralMetricsDashboard(null); // Clear the spectral dashboard
 
-        // Explicitly clear any 3D sensor grid visualization from previous results
-        glareHighlighter.clear();
-        updateSensorGridColors(null);
+    // Explicitly clear any 3D sensor grid visualization from previous results
+    glareHighlighter.clear();
+    updateSensorGridColors(null);
 }
 
 /**
@@ -3565,123 +3575,123 @@ async function handleResultsFile(file, key) {
         const url = URL.createObjectURL(file);
 
         loader.load(url, (texture) => {
-        resultsManager.setHdrResult(texture, file.name);
-        if (fileNameDisplay) fileNameDisplay.textContent = file.name;
-        if (dom['view-hdr-btn']) dom['view-hdr-btn'].classList.remove('hidden');
-        showAlert(`HDR Image "${file.name}" loaded successfully.`, 'File Loaded');
-        URL.revokeObjectURL(url);
-    }, undefined, (error) => {
-        console.error("An error occurred loading the HDR file:", error);
-        showAlert(`Failed to load HDR file: ${file.name}. See console for details.`, 'File Load Error');
-        if (fileNameDisplay) fileNameDisplay.textContent = "Failed to load.";
-    });
-
-    } else {
-    // Handle .ill, .epw, and other text-based results files
-    try {
-        const result = await resultsManager.loadAndProcessFile(file, key);
-        const loadedKey = result.key;
-
-        // If an EPW was loaded, just show the climate button and stop
-        if (result.type === 'climate') {
+            resultsManager.setHdrResult(texture, file.name);
             if (fileNameDisplay) fileNameDisplay.textContent = file.name;
-            dom['climate-analysis-controls']?.classList.remove('hidden');
-            return;
-        }
+            if (dom['view-hdr-btn']) dom['view-hdr-btn'].classList.remove('hidden');
+            showAlert(`HDR Image "${file.name}" loaded successfully.`, 'File Loaded');
+            URL.revokeObjectURL(url);
+        }, undefined, (error) => {
+            console.error("An error occurred loading the HDR file:", error);
+            showAlert(`Failed to load HDR file: ${file.name}. See console for details.`, 'File Load Error');
+            if (fileNameDisplay) fileNameDisplay.textContent = "Failed to load.";
+        });
 
-        if (resultsManager.hasAnnualData(loadedKey)) {
-            const { project } = await import('./project.js');
-            const scheduleFile = project.simulationFiles['occupancy-schedule'];
-            await resultsManager.calculateLightingMetrics(loadedKey, null, scheduleFile);
-      }
-
-        if (fileNameDisplay) fileNameDisplay.textContent = file.name;
-
-        updateSpectralMetricsDashboard(loadedKey); // Update the spectral dashboard
-
-    // After loading, check for annual data to update relevant dashboards
-    if (resultsManager.hasAnnualData(loadedKey)) {
-        const { updateAnnualMetricsDashboard, updateLightingEnergyDashboard } = await import('./annualDashboard.js');
-        const metrics = resultsManager.calculateAnnualMetrics(loadedKey, {});
-        const lightingMetrics = resultsManager.datasets[loadedKey].lightingMetrics;
-        const energyMetrics = resultsManager.datasets[loadedKey].lightingEnergyMetrics;
-        updateAnnualMetricsDashboard(metrics, lightingMetrics);
-        if (energyMetrics) {
-            updateLightingEnergyDashboard(energyMetrics);
-        }
-        updateTimeSeriesExplorer();
     } else {
-        clearAnnualDashboard();
-        clearTimeSeriesExplorer();
-    }
+        // Handle .ill, .epw, and other text-based results files
+        try {
+            const result = await resultsManager.loadAndProcessFile(file, key);
+            const loadedKey = result.key;
 
-    // Check for and update circadian metrics dashboard
-    const loadedDataset = resultsManager.datasets[loadedKey];
-    if (loadedDataset && loadedDataset.circadianMetrics) {
-        const { updateCircadianDashboard } = await import('./annualDashboard.js');
-        updateCircadianDashboard(loadedDataset.circadianMetrics);
-    }
-
-    // Check for per-point spectral data and populate the metric selector
-    if (loadedDataset && loadedDataset.spectralResults && Object.keys(loadedDataset.spectralResults).length > 0) {
-        updateMetricSelector(loadedDataset.spectralResults);
-    } else {
-        dom['metric-selector-container']?.classList.add('hidden');
-    }
-
-    // Show summary for dataset B if it was just loaded
-    if (loadedKey === 'b' && dom['summary-b']) {
-        dom['summary-b'].classList.remove('hidden');
-    }
-
-    // If both datasets are loaded, enable comparison buttons
-    if (resultsManager.datasets.a && resultsManager.datasets.b) {
-        dom['view-mode-b-btn']?.classList.remove('hidden');
-        dom['view-mode-diff-btn']?.classList.remove('hidden');
-    }
-
-    // Set the view to the newly loaded dataset and update everything
-    setViewMode(loadedKey);
-    if (dom['results-dashboard']) dom['results-dashboard'].classList.remove('hidden');
-
-    // Show the data table button and populate the table
-    if (dom['data-table-btn']) dom['data-table-btn'].classList.remove('hidden');
-        currentSort = { column: 'id', direction: 'asc' }; // Reset sort
-        populateDataTable();
-
-    // --- TRIGGER PROACTIVE SUGGESTIONS ---
-    import('./ai-assistant.js').then(({ triggerProactiveSuggestion }) => {
-        if (resultsManager.hasAnnualData(loadedKey)) {
-            triggerProactiveSuggestion('annual_illuminance_loaded');
+            // If an EPW was loaded, just show the climate button and stop
+            if (result.type === 'climate') {
+                if (fileNameDisplay) fileNameDisplay.textContent = file.name;
+                dom['climate-analysis-controls']?.classList.remove('hidden');
+                return;
             }
-        if (resultsManager.hasAnnualGlareData(loadedKey)) {
-            triggerProactiveSuggestion('annual_glare_loaded');
+
+            if (resultsManager.hasAnnualData(loadedKey)) {
+                const { project } = await import('./project.js');
+                const scheduleFile = project.simulationFiles['occupancy-schedule'];
+                await resultsManager.calculateLightingMetrics(loadedKey, null, scheduleFile);
             }
-    });
 
-    // Show annual glare controls if that data type was loaded
-    if (resultsManager.hasAnnualGlareData(loadedKey)) {
-        if (dom['annual-glare-controls']) dom['annual-glare-controls'].classList.remove('hidden');
-    }
+            if (fileNameDisplay) fileNameDisplay.textContent = file.name;
 
-    // Check if both data types are now loaded to show the combined analysis button
-    const hasIll = resultsManager.hasAnnualData('a') || resultsManager.hasAnnualData('b');
-    const hasDgp = resultsManager.hasAnnualGlareData('a') || resultsManager.hasAnnualGlareData('b');
-    if (hasIll && hasDgp) {
-    if(dom['combined-analysis-btn']) dom['combined-analysis-btn'].style.display = 'block';
-    } else {
-        if(dom['combined-analysis-btn']) dom['combined-analysis-btn'].style.display = 'none';
-    }
+            updateSpectralMetricsDashboard(loadedKey); // Update the spectral dashboard
 
-    if (dom['generate-report-btn']) {
-        dom['generate-report-btn'].classList.remove('hidden');
-    }
+            // After loading, check for annual data to update relevant dashboards
+            if (resultsManager.hasAnnualData(loadedKey)) {
+                const { updateAnnualMetricsDashboard, updateLightingEnergyDashboard } = await import('./annualDashboard.js');
+                const metrics = resultsManager.calculateAnnualMetrics(loadedKey, {});
+                const lightingMetrics = resultsManager.datasets[loadedKey].lightingMetrics;
+                const energyMetrics = resultsManager.datasets[loadedKey].lightingEnergyMetrics;
+                updateAnnualMetricsDashboard(metrics, lightingMetrics);
+                if (energyMetrics) {
+                    updateLightingEnergyDashboard(energyMetrics);
+                }
+                updateTimeSeriesExplorer();
+            } else {
+                clearAnnualDashboard();
+                clearTimeSeriesExplorer();
+            }
+
+            // Check for and update circadian metrics dashboard
+            const loadedDataset = resultsManager.datasets[loadedKey];
+            if (loadedDataset && loadedDataset.circadianMetrics) {
+                const { updateCircadianDashboard } = await import('./annualDashboard.js');
+                updateCircadianDashboard(loadedDataset.circadianMetrics);
+            }
+
+            // Check for per-point spectral data and populate the metric selector
+            if (loadedDataset && loadedDataset.spectralResults && Object.keys(loadedDataset.spectralResults).length > 0) {
+                updateMetricSelector(loadedDataset.spectralResults);
+            } else {
+                dom['metric-selector-container']?.classList.add('hidden');
+            }
+
+            // Show summary for dataset B if it was just loaded
+            if (loadedKey === 'b' && dom['summary-b']) {
+                dom['summary-b'].classList.remove('hidden');
+            }
+
+            // If both datasets are loaded, enable comparison buttons
+            if (resultsManager.datasets.a && resultsManager.datasets.b) {
+                dom['view-mode-b-btn']?.classList.remove('hidden');
+                dom['view-mode-diff-btn']?.classList.remove('hidden');
+            }
+
+            // Set the view to the newly loaded dataset and update everything
+            setViewMode(loadedKey);
+            if (dom['results-dashboard']) dom['results-dashboard'].classList.remove('hidden');
+
+            // Show the data table button and populate the table
+            if (dom['data-table-btn']) dom['data-table-btn'].classList.remove('hidden');
+            currentSort = { column: 'id', direction: 'asc' }; // Reset sort
+            populateDataTable();
+
+            // --- TRIGGER PROACTIVE SUGGESTIONS ---
+            import('./ai-assistant.js').then(({ triggerProactiveSuggestion }) => {
+                if (resultsManager.hasAnnualData(loadedKey)) {
+                    triggerProactiveSuggestion('annual_illuminance_loaded');
+                }
+                if (resultsManager.hasAnnualGlareData(loadedKey)) {
+                    triggerProactiveSuggestion('annual_glare_loaded');
+                }
+            });
+
+            // Show annual glare controls if that data type was loaded
+            if (resultsManager.hasAnnualGlareData(loadedKey)) {
+                if (dom['annual-glare-controls']) dom['annual-glare-controls'].classList.remove('hidden');
+            }
+
+            // Check if both data types are now loaded to show the combined analysis button
+            const hasIll = resultsManager.hasAnnualData('a') || resultsManager.hasAnnualData('b');
+            const hasDgp = resultsManager.hasAnnualGlareData('a') || resultsManager.hasAnnualGlareData('b');
+            if (hasIll && hasDgp) {
+                if (dom['combined-analysis-btn']) dom['combined-analysis-btn'].style.display = 'block';
+            } else {
+                if (dom['combined-analysis-btn']) dom['combined-analysis-btn'].style.display = 'none';
+            }
+
+            if (dom['generate-report-btn']) {
+                dom['generate-report-btn'].classList.remove('hidden');
+            }
 
 
-    } catch (error) {
-        console.error(`Failed to handle results file for dataset ${key}:`, error);
-        if (fileNameDisplay) fileNameDisplay.textContent = "Failed to load.";
-    }
+        } catch (error) {
+            console.error(`Failed to handle results file for dataset ${key}:`, error);
+            if (fileNameDisplay) fileNameDisplay.textContent = "Failed to load.";
+        }
     }
 }
 
@@ -3822,9 +3832,9 @@ function updateDifferenceLegend() {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 
-const maxAbs = Math.max(Math.abs(stats.min), Math.abs(stats.max));
-dom['diff-legend-min-label'].textContent = `-${maxAbs.toFixed(0)}`;
-dom['diff-legend-max-label'].textContent = `+${maxAbs.toFixed(0)}`;
+    const maxAbs = Math.max(Math.abs(stats.min), Math.abs(stats.max));
+    dom['diff-legend-min-label'].textContent = `-${maxAbs.toFixed(0)}`;
+    dom['diff-legend-max-label'].textContent = `+${maxAbs.toFixed(0)}`;
 }
 
 export function updateViewpointFromSliders() {
@@ -3896,7 +3906,7 @@ async function onSensorClick(event) {
         }
 
         const finalIndex = baseIndex + instanceId;
-            const { openTemporalMapForPoint } = await import('./annualDashboard.js');
+        const { openTemporalMapForPoint } = await import('./annualDashboard.js');
         openTemporalMapForPoint(finalIndex);
     }
 }
@@ -3956,7 +3966,7 @@ function projectGlareSource(pixelPos, imageWidth, imageHeight) {
     if (intersects.length > 0) {
         // Find the first non-wireframe intersection
         const firstHit = intersects.find(hit => hit.object.type !== 'LineSegments');
-        
+
         if (firstHit) {
             glareHighlighter.highlight(firstHit.object);
             showAlert(`Glare source projected onto scene geometry.`, 'Highlight');
@@ -3998,17 +4008,17 @@ function populateGlareSourceList(glareResult) {
                           <span>Source ${index + 1} (L: ${source.L.toFixed(0)} cd/m²)</span>
                           <span class="text-xs text-[--text-secondary]">Ev: ${source.Ev.toFixed(0)}</span>
                         </div>`;
-        
+
         li.addEventListener('click', () => {
             // Remove active class from all other items
             list.querySelectorAll('li').forEach(item => item.classList.remove('active-glare-source'));
             // Add active class to the clicked item
             li.classList.add('active-glare-source');
-        // Pass dimensions from the glare result object, falling back to defaults.
-        projectGlareSource(source.pos, glareResult.imageWidth, glareResult.imageHeight);
-    });
+            // Pass dimensions from the glare result object, falling back to defaults.
+            projectGlareSource(source.pos, glareResult.imageWidth, glareResult.imageHeight);
+        });
 
-    list.appendChild(li);
+        list.appendChild(li);
     });
 }
 
@@ -4056,11 +4066,11 @@ function updateSpectralMetricsDashboard(key) {
 }
 
 dom['clear-glare-highlight-btn']?.addEventListener('click', () => {
-        glareHighlighter.clear();
-        if(dom['glare-source-list']) {
-            dom['glare-source-list'].querySelectorAll('li').forEach(item => item.classList.remove('active-glare-source'));
-        }
-    });
+    glareHighlighter.clear();
+    if (dom['glare-source-list']) {
+        dom['glare-source-list'].querySelectorAll('li').forEach(item => item.classList.remove('active-glare-source'));
+    }
+});
 
 /** Handles right-click events on the 3D scene to show a context menu on sensor points.
 * @param {MouseEvent} event The contextmenu event.
@@ -4155,7 +4165,7 @@ function _updateViewpointSliderAndDispatch(id, value) {
 function setAndDisplayGizmoMode(mode) {
     const dom = getDom();
 
-    setGizmoMode(mode); 
+    setGizmoMode(mode);
 
     // Update UI button states
     dom['gizmo-mode-translate']?.classList.toggle('active', mode === 'translate');
@@ -4290,7 +4300,7 @@ function updatePointAnnualProfileChart(key, pointIndex) {
                         mode: 'index',
                         intersect: false,
                         callbacks: {
-                            title: function(tooltipItems) {
+                            title: function (tooltipItems) {
                                 const hour = tooltipItems[0].parsed.x;
                                 const day = Math.floor(hour / 24) + 1;
                                 const hourOfDay = hour % 24;
@@ -4346,183 +4356,183 @@ export function setupWelcomeScreen() {
 
     // --- EFFECT 1: Raycasting ---
     const raycastEffect = {
-    boundaries: [],
-    rays: [],
-    init() {
-    this.boundaries = [];
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
+        boundaries: [],
+        rays: [],
+        init() {
+            this.boundaries = [];
+            const w = canvas.clientWidth;
+            const h = canvas.clientHeight;
 
-        this.boundaries.push(new this.Boundary(0, 0, w, 0));
-        this.boundaries.push(new this.Boundary(w, 0, w, h));
-        this.boundaries.push(new this.Boundary(0, h, w, h));
-        this.boundaries.push(new this.Boundary(0, 0, 0, h));
+            this.boundaries.push(new this.Boundary(0, 0, w, 0));
+            this.boundaries.push(new this.Boundary(w, 0, w, h));
+            this.boundaries.push(new this.Boundary(0, h, w, h));
+            this.boundaries.push(new this.Boundary(0, 0, 0, h));
 
-        for (let i = 0; i < 4; i++) {
-            this.boundaries.push(new this.Boundary(Math.random() * w, Math.random() * h, Math.random() * w, Math.random() * h));
-        }
-        if (this.rays.length === 0) {
-            for (let a = 0; a < 360; a += 1.5) {
-                this.rays.push(new this.Ray(a * Math.PI / 180));
+            for (let i = 0; i < 4; i++) {
+                this.boundaries.push(new this.Boundary(Math.random() * w, Math.random() * h, Math.random() * w, Math.random() * h));
             }
-        }
-    },
-    
-    animate() {
-        const theme = document.documentElement.getAttribute('data-theme') || 'light';
-        let bgColor, rayColor, hitColor;
-        if (theme === 'dark') { bgColor = '#212121'; rayColor = 'rgba(224, 224, 224, 0.1)'; hitColor = 'rgba(224, 224, 224, 0.8)'; }
-        else if (theme === 'cyber') { bgColor = '#030d22'; rayColor = 'rgba(77, 139, 238, 0.2)'; hitColor = '#00f6ff'; }
-        else { bgColor = '#E9E9EF'; rayColor = 'rgba(52, 52, 52, 0.1)'; hitColor = 'rgba(52, 52, 52, 0.7)'; }
-
-        ctx.fillStyle = bgColor;
-        ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
-
-        for (const ray of this.rays) {
-            let closestPoint = null;
-            let record = Infinity;
-            for (const wall of this.boundaries) {
-                const pt = ray.cast(wall, mouse);
-                if (pt) {
-                    const d = Math.hypot(pt.x - mouse.x, pt.y - mouse.y);
-                    if (d < record) {
-                        record = d;
-                        closestPoint = pt;
-                    }
+            if (this.rays.length === 0) {
+                for (let a = 0; a < 360; a += 1.5) {
+                    this.rays.push(new this.Ray(a * Math.PI / 180));
                 }
             }
-            if (closestPoint) {
-                ctx.strokeStyle = rayColor;
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(mouse.x, mouse.y);
-                ctx.lineTo(closestPoint.x, closestPoint.y);
-                ctx.stroke();
-                ctx.fillStyle = hitColor;
-                ctx.beginPath();
-                ctx.arc(closestPoint.x, closestPoint.y, 3, 0, Math.PI * 2);
-                ctx.fill();
+        },
+
+        animate() {
+            const theme = document.documentElement.getAttribute('data-theme') || 'light';
+            let bgColor, rayColor, hitColor;
+            if (theme === 'dark') { bgColor = '#212121'; rayColor = 'rgba(224, 224, 224, 0.1)'; hitColor = 'rgba(224, 224, 224, 0.8)'; }
+            else if (theme === 'cyber') { bgColor = '#030d22'; rayColor = 'rgba(77, 139, 238, 0.2)'; hitColor = '#00f6ff'; }
+            else { bgColor = '#E9E9EF'; rayColor = 'rgba(52, 52, 52, 0.1)'; hitColor = 'rgba(52, 52, 52, 0.7)'; }
+
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+
+            for (const ray of this.rays) {
+                let closestPoint = null;
+                let record = Infinity;
+                for (const wall of this.boundaries) {
+                    const pt = ray.cast(wall, mouse);
+                    if (pt) {
+                        const d = Math.hypot(pt.x - mouse.x, pt.y - mouse.y);
+                        if (d < record) {
+                            record = d;
+                            closestPoint = pt;
+                        }
+                    }
+                }
+                if (closestPoint) {
+                    ctx.strokeStyle = rayColor;
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(mouse.x, mouse.y);
+                    ctx.lineTo(closestPoint.x, closestPoint.y);
+                    ctx.stroke();
+                    ctx.fillStyle = hitColor;
+                    ctx.beginPath();
+                    ctx.arc(closestPoint.x, closestPoint.y, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        },
+
+        Boundary: class {
+            constructor(x1, y1, x2, y2) { this.a = { x: x1, y: y1 }; this.b = { x: x2, y: y2 }; }
+        },
+        Ray: class {
+            constructor(angle) { this.dir = { x: Math.cos(angle), y: Math.sin(angle) }; }
+            cast(wall, origin) {
+                const [x1, y1, x2, y2] = [wall.a.x, wall.a.y, wall.b.x, wall.b.y];
+                const [x3, y3, x4, y4] = [origin.x, origin.y, origin.x + this.dir.x, origin.y + this.dir.y];
+                const den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+                if (den === 0) return null;
+                const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
+                const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den;
+                if (t > 0 && t < 1 && u > 0) return { x: x1 + t * (x2 - x1), y: y1 + t * (y2 - y1) };
+                return null;
             }
         }
-    },
-    
-    Boundary: class {
-        constructor(x1, y1, x2, y2) { this.a = { x: x1, y: y1 }; this.b = { x: x2, y: y2 }; }
-    },
-    Ray: class {
-        constructor(angle) { this.dir = { x: Math.cos(angle), y: Math.sin(angle) }; }
-        cast(wall, origin) {
-            const [x1, y1, x2, y2] = [wall.a.x, wall.a.y, wall.b.x, wall.b.y];
-            const [x3, y3, x4, y4] = [origin.x, origin.y, origin.x + this.dir.x, origin.y + this.dir.y];
-            const den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-            if (den === 0) return null;
-            const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
-            const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den;
-            if (t > 0 && t < 1 && u > 0) return { x: x1 + t * (x2 - x1), y: y1 + t * (y2 - y1) };
-            return null;
-        }
-    }
     };
 
     // --- EFFECT 2: Flashlight ---
     const flashlightEffect = {
-    shapes: [],
-    init() {
-    this.shapes = [];
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
-    for (let i = 0; i < 50; i++) {
-    this.shapes.push(new this.Shape(w, h));
-    }
-    },
-    
-    animate() {
-    const theme = document.documentElement.getAttribute('data-theme') || 'light';
-    let bgColor;
-    if (theme === 'dark') { bgColor = '#212121'; }
-    else if (theme === 'cyber') { bgColor = '#030d22'; }
-    else { bgColor = '#E9E9EF'; }
+        shapes: [],
+        init() {
+            this.shapes = [];
+            const w = canvas.clientWidth;
+            const h = canvas.clientHeight;
+            for (let i = 0; i < 50; i++) {
+                this.shapes.push(new this.Shape(w, h));
+            }
+        },
 
-        ctx.fillStyle = bgColor;
-        ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+        animate() {
+            const theme = document.documentElement.getAttribute('data-theme') || 'light';
+            let bgColor;
+            if (theme === 'dark') { bgColor = '#212121'; }
+            else if (theme === 'cyber') { bgColor = '#030d22'; }
+            else { bgColor = '#E9E9EF'; }
 
-        for (const shape of this.shapes) {
-            shape.draw(ctx);
-        }
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
 
-        ctx.globalCompositeOperation = 'destination-in';
+            for (const shape of this.shapes) {
+                shape.draw(ctx);
+            }
 
-        const gradient = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 250);
-        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+            ctx.globalCompositeOperation = 'destination-in';
 
-        ctx.globalCompositeOperation = 'source-over';
-    },
-    
-    Shape: class {
-        constructor(w, h) {
-            this.x = Math.random() * w;
-            this.y = Math.random() * h;
-            this.type = Math.random() > 0.5 ? 'circle' : 'rect';
-            const colors = ['#ff2e97', '#00f6ff', '#ffd400', '#4d8bee', '#E1DEDE', '#888888'];
-            this.color = colors[Math.floor(Math.random() * colors.length)];
-            if (this.type === 'circle') { this.radius = Math.random() * 30 + 10; } 
-            else { this.width = Math.random() * 60 + 20; this.height = Math.random() * 60 + 20; }
-        }
-        draw(ctx) {
-            ctx.fillStyle = this.color;
-            if (this.type === 'circle') {
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-                ctx.fill();
-            } else {
-                ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
+            const gradient = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 250);
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+
+            ctx.globalCompositeOperation = 'source-over';
+        },
+
+        Shape: class {
+            constructor(w, h) {
+                this.x = Math.random() * w;
+                this.y = Math.random() * h;
+                this.type = Math.random() > 0.5 ? 'circle' : 'rect';
+                const colors = ['#ff2e97', '#00f6ff', '#ffd400', '#4d8bee', '#E1DEDE', '#888888'];
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+                if (this.type === 'circle') { this.radius = Math.random() * 30 + 10; }
+                else { this.width = Math.random() * 60 + 20; this.height = Math.random() * 60 + 20; }
+            }
+            draw(ctx) {
+                ctx.fillStyle = this.color;
+                if (this.type === 'circle') {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
+                }
             }
         }
-    }
     };
 
     const effects = [raycastEffect, flashlightEffect];
 
     function switchEffect(index) {
-    cancelAnimationFrame(animationFrameId);
-    currentEffectIndex = index % effects.length;
-    const effect = effects[currentEffectIndex];
+        cancelAnimationFrame(animationFrameId);
+        currentEffectIndex = index % effects.length;
+        const effect = effects[currentEffectIndex];
 
-    // A single animation loop that calls the current effect's animate function
-    function animationLoop() {
-        effect.animate();
-        animationFrameId = requestAnimationFrame(animationLoop);
-    }
+        // A single animation loop that calls the current effect's animate function
+        function animationLoop() {
+            effect.animate();
+            animationFrameId = requestAnimationFrame(animationLoop);
+        }
 
-    effect.init(); // Initialize the new effect
-    animationLoop(); // Start its animation
+        effect.init(); // Initialize the new effect
+        animationLoop(); // Start its animation
     }
 
     function resizeCanvas() {
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
-    effects[currentEffectIndex].init();
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+        effects[currentEffectIndex].init();
     }
 
     function onMouseMove(e) {
-    mouse.x = e.clientX;
-    mouse.y = e.clientY;
+        mouse.x = e.clientX;
+        mouse.y = e.clientY;
     }
 
     function hideWelcomeScreen() {
-    welcomeScreen.style.opacity = '0';
-    setTimeout(() => {
-    welcomeScreen.style.display = 'none';
-    cancelAnimationFrame(animationFrameId);
-    window.removeEventListener('mousemove', onMouseMove);
-    if (resizeObserver) resizeObserver.disconnect();
-    }, 500);
+        welcomeScreen.style.opacity = '0';
+        setTimeout(() => {
+            welcomeScreen.style.display = 'none';
+            cancelAnimationFrame(animationFrameId);
+            window.removeEventListener('mousemove', onMouseMove);
+            if (resizeObserver) resizeObserver.disconnect();
+        }, 500);
     }
 
     // --- Setup Event Listeners ---
@@ -4531,21 +4541,21 @@ export function setupWelcomeScreen() {
     window.addEventListener('mousemove', onMouseMove);
 
     dom['start-with-shoebox']?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    switchGeometryMode('parametric');
-    hideWelcomeScreen();
+        e.stopPropagation();
+        switchGeometryMode('parametric');
+        hideWelcomeScreen();
     });
 
     dom['start-with-import']?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    switchGeometryMode('import');
-    hideWelcomeScreen();
-    togglePanelVisibility('panel-dimensions', 'toggle-panel-dimensions-btn');
+        e.stopPropagation();
+        switchGeometryMode('import');
+        hideWelcomeScreen();
+        togglePanelVisibility('panel-dimensions', 'toggle-panel-dimensions-btn');
     });
 
     dom['cycle-effect-btn']?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    switchEffect(currentEffectIndex + 1);
+        e.stopPropagation();
+        switchEffect(currentEffectIndex + 1);
     });
 
     // Initial setup
@@ -4655,10 +4665,19 @@ function showApertureControlsFor(id) {
     // Show or hide the lock button depending on whether a wall is selected
     dom['wall-select-lock-btn']?.classList.toggle('hidden', !id);
 
-    if (id && dom[`aperture-controls-${id}`]) {
+    if (id) {
         // Show the specific panel for the selected wall
-        dom[`aperture-controls-${id}`].classList.remove('hidden');
-        dom['selected-wall-display'].textContent = `${wallNames[id]} Wall`;
+        let controls = dom[`aperture-controls-${id}`];
+        if (!controls) {
+            // Fallback: try to find it again if not in cache
+            controls = document.getElementById(`aperture-controls-${id}`);
+            if (controls) dom[`aperture-controls-${id}`] = controls;
+        }
+
+        if (controls) {
+            controls.classList.remove('hidden');
+            dom['selected-wall-display'].textContent = `${wallNames[id]} Wall`;
+        }
     } else {
         // If no ID, reset the display text and ensure the lock is off
         dom['selected-wall-display'].textContent = 'None';
@@ -4771,7 +4790,7 @@ async function handleRenderPreview() {
     }
 
     const btn = dom['render-section-preview-btn'];
-     const btnSpan = btn.querySelector('span');
+    const btnSpan = btn.querySelector('span');
     const originalText = btnSpan.textContent;
     btn.disabled = true;
     btnSpan.textContent = 'Rendering...';
@@ -4853,7 +4872,7 @@ export function getViewpointFileContent(forceFisheye = false) {
 
     // --- Get Position and Direction from the 3D Camera Object ---
     // This ensures that movements made in FPV mode are correctly captured.
-    
+
     // 1. Get the camera's world position. Radiance is Z-up, Three.js is Y-up.
     const pos = viewpointCamera.position;
     const rad_vp = `${pos.x.toFixed(4)} ${pos.z.toFixed(4)} ${pos.y.toFixed(4)}`;
@@ -4916,7 +4935,7 @@ export function displayProactiveSuggestion(htmlContent) {
                         break;
                     case 'show_temporal_map_info':
                         showAlert('To view a temporal map, right-click on any sensor point in the 3D view after loading annual results.', 'Temporal Map');
-                    break;
+                        break;
                     case 'open_glare_rose': {
                         const { openGlareRoseDiagram } = await import('./annualDashboard.js');
                         openGlareRoseDiagram();
@@ -4953,21 +4972,21 @@ export function highlightSensorByIndex(index) {
     // First, reset all sensor colors to their correct data-driven values
     const activeData = resultsManager.getActiveData();
     if (activeData) {
-    updateSensorGridColors(activeData);
+        updateSensorGridColors(activeData);
     }
 
     if (index === null || index < 0) return; // Stop if we're just clearing
 
     let cumulativeIndex = 0;
     for (const mesh of sensorMeshes) {
-    if (index < cumulativeIndex + mesh.count) {
-        const instanceIndex = index - cumulativeIndex;
-        // Apply a unique highlight color (purple) to the selected instance
-        mesh.setColorAt(instanceIndex, new THREE.Color(0x9c27b0));
-        mesh.instanceColor.needsUpdate = true;
-        return; // Exit after highlighting
-    }
-    cumulativeIndex += mesh.count;
+        if (index < cumulativeIndex + mesh.count) {
+            const instanceIndex = index - cumulativeIndex;
+            // Apply a unique highlight color (purple) to the selected instance
+            mesh.setColorAt(instanceIndex, new THREE.Color(0x9c27b0));
+            mesh.instanceColor.needsUpdate = true;
+            return; // Exit after highlighting
+        }
+        cumulativeIndex += mesh.count;
     }
 }
 
@@ -4980,53 +4999,53 @@ function populateDataTable() {
 
     const tableBody = dom['data-table-body'];
     const tableHead = dom['data-table-head'];
-    
+
     if (!tableBody || !tableHead) return;
 
     const activeData = resultsManager.getActiveData();
     const activeMetric = resultsManager.activeMetricType;
 
-        if (!activeData || activeData.length === 0) {
+    if (!activeData || activeData.length === 0) {
         tableHead.innerHTML = '<tr><th>Point ID</th><th>Value</th></tr>';
         tableBody.innerHTML = '<tr><td colspan="2" class="p-4 text-center text-[--text-secondary]">No grid data loaded.</td></tr>';
         return;
-        }
+    }
 
-        // Map metric keys to user-friendly names for table headers
-        const metricMap = {
+    // Map metric keys to user-friendly names for table headers
+    const metricMap = {
         'illuminance': 'Illuminance (lux)', 'Photopic_lux': 'Photopic (lux)',
         'EML': 'EML (lux)', 'CS': 'Circadian Stimulus', 'CCT': 'CCT (K)'
-        };
-        const metricName = metricMap[activeMetric] || activeMetric.replace(/_/g, ' ');
+    };
+    const metricName = metricMap[activeMetric] || activeMetric.replace(/_/g, ' ');
 
-        // Update table headers with sort indicators
-        const sortIndicator = (col) => {
+    // Update table headers with sort indicators
+    const sortIndicator = (col) => {
         if (currentSort.column === col) {
-        return currentSort.direction === 'asc' ? ' ▲' : ' ▼';
+            return currentSort.direction === 'asc' ? ' ▲' : ' ▼';
         }
-            return ' ↕';
-        };
-        tableHead.innerHTML = `
+        return ' ↕';
+    };
+    tableHead.innerHTML = `
             <tr>
                 <th data-column="id" class="cursor-pointer p-2 hover:bg-[--grid-color]">Point ID${sortIndicator('id')}</th>
                 <th data-column="value" class="cursor-pointer p-2 hover:bg-[--grid-color]">${metricName}${sortIndicator('value')}</th>
             </tr>
         `;
 
-        // Create a new array of objects for sorting, preserving original data
-        tableData = activeData.map((value, index) => ({ id: index, value: value }));
+    // Create a new array of objects for sorting, preserving original data
+    tableData = activeData.map((value, index) => ({ id: index, value: value }));
 
-        // Apply the current sorting
-        if (currentSort.column) {
-            tableData.sort((a, b) => {
+    // Apply the current sorting
+    if (currentSort.column) {
+        tableData.sort((a, b) => {
             const valA = a[currentSort.column];
             const valB = b[currentSort.column];
             const direction = currentSort.direction === 'asc' ? 1 : -1;
             if (valA < valB) return -1 * direction;
             if (valA > valB) return 1 * direction;
             return 0;
-            });
-        }
+        });
+    }
 
     // Generate and insert table rows
     tableBody.innerHTML = tableData.map(item => `
@@ -5251,41 +5270,41 @@ function filterDataTable() {
 
     const input = dom['data-table-filter-input'];
     const tableBody = dom['data-table-body'];
-        if (!input || !tableBody) return;
+    if (!input || !tableBody) return;
 
-        const filterText = input.value.trim().replace(/\s+/g, '');
-        const rows = tableBody.querySelectorAll('tr');
+    const filterText = input.value.trim().replace(/\s+/g, '');
+    const rows = tableBody.querySelectorAll('tr');
 
-        if (!filterText) {
+    if (!filterText) {
         rows.forEach(row => row.style.display = '');
         return;
-        }
+    }
 
     // Regex to parse operators and values (e.g., >=500, <100)
     const match = filterText.match(/^([<>=!]=?)\s*(-?\d+.?\d*)$/);
-        if (!match) {
+    if (!match) {
         rows.forEach(row => row.style.display = ''); // Show all if filter is invalid
         return;
-        }
+    }
 
     const operator = match[1];
     const filterValue = parseFloat(match[2]);
 
     rows.forEach(row => {
-    const cell = row.cells[1]; // Value is always in the second column
+        const cell = row.cells[1]; // Value is always in the second column
         if (cell) {
-        const cellValue = parseFloat(cell.textContent);
-        let show = false;
-        switch (operator) {
-        case '>':  show = cellValue > filterValue; break;
-        case '<':  show = cellValue < filterValue; break;
-        case '>=': show = cellValue >= filterValue; break;
-        case '<=': show = cellValue <= filterValue; break;
-        case '=':
-        case '==': show = cellValue === filterValue; break;
-        case '!=': show = cellValue !== filterValue; break;
-        }
-        row.style.display = show ? '' : 'none';
+            const cellValue = parseFloat(cell.textContent);
+            let show = false;
+            switch (operator) {
+                case '>': show = cellValue > filterValue; break;
+                case '<': show = cellValue < filterValue; break;
+                case '>=': show = cellValue >= filterValue; break;
+                case '<=': show = cellValue <= filterValue; break;
+                case '=':
+                case '==': show = cellValue === filterValue; break;
+                case '!=': show = cellValue !== filterValue; break;
+            }
+            row.style.display = show ? '' : 'none';
         }
     });
 }
@@ -5342,7 +5361,7 @@ async function openBsdfViewer() {
     });
 
     select.onchange = () => renderBsdfPlot(parsedBsdfData, select.value);
-    
+
     // Ensure canvas is ready before drawing
     requestAnimationFrame(() => renderBsdfPlot(parsedBsdfData, 0));
 }
@@ -5416,7 +5435,7 @@ async function applySavedView(index) {
     if (dom['view-type'] && view.cameraState.viewType) {
         dom['view-type'].value = view.cameraState.viewType;
         // This will trigger other UI updates like enabling/disabling the fov slider
-        dom['view-type'].dispatchEvent(new Event('change', { bubbles: true })); 
+        dom['view-type'].dispatchEvent(new Event('change', { bubbles: true }));
     }
     if (dom['view-fov'] && view.cameraState.fov) {
         dom['view-fov'].value = view.cameraState.fov;
@@ -5655,7 +5674,7 @@ function handleSunRayToggle(event) {
     // Uncheck all other sun ray toggles to ensure only one is active
     ['n', 's', 'e', 'w'].forEach(d => {
         if (d !== dir && dom[`sun-ray-tracing-toggle-${d}`]) {
-        dom[`sun-ray-tracing-toggle-${d}`].checked = false;
+            dom[`sun-ray-tracing-toggle-${d}`].checked = false;
         }
     });
 
@@ -5676,10 +5695,10 @@ function handleSunRayToggle(event) {
 async function handleSunRayTrace() {
     const dom = getDom();
 
-if (!project.epwFileContent) {
-    showAlert('Please load an EPW weather file in the Project Setup panel before tracing sun rays.', 'Weather Data Missing');
-    return;
-}
+    if (!project.epwFileContent) {
+        showAlert('Please load an EPW weather file in the Project Setup panel before tracing sun rays.', 'Weather Data Missing');
+        return;
+    }
 
     const btn = dom['trace-sun-rays-btn'];
     const btnSpan = btn.querySelector('span');
@@ -5687,30 +5706,30 @@ if (!project.epwFileContent) {
     btn.disabled = true;
     btnSpan.textContent = 'Tracing...';
 
-try {
-// Use a timeout to allow the UI to update to the "Tracing..." state
-await new Promise(resolve => setTimeout(resolve, 10));
+    try {
+        // Use a timeout to allow the UI to update to the "Tracing..." state
+        await new Promise(resolve => setTimeout(resolve, 10));
 
-  const { traceSunRays } = await import('./sunTracer.js');
-  const params = {
-      epwContent: project.epwFileContent,
-      date: dom['sun-ray-date']._flatpickr.selectedDates[0],
-      time: dom['sun-ray-time'].value,
-      rayCount: parseInt(dom['sun-ray-count'].value, 10),
-      maxBounces: parseInt(dom['sun-ray-bounces'].value, 10),
-      W: parseFloat(dom.width.value),
-      L: parseFloat(dom.length.value),
-      H: parseFloat(dom.height.value),
-      rotationY: parseFloat(dom['room-orientation'].value)
-  };
+        const { traceSunRays } = await import('./sunTracer.js');
+        const params = {
+            epwContent: project.epwFileContent,
+            date: dom['sun-ray-date']._flatpickr.selectedDates[0],
+            time: dom['sun-ray-time'].value,
+            rayCount: parseInt(dom['sun-ray-count'].value, 10),
+            maxBounces: parseInt(dom['sun-ray-bounces'].value, 10),
+            W: parseFloat(dom.width.value),
+            L: parseFloat(dom.length.value),
+            H: parseFloat(dom.height.value),
+            rotationY: parseFloat(dom['room-orientation'].value)
+        };
 
-  traceSunRays(params);
+        traceSunRays(params);
     } catch (error) {
-    console.error("Error during sun ray tracing:", error);
-    showAlert(`An error occurred: ${error.message}`, 'Error');
+        console.error("Error during sun ray tracing:", error);
+        showAlert(`An error occurred: ${error.message}`, 'Error');
     } finally {
-    btn.disabled = false;
-    btnSpan.textContent = originalText;
+        btn.disabled = false;
+        btnSpan.textContent = originalText;
     }
 }
 
@@ -5746,10 +5765,10 @@ function _setupAssetLibraryDragDrop() {
     let assetTypeToImport = null;
 
     const handleAssetClick = (e) => {
-    const item = e.target.closest('.asset-item');
-    if (!item) return;
+        const item = e.target.closest('.asset-item');
+        if (!item) return;
 
-    const assetType = item.dataset.assetType;
+        const assetType = item.dataset.assetType;
         if (assetType === 'custom-obj-furniture' || assetType === 'custom-obj-vegetation') {
             assetTypeToImport = assetType;
             customAssetImporter.click();
@@ -5760,14 +5779,14 @@ function _setupAssetLibraryDragDrop() {
     dom['asset-library-vegetation']?.addEventListener('click', handleAssetClick);
 
     customAssetImporter?.addEventListener('change', async (e) => {
-    if (!assetTypeToImport) return;
+        if (!assetTypeToImport) return;
 
-    let objFile = null;
-    let mtlFile = null;
+        let objFile = null;
+        let mtlFile = null;
 
-    for (const file of e.target.files) {
-        if (file.name.toLowerCase().endsWith('.obj')) objFile = file;
-        else if (file.name.toLowerCase().endsWith('.mtl')) mtlFile = file;
+        for (const file of e.target.files) {
+            if (file.name.toLowerCase().endsWith('.obj')) objFile = file;
+            else if (file.name.toLowerCase().endsWith('.mtl')) mtlFile = file;
         }
 
         if (!objFile) {
@@ -5775,25 +5794,25 @@ function _setupAssetLibraryDragDrop() {
             return;
         }
 
-    const readAsText = (file) => new Promise((resolve, reject) => {
-        if (!file) { resolve(null); return; }
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsText(file);
-    });
+        const readAsText = (file) => new Promise((resolve, reject) => {
+            if (!file) { resolve(null); return; }
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsText(file);
+        });
 
-    try {
-        const [objContent, mtlContent] = await Promise.all([readAsText(objFile), readAsText(mtlFile)]);
+        try {
+            const [objContent, mtlContent] = await Promise.all([readAsText(objFile), readAsText(mtlFile)]);
 
-        const newAsset = await addImportedAsset(objContent, mtlContent, assetTypeToImport);
+            const newAsset = await addImportedAsset(objContent, mtlContent, assetTypeToImport);
 
-        if (newAsset) {
-            selectTransformableObject(newAsset);
-            showAlert(`Imported ${objFile.name} successfully.`, 'Asset Imported');
-        } else {
-            throw new Error("Asset creation failed in geometry module.");
-        }
+            if (newAsset) {
+                selectTransformableObject(newAsset);
+                showAlert(`Imported ${objFile.name} successfully.`, 'Asset Imported');
+            } else {
+                throw new Error("Asset creation failed in geometry module.");
+            }
 
         } catch (error) {
             console.error("Error importing custom asset:", error);
@@ -5960,7 +5979,7 @@ function onPointerDown(event) {
 
         const raycaster = new THREE.Raycaster();
         raycaster.setFromCamera(pointer, activeCamera);
-        
+
         const intersects = raycaster.intersectObjects(resizeHandlesObject.children);
 
         if (intersects.length > 0) {
@@ -5971,11 +5990,11 @@ function onPointerDown(event) {
             initialDimension.length = parseFloat(dom.length.value);
             initialDimension.height = parseFloat(dom.height.value);
 
-            const normal = (draggedHandle.userData.axis === 'y') 
-                ? activeCamera.getWorldDirection(new THREE.Vector3()).negate() 
+            const normal = (draggedHandle.userData.axis === 'y')
+                ? activeCamera.getWorldDirection(new THREE.Vector3()).negate()
                 : new THREE.Vector3(0, 1, 0).applyQuaternion(roomObject.quaternion);
             dragPlane.setFromNormalAndCoplanarPoint(normal, intersectionPoint);
-            
+
             controls.enabled = false;
             renderer.domElement.style.cursor = 'move';
         }
@@ -6082,7 +6101,7 @@ function handleSceneClick(event) {
                 cameraForRaycast = sideCamera;
                 break;
             default:
-                return; 
+                return;
         }
     }
 
@@ -6123,20 +6142,20 @@ function handleSceneClick(event) {
     } else if (massingIntersect) {
         selectTransformableObject(massingIntersect.object);
     } else if (wallIntersect) {
-    transformControls.detach(); // Detach from any other object
-    handleWallInteraction(wallIntersect);
-    // --- ADD THIS NEW LOGIC ---
-    // Ensure the wall group exists and get its ID
-    let targetGroup = wallIntersect.object.parent;
-    while (targetGroup && !targetGroup.userData.canonicalId) {
-        targetGroup = targetGroup.parent;
+        transformControls.detach(); // Detach from any other object
+        handleWallInteraction(wallIntersect);
+        // --- ADD THIS NEW LOGIC ---
+        // Ensure the wall group exists and get its ID
+        let targetGroup = wallIntersect.object.parent;
+        while (targetGroup && !targetGroup.userData.canonicalId) {
+            targetGroup = targetGroup.parent;
+        }
+        if (targetGroup && targetGroup.userData.canonicalId && !isWallSelectionLocked) {
+            handleWallSelection(targetGroup, true);
+        }
+    } else {
+        handleDeselection();
     }
-    if (targetGroup && targetGroup.userData.canonicalId && !isWallSelectionLocked) {
-        handleWallSelection(targetGroup, true);
-    }
-} else {
-    handleDeselection();
-}
 }
 
 /**
@@ -6171,141 +6190,141 @@ function updateResizeCursor(event) {
 export function switchGeometryMode(mode) {
     const dom = getDom();
 
-const isParametric = mode === 'parametric';
+    const isParametric = mode === 'parametric';
 
-// Toggle button active state
-dom['mode-parametric-btn']?.classList.toggle('active', isParametric);
-dom['mode-import-btn']?.classList.toggle('active', !isParametric);
+    // Toggle button active state
+    dom['mode-parametric-btn']?.classList.toggle('active', isParametric);
+    dom['mode-import-btn']?.classList.toggle('active', !isParametric);
 
-// Toggle panel visibility
-dom['parametric-controls']?.classList.toggle('hidden', !isParametric);
-dom['import-controls']?.classList.toggle('hidden', isParametric);
+    // Toggle panel visibility
+    dom['parametric-controls']?.classList.toggle('hidden', !isParametric);
+    dom['import-controls']?.classList.toggle('hidden', isParametric);
 
-// Using an async IIFE to handle the dynamic import
-(async () => {
-    const { clearImportedModel, roomObject, wallSelectionGroup, shadingObject } = await import('./geometry.js');
-    if (!isParametric) {
-        // When switching to import mode, hide the parametric geometry
-        roomObject.visible = false;
-        wallSelectionGroup.visible = false;
-        shadingObject.visible = false; // Hide parametric shading too
-    } else {
-        // When switching back to parametric, restore geometry visibility and clear any imported model.
-        clearImportedModel();
-        roomObject.visible = true;
-        wallSelectionGroup.visible = true;
-        shadingObject.visible = true;
-        scheduleUpdate(); // Rebuild parametric geometry
-    }
-})();
+    // Using an async IIFE to handle the dynamic import
+    (async () => {
+        const { clearImportedModel, roomObject, wallSelectionGroup, shadingObject } = await import('./geometry.js');
+        if (!isParametric) {
+            // When switching to import mode, hide the parametric geometry
+            roomObject.visible = false;
+            wallSelectionGroup.visible = false;
+            shadingObject.visible = false; // Hide parametric shading too
+        } else {
+            // When switching back to parametric, restore geometry visibility and clear any imported model.
+            clearImportedModel();
+            roomObject.visible = true;
+            wallSelectionGroup.visible = true;
+            shadingObject.visible = true;
+            scheduleUpdate(); // Rebuild parametric geometry
+        }
+    })();
 }
 
 async function handleModelImport() {
     const dom = getDom();
 
-const { loadImportedModel } = await import('./geometry.js');
-const fileInput = dom['import-obj-file'];
+    const { loadImportedModel } = await import('./geometry.js');
+    const fileInput = dom['import-obj-file'];
 
-if (!fileInput || fileInput.files.length === 0) {
-    showAlert('Please select an OBJ file to import.', 'No File Selected');
-    return;
-}
-
-let objFile = null;
-let mtlFile = null;
-
-for (const file of fileInput.files) {
-    if (file.name.toLowerCase().endsWith('.obj')) {
-        objFile = file;
-    } else if (file.name.toLowerCase().endsWith('.mtl')) {
-        mtlFile = file;
-    }
-}
-
-if (!objFile) {
-    showAlert('An .obj file is required for import.', 'File Missing');
-    return;
-}
-
-const readAsText = (file) => new Promise((resolve, reject) => {
-    if (!file) {
-        resolve(null);
+    if (!fileInput || fileInput.files.length === 0) {
+        showAlert('Please select an OBJ file to import.', 'No File Selected');
         return;
     }
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsText(file);
-});
 
-try {
-    const [objContent, mtlContent] = await Promise.all([
-        readAsText(objFile),
-        readAsText(mtlFile)
-    ]);
+    let objFile = null;
+    let mtlFile = null;
 
-    const options = {
-        scale: parseFloat(dom['import-scale'].value) || 1.0,
-        center: dom['import-center-toggle'].checked
-    };
-
-    const materials = await loadImportedModel(objContent, mtlContent, options);
-
-    if (materials.length > 0) {
-        openMaterialTagger(materials);
-    } else {
-        showAlert('Model loaded, but no materials were found to tag. The model will be treated as a single object.', 'No Materials');
+    for (const file of fileInput.files) {
+        if (file.name.toLowerCase().endsWith('.obj')) {
+            objFile = file;
+        } else if (file.name.toLowerCase().endsWith('.mtl')) {
+            mtlFile = file;
+        }
     }
-} catch (error) {
-    console.error("Error importing model:", error);
-    showAlert(`Failed to import model: ${error.message}`, 'Import Error');
-}
+
+    if (!objFile) {
+        showAlert('An .obj file is required for import.', 'File Missing');
+        return;
+    }
+
+    const readAsText = (file) => new Promise((resolve, reject) => {
+        if (!file) {
+            resolve(null);
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsText(file);
+    });
+
+    try {
+        const [objContent, mtlContent] = await Promise.all([
+            readAsText(objFile),
+            readAsText(mtlFile)
+        ]);
+
+        const options = {
+            scale: parseFloat(dom['import-scale'].value) || 1.0,
+            center: dom['import-center-toggle'].checked
+        };
+
+        const materials = await loadImportedModel(objContent, mtlContent, options);
+
+        if (materials.length > 0) {
+            openMaterialTagger(materials);
+        } else {
+            showAlert('Model loaded, but no materials were found to tag. The model will be treated as a single object.', 'No Materials');
+        }
+    } catch (error) {
+        console.error("Error importing model:", error);
+        showAlert(`Failed to import model: ${error.message}`, 'Import Error');
+    }
 }
 
 function openMaterialTagger(materials) {
     const dom = getDom();
 
-const template = document.getElementById('template-material-tagger');
-if (!template) return;
+    const template = document.getElementById('template-material-tagger');
+    if (!template) return;
 
-// Remove any existing tagger panel
-document.getElementById('material-tagger-panel')?.remove();
+    // Remove any existing tagger panel
+    document.getElementById('material-tagger-panel')?.remove();
 
-const taggerPanel = template.content.cloneNode(true).firstElementChild;
-taggerPanel.id = 'material-tagger-panel';
-document.getElementById('window-container').appendChild(taggerPanel);
-initializePanelControls(taggerPanel); // Make it draggable, etc.
+    const taggerPanel = template.content.cloneNode(true).firstElementChild;
+    taggerPanel.id = 'material-tagger-panel';
+    document.getElementById('window-container').appendChild(taggerPanel);
+    initializePanelControls(taggerPanel); // Make it draggable, etc.
 
-const list = taggerPanel.querySelector('#material-tag-list');
-const itemTemplate = document.getElementById('template-material-tag-item');
+    const list = taggerPanel.querySelector('#material-tag-list');
+    const itemTemplate = document.getElementById('template-material-tag-item');
 
-materials.forEach(mat => {
-    const item = itemTemplate.content.cloneNode(true).firstElementChild;
-    item.querySelector('.material-name').textContent = mat.name;
-    const swatch = item.querySelector('.material-swatch');
-    if (mat.color) {
-        swatch.style.backgroundColor = `#${mat.color.getHexString()}`;
-    }
-    list.appendChild(item);
-});
-
-taggerPanel.querySelector('#finalize-import-btn').addEventListener('click', () => {
-    const tagMap = new Map();
-    list.querySelectorAll('.material-tag-item').forEach(item => {
-        const name = item.querySelector('.material-name').textContent;
-        const type = item.querySelector('.surface-type-selector').value;
-        tagMap.set(name, type);
+    materials.forEach(mat => {
+        const item = itemTemplate.content.cloneNode(true).firstElementChild;
+        item.querySelector('.material-name').textContent = mat.name;
+        const swatch = item.querySelector('.material-swatch');
+        if (mat.color) {
+            swatch.style.backgroundColor = `#${mat.color.getHexString()}`;
+        }
+        list.appendChild(item);
     });
 
-    // Apply tags in geometry.js
-    import('./geometry.js').then(({ applySurfaceTags }) => {
-        applySurfaceTags(tagMap);
-        showAlert('Surface types applied successfully.', 'Import Complete');
-        taggerPanel.remove();
-    });
-});
+    taggerPanel.querySelector('#finalize-import-btn').addEventListener('click', () => {
+        const tagMap = new Map();
+        list.querySelectorAll('.material-tag-item').forEach(item => {
+            const name = item.querySelector('.material-name').textContent;
+            const type = item.querySelector('.surface-type-selector').value;
+            tagMap.set(name, type);
+        });
 
-ensureWindowInView(taggerPanel);
+        // Apply tags in geometry.js
+        import('./geometry.js').then(({ applySurfaceTags }) => {
+            applySurfaceTags(tagMap);
+            showAlert('Surface types applied successfully.', 'Import Complete');
+            taggerPanel.remove();
+        });
+    });
+
+    ensureWindowInView(taggerPanel);
 }
 
 /**
@@ -6439,10 +6458,10 @@ function updateMassingInfo() {
         if (shape === 'cylinder') {
             volume = Math.PI * radius * radius * height;
         } else if (shape === 'sphere') {
-            volume = (4/3) * Math.PI * radius * radius * radius;
+            volume = (4 / 3) * Math.PI * radius * radius * radius;
         } else if (shape === 'pyramid') {
             // Approximate pyramid volume (cone geometry)
-            volume = (1/3) * Math.PI * radius * radius * height;
+            volume = (1 / 3) * Math.PI * radius * radius * height;
         }
     }
 
@@ -7722,24 +7741,24 @@ The final output is a text file containing the total annual solar radiation valu
         // 1. Clean content
         rawContent = rawContent.replace(/\//g, '').trim();
 
-    // 3. Process content line-by-line to build the main HTML content
-    let html = '';
-   let inList = null; // null, 'ul', 'ol', 'table'
-    let tableHeader = true;
+        // 3. Process content line-by-line to build the main HTML content
+        let html = '';
+        let inList = null; // null, 'ul', 'ol', 'table'
+        let tableHeader = true;
 
-    const closeList = () => {
+        const closeList = () => {
             if (inList) {
                 html += `</${inList}>`;
                 inList = null;
                 tableHeader = true;
-          }
-      };
+            }
+        };
 
-      const lines = rawContent.split('\n');
-      for (const line of lines) {
-          const trimmedLine = line.trim();
+        const lines = rawContent.split('\n');
+        for (const line of lines) {
+            const trimmedLine = line.trim();
 
-          if (trimmedLine.length === 0) {
+            if (trimmedLine.length === 0) {
                 closeList();
                 continue;
             }
