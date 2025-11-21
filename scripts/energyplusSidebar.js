@@ -47,7 +47,7 @@ const recipes = {
 
 function initializeEnergyPlusSidebar() {
     dom = getDom();
-    const panel = dom['panel-energyplus'];
+    const panel = dom['panel-energyplus'] || document.getElementById('panel-energyplus');
     if (!panel) return;
 
     let content = panel.querySelector('.window-content');
@@ -98,7 +98,7 @@ function initializeEnergyPlusSidebar() {
                 </div>
             </section>
 
-            <p class="info-box" style="margin-top: 0.75rem; font-size: 0.75rem;">
+            <p class="info-box" style="margin-top: 0.75rem;">
                 <strong>HVAC scope:</strong> Ray-Modeler generates models using
                 <code>ZoneHVAC:IdealLoadsAirSystem</code>. Detailed Air/PlantLoop systems are not generated.
             </p>
@@ -507,7 +507,7 @@ async function computeSimulationChecklist() {
 
 function renderSimulationChecklist(container) {
     container.innerHTML = `
-        <div class="text-xs text-[--text-secondary]">
+        <div class="text-sm text-[--text-secondary]">
             Evaluating project configuration...
         </div>
     `;
@@ -516,7 +516,7 @@ function renderSimulationChecklist(container) {
         .then((items) => {
             if (!items || !items.length) {
                 container.innerHTML = `
-                    <div class="text-xs text-red-400">
+                    <div class="text-sm text-red-400">
                         Failed to evaluate checklist.
                     </div>
                 `;
@@ -535,18 +535,18 @@ function renderSimulationChecklist(container) {
                     const actions =
                         item.actions && item.actions.length
                             ? item.actions
-                                  .map(
-                                      (a) =>
-                                          `<button class="btn btn-xxs btn-secondary ml-1" data-checklist-action="${a.actionId}">${a.label}</button>`
-                                  )
-                                  .join('')
+                                .map(
+                                    (a) =>
+                                        `<button class="btn btn-xxs btn-secondary ml-1" data-checklist-action="${a.actionId}">${a.label}</button>`
+                                )
+                                .join('')
                             : '';
                     return `
                         <div style="padding: 0.25rem 0; border-bottom: 1px solid var(--grid-color);">
                             <div style="display:flex; align-items:center; justify-content:space-between; gap:0.25rem;">
                                 <div style="display:flex; align-items:center; min-width:0;">
                                     ${icon(item.status)}
-                                    <span class="data-value" style="font-size:0.78rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                    <span class="data-value" style="font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                                         ${item.label}
                                     </span>
                                 </div>
@@ -554,7 +554,7 @@ function renderSimulationChecklist(container) {
                                     ${actions}
                                 </div>
                             </div>
-                            <div style="margin-left:18px; margin-top:2px; font-size:0.7rem; color:var(--text-secondary);">
+                            <div style="margin-left:18px; margin-top:2px; font-size:0.8rem; color:var(--text-secondary);">
                                 ${item.description || ''}
                             </div>
                         </div>
@@ -567,7 +567,7 @@ function renderSimulationChecklist(container) {
         .catch((err) => {
             console.error('SimulationChecklist: render failed', err);
             container.innerHTML = `
-                <div class="text-xs text-red-400">
+                <div class="text-sm text-red-400">
                     Failed to evaluate checklist. Check console for details.
                 </div>
             `;
@@ -590,8 +590,8 @@ function populateRecipeList() {
         button.style.gap = '2px';
         button.style.padding = '0.4rem 0.6rem';
         button.innerHTML = `
-            <div class="data-value" style="font-size:0.8rem; font-weight:600;">${name}</div>
-            <div style="font-size:0.7rem; font-weight:400; color:var(--text-secondary); white-space:normal;">
+            <div class="data-value" style="font-size:0.9rem; font-weight:600;">${name}</div>
+            <div style="font-size:0.8rem; font-weight:400; color:var(--text-secondary); white-space:normal;">
                 ${recipe.description}
             </div>
         `;
@@ -666,12 +666,12 @@ function createDiagnosticsPanel() {
             </div>
 
             <div class="panel-subtle scrollable-panel-inner" style="max-height:18rem;" data-role="diagnostics-body">
-                <div style="font-size:0.7rem; color:var(--text-secondary);">
+                <div style="font-size:0.8rem; color:var(--text-secondary);">
                     Diagnostics will appear here.
                 </div>
             </div>
 
-            <div style="font-size:0.7rem; color:var(--text-secondary);">
+            <div style="font-size:0.8rem; color:var(--text-secondary);">
                 Use this panel to:
                 <ul class="list-disc pl-4 space-y-0.5">
                     <li>Verify that zones are detected.</li>
@@ -707,7 +707,7 @@ async function refreshDiagnosticsPanel(panel) {
     if (!body) return;
 
     body.innerHTML = `
-        <div class="text-[8px] text-[--text-secondary]">
+        <div class="text-xs text-[--text-secondary]">
             Gathering diagnostics from current project...
         </div>
     `;
@@ -720,7 +720,7 @@ async function refreshDiagnosticsPanel(panel) {
     } catch (err) {
         console.error('EnergyPlus Diagnostics: failed to load diagnostics', err);
         body.innerHTML = `
-            <div style="font-size:0.7rem; color:var(--status-error);">
+            <div style="font-size:0.8rem; color:var(--status-error);">
                 Failed to compute diagnostics. Check console for details.
             </div>
         `;
@@ -730,7 +730,7 @@ async function refreshDiagnosticsPanel(panel) {
 function renderDiagnostics(container, diagnostics) {
     if (!diagnostics) {
         container.innerHTML = `
-            <div class="text-[8px] text-red-400">
+            <div class="text-xs text-red-400">
                 No diagnostics data returned.
             </div>
         `;
@@ -743,10 +743,10 @@ function renderDiagnostics(container, diagnostics) {
     const hasWarnings = (issues || []).some((i) => i.severity === 'warning');
 
     const issueBadge = hasErrors
-        ? `<span class="ml-1 px-1 rounded bg-red-600/70 text-[7px]">Errors</span>`
+        ? `<span class="ml-1 px-1 rounded bg-red-600/70 text-xs">Errors</span>`
         : hasWarnings
-        ? `<span class="ml-1 px-1 rounded bg-yellow-600/70 text-[7px]">Warnings</span>`
-        : `<span class="ml-1 px-1 rounded bg-emerald-700/70 text-[7px]">Clean</span>`;
+            ? `<span class="ml-1 px-1 rounded bg-yellow-600/70 text-xs">Warnings</span>`
+            : `<span class="ml-1 px-1 rounded bg-emerald-700/70 text-xs">Clean</span>`;
 
     const zonesHtml = (geometry?.zones || [])
         .map(
@@ -763,7 +763,7 @@ function renderDiagnostics(container, diagnostics) {
         `
         )
         .join('') ||
-        `<tr><td class="px-1 py-0.5 text-[--text-secondary]" colspan="3">
+        `<tr><td class="px-1 py-0.5 text-white" colspan="3">
             No zones detected. Generated IDF will fall back to a single Zone_1.
         </td></tr>`;
 
@@ -852,7 +852,7 @@ function renderDiagnostics(container, diagnostics) {
 
     const renderIssueList = (arr, navDomain) => {
         if (!arr.length) {
-            return `<div class="text-[8px] text-[--text-secondary]">No issues.</div>`;
+            return `<div class="text-xs text-[--text-secondary]">No issues.</div>`;
         }
         return arr
             .map((i) => {
@@ -860,8 +860,8 @@ function renderDiagnostics(container, diagnostics) {
                     i.severity === 'error'
                         ? 'text-red-400'
                         : i.severity === 'warning'
-                        ? 'text-yellow-300'
-                        : 'text-[--text-secondary]';
+                            ? 'text-yellow-300'
+                            : 'text-[--text-secondary]';
 
                 const ctx = i.context || {};
                 const attrs = [];
@@ -897,7 +897,7 @@ function renderDiagnostics(container, diagnostics) {
         <div class="space-y-2">
             <div class="flex items-center justify-between">
                 <div>
-                    <span class="font-semibold text-[9px] uppercase text-[--text-secondary]">
+                    <span class="font-semibold text-xs uppercase text-[--text-secondary]">
                         Overall Status
                     </span>
                     ${issueBadge}
@@ -905,13 +905,13 @@ function renderDiagnostics(container, diagnostics) {
             </div>
 
             <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
-                <div class="font-semibold text-[8px] uppercase text-[--text-secondary]">
+                <div class="font-semibold text-xs uppercase text-[--text-secondary]">
                     Geometry
                 </div>
-                <div class="text-[8px] text-[--text-secondary] mb-1">
+                <div class="text-xs text-[--text-secondary] mb-1">
                     Zones detected: ${geometry?.totals?.zones ?? 0}
                 </div>
-                <table class="w-full text-[8px]">
+                <table class="w-full text-xs">
                     <thead class="bg-black/40">
                         <tr>
                             <th class="px-1 py-0.5 text-left">Zone</th>
@@ -923,99 +923,98 @@ function renderDiagnostics(container, diagnostics) {
                         ${zonesHtml}
                     </tbody>
                 </table>
-                <div class="text-[7px] text-[--text-secondary] mt-0.5">
+                <div class="text-xs text-[--text-secondary] mt-0.5">
                     *Surface/window counts are placeholders until explicit geometry mapping is exposed.
                 </div>
             </div>
 
             <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
                 <div class="flex items-center justify-between">
-                    <div class="font-semibold text-[8px] uppercase text-[--text-secondary]">
+                    <div class="font-semibold text-xs uppercase text-[--text-secondary]">
                         Constructions & Materials
                     </div>
                     <div class="flex items-center">
                         ${(missingCons.length || missingMats.length)
-                            ? button('Open Constructions', 'constructions') +
-                              button('Open Materials', 'materials')
-                            : ''}
+            ? button('Open Constructions', 'constructions') +
+            button('Open Materials', 'materials')
+            : ''}
                     </div>
                 </div>
-                <div class="text-[8px]">
+                <div class="text-xs">
                     ${missingCons.length
-                        ? `<div class="text-red-400">Missing constructions: ${missingCons
-                              .map((n) => `<code>${n}</code>`)
-                              .join(', ')}</div>`
-                        : `<div class="text-[--text-secondary]">No missing constructions.</div>`}
+            ? `<div class="text-red-400">Missing constructions: ${missingCons
+                .map((n) => `<code>${n}</code>`)
+                .join(', ')}</div>`
+            : `<div class="text-[--text-secondary]">No missing constructions.</div>`}
                     ${unusedCons.length
-                        ? `<div class="text-[--text-secondary]">Unused constructions: ${unusedCons
-                              .slice(0, 10)
-                              .map((n) => `<code>${n}</code>`)
-                              .join(', ')}${unusedCons.length > 10 ? '…' : ''}</div>`
-                        : ''}
+            ? `<div class="text-[--text-secondary]">Unused constructions: ${unusedCons
+                .slice(0, 10)
+                .map((n) => `<code>${n}</code>`)
+                .join(', ')}${unusedCons.length > 10 ? '…' : ''}</div>`
+            : ''}
                     ${missingMats.length
-                        ? `<div class="text-red-400">Missing materials (referenced but not defined): ${missingMats
-                              .map((n) => `<code>${n}</code>`)
-                              .join(', ')}</div>`
-                        : `<div class="text-[--text-secondary]">No missing materials referenced by constructions.</div>`}
+            ? `<div class="text-red-400">Missing materials (referenced but not defined): ${missingMats
+                .map((n) => `<code>${n}</code>`)
+                .join(', ')}</div>`
+            : `<div class="text-[--text-secondary]">No missing materials referenced by constructions.</div>`}
                     ${unusedMats.length
-                        ? `<div class="text-[--text-secondary]">Unused materials: ${unusedMats
-                              .slice(0, 10)
-                              .map((n) => `<code>${n}</code>`)
-                              .join(', ')}${unusedMats.length > 10 ? '…' : ''}</div>`
-                        : ''}
+            ? `<div class="text-[--text-secondary]">Unused materials: ${unusedMats
+                .slice(0, 10)
+                .map((n) => `<code>${n}</code>`)
+                .join(', ')}${unusedMats.length > 10 ? '…' : ''}</div>`
+            : ''}
                 </div>
             </div>
 
             <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
                 <div class="flex items-center justify-between">
-                    <div class="font-semibold text-[8px] uppercase text-[--text-secondary]">
+                    <div class="font-semibold text-xs uppercase text-[--text-secondary]">
                         Schedules & Loads
                     </div>
                     <div class="flex items-center">
                         ${missingScheds.length || inconsistentLoads.length
-                            ? button('Open Schedules', 'schedules') +
-                              button('Open Zone Loads', 'zone-loads')
-                            : ''}
+            ? button('Open Schedules', 'schedules') +
+            button('Open Zone Loads', 'zone-loads')
+            : ''}
                     </div>
                 </div>
-                <div class="text-[8px]">
+                <div class="text-xs">
                     ${missingScheds.length
-                        ? `<div class="text-yellow-300">Missing schedules: ${missingScheds
-                              .map((n) => `<code>${n}</code>`)
-                              .join(', ')}</div>`
-                        : `<div class="text-[--text-secondary]">No missing schedules referenced by loads/controls.</div>`}
+            ? `<div class="text-yellow-300">Missing schedules: ${missingScheds
+                .map((n) => `<code>${n}</code>`)
+                .join(', ')}</div>`
+            : `<div class="text-[--text-secondary]">No missing schedules referenced by loads/controls.</div>`}
                     ${inconsistentLoads.length
-                        ? `<div class="mt-1 text-[8px] text-yellow-300">
+            ? `<div class="mt-1 text-xs text-yellow-300">
                                ${inconsistentLoads
-                                   .slice(0, 20)
-                                   .map(
-                                       (e) =>
-                                           `• [${e.zone}] ${e.issue}`
-                                   )
-                                   .join('<br>')}
-                               ${
-                                   inconsistentLoads.length > 20
-                                       ? '<br>…'
-                                       : ''
-                               }
+                .slice(0, 20)
+                .map(
+                    (e) =>
+                        `• [${e.zone}] ${e.issue}`
+                )
+                .join('<br>')}
+                               ${inconsistentLoads.length > 20
+                ? '<br>…'
+                : ''
+            }
                            </div>`
-                        : ''}
+            : ''}
                 </div>
             </div>
 
             <!-- Grouped Issues with deep-links -->
             <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
-                <div class="font-semibold text-[8px] uppercase text-[--text-secondary]">
+                <div class="font-semibold text-xs uppercase text-[--text-secondary]">
                     Issues by Category
                 </div>
 
                 <!-- Geometry -->
                 <div class="mt-1">
                     <div class="flex items-center justify-between">
-                        <span class="text-[8px] font-semibold text-[--text-secondary]">Geometry</span>
+                        <span class="text-xs font-semibold text-[--text-secondary]">Geometry</span>
                         <button class="btn btn-xxs btn-secondary ml-1" data-nav="geometry">Open Diagnostics</button>
                     </div>
-                    <div class="text-[8px]">
+                    <div class="text-xs">
                         ${renderIssueList(grouped.geometry)}
                     </div>
                 </div>
@@ -1023,13 +1022,13 @@ function renderDiagnostics(container, diagnostics) {
                 <!-- Constructions & Materials -->
                 <div class="mt-1">
                     <div class="flex items-center justify-between">
-                        <span class="text-[8px] font-semibold text-[--text-secondary]">Constructions & Materials</span>
+                        <span class="text-xs font-semibold text-[--text-secondary]">Constructions & Materials</span>
                         <div>
                             <button class="btn btn-xxs btn-secondary ml-1" data-nav="constructions">Constructions</button>
                             <button class="btn btn-xxs btn-secondary ml-1" data-nav="materials">Materials</button>
                         </div>
                     </div>
-                    <div class="text-[8px]">
+                    <div class="text-xs">
                         ${renderIssueList(grouped.constructions)}
                     </div>
                 </div>
@@ -1037,13 +1036,13 @@ function renderDiagnostics(container, diagnostics) {
                 <!-- Schedules & Zone Loads -->
                 <div class="mt-1">
                     <div class="flex items-center justify-between">
-                        <span class="text-[8px] font-semibold text-[--text-secondary]">Schedules & Zone Loads</span>
+                        <span class="text-xs font-semibold text-[--text-secondary]">Schedules & Zone Loads</span>
                         <div>
                             <button class="btn btn-xxs btn-secondary ml-1" data-nav="schedules">Schedules</button>
                             <button class="btn btn-xxs btn-secondary ml-1" data-nav="zone-loads">Zone Loads</button>
                         </div>
                     </div>
-                    <div class="text-[8px]">
+                    <div class="text-xs">
                         ${renderIssueList(grouped.schedules)}
                     </div>
                 </div>
@@ -1051,10 +1050,10 @@ function renderDiagnostics(container, diagnostics) {
                 <!-- Thermostats & IdealLoads -->
                 <div class="mt-1">
                     <div class="flex items-center justify-between">
-                        <span class="text-[8px] font-semibold text-[--text-secondary]">Thermostats & IdealLoads</span>
+                        <span class="text-xs font-semibold text-[--text-secondary]">Thermostats & IdealLoads</span>
                         <button class="btn btn-xxs btn-secondary ml-1" data-nav="ideal-loads">Thermostats & IdealLoads</button>
                     </div>
-                    <div class="text-[8px]">
+                    <div class="text-xs">
                         ${renderIssueList(grouped.thermostats)}
                     </div>
                 </div>
@@ -1062,13 +1061,13 @@ function renderDiagnostics(container, diagnostics) {
                 <!-- Weather & Simulation Control -->
                 <div class="mt-1">
                     <div class="flex items-center justify-between">
-                        <span class="text-[8px] font-semibold text-[--text-secondary]">Weather & Simulation Control</span>
+                        <span class="text-xs font-semibold text-[--text-secondary]">Weather & Simulation Control</span>
                         <div>
                             <button class="btn btn-xxs btn-secondary ml-1" data-nav="weather">Weather & Location</button>
                             <button class="btn btn-xxs btn-secondary ml-1" data-nav="sim-control">Sim Control</button>
                         </div>
                     </div>
-                    <div class="text-[8px]">
+                    <div class="text-xs">
                         ${renderIssueList(grouped.weather)}
                     </div>
                 </div>
@@ -1076,10 +1075,10 @@ function renderDiagnostics(container, diagnostics) {
                 <!-- Daylighting & Outputs -->
                 <div class="mt-1">
                     <div class="flex items-center justify-between">
-                        <span class="text-[8px] font-semibold text-[--text-secondary]">Daylighting & Outputs</span>
+                        <span class="text-xs font-semibold text-[--text-secondary]">Daylighting & Outputs</span>
                         <button class="btn btn-xxs btn-secondary ml-1" data-nav="daylighting">Daylighting Panel</button>
                     </div>
-                    <div class="text-[8px]">
+                    <div class="text-xs">
                         ${renderIssueList(grouped.daylighting, 'daylighting')}
                     </div>
                 </div>
@@ -1087,10 +1086,10 @@ function renderDiagnostics(container, diagnostics) {
                 <!-- Outdoor Air & Natural Ventilation -->
                 <div class="mt-1">
                     <div class="flex items-center justify-between">
-                        <span class="text-[8px] font-semibold text-[--text-secondary]">Outdoor Air & Natural Ventilation</span>
+                        <span class="text-xs font-semibold text-[--text-secondary]">Outdoor Air & Natural Ventilation</span>
                         <button class="btn btn-xxs btn-secondary ml-1" data-nav="outdoor-air">Outdoor Air Panel</button>
                     </div>
-                    <div class="text-[8px]">
+                    <div class="text-xs">
                         ${renderIssueList(grouped.outdoorAir)}
                     </div>
                 </div>
@@ -1098,10 +1097,10 @@ function renderDiagnostics(container, diagnostics) {
                 <!-- Shading & Solar Control -->
                 <div class="mt-1">
                     <div class="flex items-center justify-between">
-                        <span class="text-[8px] font-semibold text-[--text-secondary]">Shading & Solar Control</span>
+                        <span class="text-xs font-semibold text-[--text-secondary]">Shading & Solar Control</span>
                         <button class="btn btn-xxs btn-secondary ml-1" data-nav="shading">Shading Panel</button>
                     </div>
-                    <div class="text-[8px]">
+                    <div class="text-xs">
                         ${renderIssueList(grouped.shading, 'shading')}
                     </div>
                 </div>
@@ -1109,9 +1108,9 @@ function renderDiagnostics(container, diagnostics) {
                 <!-- Other -->
                 <div class="mt-1">
                     <div class="flex items-center justify-between">
-                        <span class="text-[8px] font-semibold text-[--text-secondary]">Other / Unclassified</span>
+                        <span class="text-xs font-semibold text-[--text-secondary]">Other / Unclassified</span>
                     </div>
-                    <div class="text-[8px]">
+                    <div class="text-xs">
                         ${renderIssueList(grouped.other)}
                     </div>
                 </div>
@@ -1251,51 +1250,48 @@ function createRecipePanel(recipe) {
             <div class="resize-handle-corner bottom-left"></div>
             <div class="resize-handle-corner bottom-right"></div>
             <p class="info-box !text-xs !py-2 !px-3">${recipe.description}</p>
-            ${
-                isAnnual
-                    ? `
+            ${isAnnual
+            ? `
             <button class="btn btn-secondary w-full" data-action="generate-idf-from-project">
                 Generate IDF from current Ray-Modeler project
             </button>
-            <p class="text-[9px] text-[--text-secondary] mt-1">
+            <p class="text-xs text-[--text-secondary] mt-1">
                 Uses the current <code>energyPlusConfig</code> to write <code>model.idf</code>.
                 Configure Materials, Constructions, Schedules, Zone Loads, Thermostats & IdealLoads, Daylighting, Outputs, and Simulation Control in the sidebar.
             </p>
             `
-                    : ''
-            }
+            : ''
+        }
             ${paramsHtml}
-            ${
-                isAnnual
-                    ? `
-            <div class="text-[8px] text-[--text-secondary]">
+            ${isAnnual
+            ? `
+            <div class="text-xs text-[--text-secondary]">
                 Project EPW: <span data-role="project-epw-label">(resolving...)</span>
             </div>
             `
-                    : ''
-            }
-            ${
-                isHeating || isCooling
-                    ? `
-            <p class="text-[8px] text-[--text-secondary]">
+            : ''
+        }
+            ${isHeating || isCooling
+            ? `
+            <p class="text-xs text-[--text-secondary]">
                 This recipe reuses the selected IDF (or <code>model.idf</code> by default).
                 Ensure your <code>SimulationControl</code> and <code>SizingPeriod</code> objects in the IDF represent the desired design-day conditions.
                 EnergyPlus is run in a dedicated <code>runs/${isHeating ? 'heating-design' : 'cooling-design'}</code> directory via the Electron bridge.
             </p>
             `
-                    : ''
-            }
+            : ''
+        }
             <div class="space-y-2">
                 <button class="btn btn-primary w-full" data-action="run">Run Simulation</button>
             </div>
             <div class="mt-3">
-                <div class="text-[7px] text-[--text-secondary] mb-0.5">
+                <div class="text-xs text-[--text-secondary] mb-0.5">
                     Runs are executed via Electron with:
                     <code>model.idf</code> or your selected IDF and outputs written under
                     <code>runs/<recipe-name>/</code> relative to the project directory.
                 </div>
-                <h5 class="font-semibold text-[10px] uppercase text-[--text-secondary] mb-1">EnergyPlus Output</h5>
-                <pre class="simulation-output-console w-full h-32 font-mono text-[10px] p-2 rounded bg-[--grid-color] border border-gray-500/50 overflow-y-auto whitespace-pre-wrap"></pre>
+                <h5 class="font-semibold text-xs uppercase text-[--text-secondary] mb-1">EnergyPlus Output</h5>
+                <pre class="simulation-output-console w-full h-32 font-mono text-xs p-2 rounded bg-[--grid-color] border border-gray-500/50 overflow-y-auto whitespace-pre-wrap"></pre>
             </div>
         </div>
     `;
@@ -1364,8 +1360,8 @@ function createRecipePanel(recipe) {
 
             const idfPath =
                 idfInput &&
-                idfInput.files &&
-                idfInput.files[0]
+                    idfInput.files &&
+                    idfInput.files[0]
                     ? idfInput.files[0].path || idfInput.files[0].name
                     : 'model.idf'; // fallback: use generated IDF in project folder
 
@@ -1374,8 +1370,8 @@ function createRecipePanel(recipe) {
             // 2) Project-level EPW from energyPlusConfig.weather.epwPath / weatherFilePath
             const explicitEpw =
                 epwInput &&
-                epwInput.files &&
-                epwInput.files[0]
+                    epwInput.files &&
+                    epwInput.files[0]
                     ? epwInput.files[0].path || epwInput.files[0].name
                     : null;
 
@@ -1424,8 +1420,8 @@ function createRecipePanel(recipe) {
                 }
                 alert(
                     'Cannot start EnergyPlus run due to configuration issues.\n\n' +
-                        (summary ||
-                            'Check the EnergyPlus sidebar configuration and diagnostics.')
+                    (summary ||
+                        'Check the EnergyPlus sidebar configuration and diagnostics.')
                 );
                 return;
             }
@@ -1521,13 +1517,13 @@ function createRecipePanel(recipe) {
 
                 const code =
                     typeof payload === 'object' &&
-                    payload !== null
+                        payload !== null
                         ? typeof payload.exitCode === 'number'
                             ? payload.exitCode
                             : 0
                         : typeof payload === 'number'
-                        ? payload
-                        : 0;
+                            ? payload
+                            : 0;
 
                 const resolvedRunId =
                     (payload &&
@@ -1537,19 +1533,19 @@ function createRecipePanel(recipe) {
 
                 const baseDir =
                     payload &&
-                    typeof payload === 'object'
+                        typeof payload === 'object'
                         ? payload.outputDir
                         : undefined;
 
                 const errContent =
                     payload &&
-                    typeof payload === 'object'
+                        typeof payload === 'object'
                         ? payload.errContent
                         : undefined;
 
                 const csvContents =
                     payload &&
-                    typeof payload === 'object'
+                        typeof payload === 'object'
                         ? payload.csvContents
                         : undefined;
 
@@ -1763,16 +1759,16 @@ function createMaterialsManagerPanel() {
             <div class="resize-handle-corner top-right"></div>
             <div class="resize-handle-corner bottom-left"></div>
             <div class="resize-handle-corner bottom-right"></div>
-            <p class="info-box !text-[10px] !py-1.5 !px-2">
+            <p class="info-box !text-[12px] !py-1.5 !px-2">
                 Manage EnergyPlus materials used in generated IDF files.
                 Entries are stored in <code>energyPlusConfig.materials</code>.
             </p>
             <div class="flex justify-between items-center gap-2">
-                <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Materials</span>
+                <span class="font-semibold text-[12px] uppercase text-[--text-secondary]">Materials</span>
                 <button class="btn btn-xs btn-secondary" data-action="add-material">+ Add Material</button>
                 </div>
                 <div class="border border-gray-700/70 rounded bg-black/40 max-h-64 overflow-y-auto **scrollable-panel-inner**">
-                    <table class="w-full text-[9px] materials-table">
+                    <table class="w-full text-xs materials-table">
                         <thead>
                         <tr class="bg-black/40">
                             <th class="px-2 py-1 text-left">Name</th>
@@ -1784,7 +1780,7 @@ function createMaterialsManagerPanel() {
                     <tbody class="materials-tbody"></tbody>
                 </table>
             </div>
-            <div class="text-[9px] text-[--text-secondary]">
+            <div class="text-xs text-[--text-secondary]">
                 Note: You cannot delete materials referenced by EnergyPlus constructions.
             </div>
         </div>
@@ -1814,7 +1810,7 @@ function createMaterialsManagerPanel() {
         if (!materials.length) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="px-2 py-1 text-[9px] text-[--text-secondary]" colspan="4">
+                <td class="px-2 py-1 text-xs text-white" colspan="4">
                     No custom materials defined. Built-in RM_* materials are always available.
                 </td>
             `;
@@ -1828,7 +1824,7 @@ function createMaterialsManagerPanel() {
             tr.innerHTML = `
                 <td class="px-2 py-1 align-top">${m.name || ''}</td>
                 <td class="px-2 py-1 align-top">${m.type || 'Material'}</td>
-                <td class="px-2 py-1 align-top text-[8px] text-[--text-secondary]">${summary}</td>
+                <td class="px-2 py-1 align-top text-xs text-[--text-secondary]">${summary}</td>
                 <td class="px-2 py-1 align-top text-right">
                     <button class="btn btn-xxs btn-secondary" data-action="edit" data-index="${index}">Edit</button>
                     <button class="btn btn-xxs btn-danger ml-1" data-action="delete" data-index="${index}">Delete</button>
@@ -1861,9 +1857,9 @@ function createMaterialsManagerPanel() {
 
         const inUse = Array.isArray(constructions)
             ? constructions.some((c) =>
-                  Array.isArray(c.layers) &&
-                  c.layers.some((ln) => String(ln) === String(m.name))
-              )
+                Array.isArray(c.layers) &&
+                c.layers.some((ln) => String(ln) === String(m.name))
+            )
             : false;
 
         if (inUse) {
@@ -1936,29 +1932,28 @@ function openMaterialEditor(parentPanel, index) {
 
     editor = document.createElement('div');
     editor.className =
-        'materials-editor mt-2 p-2 border border-[--accent-color]/40 rounded bg-black/70 space-y-1 text-[9px]';
+        'materials-editor mt-2 p-2 border border-[--accent-color]/40 rounded bg-black/70 space-y-1 text-xs';
 
     const type = editing?.type || 'Material';
     const name = editing?.name || '';
 
     editor.innerHTML = `
         <div class="flex justify-between items-center gap-2">
-            <span class="font-semibold text-[9px]">${index != null ? 'Edit Material' : 'Add Material'}</span>
+            <span class="font-semibold text-xs">${index != null ? 'Edit Material' : 'Add Material'}</span>
             <button class="btn btn-xxs btn-secondary" data-action="close-editor">×</button>
         </div>
         <div class="grid grid-cols-2 gap-2 mt-1">
             <div>
-                <label class="label !text-[8px]">Name</label>
-                <input type="text" class="w-full text-[9px]" data-field="name" value="${name}">
+                <label class="label !text-xs">Name</label>
+                <input type="text" class="w-full text-xs" data-field="name" value="${name}">
             </div>
             <div>
-                <label class="label !text-[8px]">Type</label>
-                <select class="w-full text-[9px]" data-field="type">
+                <label class="label !text-xs">Type</label>
+                <select class="w-full text-xs" data-field="type">
                     <option value="Material"${type === 'Material' ? ' selected' : ''}>Material</option>
                     <option value="Material:NoMass"${type === 'Material:NoMass' ? ' selected' : ''}>Material:NoMass</option>
-                    <option value="WindowMaterial:SimpleGlazingSystem"${
-                        type === 'WindowMaterial:SimpleGlazingSystem' ? ' selected' : ''
-                    }>WindowMaterial:SimpleGlazingSystem</option>
+                    <option value="WindowMaterial:SimpleGlazingSystem"${type === 'WindowMaterial:SimpleGlazingSystem' ? ' selected' : ''
+        }>WindowMaterial:SimpleGlazingSystem</option>
                 </select>
             </div>
         </div>
@@ -1982,22 +1977,19 @@ function openMaterialEditor(parentPanel, index) {
             fieldsContainer.innerHTML = `
                 <div class="grid grid-cols-3 gap-1">
                     <div>
-                        <label class="label !text-[8px]">R (m²K/W)</label>
-                        <input type="number" step="0.01" class="w-full text-[9px]" data-field="thermalResistance" value="${
-                            current?.thermalResistance ?? ''
-                        }">
+                        <label class="label !text-xs">R (m²K/W)</label>
+                        <input type="number" step="0.01" class="w-full text-xs" data-field="thermalResistance" value="${current?.thermalResistance ?? ''
+                }">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Solar Abs.</label>
-                        <input type="number" step="0.01" class="w-full text-[9px]" data-field="solarAbsorptance" value="${
-                            current?.solarAbsorptance ?? ''
-                        }">
+                        <label class="label !text-xs">Solar Abs.</label>
+                        <input type="number" step="0.01" class="w-full text-xs" data-field="solarAbsorptance" value="${current?.solarAbsorptance ?? ''
+                }">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Vis. Abs.</label>
-                        <input type="number" step="0.01" class="w-full text-[9px]" data-field="visibleAbsorptance" value="${
-                            current?.visibleAbsorptance ?? ''
-                        }">
+                        <label class="label !text-xs">Vis. Abs.</label>
+                        <input type="number" step="0.01" class="w-full text-xs" data-field="visibleAbsorptance" value="${current?.visibleAbsorptance ?? ''
+                }">
                     </div>
                 </div>
             `;
@@ -2005,22 +1997,19 @@ function openMaterialEditor(parentPanel, index) {
             fieldsContainer.innerHTML = `
                 <div class="grid grid-cols-3 gap-1">
                     <div>
-                        <label class="label !text-[8px]">U (W/m²K)</label>
-                        <input type="number" step="0.01" class="w-full text-[9px]" data-field="uFactor" value="${
-                            current?.uFactor ?? ''
-                        }">
+                        <label class="label !text-xs">U (W/m²K)</label>
+                        <input type="number" step="0.01" class="w-full text-xs" data-field="uFactor" value="${current?.uFactor ?? ''
+                }">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">SHGC</label>
-                        <input type="number" step="0.01" class="w-full text-[9px]" data-field="solarHeatGainCoeff" value="${
-                            current?.solarHeatGainCoeff ?? ''
-                        }">
+                        <label class="label !text-xs">SHGC</label>
+                        <input type="number" step="0.01" class="w-full text-xs" data-field="solarHeatGainCoeff" value="${current?.solarHeatGainCoeff ?? ''
+                }">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Tv</label>
-                        <input type="number" step="0.01" class="w-full text-[9px]" data-field="visibleTransmittance" value="${
-                            current?.visibleTransmittance ?? ''
-                        }">
+                        <label class="label !text-xs">Tv</label>
+                        <input type="number" step="0.01" class="w-full text-xs" data-field="visibleTransmittance" value="${current?.visibleTransmittance ?? ''
+                }">
                     </div>
                 </div>
             `;
@@ -2029,42 +2018,36 @@ function openMaterialEditor(parentPanel, index) {
             fieldsContainer.innerHTML = `
                 <div class="grid grid-cols-3 gap-1">
                     <div>
-                        <label class="label !text-[8px]">Thickness (m)</label>
-                        <input type="number" step="0.001" class="w-full text-[9px]" data-field="thickness" value="${
-                            current?.thickness ?? ''
-                        }">
+                        <label class="label !text-xs">Thickness (m)</label>
+                        <input type="number" step="0.001" class="w-full text-xs" data-field="thickness" value="${current?.thickness ?? ''
+                }">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">k (W/mK)</label>
-                        <input type="number" step="0.01" class="w-full text-[9px]" data-field="conductivity" value="${
-                            current?.conductivity ?? ''
-                        }">
+                        <label class="label !text-xs">k (W/mK)</label>
+                        <input type="number" step="0.01" class="w-full text-xs" data-field="conductivity" value="${current?.conductivity ?? ''
+                }">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">ρ (kg/m³)</label>
-                        <input type="number" step="1" class="w-full text-[9px]" data-field="density" value="${
-                            current?.density ?? ''
-                        }">
+                        <label class="label !text-xs">ρ (kg/m³)</label>
+                        <input type="number" step="1" class="w-full text-xs" data-field="density" value="${current?.density ?? ''
+                }">
                     </div>
                 </div>
                 <div class="grid grid-cols-3 gap-1 mt-1">
                     <div>
-                        <label class="label !text-[8px]">c (J/kgK)</label>
-                        <input type="number" step="1" class="w-full text-[9px]" data-field="specificHeat" value="${
-                            current?.specificHeat ?? ''
-                        }">
+                        <label class="label !text-xs">c (J/kgK)</label>
+                        <input type="number" step="1" class="w-full text-xs" data-field="specificHeat" value="${current?.specificHeat ?? ''
+                }">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Solar Abs.</label>
-                        <input type="number" step="0.01" class="w-full text-[9px]" data-field="solarAbsorptance" value="${
-                            current?.solarAbsorptance ?? ''
-                        }">
+                        <label class="label !text-xs">Solar Abs.</label>
+                        <input type="number" step="0.01" class="w-full text-xs" data-field="solarAbsorptance" value="${current?.solarAbsorptance ?? ''
+                }">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Vis. Abs.</label>
-                        <input type="number" step="0.01" class="w-full text-[9px]" data-field="visibleAbsorptance" value="${
-                            current?.visibleAbsorptance ?? ''
-                        }">
+                        <label class="label !text-xs">Vis. Abs.</label>
+                        <input type="number" step="0.01" class="w-full text-xs" data-field="visibleAbsorptance" value="${current?.visibleAbsorptance ?? ''
+                }">
                     </div>
                 </div>
             `;
@@ -2216,16 +2199,16 @@ function createConstructionsManagerPanel() {
             <div class="resize-handle-corner top-right"></div>
             <div class="resize-handle-corner bottom-left"></div>
             <div class="resize-handle-corner bottom-right"></div>
-            <p class="info-box !text-[10px] !py-1.5 !px-2">
+            <p class="info-box !text-xs !py-1.5 !px-2">
                 Define constructions as ordered stacks of materials. Stored in <code>energyPlusConfig.constructions</code>.
                 Defaults control which constructions are used for walls, roofs, floors, and windows.
             </p>
             <div class="flex justify-between items-center gap-2">
-                <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Constructions</span>
+                <span class="font-semibold text-xs uppercase text-[--text-secondary]">Constructions</span>
                 <button class="btn btn-xs btn-secondary" data-action="add-construction">+ Add Construction</button>
             </div>
             <div class="border border-gray-700/70 rounded bg-black/40 max-h-64 overflow-y-auto **scrollable-panel-inner**">
-                <table class="w-full text-[9px] constructions-table">
+                <table class="w-full text-xs constructions-table">
                     <thead>
                         <tr class="bg-black/40">
                             <th class="px-2 py-1 text-left">Name</th>
@@ -2237,27 +2220,27 @@ function createConstructionsManagerPanel() {
                 </table>
             </div>
             <div class="mt-2 space-y-1">
-                <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Defaults</span>
-                <div class="grid grid-cols-2 gap-1 text-[9px]">
+                <span class="font-semibold text-xs uppercase text-[--text-secondary]">Defaults</span>
+                <div class="grid grid-cols-2 gap-1 text-xs">
                     <div>
-                        <label class="label !text-[8px]">Default Ext Wall</label>
-                        <select class="w-full text-[9px]" data-default-key="wallConstruction"></select>
+                        <label class="label !text-xs">Default Ext Wall</label>
+                        <select class="w-full text-xs" data-default-key="wallConstruction"></select>
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Default Roof</label>
-                        <select class="w-full text-[9px]" data-default-key="roofConstruction"></select>
+                        <label class="label !text-xs">Default Roof</label>
+                        <select class="w-full text-xs" data-default-key="roofConstruction"></select>
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Default Floor</label>
-                        <select class="w-full text-[9px]" data-default-key="floorConstruction"></select>
+                        <label class="label !text-xs">Default Floor</label>
+                        <select class="w-full text-xs" data-default-key="floorConstruction"></select>
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Default Window</label>
-                        <select class="w-full text-[9px]" data-default-key="windowConstruction"></select>
+                        <label class="label !text-xs">Default Window</label>
+                        <select class="w-full text-xs" data-default-key="windowConstruction"></select>
                     </div>
                 </div>
             </div>
-            <div class="text-[9px] text-[--text-secondary]">
+            <div class="text-xs text-[--text-secondary]">
                 Note: You cannot delete constructions that are set as defaults. Future surface editors may add additional reference checks.
             </div>
         </div>
@@ -2292,7 +2275,7 @@ function createConstructionsManagerPanel() {
         if (!constructions.length) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="px-2 py-1 text-[9px] text-[--text-secondary]" colspan="3">
+                <td class="px-2 py-1 text-xs text-white" colspan="3">
                     No custom constructions defined. Built-in RM_* constructions remain available.
                 </td>
             `;
@@ -2311,9 +2294,9 @@ function createConstructionsManagerPanel() {
                 tr.innerHTML = `
                     <td class="px-2 py-1 align-top">
                         ${c.name || ''}
-                        ${isDefault ? '<span class="ml-1 text-[7px] text-[--accent-color]">(default)</span>' : ''}
+                        ${isDefault ? '<span class="ml-1 text-xs text-[--accent-color]">(default)</span>' : ''}
                     </td>
-                    <td class="px-2 py-1 align-top text-[8px] text-[--text-secondary]">${layersText}</td>
+                    <td class="px-2 py-1 align-top text-xs text-[--text-secondary]">${layersText}</td>
                     <td class="px-2 py-1 align-top text-right">
                         <button class="btn btn-xxs btn-secondary" data-action="edit" data-index="${index}">Edit</button>
                         <button class="btn btn-xxs btn-danger ml-1" data-action="delete" data-index="${index}">Delete</button>
@@ -2499,27 +2482,27 @@ function openConstructionEditor(parentPanel, index) {
 
     editor = document.createElement('div');
     editor.className =
-        'constructions-editor mt-2 p-2 border border-[--accent-color]/40 rounded bg-black/70 space-y-1 text-[9px]';
+        'constructions-editor mt-2 p-2 border border-[--accent-color]/40 rounded bg-black/70 space-y-1 text-xs';
 
     const name = editing?.name || '';
 
     editor.innerHTML = `
         <div class="flex justify-between items-center gap-2">
-            <span class="font-semibold text-[9px]">${index != null ? 'Edit Construction' : 'Add Construction'}</span>
+            <span class="font-semibold text-xs">${index != null ? 'Edit Construction' : 'Add Construction'}</span>
             <button class="btn btn-xxs btn-secondary" data-action="close-editor">×</button>
         </div>
         <div class="mt-1 grid grid-cols-2 gap-2">
             <div>
-                <label class="label !text-[8px]">Name</label>
-                <input type="text" class="w-full text-[9px]" data-field="name" value="${name}">
+                <label class="label !text-xs">Name</label>
+                <input type="text" class="w-full text-xs" data-field="name" value="${name}">
             </div>
-            <div class="text-[8px] text-[--text-secondary] flex items-end">
+            <div class="text-xs text-[--text-secondary] flex items-end">
                 Layers are ordered from outside to inside.
             </div>
         </div>
         <div class="mt-1 space-y-1">
             <div class="flex justify-between items-center">
-                <span class="text-[8px] font-semibold text-[--text-secondary]">Layers</span>
+                <span class="text-xs font-semibold text-[--text-secondary]">Layers</span>
                 <button class="btn btn-xxs btn-secondary" data-action="add-layer">+ Add Layer</button>
             </div>
             <div class="space-y-1" data-layers-container></div>
@@ -2560,13 +2543,12 @@ function openConstructionEditor(parentPanel, index) {
         const options = materialNames
             .map(
                 (n) =>
-                    `<option value="${n}"${
-                        n === value ? ' selected' : ''
+                    `<option value="${n}"${n === value ? ' selected' : ''
                     }>${n}</option>`
             )
             .join('');
         row.innerHTML = `
-            <select class="w-full text-[9px]" data-field="layer-material">
+            <select class="w-full text-xs" data-field="layer-material">
                 <option value="">(select material)</option>
                 ${options}
             </select>
@@ -2761,16 +2743,16 @@ function createSchedulesManagerPanel() {
             <div class="resize-handle-corner top-right"></div>
             <div class="resize-handle-corner bottom-left"></div>
             <div class="resize-handle-corner bottom-right"></div>
-            <p class="info-box !text-[10px] !py-1.5 !px-2">
+            <p class="info-box !text-xs !py-1.5 !px-2">
                 Manage Schedule:Compact objects used by loads, IdealLoads, thermostats, and daylighting.
                 Built-in schedules are read-only; user schedules are stored in <code>energyPlusConfig.schedules.compact</code>.
             </p>
             <div class="flex justify-between items-center gap-2">
-                <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Schedules (Compact)</span>
+                <span class="font-semibold text-xs uppercase text-[--text-secondary]">Schedules (Compact)</span>
                 <button class="btn btn-xs btn-secondary" data-action="add-schedule">+ Add Schedule</button>
             </div>
             <div class="border border-gray-700/70 rounded bg-black/40 max-h-64 overflow-y-auto **scrollable-panel-inner**">
-                <table class="w-full text-[9px] schedules-table">
+                <table class="w-full text-xs schedules-table">
                     <thead>
                         <tr class="bg-black/40">
                             <th class="px-2 py-1 text-left">Name</th>
@@ -2782,7 +2764,7 @@ function createSchedulesManagerPanel() {
                     <tbody class="schedules-tbody"></tbody>
                 </table>
             </div>
-            <div class="text-[9px] text-[--text-secondary]">
+            <div class="text-xs text-[--text-secondary]">
                 Note: Built-in schedules cannot be edited or deleted. User schedules cannot be deleted while in use.
             </div>
         </div>
@@ -2942,8 +2924,8 @@ function createSchedulesManagerPanel() {
             tr.innerHTML = `
                 <td class="px-2 py-1 align-top">${nm}</td>
                 <td class="px-2 py-1 align-top">Fraction</td>
-                <td class="px-2 py-1 align-top text-[8px] text-[--accent-color]">Built-in</td>
-                <td class="px-2 py-1 align-top text-right text-[8px] text-[--text-secondary]">read-only</td>
+                <td class="px-2 py-1 align-top text-xs text-[--accent-color]">Built-in</td>
+                <td class="px-2 py-1 align-top text-right text-xs text-[--text-secondary]">read-only</td>
             `;
             tbody.appendChild(tr);
         });
@@ -2952,7 +2934,7 @@ function createSchedulesManagerPanel() {
         if (!user.length) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="px-2 py-1 text-[9px] text-[--text-secondary]" colspan="4">
+                <td class="px-2 py-1 text-xs text-white" colspan="4">
                     No custom schedules defined.
                 </td>
             `;
@@ -2963,7 +2945,7 @@ function createSchedulesManagerPanel() {
                 tr.innerHTML = `
                     <td class="px-2 py-1 align-top">${s.name}</td>
                     <td class="px-2 py-1 align-top">${s.typeLimits || 'Fraction'}</td>
-                    <td class="px-2 py-1 align-top text-[8px] text-[--text-secondary]">User</td>
+                    <td class="px-2 py-1 align-top text-xs text-[--text-secondary]">User</td>
                     <td class="px-2 py-1 align-top text-right">
                         <button class="btn btn-xxs btn-secondary" data-action="edit" data-index="${index}">Edit</button>
                         <button class="btn btn-xxs btn-danger ml-1" data-action="delete" data-index="${index}">Delete</button>
@@ -3106,7 +3088,7 @@ function openScheduleEditor(parentPanel, index) {
 
     editor = document.createElement('div');
     editor.className =
-        'schedules-editor mt-2 p-2 border border-[--accent-color]/40 rounded bg-black/70 space-y-1 text-[9px]';
+        'schedules-editor mt-2 p-2 border border-[--accent-color]/40 rounded bg-black/70 space-y-1 text-xs';
 
     const name = editing?.name || '';
     const typeLimits = editing?.typeLimits || 'Fraction';
@@ -3114,28 +3096,28 @@ function openScheduleEditor(parentPanel, index) {
 
     editor.innerHTML = `
         <div class="flex justify-between items-center gap-2">
-            <span class="font-semibold text-[9px]">${editing ? 'Edit Schedule' : 'Add Schedule'}</span>
+            <span class="font-semibold text-xs">${editing ? 'Edit Schedule' : 'Add Schedule'}</span>
             <button class="btn btn-xxs btn-secondary" data-action="close-editor">×</button>
         </div>
         <div class="grid grid-cols-2 gap-2 mt-1">
             <div>
-                <label class="label !text-[8px]">Name</label>
-                <input type="text" class="w-full text-[9px]" data-field="name" value="${name}">
+                <label class="label !text-xs">Name</label>
+                <input type="text" class="w-full text-xs" data-field="name" value="${name}">
             </div>
             <div>
-                <label class="label !text-[8px]">TypeLimits</label>
-                <input type="text" class="w-full text-[9px]" data-field="typeLimits" value="${typeLimits}">
+                <label class="label !text-xs">TypeLimits</label>
+                <input type="text" class="w-full text-xs" data-field="typeLimits" value="${typeLimits}">
             </div>
         </div>
         <div class="mt-1">
-            <label class="label !text-[8px]">Schedule:Compact Lines</label>
-            <textarea class="w-full text-[8px] h-24 font-mono" data-field="lines"
+            <label class="label !text-xs">Schedule:Compact Lines</label>
+            <textarea class="w-full text-xs h-24 font-mono" data-field="lines"
                 placeholder="Example:
 Through: 12/31
 For: AllDays
 Until: 24:00, 1.0">${linesText}</textarea>
         </div>
-        <div class="text-[7px] text-[--text-secondary]">
+        <div class="text-xs text-[--text-secondary]">
             Lines are written exactly as in Schedule:Compact objects and will be emitted verbatim.
         </div>
         <div class="flex justify-end gap-2 mt-2">
@@ -3269,56 +3251,56 @@ function createZoneLoadsManagerPanel() {
             <div class="resize-handle-corner top-right"></div>
             <div class="resize-handle-corner bottom-left"></div>
             <div class="resize-handle-corner bottom-right"></div>
-            <p class="info-box !text-[10px] !py-1.5 !px-2">
+            <p class="info-box !text-xs !py-1.5 !px-2">
                 Configure per-zone internal loads (people, lighting, equipment, infiltration).
                 Values are stored in <code>energyPlusConfig.zoneLoads</code>.
             </p>
 
             <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
                 <div class="flex justify-between items-center gap-2">
-                    <span class="font-semibold text-[9px] uppercase text-[--text-secondary]">Template (Apply to all zones)</span>
+                    <span class="font-semibold text-xs uppercase text-[--text-secondary]">Template (Apply to all zones)</span>
                     <button class="btn btn-xxs btn-secondary" data-action="apply-template">Apply to all zones</button>
                 </div>
-                <div class="grid grid-cols-4 gap-1 mt-1 text-[8px]">
+                <div class="grid grid-cols-4 gap-1 mt-1 text-xs">
                     <div>
-                        <label class="label !text-[8px]">People [p/m²]</label>
-                        <input type="number" step="0.01" class="w-full text-[8px]" data-template="peoplePerArea">
+                        <label class="label !text-xs">People [p/m²]</label>
+                        <input type="number" step="0.01" class="w-full text-xs" data-template="peoplePerArea">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Lights [W/m²]</label>
-                        <input type="number" step="0.1" class="w-full text-[8px]" data-template="lightsWm2">
+                        <label class="label !text-xs">Lights [W/m²]</label>
+                        <input type="number" step="0.1" class="w-full text-xs" data-template="lightsWm2">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Equip [W/m²]</label>
-                        <input type="number" step="0.1" class="w-full text-[8px]" data-template="equipWm2">
+                        <label class="label !text-xs">Equip [W/m²]</label>
+                        <input type="number" step="0.1" class="w-full text-xs" data-template="equipWm2">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Infil [ACH]</label>
-                        <input type="number" step="0.1" class="w-full text-[8px]" data-template="infilAch">
+                        <label class="label !text-xs">Infil [ACH]</label>
+                        <input type="number" step="0.1" class="w-full text-xs" data-template="infilAch">
                     </div>
                 </div>
-                <div class="grid grid-cols-4 gap-1 mt-1 text-[8px]">
+                <div class="grid grid-cols-4 gap-1 mt-1 text-xs">
                     <div>
-                        <label class="label !text-[8px]">People Sched</label>
-                        <select class="w-full text-[8px]" data-template="peopleSched"></select>
+                        <label class="label !text-xs">People Sched</label>
+                        <select class="w-full text-xs" data-template="peopleSched"></select>
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Lights Sched</label>
-                        <select class="w-full text-[8px]" data-template="lightsSched"></select>
+                        <label class="label !text-xs">Lights Sched</label>
+                        <select class="w-full text-xs" data-template="lightsSched"></select>
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Equip Sched</label>
-                        <select class="w-full text-[8px]" data-template="equipSched"></select>
+                        <label class="label !text-xs">Equip Sched</label>
+                        <select class="w-full text-xs" data-template="equipSched"></select>
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Infil Sched</label>
-                        <select class="w-full text-[8px]" data-template="infilSched"></select>
+                        <label class="label !text-xs">Infil Sched</label>
+                        <select class="w-full text-xs" data-template="infilSched"></select>
                     </div>
                 </div>
             </div>
 
             <div class="border border-gray-700/70 rounded bg-black/40 max-h-72 overflow-y-auto **scrollable-panel-inner**">
-                <table class="w-full text-[8px] zone-loads-table">
+                <table class="w-full text-xs zone-loads-table">
                     <thead class="bg-black/40">
                         <tr>
                             <th class="px-1 py-1 text-left">Zone</th>
@@ -3338,7 +3320,7 @@ function createZoneLoadsManagerPanel() {
                 </button>
             </div>
 
-            <div class="text-[8px] text-[--text-secondary]">
+            <div class="text-xs text-[--text-secondary]">
                 Notes:
                 <ul class="list-disc pl-4 space-y-0.5">
                     <li>Loads are stored per zone in <code>zoneLoads</code> (one entry per zone).</li>
@@ -3486,40 +3468,40 @@ function createZoneLoadsManagerPanel() {
 
                 <td class="px-1 py-1 align-top">
                     <input type="number" step="0.01"
-                        class="w-full text-[8px] mb-0.5"
+                        class="w-full text-xs mb-0.5"
                         data-field="peoplePerArea"
                         value="${zl.people?.peoplePerArea ?? ''}">
-                    <select class="w-full text-[8px]" data-field="peopleSched">
+                    <select class="w-full text-xs" data-field="peopleSched">
                         ${schedOptions(zl.people?.schedule || '')}
                     </select>
                 </td>
 
                 <td class="px-1 py-1 align-top">
                     <input type="number" step="0.1"
-                        class="w-full text-[8px] mb-0.5"
+                        class="w-full text-xs mb-0.5"
                         data-field="lightsWm2"
                         value="${zl.lighting?.wattsPerArea ?? ''}">
-                    <select class="w-full text-[8px]" data-field="lightsSched">
+                    <select class="w-full text-xs" data-field="lightsSched">
                         ${schedOptions(zl.lighting?.schedule || '')}
                     </select>
                 </td>
 
                 <td class="px-1 py-1 align-top">
                     <input type="number" step="0.1"
-                        class="w-full text-[8px] mb-0.5"
+                        class="w-full text-xs mb-0.5"
                         data-field="equipWm2"
                         value="${zl.equipment?.wattsPerArea ?? ''}">
-                    <select class="w-full text-[8px]" data-field="equipSched">
+                    <select class="w-full text-xs" data-field="equipSched">
                         ${schedOptions(zl.equipment?.schedule || '')}
                     </select>
                 </td>
 
                 <td class="px-1 py-1 align-top">
                     <input type="number" step="0.1"
-                        class="w-full text-[8px] mb-0.5"
+                        class="w-full text-xs mb-0.5"
                         data-field="infilAch"
                         value="${zl.infiltration?.ach ?? ''}">
-                    <select class="w-full text-[8px]" data-field="infilSched">
+                    <select class="w-full text-xs" data-field="infilSched">
                         ${schedOptions(zl.infiltration?.schedule || '')}
                     </select>
                 </td>
@@ -3756,7 +3738,7 @@ function createHvacSizingManagerPanel() {
                 <div class="window-icon-close" title="Close"></div>
             </div>
         </div>
-        <div class="window-content space-y-3 text-[8px]">
+        <div class="window-content space-y-3 text-xs">
             <div class="resize-handle-edge top"></div>
             <div class="resize-handle-edge right"></div>
             <div class="resize-handle-edge bottom"></div>
@@ -3766,7 +3748,7 @@ function createHvacSizingManagerPanel() {
             <div class="resize-handle-corner bottom-left"></div>
             <div class="resize-handle-corner bottom-right"></div>
 
-            <p class="info-box !text-[9px] !py-1.5 !px-2">
+            <p class="info-box !text-xs !py-1.5 !px-2">
                 Configure EnergyPlus sizing objects used by the generated IDF.
                 Settings are stored in <code>energyPlusConfig.sizing</code> and consumed by the model builder.
                 If left empty, Ray-Modeler emits safe default Sizing:Zone objects and no system/plant sizing.
@@ -3775,13 +3757,13 @@ function createHvacSizingManagerPanel() {
             <!-- ZONE SIZING -->
             <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
                 <div class="flex justify-between items-center">
-                    <span class="font-semibold text-[9px] uppercase text-[--text-secondary]">Zone Sizing</span>
-                    <span class="text-[7px] text-[--text-secondary]">
+                    <span class="font-semibold text-xs uppercase text-[--text-secondary]">Zone Sizing</span>
+                    <span class="text-xs text-[--text-secondary]">
                         Enable per-zone overrides; otherwise defaults are used.
                     </span>
                 </div>
                 <div class="max-h-64 overflow-y-auto scrollable-panel-inner">
-                    <table class="w-full text-[8px]">
+                    <table class="w-full text-xs">
                         <thead class="bg-black/40">
                             <tr>
                                 <th class="px-1 py-1 text-left">Zone</th>
@@ -3799,14 +3781,14 @@ function createHvacSizingManagerPanel() {
 
             <!-- SYSTEM SIZING (ADVANCED) -->
             <details class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
-                <summary class="font-semibold text-[9px] uppercase text-[--text-secondary] cursor-pointer">
+                <summary class="font-semibold text-xs uppercase text-[--text-secondary] cursor-pointer">
                     System Sizing (Sizing:System, advanced)
                 </summary>
                 <div class="flex justify-end mb-1">
                     <button class="btn btn-xxs btn-secondary" data-action="add-system-sizing">+ Add System</button>
                 </div>
                 <div class="max-h-40 overflow-y-auto scrollable-panel-inner">
-                    <table class="w-full text-[8px]">
+                    <table class="w-full text-xs">
                         <thead class="bg-black/40">
                             <tr>
                                 <th class="px-1 py-1 text-left">Air Loop Name</th>
@@ -3820,7 +3802,7 @@ function createHvacSizingManagerPanel() {
                         <tbody class="hvac-sizing-systems-tbody"></tbody>
                     </table>
                 </div>
-                <p class="text-[7px] text-[--text-secondary] mt-1">
+                <p class="text-xs text-[--text-secondary] mt-1">
                     Only define entries if you have explicit system-level sizing requirements.
                     Rows without an Air Loop Name are ignored.
                 </p>
@@ -3828,14 +3810,14 @@ function createHvacSizingManagerPanel() {
 
             <!-- PLANT SIZING (ADVANCED) -->
             <details class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
-                <summary class="font-semibold text-[9px] uppercase text-[--text-secondary] cursor-pointer">
+                <summary class="font-semibold text-xs uppercase text-[--text-secondary] cursor-pointer">
                     Plant Sizing (Sizing:Plant, advanced)
                 </summary>
                 <div class="flex justify-end mb-1">
                     <button class="btn btn-xxs btn-secondary" data-action="add-plant-sizing">+ Add Plant Loop</button>
                 </div>
                 <div class="max-h-32 overflow-y-auto scrollable-panel-inner">
-                    <table class="w-full text-[8px]">
+                    <table class="w-full text-xs">
                         <thead class="bg-black/40">
                             <tr>
                                 <th class="px-1 py-1 text-left">Plant Loop Name</th>
@@ -3847,7 +3829,7 @@ function createHvacSizingManagerPanel() {
                         <tbody class="hvac-sizing-plants-tbody"></tbody>
                     </table>
                 </div>
-                <p class="text-[7px] text-[--text-secondary] mt-1">
+                <p class="text-xs text-[--text-secondary] mt-1">
                     Define only for explicit hydronic loops. Rows without a Plant Loop Name are ignored.
                 </p>
             </details>
@@ -3923,8 +3905,7 @@ function createHvacSizingManagerPanel() {
                         dsoaNames
                             .map(
                                 (n) =>
-                                    `<option value="${n}"${
-                                        cfg.designSpecOutdoorAirName === n ? ' selected' : ''
+                                    `<option value="${n}"${cfg.designSpecOutdoorAirName === n ? ' selected' : ''
                                     }>${n}</option>`
                             )
                             .join('');
@@ -4283,7 +4264,7 @@ function createIdealLoadsManagerPanel() {
             <div class="resize-handle-corner bottom-left"></div>
             <div class="resize-handle-corner bottom-right"></div>
 
-            <p class="info-box !text-[10px] !py-1.5 !px-2">
+            <p class="info-box !text-xs !py-1.5 !px-2">
                 Configure global/per-zone thermostats and IdealLoads settings.
                 Backed by <code>energyPlusConfig.thermostats</code> and <code>energyPlusConfig.idealLoads</code>.
                 Ray-Modeler's EnergyPlus integration uses <code>ZoneHVAC:IdealLoadsAirSystem</code> plus standard
@@ -4293,11 +4274,11 @@ function createIdealLoadsManagerPanel() {
             <!-- THERMOSTAT SETPOINTS -->
             <div class="space-y-1 border border-gray-700/70 rounded bg-black/40 p-2">
                 <div class="flex justify-between items-center">
-                    <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Thermostat Setpoints</span>
+                    <span class="font-semibold text-xs uppercase text-[--text-secondary]">Thermostat Setpoints</span>
                     <button class="btn btn-xxs btn-secondary" data-action="add-tstat-setpoint">+ Add Setpoint</button>
                 </div>
                 <div class="border border-gray-700/70 rounded bg-black/60 max-h-32 overflow-y-auto scrollable-panel-inner mt-1">
-                    <table class="w-full text-[8px]">
+                    <table class="w-full text-xs">
                         <thead class="bg-black/40">
                             <tr>
                                 <th class="px-1 py-1 text-left">Name</th>
@@ -4309,7 +4290,7 @@ function createIdealLoadsManagerPanel() {
                         <tbody class="tstat-setpoints-tbody"></tbody>
                     </table>
                 </div>
-                <div class="text-[7px] text-[--text-secondary]">
+                <div class="text-xs text-[--text-secondary]">
                     Defines ThermostatSetpoint:SingleHeating / SingleCooling / SingleHeatingOrCooling / DualSetpoint
                     objects referenced by zone thermostat controls. Setpoints are stored under
                     <code>energyPlusConfig.thermostats</code> entries with <code>scope: "setpoint"</code>.
@@ -4319,10 +4300,10 @@ function createIdealLoadsManagerPanel() {
             <!-- ZONE THERMOSTAT CONTROLS -->
             <div class="space-y-1 border border-gray-700/70 rounded bg-black/40 p-2">
                 <div class="flex justify-between items-center">
-                    <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Zone Thermostat Controls</span>
+                    <span class="font-semibold text-xs uppercase text-[--text-secondary]">Zone Thermostat Controls</span>
                 </div>
                 <div class="border border-gray-700/70 rounded bg-black/60 max-h-40 overflow-y-auto scrollable-panel-inner mt-1">
-                    <table class="w-full text-[8px]">
+                    <table class="w-full text-xs">
                         <thead class="bg-black/40">
                             <tr>
                                 <th class="px-1 py-1 text-left">Zone</th>
@@ -4336,7 +4317,7 @@ function createIdealLoadsManagerPanel() {
                         <tbody class="tstat-zone-controls-tbody"></tbody>
                     </table>
                 </div>
-                <div class="text-[7px] text-[--text-secondary]">
+                <div class="text-xs text-[--text-secondary]">
                     Select a Thermostat Setpoint for each zone (by type). These mappings are written to energyPlusConfig.thermostats
                     and used to generate ZoneControl:Thermostat objects. Blank cells inherit or skip control.
                 </div>
@@ -4345,24 +4326,24 @@ function createIdealLoadsManagerPanel() {
             <!-- GLOBAL IDEAL LOADS -->
             <div class="space-y-1 border border-gray-700/70 rounded bg-black/40 p-2">
                 <div class="flex justify-between items-center">
-                    <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Global IdealLoads (Defaults)</span>
+                    <span class="font-semibold text-xs uppercase text-[--text-secondary]">Global IdealLoads (Defaults)</span>
                 </div>
-                <div class="grid grid-cols-4 gap-2 text-[8px] mt-1">
+                <div class="grid grid-cols-4 gap-2 text-xs mt-1">
                     <div>
-                        <label class="label !text-[8px]">Availability Schedule</label>
-                        <select class="w-full text-[8px]" data-field="il-global-avail"></select>
+                        <label class="label !text-xs">Availability Schedule</label>
+                        <select class="w-full text-xs" data-field="il-global-avail"></select>
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Max Heat T [°C]</label>
-                        <input type="number" class="w-full text-[8px]" data-field="il-global-maxHeatT" placeholder="50">
+                        <label class="label !text-xs">Max Heat T [°C]</label>
+                        <input type="number" class="w-full text-xs" data-field="il-global-maxHeatT" placeholder="50">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Min Cool T [°C]</label>
-                        <input type="number" class="w-full text-[8px]" data-field="il-global-minCoolT" placeholder="13">
+                        <label class="label !text-xs">Min Cool T [°C]</label>
+                        <input type="number" class="w-full text-xs" data-field="il-global-minCoolT" placeholder="13">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Heat Limit</label>
-                        <select class="w-full text-[8px]" data-field="il-global-heatLimit">
+                        <label class="label !text-xs">Heat Limit</label>
+                        <select class="w-full text-xs" data-field="il-global-heatLimit">
                             <option value="">(default)</option>
                             <option value="NoLimit">NoLimit</option>
                             <option value="LimitFlowRate">LimitFlowRate</option>
@@ -4371,18 +4352,18 @@ function createIdealLoadsManagerPanel() {
                         </select>
                     </div>
                 </div>
-                <div class="grid grid-cols-4 gap-2 text-[8px] mt-1">
+                <div class="grid grid-cols-4 gap-2 text-xs mt-1">
                     <div>
-                        <label class="label !text-[8px]">Max Heat Flow [m³/s]</label>
-                        <input type="number" step="0.001" class="w-full text-[8px]" data-field="il-global-maxHeatFlow">
+                        <label class="label !text-xs">Max Heat Flow [m³/s]</label>
+                        <input type="number" step="0.001" class="w-full text-xs" data-field="il-global-maxHeatFlow">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Max Heat Cap [W]</label>
-                        <input type="number" class="w-full text-[8px]" data-field="il-global-maxHeatCap">
+                        <label class="label !text-xs">Max Heat Cap [W]</label>
+                        <input type="number" class="w-full text-xs" data-field="il-global-maxHeatCap">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Cool Limit</label>
-                        <select class="w-full text-[8px]" data-field="il-global-coolLimit">
+                        <label class="label !text-xs">Cool Limit</label>
+                        <select class="w-full text-xs" data-field="il-global-coolLimit">
                             <option value="">(default)</option>
                             <option value="NoLimit">NoLimit</option>
                             <option value="LimitFlowRate">LimitFlowRate</option>
@@ -4391,18 +4372,18 @@ function createIdealLoadsManagerPanel() {
                         </select>
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Max Cool Flow [m³/s]</label>
-                        <input type="number" step="0.001" class="w-full text-[8px]" data-field="il-global-maxCoolFlow">
+                        <label class="label !text-xs">Max Cool Flow [m³/s]</label>
+                        <input type="number" step="0.001" class="w-full text-xs" data-field="il-global-maxCoolFlow">
                     </div>
                 </div>
-                <div class="grid grid-cols-4 gap-2 text-[8px] mt-1">
+                <div class="grid grid-cols-4 gap-2 text-xs mt-1">
                     <div>
-                        <label class="label !text-[8px]">Max Cool Cap [W]</label>
-                        <input type="number" class="w-full text-[8px]" data-field="il-global-maxCoolCap">
+                        <label class="label !text-xs">Max Cool Cap [W]</label>
+                        <input type="number" class="w-full text-xs" data-field="il-global-maxCoolCap">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Dehum Type</label>
-                        <select class="w-full text-[8px]" data-field="il-global-dehumType">
+                        <label class="label !text-xs">Dehum Type</label>
+                        <select class="w-full text-xs" data-field="il-global-dehumType">
                             <option value="">(default)</option>
                             <option value="None">None</option>
                             <option value="ConstantSensibleHeatRatio">ConstantSensibleHeatRatio</option>
@@ -4411,12 +4392,12 @@ function createIdealLoadsManagerPanel() {
                         </select>
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Cool SHR</label>
-                        <input type="number" step="0.01" class="w-full text-[8px]" data-field="il-global-coolSHR">
+                        <label class="label !text-xs">Cool SHR</label>
+                        <input type="number" step="0.01" class="w-full text-xs" data-field="il-global-coolSHR">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Humid Type</label>
-                        <select class="w-full text-[8px]" data-field="il-global-humType">
+                        <label class="label !text-xs">Humid Type</label>
+                        <select class="w-full text-xs" data-field="il-global-humType">
                             <option value="">(default)</option>
                             <option value="None">None</option>
                             <option value="Humidistat">Humidistat</option>
@@ -4424,10 +4405,10 @@ function createIdealLoadsManagerPanel() {
                         </select>
                     </div>
                 </div>
-                <div class="grid grid-cols-4 gap-2 text-[8px] mt-1">
+                <div class="grid grid-cols-4 gap-2 text-xs mt-1">
                     <div>
-                        <label class="label !text-[8px]">OA Method</label>
-                        <select class="w-full text-[8px]" data-field="il-global-oaMethod">
+                        <label class="label !text-xs">OA Method</label>
+                        <select class="w-full text-xs" data-field="il-global-oaMethod">
                             <option value="">(none)</option>
                             <option value="None">None</option>
                             <option value="Sum">Sum</option>
@@ -4436,16 +4417,16 @@ function createIdealLoadsManagerPanel() {
                         </select>
                     </div>
                     <div>
-                        <label class="label !text-[8px]">OA L/s.person</label>
-                        <input type="number" step="0.001" class="w-full text-[8px]" data-field="il-global-oaPP">
+                        <label class="label !text-xs">OA L/s.person</label>
+                        <input type="number" step="0.001" class="w-full text-xs" data-field="il-global-oaPP">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">OA L/s.m²</label>
-                        <input type="number" step="0.001" class="w-full text-[8px]" data-field="il-global-oaPA">
+                        <label class="label !text-xs">OA L/s.m²</label>
+                        <input type="number" step="0.001" class="w-full text-xs" data-field="il-global-oaPA">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Heat Recovery</label>
-                        <select class="w-full text-[8px]" data-field="il-global-hrType">
+                        <label class="label !text-xs">Heat Recovery</label>
+                        <select class="w-full text-xs" data-field="il-global-hrType">
                             <option value="">(default)</option>
                             <option value="None">None</option>
                             <option value="Sensible">Sensible</option>
@@ -4453,17 +4434,17 @@ function createIdealLoadsManagerPanel() {
                         </select>
                     </div>
                 </div>
-                <div class="grid grid-cols-4 gap-2 text-[8px] mt-1">
+                <div class="grid grid-cols-4 gap-2 text-xs mt-1">
                     <div>
-                        <label class="label !text-[8px]">HR Sens Eff</label>
-                        <input type="number" step="0.01" class="w-full text-[8px]" data-field="il-global-hrSens">
+                        <label class="label !text-xs">HR Sens Eff</label>
+                        <input type="number" step="0.01" class="w-full text-xs" data-field="il-global-hrSens">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">HR Lat Eff</label>
-                        <input type="number" step="0.01" class="w-full text-[8px]" data-field="il-global-hrLat">
+                        <label class="label !text-xs">HR Lat Eff</label>
+                        <input type="number" step="0.01" class="w-full text-xs" data-field="il-global-hrLat">
                     </div>
                 </div>
-                <div class="text-[7px] text-[--text-secondary]">
+                <div class="text-xs text-[--text-secondary]">
                     Values left blank use EnergyPlus defaults. These act as defaults for all zones unless overridden below.
                 </div>
             </div>
@@ -4471,10 +4452,10 @@ function createIdealLoadsManagerPanel() {
             <!-- PER-ZONE IDEAL LOADS -->
             <div class="space-y-1 border border-gray-700/70 rounded bg-black/40 p-2">
                 <div class="flex justify-between items-center">
-                    <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Per-Zone IdealLoads Overrides</span>
+                    <span class="font-semibold text-xs uppercase text-[--text-secondary]">Per-Zone IdealLoads Overrides</span>
                 </div>
                 <div class="border border-gray-700/70 rounded bg-black/60 max-h-40 overflow-y-auto **scrollable-panel-inner** mt-1">
-                    <table class="w-full text-[8px]">
+                    <table class="w-full text-xs">
                         <thead class="bg-black/40">
                             <tr>
                                 <th class="px-1 py-1 text-left">Zone</th>
@@ -4494,7 +4475,7 @@ function createIdealLoadsManagerPanel() {
                         Save Thermostats & IdealLoads
                     </button>
                 </div>
-                <div class="text-[7px] text-[--text-secondary]">
+                <div class="text-xs text-[--text-secondary]">
                     Blank cells inherit from Global IdealLoads. This configuration is emitted into ZoneControl:Thermostat and ZoneHVAC:IdealLoadsAirSystem.
                 </div>
             </div>
@@ -4502,16 +4483,16 @@ function createIdealLoadsManagerPanel() {
             <!-- GLOBAL THERMOSTATS -->
             <div class="space-y-1 border border-gray-700/70 rounded bg-black/40 p-2">
                 <div class="flex justify-between items-center">
-                    <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Global Thermostat Schedules</span>
+                    <span class="font-semibold text-xs uppercase text-[--text-secondary]">Global Thermostat Schedules</span>
                 </div>
-                <div class="grid grid-cols-2 gap-2 text-[8px] mt-1">
+                <div class="grid grid-cols-2 gap-2 text-xs mt-1">
                     <div>
-                        <label class="label !text-[8px]">Heating Schedule</label>
-                        <select class="w-full text-[8px]" data-field="globalHeatSched"></select>
+                        <label class="label !text-xs">Heating Schedule</label>
+                        <select class="w-full text-xs" data-field="globalHeatSched"></select>
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Cooling Schedule</label>
-                        <select class="w-full text-[8px]" data-field="globalCoolSched"></select>
+                        <label class="label !text-xs">Cooling Schedule</label>
+                        <select class="w-full text-xs" data-field="globalCoolSched"></select>
                     </div>
                 </div>
             </div>
@@ -4519,10 +4500,10 @@ function createIdealLoadsManagerPanel() {
             <!-- PER-ZONE THERMOSTATS -->
             <div class="space-y-1 border border-gray-700/70 rounded bg-black/40 p-2">
                 <div class="flex justify-between items-center">
-                    <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Per-Zone Thermostat Overrides</span>
+                    <span class="font-semibold text-xs uppercase text-[--text-secondary]">Per-Zone Thermostat Overrides</span>
                 </div>
                 <div class="max-h-40 overflow-y-auto **scrollable-panel-inner**">
-                    <table class="w-full text-[8px]">
+                    <table class="w-full text-xs">
                         <thead class="bg-black/40">
                             <tr>
                                 <th class="px-1 py-1 text-left">Zone</th>
@@ -4533,7 +4514,7 @@ function createIdealLoadsManagerPanel() {
                         <tbody class="tstats-tbody"></tbody>
                     </table>
                 </div>
-                <div class="text-[7px] text-[--text-secondary]">
+                <div class="text-xs text-[--text-secondary]">
                     Leave blank to use global schedules or no control.
                 </div>
             </div>
@@ -4541,24 +4522,24 @@ function createIdealLoadsManagerPanel() {
             <!-- GLOBAL IDEALLOADS -->
             <div class="space-y-1 border border-gray-700/70 rounded bg-black/40 p-2">
                 <div class="flex justify-between items-center">
-                    <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Global IdealLoads Settings</span>
+                    <span class="font-semibold text-xs uppercase text-[--text-secondary]">Global IdealLoads Settings</span>
                 </div>
-                <div class="grid grid-cols-4 gap-2 text-[8px] mt-1">
+                <div class="grid grid-cols-4 gap-2 text-xs mt-1">
                     <div>
-                        <label class="label !text-[8px]">Avail. Schedule</label>
-                        <select class="w-full text-[8px]" data-field="il-global-avail"></select>
+                        <label class="label !text-xs">Avail. Schedule</label>
+                        <select class="w-full text-xs" data-field="il-global-avail"></select>
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Heat Cap [W]</label>
-                        <input type="number" class="w-full text-[8px]" data-field="il-global-heatcap">
+                        <label class="label !text-xs">Heat Cap [W]</label>
+                        <input type="number" class="w-full text-xs" data-field="il-global-heatcap">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Cool Cap [W]</label>
-                        <input type="number" class="w-full text-[8px]" data-field="il-global-coolcap">
+                        <label class="label !text-xs">Cool Cap [W]</label>
+                        <input type="number" class="w-full text-xs" data-field="il-global-coolcap">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">OA Method</label>
-                        <select class="w-full text-[8px]" data-field="il-global-oamethod">
+                        <label class="label !text-xs">OA Method</label>
+                        <select class="w-full text-xs" data-field="il-global-oamethod">
                             <option value="">(none)</option>
                             <option value="None">None</option>
                             <option value="Sum">Sum</option>
@@ -4567,17 +4548,17 @@ function createIdealLoadsManagerPanel() {
                         </select>
                     </div>
                 </div>
-                <div class="grid grid-cols-4 gap-2 text-[8px] mt-1">
+                <div class="grid grid-cols-4 gap-2 text-xs mt-1">
                     <div>
-                        <label class="label !text-[8px]">OA L/s.person</label>
-                        <input type="number" step="0.001" class="w-full text-[8px]" data-field="il-global-oaperperson">
+                        <label class="label !text-xs">OA L/s.person</label>
+                        <input type="number" step="0.001" class="w-full text-xs" data-field="il-global-oaperperson">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">OA L/s.m²</label>
-                        <input type="number" step="0.001" class="w-full text-[8px]" data-field="il-global-oaperarea">
+                        <label class="label !text-xs">OA L/s.m²</label>
+                        <input type="number" step="0.001" class="w-full text-xs" data-field="il-global-oaperarea">
                     </div>
                 </div>
-                <div class="text-[7px] text-[--text-secondary]">
+                <div class="text-xs text-[--text-secondary]">
                     OA flows are stored in m³/s in metadata; values here are in L/s and converted.
                 </div>
             </div>
@@ -4585,10 +4566,10 @@ function createIdealLoadsManagerPanel() {
             <!-- PER-ZONE IDEALLOADS -->
             <div class="space-y-1 border border-gray-700/70 rounded bg-black/40 p-2">
                 <div class="flex justify-between items-center">
-                    <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Per-Zone IdealLoads Overrides</span>
+                    <span class="font-semibold text-xs uppercase text-[--text-secondary]">Per-Zone IdealLoads Overrides</span>
                 </div>
                 <div class="border border-gray-700/70 rounded bg-black/60 max-h-40 overflow-y-auto scrollable-panel-inner mt-1">
-                    <table class="w-full text-[8px]">
+                    <table class="w-full text-xs">
                         <thead class="bg-black/40">
                             <tr>
                                 <th class="px-1 py-1 text-left">Zone</th>
@@ -4603,7 +4584,7 @@ function createIdealLoadsManagerPanel() {
                         <tbody class="ideal-perzone-tbody"></tbody>
                     </table>
                 </div>
-                <div class="text-[7px] text-[--text-secondary] mt-1">
+                <div class="text-xs text-[--text-secondary] mt-1">
                     Blank cells inherit from Global IdealLoads. OA flows are entered in L/s and stored internally in m³/s.
                 </div>
             </div>
@@ -4692,8 +4673,8 @@ function createIdealLoadsManagerPanel() {
         const thermostatSource = Array.isArray(sourceCfg.thermostats)
             ? sourceCfg.thermostats
             : Array.isArray(sourceEp.thermostats)
-            ? sourceEp.thermostats
-            : [];
+                ? sourceEp.thermostats
+                : [];
 
         thermostatSource.forEach((t) => {
             if (!t || t.scope === 'setpoint') return; // skip setpoint definitions
@@ -4763,7 +4744,7 @@ function createIdealLoadsManagerPanel() {
         if (!setpoints.length) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="px-1 py-1 text-[8px] text-[--text-secondary]" colspan="4">
+                <td class="px-1 py-1 text-xs text-white" colspan="4">
                     No thermostat setpoints defined. Click "Add Setpoint" to create one.
                 </td>
             `;
@@ -4775,31 +4756,29 @@ function createIdealLoadsManagerPanel() {
                 tr.dataset.index = String(index);
                 tr.innerHTML = `
                     <td class="px-1 py-1 align-top">
-                        <input class="w-full text-[8px]" data-field="name" value="${sp.name || ''}">
+                        <input class="w-full text-xs" data-field="name" value="${sp.name || ''}">
                     </td>
                     <td class="px-1 py-1 align-top">
-                        <select class="w-full text-[8px]" data-field="type">
+                        <select class="w-full text-xs" data-field="type">
                             <option value="SingleHeating"${type === 'SingleHeating' ? ' selected' : ''}>SingleHeating</option>
                             <option value="SingleCooling"${type === 'SingleCooling' ? ' selected' : ''}>SingleCooling</option>
-                            <option value="SingleHeatingOrCooling"${
-                                type === 'SingleHeatingOrCooling' ? ' selected' : ''
-                            }>SingleHeatingOrCooling</option>
-                            <option value="DualSetpoint"${
-                                type === 'DualSetpoint' || !type ? ' selected' : ''
-                            }>DualSetpoint</option>
+                            <option value="SingleHeatingOrCooling"${type === 'SingleHeatingOrCooling' ? ' selected' : ''
+                    }>SingleHeatingOrCooling</option>
+                            <option value="DualSetpoint"${type === 'DualSetpoint' || !type ? ' selected' : ''
+                    }>DualSetpoint</option>
                         </select>
                     </td>
                     <td class="px-1 py-1 align-top">
                         <div class="grid grid-cols-2 gap-0.5">
                             <div>
                                 <div class="text-[6px] text-[--text-secondary]">Heat / Single</div>
-                                <select class="w-full text-[8px]" data-field="heatSched">
+                                <select class="w-full text-xs" data-field="heatSched">
                                     ${schedOptions(sp.heatingScheduleName || sp.singleScheduleName || '')}
                                 </select>
                             </div>
                             <div>
                                 <div class="text-[6px] text-[--text-secondary]">Cool</div>
-                                <select class="w-full text-[8px]" data-field="coolSched">
+                                <select class="w-full text-xs" data-field="coolSched">
                                     ${schedOptions(sp.coolingScheduleName || '')}
                                 </select>
                             </div>
@@ -4877,27 +4856,27 @@ function createIdealLoadsManagerPanel() {
             tr.innerHTML = `
                 <td class="px-1 py-1 align-top text-[--accent-color]">${zn}</td>
                 <td class="px-1 py-1 align-top">
-                    <select class="w-full text-[8px]" data-field="ctrlSched">
+                    <select class="w-full text-xs" data-field="ctrlSched">
                         ${controlTypeSchedOptions(existing.controlTypeSchedule || '')}
                     </select>
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <select class="w-full text-[8px]" data-field="singleHeat">
+                    <select class="w-full text-xs" data-field="singleHeat">
                         ${setpointOptions(existing.singleHeatingSetpoint || '', ['SingleHeating'])}
                     </select>
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <select class="w-full text-[8px]" data-field="singleCool">
+                    <select class="w-full text-xs" data-field="singleCool">
                         ${setpointOptions(existing.singleCoolingSetpoint || '', ['SingleCooling'])}
                     </select>
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <select class="w-full text-[8px]" data-field="singleHeatCool">
+                    <select class="w-full text-xs" data-field="singleHeatCool">
                         ${setpointOptions(existing.singleHeatCoolSetpoint || '', ['SingleHeatingOrCooling'])}
                     </select>
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <select class="w-full text-[8px]" data-field="dual">
+                    <select class="w-full text-xs" data-field="dual">
                         ${setpointOptions(existing.dualSetpoint || '', ['DualSetpoint'])}
                     </select>
                 </td>
@@ -4924,10 +4903,10 @@ function createIdealLoadsManagerPanel() {
                 tr.innerHTML = `
                     <td class="px-1 py-1 align-top text-[--accent-color]">${zn}</td>
                     <td class="px-1 py-1 align-top">
-                        <select class="w-full text-[8px]" data-field="heatSched">${schedOptions(legacy.heatingScheduleName || '')}</select>
+                        <select class="w-full text-xs" data-field="heatSched">${schedOptions(legacy.heatingScheduleName || '')}</select>
                     </td>
                     <td class="px-1 py-1 align-top">
-                        <select class="w-full text-[8px]" data-field="coolSched">${schedOptions(legacy.coolingScheduleName || '')}</select>
+                        <select class="w-full text-xs" data-field="coolSched">${schedOptions(legacy.coolingScheduleName || '')}</select>
                     </td>
                 `;
                 tstatsTbody.appendChild(tr);
@@ -5014,26 +4993,26 @@ function createIdealLoadsManagerPanel() {
             tr.innerHTML = `
                 <td class="px-1 py-1 align-top text-[--accent-color]">${zn}</td>
                 <td class="px-1 py-1 align-top">
-                    <select class="w-full text-[8px]" data-field="il-avail">
+                    <select class="w-full text-xs" data-field="il-avail">
                         ${schedOptions(cfg.availabilitySchedule || '')}
                     </select>
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <input type="number" class="w-full text-[8px]" data-field="il-heatcap" value="${heatCap}">
+                    <input type="number" class="w-full text-xs" data-field="il-heatcap" value="${heatCap}">
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <input type="number" class="w-full text-[8px]" data-field="il-coolcap" value="${coolCap}">
+                    <input type="number" class="w-full text-xs" data-field="il-coolcap" value="${coolCap}">
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <select class="w-full text-[8px]" data-field="il-oamethod">
+                    <select class="w-full text-xs" data-field="il-oamethod">
                         ${oaMethodOptions(oaMethod)}
                     </select>
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <input type="number" step="0.001" class="w-full text-[8px]" data-field="il-oaperperson" value="${oaPP_Ls}">
+                    <input type="number" step="0.001" class="w-full text-xs" data-field="il-oaperperson" value="${oaPP_Ls}">
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <input type="number" step="0.001" class="w-full text-[8px]" data-field="il-oaperarea" value="${oaPA_Ls}">
+                    <input type="number" step="0.001" class="w-full text-xs" data-field="il-oaperarea" value="${oaPA_Ls}">
                 </td>
             `;
             idealPerZoneTbody.appendChild(tr);
@@ -5373,10 +5352,10 @@ function createIdealLoadsManagerPanel() {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td class="px-1 py-1 align-top">
-                        <input class="w-full text-[8px]" data-field="name" placeholder="Setpoint name">
+                        <input class="w-full text-xs" data-field="name" placeholder="Setpoint name">
                     </td>
                     <td class="px-1 py-1 align-top">
-                        <select class="w-full text-[8px]" data-field="type">
+                        <select class="w-full text-xs" data-field="type">
                             <option value="DualSetpoint" selected>DualSetpoint</option>
                             <option value="SingleHeating">SingleHeating</option>
                             <option value="SingleCooling">SingleCooling</option>
@@ -5387,13 +5366,13 @@ function createIdealLoadsManagerPanel() {
                         <div class="grid grid-cols-2 gap-0.5">
                             <div>
                                 <div class="text-[6px] text-[--text-secondary]">Heat / Single</div>
-                                <select class="w-full text-[8px]" data-field="heatSched">
+                                <select class="w-full text-xs" data-field="heatSched">
                                     ${schedOptions('')}
                                 </select>
                             </div>
                             <div>
                                 <div class="text-[6px] text-[--text-secondary]">Cool</div>
-                                <select class="w-full text-[8px]" data-field="coolSched">
+                                <select class="w-full text-xs" data-field="coolSched">
                                     ${schedOptions('')}
                                 </select>
                             </div>
@@ -5502,7 +5481,7 @@ function createOutdoorAirManagerPanel() {
                 <div class="window-icon-close" title="Close"></div>
             </div>
         </div>
-        <div class="window-content space-y-3 text-[8px]">
+        <div class="window-content space-y-3 text-xs">
             <div class="resize-handle-edge top"></div>
             <div class="resize-handle-edge right"></div>
             <div class="resize-handle-edge bottom"></div>
@@ -5512,7 +5491,7 @@ function createOutdoorAirManagerPanel() {
             <div class="resize-handle-corner bottom-left"></div>
             <div class="resize-handle-corner bottom-right"></div>
 
-            <p class="info-box !text-[9px] !py-1.5 !px-2">
+            <p class="info-box !text-xs !py-1.5 !px-2">
                 Configure outdoor air design specs and simple natural ventilation.
                 Settings are stored in <code>energyPlusConfig.outdoorAir</code> and
                 <code>energyPlusConfig.naturalVentilation</code> and consumed by the model builder.
@@ -5522,13 +5501,13 @@ function createOutdoorAirManagerPanel() {
             <!-- DesignSpecification:OutdoorAir -->
             <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
                 <div class="flex justify-between items-center">
-                    <span class="font-semibold text-[9px] uppercase text-[--text-secondary]">
+                    <span class="font-semibold text-xs uppercase text-[--text-secondary]">
                         Outdoor Air Design Specs (DesignSpecification:OutdoorAir)
                     </span>
                     <button class="btn btn-xxs btn-secondary" data-action="add-dsoa">+ Add Design Spec</button>
                 </div>
                 <div class="max-h-40 overflow-y-auto scrollable-panel-inner">
-                    <table class="w-full text-[8px]">
+                    <table class="w-full text-xs">
                         <thead class="bg-black/40">
                             <tr>
                                 <th class="px-1 py-1 text-left">Name</th>
@@ -5545,14 +5524,14 @@ function createOutdoorAirManagerPanel() {
                         <tbody class="dsoa-tbody"></tbody>
                     </table>
                 </div>
-                <p class="text-[7px] text-[--text-secondary] mt-1">
+                <p class="text-xs text-[--text-secondary] mt-1">
                     Refer to these specs from HVAC Sizing and IdealLoads configuration (e.g. DesignSpecification:OutdoorAir Name).
                 </p>
             </div>
 
             <!-- Natural Ventilation (ZoneVentilation:DesignFlowRate) -->
             <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-2">
-                <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">
+                <div class="font-semibold text-xs uppercase text-[--text-secondary]">
                     Natural Ventilation (ZoneVentilation:DesignFlowRate)
                 </div>
 
@@ -5564,7 +5543,7 @@ function createOutdoorAirManagerPanel() {
                     </label>
                     <div class="grid grid-cols-5 gap-1 mt-1">
                         <div>
-                            <label class="label !text-[7px]">Method</label>
+                            <label class="label !text-xs">Method</label>
                             <select class="w-full" data-field="nv-global-method">
                                 <option value="">(none)</option>
                                 <option value="Flow/Zone">Flow/Zone</option>
@@ -5574,25 +5553,25 @@ function createOutdoorAirManagerPanel() {
                             </select>
                         </div>
                         <div>
-                            <label class="label !text-[7px]">Flow/Zone [m³/s]</label>
+                            <label class="label !text-xs">Flow/Zone [m³/s]</label>
                             <input type="number" step="0.001" class="w-full" data-field="nv-global-flowZone">
                         </div>
                         <div>
-                            <label class="label !text-[7px]">Flow/Area [m³/s-m²]</label>
+                            <label class="label !text-xs">Flow/Area [m³/s-m²]</label>
                             <input type="number" step="0.0001" class="w-full" data-field="nv-global-flowArea">
                         </div>
                         <div>
-                            <label class="label !text-[7px]">Flow/Person [m³/s-person]</label>
+                            <label class="label !text-xs">Flow/Person [m³/s-person]</label>
                             <input type="number" step="0.0001" class="w-full" data-field="nv-global-flowPerson">
                         </div>
                         <div>
-                            <label class="label !text-[7px]">ACH [1/h]</label>
+                            <label class="label !text-xs">ACH [1/h]</label>
                             <input type="number" step="0.01" class="w-full" data-field="nv-global-ach">
                         </div>
                     </div>
                     <div class="grid grid-cols-6 gap-1 mt-1">
                         <div>
-                            <label class="label !text-[7px]">Type</label>
+                            <label class="label !text-xs">Type</label>
                             <select class="w-full" data-field="nv-global-type">
                                 <option value="">(Natural)</option>
                                 <option value="Natural">Natural</option>
@@ -5602,33 +5581,33 @@ function createOutdoorAirManagerPanel() {
                             </select>
                         </div>
                         <div>
-                            <label class="label !text-[7px]">Min Tin [°C]</label>
+                            <label class="label !text-xs">Min Tin [°C]</label>
                             <input type="number" step="0.1" class="w-full" data-field="nv-global-minTin">
                         </div>
                         <div>
-                            <label class="label !text-[7px]">Max Tin [°C]</label>
+                            <label class="label !text-xs">Max Tin [°C]</label>
                             <input type="number" step="0.1" class="w-full" data-field="nv-global-maxTin">
                         </div>
                         <div>
-                            <label class="label !text-[7px]">Min Tout [°C]</label>
+                            <label class="label !text-xs">Min Tout [°C]</label>
                             <input type="number" step="0.1" class="w-full" data-field="nv-global-minTout">
                         </div>
                         <div>
-                            <label class="label !text-[7px]">Max Tout [°C]</label>
+                            <label class="label !text-xs">Max Tout [°C]</label>
                             <input type="number" step="0.1" class="w-full" data-field="nv-global-maxTout">
                         </div>
                         <div>
-                            <label class="label !text-[7px]">ΔT (Tin-Tout) [K]</label>
+                            <label class="label !text-xs">ΔT (Tin-Tout) [K]</label>
                             <input type="number" step="0.1" class="w-full" data-field="nv-global-deltaT">
                         </div>
                     </div>
                     <div class="grid grid-cols-4 gap-1 mt-1">
                         <div>
-                            <label class="label !text-[7px]">Max Wind [m/s]</label>
+                            <label class="label !text-xs">Max Wind [m/s]</label>
                             <input type="number" step="0.1" class="w-full" data-field="nv-global-maxWind">
                         </div>
                         <div>
-                            <label class="label !text-[7px]">Density Basis</label>
+                            <label class="label !text-xs">Density Basis</label>
                             <select class="w-full" data-field="nv-global-density">
                                 <option value="">(default)</option>
                                 <option value="Outdoor">Outdoor</option>
@@ -5641,11 +5620,11 @@ function createOutdoorAirManagerPanel() {
 
                 <!-- Per-zone overrides -->
                 <div class="border border-gray-700/70 rounded bg-black/30 p-1 space-y-1">
-                    <div class="font-semibold text-[8px] text-[--text-secondary]">
+                    <div class="font-semibold text-xs text-[--text-secondary]">
                         Per-Zone Overrides
                     </div>
                     <div class="max-h-40 overflow-y-auto scrollable-panel-inner">
-                        <table class="w-full text-[7px]">
+                        <table class="w-full text-xs">
                             <thead class="bg-black/40">
                                 <tr>
                                     <th class="px-1 py-1 text-left">Zone</th>
@@ -5661,7 +5640,7 @@ function createOutdoorAirManagerPanel() {
                             <tbody class="nv-zones-tbody"></tbody>
                         </table>
                     </div>
-                    <p class="text-[7px] text-[--text-secondary]">
+                    <p class="text-xs text-[--text-secondary]">
                         Only rows with "Override" checked and at least one field set are saved.
                         Zones without overrides inherit the global settings if enabled.
                     </p>
@@ -5724,7 +5703,7 @@ function createOutdoorAirManagerPanel() {
                 if (!designSpecs.length) {
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
-                        <td class="px-1 py-1 text-[--text-secondary]" colspan="9">
+                        <td class="px-1 py-1 text-white" colspan="9">
                             No DesignSpecification:OutdoorAir defined.
                         </td>
                     `;
@@ -5741,20 +5720,20 @@ function createOutdoorAirManagerPanel() {
                         <td class="px-1 py-1 align-top">
                             <select class="w-full" data-field="method">
                                 ${[
-                                    '',
-                                    'Flow/Person',
-                                    'Flow/Area',
-                                    'Flow/Zone',
-                                    'AirChanges/Hour',
-                                    'Sum',
-                                    'Maximum',
-                                ]
-                                    .map((m) => {
-                                        const label = m || '(auto)';
-                                        const sel = d.method === m ? ' selected' : '';
-                                        return `<option value="${m}"${sel}>${label}</option>`;
-                                    })
-                                    .join('')}
+                            '',
+                            'Flow/Person',
+                            'Flow/Area',
+                            'Flow/Zone',
+                            'AirChanges/Hour',
+                            'Sum',
+                            'Maximum',
+                        ]
+                            .map((m) => {
+                                const label = m || '(auto)';
+                                const sel = d.method === m ? ' selected' : '';
+                                return `<option value="${m}"${sel}>${label}</option>`;
+                            })
+                            .join('')}
                             </select>
                         </td>
                         <td class="px-1 py-1 align-top">
@@ -5842,18 +5821,18 @@ function createOutdoorAirManagerPanel() {
                         <td class="px-1 py-1 align-top">
                             <select class="w-full" data-field="method">
                                 ${[
-                                    '',
-                                    'Flow/Zone',
-                                    'Flow/Area',
-                                    'Flow/Person',
-                                    'AirChanges/Hour',
-                                ]
-                                    .map((m) => {
-                                        const label = m || '(inherit)';
-                                        const sel = entry.calculationMethod === m ? ' selected' : '';
-                                        return `<option value="${m}"${sel}>${label}</option>`;
-                                    })
-                                    .join('')}
+                            '',
+                            'Flow/Zone',
+                            'Flow/Area',
+                            'Flow/Person',
+                            'AirChanges/Hour',
+                        ]
+                            .map((m) => {
+                                const label = m || '(inherit)';
+                                const sel = entry.calculationMethod === m ? ' selected' : '';
+                                return `<option value="${m}"${sel}>${label}</option>`;
+                            })
+                            .join('')}
                             </select>
                         </td>
                         <td class="px-1 py-1 align-top">
@@ -6140,7 +6119,7 @@ function createShadingManagerPanel() {
                 <div class="window-icon-close" title="Close"></div>
             </div>
         </div>
-        <div class="window-content space-y-3 text-[8px]">
+        <div class="window-content space-y-3 text-xs">
             <div class="resize-handle-edge top"></div>
             <div class="resize-handle-edge right"></div>
             <div class="resize-handle-edge bottom"></div>
@@ -6150,7 +6129,7 @@ function createShadingManagerPanel() {
             <div class="resize-handle-corner bottom-left"></div>
             <div class="resize-handle-corner bottom-right"></div>
 
-            <p class="info-box !text-[9px] !py-1.5 !px-2">
+            <p class="info-box !text-xs !py-1.5 !px-2">
                 Configure explicit shading geometry, reflectance, and window shading controls.
                 Settings are stored in <code>energyPlusConfig.shading</code> and consumed directly by the EnergyPlus model builder.
                 If left empty, no additional shading objects are emitted.
@@ -6159,7 +6138,7 @@ function createShadingManagerPanel() {
             <!-- Site / Building Shading Surfaces (Shading:Site:Detailed / Shading:Building:Detailed) -->
             <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
                 <div class="flex justify-between items-center">
-                    <span class="font-semibold text-[9px] uppercase text-[--text-secondary]">
+                    <span class="font-semibold text-xs uppercase text-[--text-secondary]">
                         Surface / Zone Optical Properties
                     </span>
                     <button class="btn btn-xxs btn-secondary" data-action="add-surface-opt">
@@ -6167,7 +6146,7 @@ function createShadingManagerPanel() {
                     </button>
                 </div>
                 <div class="border border-gray-700/70 rounded bg-black/40 max-h-40 overflow-y-auto scrollable-panel-inner">
-                    <table class="w-full text-[7px]">
+                    <table class="w-full text-xs">
                         <thead class="bg-black/40">
                             <tr>
                                 <th class="px-1 py-1 text-left">Name</th>
@@ -6180,7 +6159,7 @@ function createShadingManagerPanel() {
                         <tbody class="shading-site-surfaces-tbody"></tbody>
                     </table>
                 </div>
-                <p class="text-[7px] text-[--text-secondary]">
+                <p class="text-xs text-[--text-secondary]">
                     Defines <code>Shading:Site:Detailed</code> and <code>Shading:Building:Detailed</code> surfaces.
                     Each surface requires a name, type, and at least 3 vertices.
                 </p>
@@ -6189,7 +6168,7 @@ function createShadingManagerPanel() {
             <!-- Zone Shading Surfaces (Shading:Zone:Detailed) -->
             <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
                 <div class="flex justify-between items-center">
-                    <span class="font-semibold text-[9px] uppercase text-[--text-secondary]">
+                    <span class="font-semibold text-xs uppercase text-[--text-secondary]">
                         Zone Shading Surfaces (Shading:Zone:Detailed)
                     </span>
                     <button class="btn btn-xxs btn-secondary" data-action="add-zone-surface">
@@ -6197,7 +6176,7 @@ function createShadingManagerPanel() {
                     </button>
                 </div>
                 <div class="border border-gray-700/70 rounded bg-black/40 max-h-32 overflow-y-auto scrollable-panel-inner">
-                    <table class="w-full text-[7px]">
+                    <table class="w-full text-xs">
                         <thead class="bg-black/40">
                             <tr>
                                 <th class="px-1 py-1 text-left">Name</th>
@@ -6210,7 +6189,7 @@ function createShadingManagerPanel() {
                         <tbody class="shading-zone-surfaces-tbody"></tbody>
                     </table>
                 </div>
-                <p class="text-[7px] text-[--text-secondary]">
+                <p class="text-xs text-[--text-secondary]">
                     Defines <code>Shading:Zone:Detailed</code> attached to existing base surfaces.
                 </p>
             </div>
@@ -6218,7 +6197,7 @@ function createShadingManagerPanel() {
             <!-- ShadingProperty:Reflectance -->
             <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
                 <div class="flex justify-between items-center">
-                    <span class="font-semibold text-[9px] uppercase text-[--text-secondary]">
+                    <span class="font-semibold text-xs uppercase text-[--text-secondary]">
                         Shading Surface Reflectance (ShadingProperty:Reflectance)
                     </span>
                     <button class="btn btn-xxs btn-secondary" data-action="add-reflectance">
@@ -6226,7 +6205,7 @@ function createShadingManagerPanel() {
                     </button>
                 </div>
                 <div class="border border-gray-700/70 rounded bg-black/40 max-h-32 overflow-y-auto scrollable-panel-inner">
-                    <table class="w-full text-[7px]">
+                    <table class="w-full text-xs">
                         <thead class="bg-black/40">
                             <tr>
                                 <th class="px-1 py-1 text-left">Shading Surface Name</th>
@@ -6240,7 +6219,7 @@ function createShadingManagerPanel() {
                         <tbody class="shading-reflectance-tbody"></tbody>
                     </table>
                 </div>
-                <p class="text-[7px] text-[--text-secondary]">
+                <p class="text-xs text-[--text-secondary]">
                     Binds optical properties to named shading surfaces.
                 </p>
             </div>
@@ -6248,7 +6227,7 @@ function createShadingManagerPanel() {
             <!-- Window Shading Controls (WindowShadingControl) -->
             <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
                 <div class="flex justify-between items-center">
-                    <span class="font-semibold text-[9px] uppercase text-[--text-secondary]">
+                    <span class="font-semibold text-xs uppercase text-[--text-secondary]">
                         Window Shading Controls
                     </span>
                     <button class="btn btn-xxs btn-secondary" data-action="add-window-control">
@@ -6256,7 +6235,7 @@ function createShadingManagerPanel() {
                     </button>
                 </div>
                 <div class="border border-gray-700/70 rounded bg-black/40 max-h-40 overflow-y-auto scrollable-panel-inner">
-                    <table class="w-full text-[7px]">
+                    <table class="w-full text-xs">
                         <thead class="bg-black/40">
                             <tr>
                                 <th class="px-1 py-1 text-left">Name</th>
@@ -6274,7 +6253,7 @@ function createShadingManagerPanel() {
                         <tbody class="shading-window-controls-tbody"></tbody>
                     </table>
                 </div>
-                <p class="text-[7px] text-[--text-secondary]">
+                <p class="text-xs text-[--text-secondary]">
                     Directly defines <code>WindowShadingControl</code> objects. All referenced fenestration surfaces must exist in the IDF.
                 </p>
             </div>
@@ -6310,14 +6289,14 @@ function createShadingManagerPanel() {
         const { config } = window.require
             ? window.require('./energyplusConfigService.js').getConfig(project)
             : (() => {
-                  // Fallback if require not available; mimic getConfig minimally
-                  const meta =
-                      (typeof project.getMetadata === 'function' && project.getMetadata()) ||
-                      project.metadata ||
-                      {};
-                  const ep = meta.energyPlusConfig || meta.energyplus || {};
-                  return { config: { shading: ep.shading || {} } };
-              })();
+                // Fallback if require not available; mimic getConfig minimally
+                const meta =
+                    (typeof project.getMetadata === 'function' && project.getMetadata()) ||
+                    project.metadata ||
+                    {};
+                const ep = meta.energyPlusConfig || meta.energyplus || {};
+                return { config: { shading: ep.shading || {} } };
+            })();
 
         const shading = config.shading || {};
         return {
@@ -6344,7 +6323,7 @@ function createShadingManagerPanel() {
         if (!siteSurfaces.length) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="px-1 py-1 text-[7px] text-[--text-secondary]" colspan="5">
+                <td class="px-1 py-1 text-xs text-white" colspan="5">
                     No site/building shading surfaces defined.
                 </td>
             `;
@@ -6429,7 +6408,7 @@ function createShadingManagerPanel() {
         if (!zoneSurfaces.length) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="px-1 py-1 text-[7px] text-[--text-secondary]" colspan="5">
+                <td class="px-1 py-1 text-xs text-white" colspan="5">
                     No zone shading surfaces defined.
                 </td>
             `;
@@ -6507,7 +6486,7 @@ function createShadingManagerPanel() {
         if (!reflectance.length) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="px-1 py-1 text-[7px] text-[--text-secondary]" colspan="6">
+                <td class="px-1 py-1 text-xs text-white" colspan="6">
                     No ShadingProperty:Reflectance entries defined.
                 </td>
             `;
@@ -6590,7 +6569,7 @@ function createShadingManagerPanel() {
         if (!windowShadingControls.length) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="px-1 py-1 text-[7px] text-[--text-secondary]" colspan="10">
+                <td class="px-1 py-1 text-xs text-white" colspan="10">
                     No WindowShadingControl entries defined.
                 </td>
             `;
@@ -6696,13 +6675,13 @@ function createShadingManagerPanel() {
         const { meta, ep } =
             (typeof project.getMetadata === 'function' || project.metadata)
                 ? (() => {
-                      const meta =
-                          (typeof project.getMetadata === 'function' && project.getMetadata()) ||
-                          project.metadata ||
-                          {};
-                      const ep = meta.energyPlusConfig || meta.energyplus || {};
-                      return { meta, ep };
-                  })()
+                    const meta =
+                        (typeof project.getMetadata === 'function' && project.getMetadata()) ||
+                        project.metadata ||
+                        {};
+                    const ep = meta.energyPlusConfig || meta.energyplus || {};
+                    return { meta, ep };
+                })()
                 : { meta: {}, ep: {} };
 
         // Site surfaces
@@ -6922,7 +6901,7 @@ function createShadingManagerPanel() {
         if (!overhangs.length) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="px-1 py-1 text-[7px] text-[--text-secondary]" colspan="7">
+                <td class="px-1 py-1 text-xs text-white" colspan="7">
                     No overhangs defined.
                 </td>
             `;
@@ -7227,7 +7206,7 @@ function createDaylightingManagerPanel() {
             <div class="resize-handle-corner top-right"></div>
             <div class="resize-handle-corner bottom-left"></div>
             <div class="resize-handle-corner bottom-right"></div>
-            <p class="info-box !text-[10px] !py-1.5 !px-2">
+            <p class="info-box !text-xs !py-1.5 !px-2">
                 Configure per-zone <code>Daylighting:Controls</code>, <code>Output:IlluminanceMap</code>,
                 and selected <code>Output:Variable</code> entries.
                 Settings are stored in <code>energyPlusConfig.daylighting</code> and consumed by the EnergyPlus model builder.
@@ -7237,10 +7216,10 @@ function createDaylightingManagerPanel() {
             <!-- Per-zone Daylighting:Controls -->
             <div class="space-y-1">
                 <div class="flex justify-between items-center">
-                    <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Daylighting Controls (per zone)</span>
+                    <span class="font-semibold text-xs uppercase text-[--text-secondary]">Daylighting Controls (per zone)</span>
                 </div>
                 <div class="border border-gray-700/70 rounded bg-black/40 max-h-60 overflow-y-auto **scrollable-panel-inner**">
-                    <table class="w-full text-[8px]">
+                    <table class="w-full text-xs">
                         <thead class="bg-black/40">
                             <tr>
                                 <th class="px-1 py-1 text-left">Zone</th>
@@ -7260,11 +7239,11 @@ function createDaylightingManagerPanel() {
             <!-- Illuminance Maps -->
             <div class="space-y-1">
                 <div class="flex justify-between items-center">
-                    <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Illuminance Maps</span>
+                    <span class="font-semibold text-xs uppercase text-[--text-secondary]">Illuminance Maps</span>
                     <button class="btn btn-xxs btn-secondary" data-action="add-illum-map">+ Add Map</button>
                 </div>
                 <div class="border border-gray-700/70 rounded bg-black/40 max-h-40 overflow-y-auto **scrollable-panel-inner**">
-                    <table class="w-full text-[8px]">
+                    <table class="w-full text-xs">
                         <thead class="bg-black/40">
                             <tr>
                                 <th class="px-1 py-1 text-left">Name</th>
@@ -7282,11 +7261,11 @@ function createDaylightingManagerPanel() {
             <!-- Output:Variable (lighting/daylighting focused) -->
             <div class="space-y-1">
                 <div class="flex justify-between items-center">
-                    <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Lighting & Daylighting Output Variables</span>
+                    <span class="font-semibold text-xs uppercase text-[--text-secondary]">Lighting & Daylighting Output Variables</span>
                     <button class="btn btn-xxs btn-secondary" data-action="add-output-var">+ Add Variable</button>
                 </div>
                 <div class="border border-gray-700/70 rounded bg-black/40 max-h-40 overflow-y-auto scrollable-panel-inner">
-                    <table class="w-full text-[8px]">
+                    <table class="w-full text-xs">
                         <thead class="bg-black/40">
                             <tr>
                                 <th class="px-1 py-1 text-left">Key</th>
@@ -7298,7 +7277,7 @@ function createDaylightingManagerPanel() {
                         <tbody class="daylighting-output-vars-tbody"></tbody>
                     </table>
                 </div>
-                <p class="text-[7px] text-[--text-secondary]">
+                <p class="text-xs text-[--text-secondary]">
                     Examples: Key = zone name or "Environment"; Variable = "Zone Lights Electric Power";
                     Frequency = Hourly / Timestep / RunPeriod, etc.
                     These entries are stored in <code>energyPlusConfig.daylighting.outputs.variables</code>.
@@ -7393,30 +7372,30 @@ function createDaylightingManagerPanel() {
                 </td>
                 <td class="px-1 py-1 align-top">
                     <div class="grid grid-cols-3 gap-0.5">
-                        <input type="number" step="0.01" class="w-full text-[8px]" placeholder="x" data-field="rp1x" value="${rp1.x ?? ''}">
-                        <input type="number" step="0.01" class="w-full text-[8px]" placeholder="y" data-field="rp1y" value="${rp1.y ?? ''}">
-                        <input type="number" step="0.01" class="w-full text-[8px]" placeholder="z" data-field="rp1z" value="${rp1.z ?? ''}">
+                        <input type="number" step="0.01" class="w-full text-xs" placeholder="x" data-field="rp1x" value="${rp1.x ?? ''}">
+                        <input type="number" step="0.01" class="w-full text-xs" placeholder="y" data-field="rp1y" value="${rp1.y ?? ''}">
+                        <input type="number" step="0.01" class="w-full text-xs" placeholder="z" data-field="rp1z" value="${rp1.z ?? ''}">
                     </div>
                 </td>
                 <td class="px-1 py-1 align-top">
                     <div class="grid grid-cols-3 gap-0.5">
-                        <input type="number" step="0.01" class="w-full text-[8px]" placeholder="x" data-field="rp2x" value="${rp2.x ?? ''}">
-                        <input type="number" step="0.01" class="w-full text-[8px]" placeholder="y" data-field="rp2y" value="${rp2.y ?? ''}">
-                        <input type="number" step="0.01" class="w-full text-[8px]" placeholder="z" data-field="rp2z" value="${rp2.z ?? ''}">
+                        <input type="number" step="0.01" class="w-full text-xs" placeholder="x" data-field="rp2x" value="${rp2.x ?? ''}">
+                        <input type="number" step="0.01" class="w-full text-xs" placeholder="y" data-field="rp2y" value="${rp2.y ?? ''}">
+                        <input type="number" step="0.01" class="w-full text-xs" placeholder="z" data-field="rp2z" value="${rp2.z ?? ''}">
                     </div>
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <input type="number" step="1" class="w-full text-[8px]" data-field="setpoint" value="${c.setpoint ?? ''}">
+                    <input type="number" step="1" class="w-full text-xs" data-field="setpoint" value="${c.setpoint ?? ''}">
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <select class="w-full text-[8px]" data-field="type">
+                    <select class="w-full text-xs" data-field="type">
                         <option value="Continuous"${c.type === 'Continuous' || !c.type ? ' selected' : ''}>Continuous</option>
                         <option value="Stepped"${c.type === 'Stepped' ? ' selected' : ''}>Stepped</option>
                         <option value="ContinuousOff"${c.type === 'ContinuousOff' ? ' selected' : ''}>ContinuousOff</option>
                     </select>
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <input type="number" step="0.05" min="0" max="1" class="w-full text-[8px]" data-field="fraction" value="${c.fraction ?? ''}">
+                    <input type="number" step="0.05" min="0" max="1" class="w-full text-xs" data-field="fraction" value="${c.fraction ?? ''}">
                 </td>
             `;
             controlsTbody.appendChild(tr);
@@ -7435,7 +7414,7 @@ function createDaylightingManagerPanel() {
         if (!maps.length) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="px-1 py-1 text-[8px] text-[--text-secondary]" colspan="5">
+                <td class="px-1 py-1 text-xs text-white" colspan="5">
                     No illuminance maps defined.
                 </td>
             `;
@@ -7448,28 +7427,28 @@ function createDaylightingManagerPanel() {
             tr.dataset.index = String(index);
             tr.innerHTML = `
                 <td class="px-1 py-1 align-top">
-                    <input class="w-full text-[8px]" data-field="name" value="${m.name || ''}">
+                    <input class="w-full text-xs" data-field="name" value="${m.name || ''}">
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <select class="w-full text-[8px]" data-field="zoneName">
+                    <select class="w-full text-xs" data-field="zoneName">
                         ${zones
-                            .map((zn) => `<option value="${zn}"${zn === m.zoneName ? ' selected' : ''}>${zn}</option>`)
-                            .join('')}
+                    .map((zn) => `<option value="${zn}"${zn === m.zoneName ? ' selected' : ''}>${zn}</option>`)
+                    .join('')}
                     </select>
                 </td>
                 <td class="px-1 py-1 align-top">
                     <div class="grid grid-cols-3 gap-0.5">
-                        <input type="number" step="0.01" class="w-full text-[8px]" placeholder="x" data-field="xOrigin" value="${m.xOrigin ?? ''}">
-                        <input type="number" step="0.01" class="w-full text-[8px]" placeholder="y" data-field="yOrigin" value="${m.yOrigin ?? ''}">
-                        <input type="number" step="0.01" class="w-full text-[8px]" placeholder="z" data-field="zHeight" value="${m.zHeight ?? ''}">
+                        <input type="number" step="0.01" class="w-full text-xs" placeholder="x" data-field="xOrigin" value="${m.xOrigin ?? ''}">
+                        <input type="number" step="0.01" class="w-full text-xs" placeholder="y" data-field="yOrigin" value="${m.yOrigin ?? ''}">
+                        <input type="number" step="0.01" class="w-full text-xs" placeholder="z" data-field="zHeight" value="${m.zHeight ?? ''}">
                     </div>
                 </td>
                 <td class="px-1 py-1 align-top">
                     <div class="grid grid-cols-4 gap-0.5">
-                        <input type="number" step="1" class="w-full text-[8px]" placeholder="Nx" data-field="xNumPoints" value="${m.xNumPoints ?? ''}">
-                        <input type="number" step="0.01" class="w-full text-[8px]" placeholder="Dx" data-field="xSpacing" value="${m.xSpacing ?? ''}">
-                        <input type="number" step="1" class="w-full text-[8px]" placeholder="Ny" data-field="yNumPoints" value="${m.yNumPoints ?? ''}">
-                        <input type="number" step="0.01" class="w-full text-[8px]" placeholder="Dy" data-field="ySpacing" value="${m.ySpacing ?? ''}">
+                        <input type="number" step="1" class="w-full text-xs" placeholder="Nx" data-field="xNumPoints" value="${m.xNumPoints ?? ''}">
+                        <input type="number" step="0.01" class="w-full text-xs" placeholder="Dx" data-field="xSpacing" value="${m.xSpacing ?? ''}">
+                        <input type="number" step="1" class="w-full text-xs" placeholder="Ny" data-field="yNumPoints" value="${m.yNumPoints ?? ''}">
+                        <input type="number" step="0.01" class="w-full text-xs" placeholder="Dy" data-field="ySpacing" value="${m.ySpacing ?? ''}">
                     </div>
                 </td>
                 <td class="px-1 py-1 align-top text-right">
@@ -7492,26 +7471,26 @@ function createDaylightingManagerPanel() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td class="px-1 py-1 align-top">
-                <input class="w-full text-[8px]" data-field="name" placeholder="Map name">
+                <input class="w-full text-xs" data-field="name" placeholder="Map name">
             </td>
             <td class="px-1 py-1 align-top">
-                <select class="w-full text-[8px]" data-field="zoneName">
+                <select class="w-full text-xs" data-field="zoneName">
                     ${zones.map((zn) => `<option value="${zn}">${zn}</option>`).join('')}
                 </select>
             </td>
             <td class="px-1 py-1 align-top">
                 <div class="grid grid-cols-3 gap-0.5">
-                    <input type="number" step="0.01" class="w-full text-[8px]" placeholder="x" data-field="xOrigin">
-                    <input type="number" step="0.01" class="w-full text-[8px]" placeholder="y" data-field="yOrigin">
-                    <input type="number" step="0.01" class="w-full text-[8px]" placeholder="z" data-field="zHeight">
+                    <input type="number" step="0.01" class="w-full text-xs" placeholder="x" data-field="xOrigin">
+                    <input type="number" step="0.01" class="w-full text-xs" placeholder="y" data-field="yOrigin">
+                    <input type="number" step="0.01" class="w-full text-xs" placeholder="z" data-field="zHeight">
                 </div>
             </td>
             <td class="px-1 py-1 align-top">
                 <div class="grid grid-cols-4 gap-0.5">
-                    <input type="number" step="1" class="w-full text-[8px]" placeholder="Nx" data-field="xNumPoints">
-                    <input type="number" step="0.01" class="w-full text-[8px]" placeholder="Dx" data-field="xSpacing">
-                    <input type="number" step="1" class="w-full text-[8px]" placeholder="Ny" data-field="yNumPoints">
-                    <input type="number" step="0.01" class="w-full text-[8px]" placeholder="Dy" data-field="ySpacing">
+                    <input type="number" step="1" class="w-full text-xs" placeholder="Nx" data-field="xNumPoints">
+                    <input type="number" step="0.01" class="w-full text-xs" placeholder="Dx" data-field="xSpacing">
+                    <input type="number" step="1" class="w-full text-xs" placeholder="Ny" data-field="yNumPoints">
+                    <input type="number" step="0.01" class="w-full text-xs" placeholder="Dy" data-field="ySpacing">
                 </div>
             </td>
             <td class="px-1 py-1 align-top text-right">
@@ -7534,7 +7513,7 @@ function createDaylightingManagerPanel() {
         if (!vars.length) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="px-1 py-1 text-[7px] text-[--text-secondary]" colspan="4">
+                <td class="px-1 py-1 text-xs text-white" colspan="4">
                     No Output:Variable entries defined for daylighting/lighting.
                 </td>
             `;
@@ -7547,14 +7526,14 @@ function createDaylightingManagerPanel() {
             tr.dataset.index = String(idx);
             tr.innerHTML = `
                 <td class="px-1 py-1 align-top">
-                    <input class="w-full text-[8px]" data-field="key" value="${v.key || ''}">
+                    <input class="w-full text-xs" data-field="key" value="${v.key || ''}">
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <input class="w-full text-[8px]" data-field="variableName" value="${v.variableName || ''}">
+                    <input class="w-full text-xs" data-field="variableName" value="${v.variableName || ''}">
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <select class="w-full text-[8px]" data-field="freq">
-                        ${['Timestep','Hourly','Daily','Monthly','RunPeriod'].map((f) => `
+                    <select class="w-full text-xs" data-field="freq">
+                        ${['Timestep', 'Hourly', 'Daily', 'Monthly', 'RunPeriod'].map((f) => `
                             <option value="${f}"${(v.reportingFrequency || 'Hourly') === f ? ' selected' : ''}>${f}</option>
                         `).join('')}
                     </select>
@@ -7578,13 +7557,13 @@ function createDaylightingManagerPanel() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td class="px-1 py-1 align-top">
-                <input class="w-full text-[8px]" data-field="key" placeholder="Key (zone name, Environment, *)">
+                <input class="w-full text-xs" data-field="key" placeholder="Key (zone name, Environment, *)">
             </td>
             <td class="px-1 py-1 align-top">
-                <input class="w-full text-[8px]" data-field="variableName" placeholder="Variable Name">
+                <input class="w-full text-xs" data-field="variableName" placeholder="Variable Name">
             </td>
             <td class="px-1 py-1 align-top">
-                <select class="w-full text-[8px]" data-field="freq">
+                <select class="w-full text-xs" data-field="freq">
                     <option value="Hourly" selected>Hourly</option>
                     <option value="Timestep">Timestep</option>
                     <option value="Daily">Daily</option>
@@ -7832,18 +7811,19 @@ function createOutputsManagerPanel() {
             <div class="resize-handle-corner bottom-left"></div>
             <div class="resize-handle-corner bottom-right"></div>
 
-            <p class="info-box !text-[10px] !py-1.5 !px-2">
+            <p class="info-box !text-xs !py-1.5 !px-2">
+            <p class="info-box !text-xs !py-1.5 !px-2">
                 Configure <code>Output:Variable</code> entries.
                 Settings are stored in <code>energyPlusConfig.daylighting.outputs.variables</code>.
             </p>
 
             <div class="flex justify-between items-center">
-                <span class="font-semibold text-[10px] uppercase text-[--text-secondary]">Output Variables</span>
+                <span class="font-semibold text-xs uppercase text-[--text-secondary]">Output Variables</span>
                 <button class="btn btn-xxs btn-secondary" data-action="add-output-var">+ Add Variable</button>
             </div>
 
             <div class="border border-gray-700/70 rounded bg-black/40 max-h-56 overflow-y-auto **scrollable-panel-inner**">
-                <table class="w-full text-[8px]">
+                <table class="w-full text-xs">
                     <thead class="bg-black/40">
                         <tr>
                             <th class="px-1 py-1 text-left">Key</th>
@@ -7856,7 +7836,7 @@ function createOutputsManagerPanel() {
                 </table>
             </div>
 
-            <div class="text-[7px] text-[--text-secondary]">
+            <div class="text-xs text-[--text-secondary]">
                 Examples: Key = zone name or "Environment"; Variable = "Zone Lights Electric Power"; Frequency = Hourly/RunPeriod/etc.
             </div>
 
@@ -7898,7 +7878,7 @@ function createOutputsManagerPanel() {
         if (!vars.length) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="px-1 py-1 text-[8px] text-[--text-secondary]" colspan="4">
+                <td class="px-1 py-1 text-xs text-white" colspan="4">
                     No Output:Variable entries defined.
                 </td>
             `;
@@ -7911,14 +7891,14 @@ function createOutputsManagerPanel() {
             tr.dataset.index = String(index);
             tr.innerHTML = `
                 <td class="px-1 py-1 align-top">
-                    <input class="w-full text-[8px]" data-field="key" value="${v.key || ''}">
+                    <input class="w-full text-xs" data-field="key" value="${v.key || ''}">
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <input class="w-full text-[8px]" data-field="variableName" value="${v.variableName || ''}">
+                    <input class="w-full text-xs" data-field="variableName" value="${v.variableName || ''}">
                 </td>
                 <td class="px-1 py-1 align-top">
-                    <select class="w-full text-[8px]" data-field="freq">
-                        ${['Timestep','Hourly','Daily','Monthly','RunPeriod'].map((f) => `
+                    <select class="w-full text-xs" data-field="freq">
+                        ${['Timestep', 'Hourly', 'Daily', 'Monthly', 'RunPeriod'].map((f) => `
                             <option value="${f}"${(v.reportingFrequency || 'Hourly') === f ? ' selected' : ''}>${f}</option>
                         `).join('')}
                     </select>
@@ -7942,13 +7922,13 @@ function createOutputsManagerPanel() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td class="px-1 py-1 align-top">
-                <input class="w-full text-[8px]" data-field="key" placeholder="Key (zone name, Environment, *)">
+                <input class="w-full text-xs" data-field="key" placeholder="Key (zone name, Environment, *)">
             </td>
             <td class="px-1 py-1 align-top">
-                <input class="w-full text-[8px]" data-field="variableName" placeholder="Variable Name">
+                <input class="w-full text-xs" data-field="variableName" placeholder="Variable Name">
             </td>
             <td class="px-1 py-1 align-top">
-                <select class="w-full text-[8px]" data-field="freq">
+                <select class="w-full text-xs" data-field="freq">
                     <option value="Hourly" selected>Hourly</option>
                     <option value="Timestep">Timestep</option>
                     <option value="Daily">Daily</option>
@@ -8093,7 +8073,7 @@ function createWeatherLocationManagerPanel() {
                 <div class="window-icon-close" title="Close"></div>
             </div>
         </div>
-        <div class="window-content space-y-3 text-[8px]">
+        <div class="window-content space-y-3 text-xs">
             <div class="resize-handle-edge top"></div>
             <div class="resize-handle-edge right"></div>
             <div class="resize-handle-edge bottom"></div>
@@ -8103,7 +8083,7 @@ function createWeatherLocationManagerPanel() {
             <div class="resize-handle-corner bottom-left"></div>
             <div class="resize-handle-corner bottom-right"></div>
 
-            <p class="info-box !text-[9px] !py-1.5 !px-2">
+            <p class="info-box !text-xs !py-1.5 !px-2">
                 Configure the project-level EnergyPlus weather file (EPW) and location strategy.
                 This configuration is used when generating IDFs and running simulations.
             </p>
@@ -8111,14 +8091,14 @@ function createWeatherLocationManagerPanel() {
             <!-- Project EPW selection -->
             <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
                 <div class="flex items-center justify-between">
-                    <span class="font-semibold text-[9px] uppercase text-[--text-secondary]">
+                    <span class="font-semibold text-xs uppercase text-[--text-secondary]">
                         Project Weather File (EPW)
                     </span>
                 </div>
                 <div class="flex items-center gap-2 mt-1">
                     <input
                         type="text"
-                        class="w-full text-[8px]"
+                        class="w-full text-xs"
                         data-field="epw-path"
                         value="${epwPath || ''}"
                         placeholder="No EPW selected"
@@ -8131,53 +8111,53 @@ function createWeatherLocationManagerPanel() {
                         Clear
                     </button>
                 </div>
-                <div class="text-[7px] text-[--text-secondary] mt-1">
+                <div class="text-xs text-[--text-secondary] mt-1">
                     The selected EPW is stored in <code>energyPlusConfig.weather.epwPath</code>.
                     If not set, annual simulations will fail validation.
                 </div>
-                <div class="text-[7px] text-yellow-300" data-role="epw-warning" style="${epwPath ? 'display:none;' : ''}">
+                <div class="text-xs text-yellow-300" data-role="epw-warning" style="${epwPath ? 'display:none;' : ''}">
                     No EPW is currently configured.
                 </div>
             </div>
 
             <!-- Location source -->
             <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
-                <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">
+                <div class="font-semibold text-xs uppercase text-[--text-secondary]">
                     Location Source
                 </div>
                 <div class="flex flex-col gap-1 mt-1">
                     <label class="inline-flex items-center gap-1">
                         <input type="radio" name="loc-source" value="FromEPW" data-field="loc-from-epw" ${locationSource === 'Custom' ? '' : 'checked'}>
-                        <span class="text-[8px]">From EPW (recommended)</span>
+                        <span class="text-xs">From EPW (recommended)</span>
                     </label>
                     <label class="inline-flex items-center gap-1">
                         <input type="radio" name="loc-source" value="Custom" data-field="loc-custom" ${locationSource === 'Custom' ? 'checked' : ''}>
-                        <span class="text-[8px]">Custom location (advanced)</span>
+                        <span class="text-xs">Custom location (advanced)</span>
                     </label>
                 </div>
-                <div class="mt-2 grid grid-cols-5 gap-1 text-[8px]" data-role="custom-location-fields" style="${locationSource === 'Custom' ? '' : 'display:none;'}">
+                <div class="mt-2 grid grid-cols-5 gap-1 text-xs" data-role="custom-location-fields" style="${locationSource === 'Custom' ? '' : 'display:none;'}">
                     <div>
-                        <label class="label !text-[7px]">Name</label>
+                        <label class="label !text-xs">Name</label>
                         <input class="w-full" data-field="cl-name" value="${cl.name || ''}" placeholder="MySite">
                     </div>
                     <div>
-                        <label class="label !text-[7px]">Lat (°)</label>
+                        <label class="label !text-xs">Lat (°)</label>
                         <input type="number" step="0.01" class="w-full" data-field="cl-lat" value="${cl.latitude ?? ''}">
                     </div>
                     <div>
-                        <label class="label !text-[7px]">Lon (°)</label>
+                        <label class="label !text-xs">Lon (°)</label>
                         <input type="number" step="0.01" class="w-full" data-field="cl-lon" value="${cl.longitude ?? ''}">
                     </div>
                     <div>
-                        <label class="label !text-[7px]">TZ (hr)</label>
+                        <label class="label !text-xs">TZ (hr)</label>
                         <input type="number" step="0.1" class="w-full" data-field="cl-tz" value="${cl.timeZone ?? ''}">
                     </div>
                     <div>
-                        <label class="label !text-[7px]">Elev (m)</label>
+                        <label class="label !text-xs">Elev (m)</label>
                         <input type="number" step="0.1" class="w-full" data-field="cl-elev" value="${cl.elevation ?? ''}">
                     </div>
                 </div>
-                <div class="text-[7px] text-[--text-secondary] mt-1">
+                <div class="text-xs text-[--text-secondary] mt-1">
                     When using "Custom location", these values override EPW-derived location for IDF generation.
                     All fields are required for a valid custom location.
                 </div>
@@ -8486,7 +8466,7 @@ function createSimulationControlManagerPanel() {
                 <div class="window-icon-close" title="Close"></div>
             </div>
         </div>
-        <div class="window-content space-y-3 text-[8px]">
+        <div class="window-content space-y-3 text-xs">
             <div class="resize-handle-edge top"></div>
             <div class="resize-handle-edge right"></div>
             <div class="resize-handle-edge bottom"></div>
@@ -8496,40 +8476,40 @@ function createSimulationControlManagerPanel() {
             <div class="resize-handle-corner bottom-left"></div>
             <div class="resize-handle-corner bottom-right"></div>
 
-            <p class="info-box !text-[9px] !py-1.5 !px-2">
+            <p class="info-box !text-xs !py-1.5 !px-2">
                 Configure global EnergyPlus simulation settings used when generating the IDF.
                 Location is taken from the EPW file and is not configured here.
             </p>
 
             <!-- Building -->
             <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
-                <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">Building</div>
+                <div class="font-semibold text-xs uppercase text-[--text-secondary]">Building</div>
                 <div class="grid grid-cols-4 gap-1">
                     <div>
-                        <label class="label !text-[8px]">Name</label>
-                        <input class="w-full" data-field="b-name" value="${sc.building.name}">
+                        <label class="label !text-xs">Name</label>
+                        <input class="w-full text-xs" data-field="b-name" value="${sc.building.name}">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">North Axis [deg]</label>
-                        <input type="number" step="0.1" class="w-full" data-field="b-north" value="${sc.building.northAxis}">
+                        <label class="label !text-xs">North Axis [deg]</label>
+                        <input type="number" step="0.1" class="w-full text-xs" data-field="b-north" value="${sc.building.northAxis}">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Terrain</label>
-                        <select class="w-full" data-field="b-terrain">
-                            ${['Ocean','Country','Suburbs','City'].map(t => `
+                        <label class="label !text-xs">Terrain</label>
+                        <select class="w-full text-xs" data-field="b-terrain">
+                            ${['Ocean', 'Country', 'Suburbs', 'City'].map(t => `
                                 <option value="${t}" ${t === sc.building.terrain ? 'selected' : ''}>${t}</option>
                             `).join('')}
                         </select>
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Solar Dist.</label>
-                        <select class="w-full" data-field="b-solar">
+                        <label class="label !text-xs">Solar Dist.</label>
+                        <select class="w-full text-xs" data-field="b-solar">
                             ${[
-                                'MinimalShadowing',
-                                'FullExterior',
-                                'FullInteriorAndExterior',
-                                'FullInteriorAndExteriorWithReflections'
-                            ].map(v => `
+            'MinimalShadowing',
+            'FullExterior',
+            'FullInteriorAndExterior',
+            'FullInteriorAndExteriorWithReflections'
+        ].map(v => `
                                 <option value="${v}" ${v === sc.building.solarDistribution ? 'selected' : ''}>${v}</option>
                             `).join('')}
                         </select>
@@ -8537,20 +8517,20 @@ function createSimulationControlManagerPanel() {
                 </div>
                 <div class="grid grid-cols-4 gap-1 mt-1">
                     <div>
-                        <label class="label !text-[8px]">Loads Tol.</label>
-                        <input type="number" step="0.001" class="w-full" data-field="b-loadsTol" value="${sc.building.loadsTolerance}">
+                        <label class="label !text-xs">Loads Tol.</label>
+                        <input type="number" step="0.001" class="w-full text-xs" data-field="b-loadsTol" value="${sc.building.loadsTolerance}">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Temp Tol. [°C]</label>
-                        <input type="number" step="0.01" class="w-full" data-field="b-tempTol" value="${sc.building.tempTolerance}">
+                        <label class="label !text-xs">Temp Tol. [°C]</label>
+                        <input type="number" step="0.01" class="w-full text-xs" data-field="b-tempTol" value="${sc.building.tempTolerance}">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Max Warmup Days</label>
-                        <input type="number" class="w-full" data-field="b-maxWarmup" value="${sc.building.maxWarmupDays}">
+                        <label class="label !text-xs">Max Warmup Days</label>
+                        <input type="number" class="w-full text-xs" data-field="b-maxWarmup" value="${sc.building.maxWarmupDays}">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Min Warmup Days</label>
-                        <input type="number" class="w-full" data-field="b-minWarmup" value="${sc.building.minWarmupDays}">
+                        <label class="label !text-xs">Min Warmup Days</label>
+                        <input type="number" class="w-full text-xs" data-field="b-minWarmup" value="${sc.building.minWarmupDays}">
                     </div>
                 </div>
             </div>
@@ -8558,30 +8538,30 @@ function createSimulationControlManagerPanel() {
             <!-- Timestep & SimulationControl -->
             <div class="grid grid-cols-2 gap-2">
                 <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
-                    <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">Timestep</div>
-                    <label class="label !text-[8px]">Timesteps per Hour</label>
-                    <input type="number" min="1" max="60" class="w-full" data-field="ts-perhour" value="${sc.timestep.timestepsPerHour}">
+                    <div class="font-semibold text-xs uppercase text-[--text-secondary]">Timestep</div>
+                    <label class="label !text-xs">Timesteps per Hour</label>
+                    <input type="number" min="1" max="60" class="w-full text-xs" data-field="ts-perhour" value="${sc.timestep.timestepsPerHour}">
                 </div>
                 <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
-                    <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">Simulation Control</div>
+                    <div class="font-semibold text-xs uppercase text-[--text-secondary]">Simulation Control</div>
                     <div class="grid grid-cols-2 gap-1">
-                        <label class="inline-flex items-center gap-1">
+                        <label class="inline-flex items-center gap-1 text-xs">
                             <input type="checkbox" data-field="sc-doZone" ${sc.simulationControlFlags.doZoneSizing ? 'checked' : ''}>
                             <span>Do Zone Sizing</span>
                         </label>
-                        <label class="inline-flex items-center gap-1">
+                        <label class="inline-flex items-center gap-1 text-xs">
                             <input type="checkbox" data-field="sc-doSystem" ${sc.simulationControlFlags.doSystemSizing ? 'checked' : ''}>
                             <span>Do System Sizing</span>
                         </label>
-                        <label class="inline-flex items-center gap-1">
+                        <label class="inline-flex items-center gap-1 text-xs">
                             <input type="checkbox" data-field="sc-doPlant" ${sc.simulationControlFlags.doPlantSizing ? 'checked' : ''}>
                             <span>Do Plant Sizing</span>
                         </label>
-                        <label class="inline-flex items-center gap-1">
+                        <label class="inline-flex items-center gap-1 text-xs">
                             <input type="checkbox" data-field="sc-runSizing" ${sc.simulationControlFlags.runSizingPeriods ? 'checked' : ''}>
                             <span>Run Sizing Periods</span>
                         </label>
-                        <label class="inline-flex items-center gap-1">
+                        <label class="inline-flex items-center gap-1 text-xs">
                             <input type="checkbox" data-field="sc-runWeather" ${sc.simulationControlFlags.runWeatherRunPeriods ? 'checked' : ''}>
                             <span>Run Weather Periods</span>
                         </label>
@@ -8592,51 +8572,51 @@ function createSimulationControlManagerPanel() {
             <!-- GlobalGeometryRules & ShadowCalculation -->
             <div class="grid grid-cols-2 gap-2">
                 <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
-                    <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">Global Geometry Rules</div>
+                    <div class="font-semibold text-xs uppercase text-[--text-secondary]">Global Geometry Rules</div>
                     <div>
-                        <label class="label !text-[8px]">Starting Vertex Position</label>
-                        <select class="w-full" data-field="ggr-start">
-                            ${['UpperLeftCorner','UpperRightCorner','LowerLeftCorner','LowerRightCorner'].map(v => `
+                        <label class="label !text-xs">Starting Vertex Position</label>
+                        <select class="w-full text-xs" data-field="ggr-start">
+                            ${['UpperLeftCorner', 'UpperRightCorner', 'LowerLeftCorner', 'LowerRightCorner'].map(v => `
                                 <option value="${v}" ${v === sc.globalGeometryRules.startingVertexPosition ? 'selected' : ''}>${v}</option>
                             `).join('')}
                         </select>
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Vertex Entry Direction</label>
-                        <select class="w-full" data-field="ggr-dir">
-                            ${['Counterclockwise','Clockwise'].map(v => `
+                        <label class="label !text-xs">Vertex Entry Direction</label>
+                        <select class="w-full text-xs" data-field="ggr-dir">
+                            ${['Counterclockwise', 'Clockwise'].map(v => `
                                 <option value="${v}" ${v === sc.globalGeometryRules.vertexEntryDirection ? 'selected' : ''}>${v}</option>
                             `).join('')}
                         </select>
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Coordinate System</label>
-                        <select class="w-full" data-field="ggr-coord">
-                            ${['World','Local','Relative'].map(v => `
+                        <label class="label !text-xs">Coordinate System</label>
+                        <select class="w-full text-xs" data-field="ggr-coord">
+                            ${['World', 'Local', 'Relative'].map(v => `
                                 <option value="${v}" ${v === sc.globalGeometryRules.coordinateSystem ? 'selected' : ''}>${v}</option>
                             `).join('')}
                         </select>
                     </div>
                 </div>
                 <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
-                    <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">Shadow Calculation</div>
+                    <div class="font-semibold text-xs uppercase text-[--text-secondary]">Shadow Calculation</div>
                     <div class="grid grid-cols-2 gap-1">
                         <div>
-                            <label class="label !text-[8px]">Calc Frequency</label>
-                            <input type="number" class="w-full" data-field="shad-freq" value="${sc.shadowCalculation.calculationFrequency}">
+                            <label class="label !text-xs">Calc Frequency</label>
+                            <input type="number" class="w-full text-xs" data-field="shad-freq" value="${sc.shadowCalculation.calculationFrequency}">
                         </div>
                         <div>
-                            <label class="label !text-[8px]">Max Figures</label>
-                            <input type="number" class="w-full" data-field="shad-maxfig" value="${sc.shadowCalculation.maxFigures}">
+                            <label class="label !text-xs">Max Figures</label>
+                            <input type="number" class="w-full text-xs" data-field="shad-maxfig" value="${sc.shadowCalculation.maxFigures}">
                         </div>
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Algorithm</label>
-                        <input class="w-full" data-field="shad-alg" value="${sc.shadowCalculation.algorithm}">
+                        <label class="label !text-xs">Algorithm</label>
+                        <input class="w-full text-xs" data-field="shad-alg" value="${sc.shadowCalculation.algorithm}">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Sky Diffuse Model</label>
-                        <input class="w-full" data-field="shad-sky" value="${sc.shadowCalculation.skyDiffuseModel}">
+                        <label class="label !text-xs">Sky Diffuse Model</label>
+                        <input class="w-full text-xs" data-field="shad-sky" value="${sc.shadowCalculation.skyDiffuseModel}">
                     </div>
                 </div>
             </div>
@@ -8644,34 +8624,34 @@ function createSimulationControlManagerPanel() {
             <!-- Surface Convection & Heat Balance -->
             <div class="grid grid-cols-2 gap-2">
                 <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
-                    <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">Surface Convection</div>
+                    <div class="font-semibold text-xs uppercase text-[--text-secondary]">Surface Convection</div>
                     <div>
-                        <label class="label !text-[8px]">Inside Algorithm</label>
-                        <input class="w-full" data-field="conv-in" value="${sc.surfaceConvection.insideAlgorithm}">
+                        <label class="label !text-xs">Inside Algorithm</label>
+                        <input class="w-full text-xs" data-field="conv-in" value="${sc.surfaceConvection.insideAlgorithm}">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Outside Algorithm</label>
-                        <input class="w-full" data-field="conv-out" value="${sc.surfaceConvection.outsideAlgorithm}">
+                        <label class="label !text-xs">Outside Algorithm</label>
+                        <input class="w-full text-xs" data-field="conv-out" value="${sc.surfaceConvection.outsideAlgorithm}">
                     </div>
                 </div>
                 <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
-                    <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">Heat Balance Algorithm</div>
+                    <div class="font-semibold text-xs uppercase text-[--text-secondary]">Heat Balance Algorithm</div>
                     <div>
-                        <label class="label !text-[8px]">Algorithm</label>
-                        <input class="w-full" data-field="hb-alg" value="${sc.heatBalanceAlgorithm.algorithm}">
+                        <label class="label !text-xs">Algorithm</label>
+                        <input class="w-full text-xs" data-field="hb-alg" value="${sc.heatBalanceAlgorithm.algorithm}">
                     </div>
                     <div class="grid grid-cols-3 gap-1 mt-1">
                         <div>
-                            <label class="label !text-[8px]">Surf T max [°C]</label>
-                            <input type="number" class="w-full" data-field="hb-tmax" value="${sc.heatBalanceAlgorithm.surfaceTempUpperLimit}">
+                            <label class="label !text-xs">Surf T max [°C]</label>
+                            <input type="number" class="w-full text-xs" data-field="hb-tmax" value="${sc.heatBalanceAlgorithm.surfaceTempUpperLimit}">
                         </div>
                         <div>
-                            <label class="label !text-[8px]">hConv min</label>
-                            <input type="number" step="0.01" class="w-full" data-field="hb-hmin" value="${sc.heatBalanceAlgorithm.hConvMin}">
+                            <label class="label !text-xs">hConv min</label>
+                            <input type="number" step="0.01" class="w-full text-xs" data-field="hb-hmin" value="${sc.heatBalanceAlgorithm.hConvMin}">
                         </div>
                         <div>
-                            <label class="label !text-[8px]">hConv max</label>
-                            <input type="number" class="w-full" data-field="hb-hmax" value="${sc.heatBalanceAlgorithm.hConvMax}">
+                            <label class="label !text-xs">hConv max</label>
+                            <input type="number" class="w-full text-xs" data-field="hb-hmax" value="${sc.heatBalanceAlgorithm.hConvMax}">
                         </div>
                     </div>
                 </div>
@@ -8679,34 +8659,34 @@ function createSimulationControlManagerPanel() {
 
             <!-- Sizing Period -->
             <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
-                <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">SizingPeriod:WeatherFileDays</div>
+                <div class="font-semibold text-xs uppercase text-[--text-secondary]">SizingPeriod:WeatherFileDays</div>
                 <div class="grid grid-cols-6 gap-1">
                     <div>
-                        <label class="label !text-[8px]">Name</label>
-                        <input class="w-full" data-field="sp-name" value="${sc.sizingPeriodWeatherFileDays.name}">
+                        <label class="label !text-xs">Name</label>
+                        <input class="w-full text-xs" data-field="sp-name" value="${sc.sizingPeriodWeatherFileDays.name}">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Begin M</label>
-                        <input type="number" min="1" max="12" class="w-full" data-field="sp-bm" value="${sc.sizingPeriodWeatherFileDays.beginMonth}">
+                        <label class="label !text-xs">Begin M</label>
+                        <input type="number" min="1" max="12" class="w-full text-xs" data-field="sp-bm" value="${sc.sizingPeriodWeatherFileDays.beginMonth}">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">Begin D</label>
-                        <input type="number" min="1" max="31" class="w-full" data-field="sp-bd" value="${sc.sizingPeriodWeatherFileDays.beginDayOfMonth}">
+                        <label class="label !text-xs">Begin D</label>
+                        <input type="number" min="1" max="31" class="w-full text-xs" data-field="sp-bd" value="${sc.sizingPeriodWeatherFileDays.beginDayOfMonth}">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">End M</label>
-                        <input type="number" min="1" max="12" class="w-full" data-field="sp-em" value="${sc.sizingPeriodWeatherFileDays.endMonth}">
+                        <label class="label !text-xs">End M</label>
+                        <input type="number" min="1" max="12" class="w-full text-xs" data-field="sp-em" value="${sc.sizingPeriodWeatherFileDays.endMonth}">
                     </div>
                     <div>
-                        <label class="label !text-[8px]">End D</label>
-                        <input type="number" min="1" max="31" class="w-full" data-field="sp-ed" value="${sc.sizingPeriodWeatherFileDays.endDayOfMonth}">
+                        <label class="label !text-xs">End D</label>
+                        <input type="number" min="1" max="31" class="w-full text-xs" data-field="sp-ed" value="${sc.sizingPeriodWeatherFileDays.endDayOfMonth}">
                     </div>
                     <div class="flex flex-col justify-end gap-0.5">
-                        <label class="inline-flex items-center gap-1">
+                        <label class="inline-flex items-center gap-1 text-xs">
                             <input type="checkbox" data-field="sp-dst" ${sc.sizingPeriodWeatherFileDays.useWeatherFileDaylightSaving ? 'checked' : ''}>
                             <span class="whitespace-nowrap">Use WF DST</span>
                         </label>
-                        <label class="inline-flex items-center gap-1">
+                        <label class="inline-flex items-center gap-1 text-xs">
                             <input type="checkbox" data-field="sp-rain" ${sc.sizingPeriodWeatherFileDays.useWeatherFileRainSnowIndicators ? 'checked' : ''}>
                             <span class="whitespace-nowrap">Use WF Rain/Snow</span>
                         </label>
@@ -8717,72 +8697,72 @@ function createSimulationControlManagerPanel() {
             <!-- RunPeriod & DST -->
             <div class="grid grid-cols-2 gap-2">
                 <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
-                    <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">RunPeriod</div>
+                    <div class="font-semibold text-xs uppercase text-[--text-secondary]">RunPeriod</div>
                     <div class="grid grid-cols-4 gap-1">
                         <div class="col-span-2">
-                            <label class="label !text-[8px]">Name</label>
-                            <input class="w-full" data-field="rp-name" value="${sc.runPeriod.name}">
+                            <label class="label !text-xs">Name</label>
+                            <input class="w-full text-xs" data-field="rp-name" value="${sc.runPeriod.name}">
                         </div>
                         <div>
-                            <label class="label !text-[8px]">Begin M</label>
-                            <input type="number" min="1" max="12" class="w-full" data-field="rp-bm" value="${sc.runPeriod.beginMonth}">
+                            <label class="label !text-xs">Begin M</label>
+                            <input type="number" min="1" max="12" class="w-full text-xs" data-field="rp-bm" value="${sc.runPeriod.beginMonth}">
                         </div>
                         <div>
-                            <label class="label !text-[8px]">Begin D</label>
-                            <input type="number" min="1" max="31" class="w-full" data-field="rp-bd" value="${sc.runPeriod.beginDayOfMonth}">
+                            <label class="label !text-xs">Begin D</label>
+                            <input type="number" min="1" max="31" class="w-full text-xs" data-field="rp-bd" value="${sc.runPeriod.beginDayOfMonth}">
                         </div>
                     </div>
                     <div class="grid grid-cols-4 gap-1 mt-1">
                         <div>
-                            <label class="label !text-[8px]">End M</label>
-                            <input type="number" min="1" max="12" class="w-full" data-field="rp-em" value="${sc.runPeriod.endMonth}">
+                            <label class="label !text-xs">End M</label>
+                            <input type="number" min="1" max="12" class="w-full text-xs" data-field="rp-em" value="${sc.runPeriod.endMonth}">
                         </div>
                         <div>
-                            <label class="label !text-[8px]">End D</label>
-                            <input type="number" min="1" max="31" class="w-full" data-field="rp-ed" value="${sc.runPeriod.endDayOfMonth}">
+                            <label class="label !text-xs">End D</label>
+                            <input type="number" min="1" max="31" class="w-full text-xs" data-field="rp-ed" value="${sc.runPeriod.endDayOfMonth}">
                         </div>
                         <div class="col-span-2">
-                            <label class="label !text-[8px]">Day of Week / UseWeatherFile</label>
-                            <input class="w-full" data-field="rp-dow" value="${sc.runPeriod.dayOfWeekForStart}">
+                            <label class="label !text-xs">Day of Week / UseWeatherFile</label>
+                            <input class="w-full text-xs" data-field="rp-dow" value="${sc.runPeriod.dayOfWeekForStart}">
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-1 mt-1">
-                        <label class="inline-flex items-center gap-1">
+                        <label class="inline-flex items-center gap-1 text-xs">
                             <input type="checkbox" data-field="rp-holidays" ${sc.runPeriod.useWeatherFileHolidays ? 'checked' : ''}>
                             <span>Use WF Holidays</span>
                         </label>
-                        <label class="inline-flex items-center gap-1">
+                        <label class="inline-flex items-center gap-1 text-xs">
                             <input type="checkbox" data-field="rp-dst" ${sc.runPeriod.useWeatherFileDaylightSaving ? 'checked' : ''}>
                             <span>Use WF DST</span>
                         </label>
-                        <label class="inline-flex items-center gap-1">
+                        <label class="inline-flex items-center gap-1 text-xs">
                             <input type="checkbox" data-field="rp-weekend" ${sc.runPeriod.applyWeekendHolidayRule ? 'checked' : ''}>
                             <span>Weekend Holiday Rule</span>
                         </label>
-                        <label class="inline-flex items-center gap-1">
+                        <label class="inline-flex items-center gap-1 text-xs">
                             <input type="checkbox" data-field="rp-rain" ${sc.runPeriod.useWeatherFileRain ? 'checked' : ''}>
                             <span>Use WF Rain</span>
                         </label>
-                        <label class="inline-flex items-center gap-1">
+                        <label class="inline-flex items-center gap-1 text-xs">
                             <input type="checkbox" data-field="rp-snow" ${sc.runPeriod.useWeatherFileSnow ? 'checked' : ''}>
                             <span>Use WF Snow</span>
                         </label>
                         <div>
-                            <label class="label !text-[8px]">Repeat Count</label>
-                            <input type="number" min="1" class="w-full" data-field="rp-repeat" value="${sc.runPeriod.numTimesRunperiodToBeRepeated}">
+                            <label class="label !text-xs">Repeat Count</label>
+                            <input type="number" min="1" class="w-full text-xs" data-field="rp-repeat" value="${sc.runPeriod.numTimesRunperiodToBeRepeated}">
                         </div>
                     </div>
                 </div>
                 <div class="border border-gray-700/70 rounded bg-black/40 p-2 space-y-1">
-                    <div class="font-semibold text-[9px] uppercase text-[--text-secondary]">RunPeriodControl:DaylightSavingTime</div>
+                    <div class="font-semibold text-xs uppercase text-[--text-secondary]">RunPeriodControl:DaylightSavingTime</div>
                     <div class="grid grid-cols-2 gap-1">
                         <div>
-                            <label class="label !text-[8px]">Start Date (M/D)</label>
-                            <input class="w-full" data-field="dst-start" value="${sc.daylightSavingTime.startDate}">
+                            <label class="label !text-xs">Start Date (M/D)</label>
+                            <input class="w-full text-xs" data-field="dst-start" value="${sc.daylightSavingTime.startDate}">
                         </div>
                         <div>
-                            <label class="label !text-[8px]">End Date (M/D)</label>
-                            <input class="w-full" data-field="dst-end" value="${sc.daylightSavingTime.endDate}">
+                            <label class="label !text-xs">End Date (M/D)</label>
+                            <input class="w-full text-xs" data-field="dst-end" value="${sc.daylightSavingTime.endDate}">
                         </div>
                     </div>
                 </div>

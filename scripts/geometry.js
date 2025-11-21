@@ -476,6 +476,10 @@ function _createWallSegment(key, props, winParams, { H, wallThickness }) {
     wallMeshGroup.userData = { canonicalId: key };
 
     const isEW = key === 'e' || key === 'w';
+    // Fix: Only the East wall needs the negative Z translation/inversion logic. 
+    // West wall aligns correctly with standard positive extrusion in this coordinate system.
+    const isEast = key === 'e';
+
     let wallW = props.s[0];
     const wallH = props.s[1];
     if (isEW) wallW += (2 * wallThickness);
@@ -509,7 +513,8 @@ function _createWallSegment(key, props, winParams, { H, wallThickness }) {
             holePath.closePath();
             wallShape.holes.push(holePath);
 
-            const effectiveWinDepthPos = (isEW) ? -winDepthPos : winDepthPos;
+            // Fix: Use isEast to determine depth inversion
+            const effectiveWinDepthPos = (isEast) ? -winDepthPos : winDepthPos;
             const glassWidth = Math.max(0, ww - 2 * ft);
             const glassHeight = Math.max(0, wh - 2 * ft);
 
@@ -548,12 +553,15 @@ function _createWallSegment(key, props, winParams, { H, wallThickness }) {
 
         const extrudeSettings = { steps: 1, depth: wallThickness, bevelEnabled: false };
         const wallGeometry = new THREE.ExtrudeGeometry(wallShape, extrudeSettings);
-        if (isEW) wallGeometry.translate(0, 0, -wallThickness);
+        // Fix: Only translate geometry for East wall
+        if (isEast) wallGeometry.translate(0, 0, -wallThickness);
+
         const wallMeshWithHoles = createSchematicObject(wallGeometry, wallMeshGroup, wallMaterial, SURFACE_TYPES.INTERIOR_WALL);
         wallMeshWithHoles.userData.isSelectableWall = true;
     } else {
         const wallGeometry = new THREE.BoxGeometry(wallW, wallH, wallThickness);
-        const z_translation = isEW ? -wallThickness / 2 : wallThickness / 2;
+        // Fix: Determine Z translation based on isEast
+        const z_translation = isEast ? -wallThickness / 2 : wallThickness / 2;
         wallGeometry.translate(0, 0, z_translation);
         const wallMesh = createSchematicObject(wallGeometry, wallMeshGroup, wallMaterial, SURFACE_TYPES.INTERIOR_WALL);
         wallMesh.userData.isSelectableWall = true;
@@ -825,10 +833,8 @@ export function createShadingDevices() {
         const outward = getWallOutwardNormal(orientation);
         if (outward.lengthSq() === 0) continue;
 
-        // Determine if East or West wall
-        const isEW = (orientation === 'E' || orientation === 'W');
-        // Apply same inversion logic as windows for consistent positioning
-        const effectiveWinDepthPos = isEW ? -winDepthPos : winDepthPos;
+        // Use standard positive depth for all orientations
+        const effectiveWinDepthPos = winDepthPos;
 
         const spacing = mode === 'wwr' ? 0.1 : ww / 2;
         const groupWidth = winCount * ww + Math.max(0, winCount - 1) * spacing;
@@ -880,8 +886,8 @@ export function createShadingDevices() {
             }
 
             // Place deviceGroup origin at window center, then offset relative to glass position
-            // Subtract glassOffset to invert positioning as requested
-            const base = windowCenterLocal.clone().sub(glassOffset);
+            // Add glassOffset to move outwards from the wall center
+            const base = windowCenterLocal.clone().add(glassOffset);
             deviceGroup.position.copy(base);
 
             shadingContainer.add(deviceGroup);

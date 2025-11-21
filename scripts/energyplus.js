@@ -5,12 +5,14 @@ import { project } from './project.js';
 import { buildEnergyPlusModel, buildEnergyPlusDiagnostics } from './energyplusModelBuilder.js';
 import { validateEnergyPlusConfig, EnergyPlusValidationError } from './energyplusValidation.js';
 import { getConfig } from './energyplusConfigService.js';
+import { initializeEnergyPlusSidebar } from './energyplusSidebar.js';
 
 const dom = getDom();
 
 function initializeEnergyPlus() {
     console.log('EnergyPlus module initialized');
     setupEventListeners();
+    initializeEnergyPlusSidebar();
 }
 
 /**
