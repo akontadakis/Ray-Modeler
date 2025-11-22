@@ -21,13 +21,7 @@ The UI is designed around a system of floating panels that can be dragged, resiz
     *   **`scripts/project.js`**: Handles the logic for saving and loading the entire project state. It gathers all parameters from the DOM, bundles them into a single `.json` file, and can also restore the application state from such a file.
     *   **`scripts/simulation.js`**: Implements a "recipe-based" engine. It dynamically creates UI panels for different simulation types (e.g., illuminance, glare) and generates the corresponding Radiance shell scripts.
     *   **`scripts/ai-assistant.js`**: Powers the integrated AI chat. It defines a set of "tools" (functions) that the AI can call to interact with the application, such as modifying scene parameters, running simulations, or querying results.
-    *   **`scripts/energyplus.js`**: Main entry point for EnergyPlus integration. It initializes the EnergyPlus functionality and handles the generation of EnergyPlus Input Data Files (IDF).
-    *   **`scripts/energyplusConfigService.js`**: Provides centralized helper functions for reading, updating, and normalizing EnergyPlus configurations from the project's metadata. It ensures backward compatibility and a single source of truth for EnergyPlus settings.
-    *   **`scripts/energyplusValidation.js`**: Contains lightweight, side-effect-free validation utilities to check the EnergyPlus configuration for run readiness. It helps identify common issues like missing files or inconsistent definitions before launching a simulation.
-    *   **`scripts/energyplusDefaults.js`**: Provides default materials, constructions, schedules, and other parameters for EnergyPlus simulations, loaded from a static JSON file.
-    *   **`scripts/energyplusHelp.js`**: Manages contextual help for EnergyPlus features (currently disabled).
-    *   **`scripts/energyplusModelBuilder.js`**: Contains the logic to build a complete EnergyPlus IDF file from the project's scene and configuration data.
-    *   **`scripts/energyplusSidebar.js`**: Manages the EnergyPlus sidebar UI, including simulation recipes and buttons to open configuration panels for materials, constructions, schedules, and loads.
+
     *   **`scripts/annualDashboard.js`**: Manages the creation and updates of various charts and dashboards for annual simulations.
     *   **`scripts/hdrViewer.js`**: Provides a viewer for High Dynamic Range (HDR) images, with exposure and false color controls.
     *   **`scripts/knowledgeBase.js`**: Loads and searches a local knowledge base for the AI assistant.

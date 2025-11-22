@@ -83,8 +83,7 @@ class ReportGenerator {
             ? resultsManager.getResult(reportDataKey, 'evalglare-pit')
             : activeDataset.glareResult || null;
 
-        // Latest EnergyPlus KPIs (global)
-        const epKpis = resultsManager.getEnergyPlusKpisForUi(null);
+
 
         // Climate summaries (if EPW loaded)
         const climate = resultsManager.hasResult(null, 'epw-climate')
@@ -104,7 +103,7 @@ class ReportGenerator {
             annualMetrics,
             glareResult,
             circadianMetrics,
-            epKpis,
+
             climate,
             lightingMetrics,
             charts: getDashboardChartsAsBase64(),
@@ -159,7 +158,7 @@ class ReportGenerator {
                         ${this._buildProjectInfoSection()}
                         ${this._buildSceneSnapshotSection()}
                         ${this._buildKeyMetricsSection()}
-                        ${this._buildEnergyPlusSection()}
+
                         ${this._buildClimateSection()}
                         ${this._buildLightingSection()}
                         ${this._buildChartsSection()}
@@ -170,7 +169,7 @@ class ReportGenerator {
             </html>
         `;
     }
-    
+
     // --- HTML Component Builders ---
 
     /** @private */
@@ -259,89 +258,7 @@ class ReportGenerator {
     }
 
     /** @private */
-    _buildEnergyPlusSection() {
-        const { epKpis } = this.data;
-        if (!epKpis) return '';
 
-        const {
-            label,
-            status,
-            eui,
-            heating,
-            cooling,
-            lighting,
-            fans,
-            pumps,
-            other,
-            unmetHeat,
-            unmetCool,
-            peakHeatKw,
-            peakCoolKw
-        } = epKpis;
-
-        const fmt = (v, unit = '', digits = 1) =>
-            (v || v === 0 || v === 0.0)
-                ? `${v.toFixed(digits)}${unit}`
-                : '--';
-
-        const endUses = [
-            { label: 'Heating', val: heating },
-            { label: 'Cooling', val: cooling },
-            { label: 'Lighting', val: lighting },
-            { label: 'Fans', val: fans },
-            { label: 'Pumps', val: pumps },
-            { label: 'Other', val: other },
-        ].filter(e => e.val != null);
-
-        const totalEndUse = endUses.reduce((sum, e) => sum + (e.val || 0), 0);
-        const endUseRows = endUses.length
-            ? endUses.map(e => {
-                const share = totalEndUse > 0 ? (e.val / totalEndUse) * 100 : 0;
-                return `
-                    <tr>
-                        <td>${e.label}</td>
-                        <td class="text-right">${fmt(e.val, '', 1)}</td>
-                        <td class="text-right">${totalEndUse > 0 ? share.toFixed(1) + '%' : '--'}</td>
-                    </tr>`;
-            }).join('')
-            : `
-                <tr>
-                    <td colspan="3" class="text-muted">
-                        No end-use breakdown available.
-                    </td>
-                </tr>`;
-
-        return `
-            <div class="section">
-                <h2>EnergyPlus Summary (Latest Run)</h2>
-                <ul>
-                    <li><strong>Run:</strong> ${label || epKpis.runId || 'N/A'}</li>
-                    <li><strong>Status:</strong> ${status || 'unknown'}</li>
-                </ul>
-                <div class="metric-grid">
-                    ${this._buildMetricCard('EUI', fmt(eui, ' kWh/m²·yr'), '')}
-                    ${this._buildMetricCard('Heating Unmet Hours', fmt(unmetHeat, ' h', 0))}
-                    ${this._buildMetricCard('Cooling Unmet Hours', fmt(unmetCool, ' h', 0))}
-                    ${this._buildMetricCard('Peak Heating Load', fmt(peakHeatKw, ' kW', 1))}
-                    ${this._buildMetricCard('Peak Cooling Load', fmt(peakCoolKw, ' kW', 1))}
-                </div>
-                <div class="section" style="margin-top:15px;">
-                    <h3 style="margin:0 0 8px 0;font-size:1em;">End Use Breakdown (kWh/m²·yr)</h3>
-                    <table style="width:100%;border-collapse:collapse;font-size:0.85em;">
-                        <thead>
-                            <tr>
-                                <th style="text-align:left;padding:4px 6px;border-bottom:1px solid #ddd;">End Use</th>
-                                <th style="text-align:right;padding:4px 6px;border-bottom:1px solid #ddd;">kWh/m²·yr</th>
-                                <th style="text-align:right;padding:4px 6px;border-bottom:1px solid #ddd;">Share</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${endUseRows}
-                        </tbody>
-                    </table>
-                </div>
-            </div>`;
-    }
 
     /** @private */
     _buildClimateSection() {
@@ -355,21 +272,21 @@ class ReportGenerator {
 
         const solarRows = monthlySolar
             ? monthLabels.map((m, i) => `
-                <tr>
+            <tr >
                     <td>${m}</td>
                     <td class="text-right">${(monthlySolar.dni[i] || 0).toFixed(2)}</td>
                     <td class="text-right">${(monthlySolar.dhi[i] || 0).toFixed(2)}</td>
-                </tr>`).join('')
+                </tr> `).join('')
             : '';
 
         const tempRows = monthlyTemp
             ? monthLabels.map((m, i) => `
-                <tr>
+            <tr >
                     <td>${m}</td>
                     <td class="text-right">${(monthlyTemp.min[i] || 0).toFixed(1)}</td>
                     <td class="text-right">${(monthlyTemp.avg[i] || 0).toFixed(1)}</td>
                     <td class="text-right">${(monthlyTemp.max[i] || 0).toFixed(1)}</td>
-                </tr>`).join('')
+                </tr> `).join('')
             : '';
 
         const hasSolar = !!monthlySolar;
@@ -393,7 +310,8 @@ class ReportGenerator {
                             ${solarRows}
                         </tbody>
                     </table>
-                ` : ''}
+                ` : ''
+            }
 
                 ${hasTemp ? `
                     <h3 style="margin:10px 0 4px 0;font-size:1em;">Monthly Temperature Statistics</h3>
@@ -410,15 +328,17 @@ class ReportGenerator {
                             ${tempRows}
                         </tbody>
                     </table>
-                ` : ''}
+                ` : ''
+            }
 
                 ${hasWind ? `
                     <p style="font-size:0.8em;color:#555;margin-top:8px;">
                         Wind rose statistics are available in the interactive dashboard and can be referenced
                         alongside this summary for prevailing wind directions and speeds.
                     </p>
-                ` : ''}
-            </div>`;
+                ` : ''
+            }
+            </div> `;
     }
 
     /** @private */
@@ -444,7 +364,7 @@ class ReportGenerator {
                     Lighting control performance is estimated from the daylight autonomy-based control model
                     configured in the project, using occupied hours consistent with sDA/ASE calculations.
                 </p>
-            </div>`;
+            </div> `;
     }
 
     /** @private */
@@ -454,7 +374,7 @@ class ReportGenerator {
             <div class="metric-card">
                 <div class="metric-label">${label}</div>
                 <div class="metric-value">${value} ${unit}</div>
-            </div>`;
+            </div> `;
     }
 
     /** @private */
@@ -476,15 +396,15 @@ class ReportGenerator {
                 <div class="chart-container">
                     <img src="${imgSrc}" alt="${title}" />
                 </div>
-            </div>`;
+            </div> `;
     }
 
     /** @private */
     _buildFooter() {
         return `
             <footer>
-                <p>Report generated by Ray Modeler</p>
-            </footer>`;
+            <p>Report generated by Ray Modeler</p>
+            </footer> `;
     }
 }
 

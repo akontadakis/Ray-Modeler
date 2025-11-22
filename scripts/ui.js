@@ -14,7 +14,7 @@ export { generateAndStoreOccupancyCsv, getDom };
 import { resultsManager, palettes } from './resultsManager.js';
 import * as MESH from '../scripts/scene.js';
 import { initHdrViewer, openHdrViewer } from './hdrViewer.js';
-import { initializeEnergyPlus } from './energyplus.js';
+
 
 // --- SHORTCUTS ---
 // Centralized object to define all keyboard shortcut actions
@@ -42,7 +42,7 @@ const shortcutActions = {
     'toggleSensorPanel': () => togglePanelVisibility('panel-sensor', 'toggle-panel-sensor-btn'),
     'toggleViewpointPanel': () => togglePanelVisibility('panel-viewpoint', 'toggle-panel-viewpoint-btn'),
     'toggleScenePanel': () => togglePanelVisibility('panel-scene-elements', 'toggle-panel-scene-btn'),
-    'toggleEnergyPlusPanel': () => togglePanelVisibility('panel-energyplus', 'toggle-panel-energyplus-btn'),
+
 
     // Other UI toggles
     'toggleInfoPanel': () => togglePanelVisibility('panel-info', 'info-button'),
@@ -81,7 +81,7 @@ const keyMap = {
     'Digit6': 'toggleSensorPanel',
     'Digit7': 'toggleViewpointPanel',
     'Digit8': 'toggleScenePanel',
-    'Digit9': 'toggleEnergyPlusPanel',
+
     'KeyQ': 'toggleQuadView',
     'KeyV': 'toggleFpv',
     'KeyG': 'toggleGizmo',
@@ -1689,7 +1689,7 @@ export async function setupEventListeners() {
         }
     });
 
-    initializeEnergyPlus();
+
 
 } // End of setupEventListeners
 

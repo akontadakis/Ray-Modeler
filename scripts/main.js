@@ -7,8 +7,7 @@ import { lightingManager } from './lighting.js';
 import { setupSimulationSidebar } from './simulation.js';
 import { updateScene } from './geometry.js';
 import { initAiAssistant } from './ai-assistant.js';
-import { initializeEnergyPlus } from './energyplus.js';
-import { initializeEnergyPlusSidebar } from './energyplusSidebar.js';
+
 import './optimizationEngine.js'; // Import engine
 import './optimizationOrchestrator.js'; // Import orchestrator
 
@@ -40,7 +39,7 @@ async function init() {
 
         // 7. Start the render loop.
         animate();
-        
+
         console.log("Initialization Complete.");
     } catch (error) {
         console.error("Application initialization failed:", error);
@@ -57,8 +56,7 @@ async function setupCoreUI() {
     setupSimulationSidebar();
     lightingManager.setupPanel();
     initAiAssistant();
-    initializeEnergyPlus();
-    initializeEnergyPlusSidebar();
+
     updateAllLabels();
 }
 

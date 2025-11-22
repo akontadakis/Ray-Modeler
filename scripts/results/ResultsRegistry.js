@@ -104,11 +104,11 @@ export const ResultsRegistry = (() => {
         ds.data = Array.isArray(result.data)
           ? result.data
           : (result.annualData || []).map((row) => {
-              if (!row || !row.length) return 0;
-              let sum = 0;
-              for (let i = 0; i < row.length; i++) sum += row[i];
-              return sum / row.length;
-            });
+            if (!row || !row.length) return 0;
+            let sum = 0;
+            for (let i = 0; i < row.length; i++) sum += row[i];
+            return sum / row.length;
+          });
         ds.units = "lux";
         if (typeof rm._updateStatsForDataset === "function") {
           rm._updateStatsForDataset(key);
@@ -298,15 +298,15 @@ export const ResultsRegistry = (() => {
     visualizations: ["lighting-energy-dashboard", "report-lighting"],
   });
 
-// Synthetic/global descriptors (EPW / EnergyPlus)
-// ----------------------------------------------
-//
-// These descriptors document canonical type IDs for non-worker-based flows.
-// Storage is managed directly by resultsManager; match() always returns false
-// here so they are not selected for file-based imports, but tools and UIs can
-// rely on ResultsRegistry.descriptors as the central catalog of known types.
 
-// EPW Climate (handled directly in resultsManager._parseEpwContent)
+  // ----------------------------------------------
+  //
+  // These descriptors document canonical type IDs for non-worker-based flows.
+  // Storage is managed directly by resultsManager; match() always returns false
+  // here so they are not selected for file-based imports, but tools and UIs can
+  // rely on ResultsRegistry.descriptors as the central catalog of known types.
+
+  // EPW Climate (handled directly in resultsManager._parseEpwContent)
   register({
     id: "epw-climate",
     label: "EPW Climate Data",
@@ -319,21 +319,6 @@ export const ResultsRegistry = (() => {
       },
     },
     visualizations: ["climate-dashboard"],
-  });
-
-// EnergyPlus Results (handled via resultsManager.energyPlusRuns)
-  register({
-    id: "ep-results",
-    label: "EnergyPlus Run Results",
-    match: () => false, // Populated via dedicated EnergyPlus APIs, not worker
-    storage: {
-      target: "epRun",
-      apply: () => {
-        // No-op: EnergyPlus result lifecycle is handled entirely inside
-        // resultsManager.parseEnergyPlusResults and related helpers.
-      },
-    },
-    visualizations: ["energyplus-dashboard"],
   });
 
   // Generic scalar grid (fallback)

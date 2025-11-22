@@ -4,19 +4,7 @@ import { loadKnowledgeBase, searchKnowledgeBase } from './knowledgeBase.js';
 import { project } from './project.js';
 import { resultsManager } from './resultsManager.js';
 import { showAlert, getNewZIndex, togglePanelVisibility, highlightSensorPoint, clearSensorHighlights, clearAllResultsDisplay, getSensorGridParams, setCameraView, scheduleUpdate, setShadingState, setUiValue, generateAndStoreOccupancyCsv } from './ui.js';
-import { generateAndStoreIdf, generateEnergyPlusDiagnostics } from './energyplus.js';
-import {
-    setThermostatSetpoints,
-    setSchedulesCompact,
-    setNaturalVentilation,
-    setOutdoorAirDesignSpecs,
-    setWeather,
-    setSimulationControl,
-    setZoneLoadsCanonical,
-    setZoneThermostatAssignments,
-    setIdealLoadsParameters,
-    setRunPeriod
-} from './energyplusConfigService.js';
+
 import { getDom } from './dom.js';
 import { openGlareRoseDiagram, openCombinedAnalysisPanel } from './annualDashboard.js';
 import { openRecipePanelByType, programmaticallyGeneratePackage } from './simulation.js';
@@ -43,8 +31,8 @@ const MASTER_MODE = {
     description: 'I am Helios, your unified AI assistant. Ask me anything about your project, or click the button to see my full capabilities.',
     placeholder: 'Ex tenebris lux...',
     welcomeMessage: 'Hello! I\'m Helios.' +
-                   'You can ask me to create designs, analyze your project, critique results, explore data, or guide you through workflows. ' +
-                   'What would you like to work on today?'
+        'You can ask me to create designs, analyze your project, critique results, explore data, or guide you through workflows. ' +
+        'What would you like to work on today?'
 };
 
 // Define the tools the AI can use to interact with the application
@@ -110,66 +98,12 @@ const availableTools = [
                     "required": []
                 }
             },
-            {
-                "name": "generateEnergyPlusIdf",
-                "description": "Generate an EnergyPlus IDF using the current project and EnergyPlus configuration. Runs validation first, then stores the IDF in the project simulation files if successful.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {},
-                    "required": []
-                }
-            },
-            {
-                "name": "getEnergyPlusDiagnostics",
-                "description": "Return a structured diagnostics summary for the current EnergyPlus configuration without writing files, to identify configuration gaps and potential issues.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {},
-                    "required": []
-                }
-            },
-            {
-                "name": "getEnergyPlusSummary",
-                "description": "Return key performance indicators (EUI, end uses, unmet hours, peaks) for the latest successful EnergyPlus run, or for a specific runId if provided.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "runId": { "type": "STRING", "description": "Optional: specific EnergyPlus run id to inspect. If omitted, uses the latest successful run." }
-                    },
-                    "required": []
-                }
-            },
-            {
-                "name": "getEnergyPlusErrors",
-                "description": "Return categorized EnergyPlus errors and warnings (fatal, severe, warning) for the latest run or a specific runId.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "runId": { "type": "STRING", "description": "Optional: specific EnergyPlus run id to inspect. If omitted, uses the latest successful run." }
-                    },
-                    "required": []
-                }
-            },
-            {
-                "name": "listEnergyPlusRuns",
-                "description": "List registered EnergyPlus runs known to the application, including runId, label, recipeId, status, and whether KPIs are available.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {},
-                    "required": []
-                }
-            },
-            {
-                "name": "runEnergyPlusSimulation",
-                "description": "Initiates an EnergyPlus simulation using the current project configuration and generated IDF. Registers the run in resultsManager.energyPlusRuns and delegates execution to the Electron backend. Does not block; use listEnergyPlusRuns/getEnergyPlusSummary/getEnergyPlusErrors to inspect results.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "label": { "type": "STRING", "description": "Optional human-readable label for this run." }
-                    },
-                    "required": []
-                }
-            },
+
+
+
+
+
+
             {
                 "name": "getLightingEnergySummary",
                 "description": "Retrieves lighting energy KPIs if available (lighting-energy typed result), e.g. savings and EUI-style metrics.",
@@ -181,188 +115,16 @@ const availableTools = [
                     "required": []
                 }
             },
-            {
-                "name": "setEnergyPlusThermostatSetpoints",
-                "description": "Defines EnergyPlus thermostat setpoint objects (Schedule-based), stored in energyPlusConfig. Does not map them to specific zones.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "setpoints": {
-                            "type": "ARRAY",
-                            "description": "Array of canonical setpoint objects.",
-                            "items": {
-                                "type": "OBJECT",
-                                "properties": {
-                                    "name": { "type": "STRING" },
-                                    "type": { "type": "STRING", "description": "One of 'SingleHeating', 'SingleCooling', 'SingleHeatingOrCooling', 'DualSetpoint'." },
-                                    "heatingScheduleName": { "type": "STRING" },
-                                    "coolingScheduleName": { "type": "STRING" },
-                                    "singleScheduleName": { "type": "STRING" }
-                                },
-                                "required": ["name", "type"]
-                            }
-                        }
-                    },
-                    "required": ["setpoints"]
-                }
-            },
-            {
-                "name": "setEnergyPlusCompactSchedules",
-                "description": "Replaces the EnergyPlus compact schedules block with a normalized list of schedules.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "schedules": {
-                            "type": "ARRAY",
-                            "items": {
-                                "type": "OBJECT",
-                                "properties": {
-                                    "name": { "type": "STRING" },
-                                    "typeLimits": { "type": "STRING" },
-                                    "lines": {
-                                        "type": "ARRAY",
-                                        "items": { "type": "STRING" }
-                                    }
-                                },
-                                "required": ["name", "lines"]
-                            }
-                        }
-                    },
-                    "required": ["schedules"]
-                }
-            },
-            {
-                "name": "setEnergyPlusNaturalVentilation",
-                "description": "Configures simple natural ventilation (ZoneVentilation:DesignFlowRate-style) using the normalized naturalVentilation block.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "naturalVentilation": {
-                            "type": "OBJECT",
-                            "description": "Normalized natural ventilation configuration (global + perZone)."
-                        }
-                    },
-                    "required": ["naturalVentilation"]
-                }
-            },
-            {
-                "name": "setEnergyPlusOutdoorAirDesignSpecs",
-                "description": "Sets DesignSpecification:OutdoorAir style objects used for zone outdoor air requirements.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "designSpecs": {
-                            "type": "ARRAY",
-                            "description": "Array of design spec objects (name + method/values), passed through to energyPlusConfig.",
-                            "items": {
-                                "type": "OBJECT",
-                                "properties": {
-                                    "name": { "type": "STRING" }
-                                },
-                                "required": ["name"]
-                            }
-                        }
-                    },
-                    "required": ["designSpecs"]
-                }
-            },
-            {
-                "name": "setEnergyPlusWeather",
-                "description": "Updates the EnergyPlus weather configuration block (EPW path, locationSource, custom location).",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "weather": { "type": "OBJECT" }
-                    },
-                    "required": ["weather"]
-                }
-            },
-            {
-                "name": "setEnergyPlusSimulationControl",
-                "description": "Updates the EnergyPlus simulationControl block (run period, timesteps, sizing flags, etc.).",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "simulationControl": { "type": "OBJECT" }
-                    },
-                    "required": ["simulationControl"]
-                }
-            },
-            {
-                "name": "setEnergyPlusRunPeriod",
-                "description": "Sets the EnergyPlus RunPeriod block under simulationControl, keeping dates and flags consistent.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "runPeriod": {
-                            "type": "OBJECT",
-                            "description": "RunPeriod configuration (begin/end dates, UseWeatherFile flags, etc.)."
-                        }
-                    },
-                    "required": ["runPeriod"]
-                }
-            },
-            {
-                "name": "setEnergyPlusZoneLoads",
-                "description": "Defines canonical zone-level internal loads and schedules (people, lights, equipment) for each thermal zone.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "zoneLoads": {
-                            "type": "ARRAY",
-                            "items": {
-                                "type": "OBJECT",
-                                "properties": {
-                                    "zoneName": { "type": "STRING" },
-                                    "peoplePerArea": { "type": "NUMBER" },
-                                    "lightsPerArea": { "type": "NUMBER" },
-                                    "equipmentPerArea": { "type": "NUMBER" },
-                                    "occupancySchedule": { "type": "STRING" },
-                                    "lightingSchedule": { "type": "STRING" },
-                                    "equipmentSchedule": { "type": "STRING" }
-                                },
-                                "required": ["zoneName"]
-                            }
-                        }
-                    },
-                    "required": ["zoneLoads"]
-                }
-            },
-            {
-                "name": "assignEnergyPlusThermostatsToZones",
-                "description": "Assigns named thermostat setpoint objects to specific zones for use in ZoneControl:Thermostat.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "assignments": {
-                            "type": "ARRAY",
-                            "items": {
-                                "type": "OBJECT",
-                                "properties": {
-                                    "zoneName": { "type": "STRING" },
-                                    "thermostatName": { "type": "STRING" }
-                                },
-                                "required": ["zoneName", "thermostatName"]
-                            }
-                        }
-                    },
-                    "required": ["assignments"]
-                }
-            },
-            {
-                "name": "setEnergyPlusIdealLoadsParameters",
-                "description": "Configures IdealLoads-style HVAC parameters globally and per zone; mapped to IdealLoads systems by the builder.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "idealLoads": {
-                            "type": "OBJECT",
-                            "description": "IdealLoads configuration with optional defaults and perZone entries."
-                        }
-                    },
-                    "required": ["idealLoads"]
-                }
-            },
+
+
+
+
+
+
+
+
+
+
             {
                 "name": "compareMetrics",
                 "description": "Compares a specific performance metric between the two loaded datasets (A and B).",
@@ -405,7 +167,7 @@ const availableTools = [
                     "required": ["wall", "count", "width", "height", "sillHeight"]
                 }
             },
-             {
+            {
                 "name": "openSimulationRecipe",
                 "description": "Opens a specific simulation recipe panel from the Simulation Modules sidebar if it is not already open.",
                 "parameters": {
@@ -477,7 +239,7 @@ const availableTools = [
         "functionDeclarations": [
             {
                 "name": "setSensorGrid",
-            "description": "Configures parameters for the illuminance sensor grid on a specific surface.",
+                "description": "Configures parameters for the illuminance sensor grid on a specific surface.",
                 "parameters": {
                     "type": "OBJECT",
                     "properties": {
@@ -546,38 +308,38 @@ const availableTools = [
             {
                 "name": "configureSimulationRecipe",
                 "description": "Sets parameters within an already OPEN simulation recipe panel.",
-                    "parameters": {
-                        "type": "OBJECT",
-                        "properties": {
-                            "recipeType": { "type": "STRING", "description": "The type of recipe to configure. E.g., 'illuminance', 'rendering', 'dgp'." },
-                            "parameters": {
-                                "type": "OBJECT",
-                                "description": "A JSON object of key-value pairs to set. Keys must match the base ID of the input controls, e.g., 'pit-month', 'quality-preset', 'rpict-x'."
-                            }
-                        },
-                        "required": ["recipeType", "parameters"]
-                    }
-                },
-                {
-                    "name": "showAnalysisDashboard",
-                    "description": "Opens a specific annual analysis dashboard if the required results files are loaded.",
-                    "parameters": {
-                        "type": "OBJECT",
-                        "properties": {
-                            "dashboardType": { "type": "STRING", "description": "The dashboard to open. Must be one of 'glareRose' or 'combinedAnalysis'." }
-                        },
-                        "required": ["dashboardType"]
-                    }
-                },
-                {
-                    "name": "toggleUIPanel",
-                "description": "Opens or closes a primary UI panel from the left toolbar, such as 'Project Setup' or 'Dimensions', or auxiliary module panels. Supported names: 'project', 'dimensions', 'apertures', 'lighting', 'materials', 'sensors', 'viewpoint', 'viewOptions', 'info', 'aiAssistant', 'simulationModules', 'analysisModules', 'energyplus'.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "recipeType": { "type": "STRING", "description": "The type of recipe to configure. E.g., 'illuminance', 'rendering', 'dgp'." },
+                        "parameters": {
+                            "type": "OBJECT",
+                            "description": "A JSON object of key-value pairs to set. Keys must match the base ID of the input controls, e.g., 'pit-month', 'quality-preset', 'rpict-x'."
+                        }
+                    },
+                    "required": ["recipeType", "parameters"]
+                }
+            },
+            {
+                "name": "showAnalysisDashboard",
+                "description": "Opens a specific annual analysis dashboard if the required results files are loaded.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "dashboardType": { "type": "STRING", "description": "The dashboard to open. Must be one of 'glareRose' or 'combinedAnalysis'." }
+                    },
+                    "required": ["dashboardType"]
+                }
+            },
+            {
+                "name": "toggleUIPanel",
+                "description": "Opens or closes a primary UI panel from the left toolbar, such as 'Project Setup' or 'Dimensions', or auxiliary module panels. Supported names: 'project', 'dimensions', 'apertures', 'lighting', 'materials', 'sensors', 'viewpoint', 'viewOptions', 'info', 'aiAssistant', 'simulationModules', 'analysisModules'.",
                 "parameters": {
                     "type": "OBJECT",
                     "properties": {
                         "panelName": {
                             "type": "STRING",
-                            "description": "The friendly name of the panel to toggle. Must be one of: 'project', 'dimensions', 'apertures', 'lighting', 'materials', 'sensors', 'viewpoint', 'viewOptions', 'info', 'aiAssistant', 'simulationModules', 'analysisModules', 'energyplus'."
+                            "description": "The friendly name of the panel to toggle. Must be one of: 'project', 'dimensions', 'apertures', 'lighting', 'materials', 'sensors', 'viewpoint', 'viewOptions', 'info', 'aiAssistant', 'simulationModules', 'analysisModules'."
                         },
                         "state": { "type": "STRING", "description": "The desired state for the panel. Must be 'open' or 'close'." }
                     },
@@ -585,7 +347,7 @@ const availableTools = [
                 }
             },
             {
-            "name": "runSimulation",
+                "name": "runSimulation",
                 "description": "Initiates a simulation by programmatically clicking the 'Run Simulation' button within an open and configured recipe panel.",
                 "parameters": {
                     "type": "OBJECT",
@@ -626,9 +388,9 @@ const availableTools = [
                         "queryType": { "type": "STRING", "description": "The type of query to perform. Must be one of 'average', 'min', 'max', 'countBelow', 'countAbove'." },
                         "threshold": { "type": "NUMBER", "description": "The illuminance threshold in lux. Required only for 'countBelow' and 'countAbove' queries." }
                     },
-                                    "required": ["queryType"]
-                                }
-                            },
+                    "required": ["queryType"]
+                }
+            },
             {
                 "name": "getDatasetStatistics",
                 "description": "Retrieves the summary statistics (min, max, average, count) for a specific dataset (A or B), regardless of which one is currently active in the UI.",
@@ -804,132 +566,53 @@ const availableTools = [
                 }
             },
             {
-                "name": "openEnergyPlusOptimizationPanel",
-                "description": "Opens the EnergyPlus Optimization tab and initializes its UI so the assistant can configure or start EnergyPlus-based optimization runs.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {},
-                    "required": []
-                }
-            },
-            {
-                "name": "configureEnergyPlusOptimization",
-                "description": "Configures the EnergyPlus Optimization panel: selects goal metric/type, GA settings, and up to 3 parameters with ranges before starting an optimization.",
+                "name": "configureOptimization",
+                "description": "Pre-configures optimization settings by adding parameters to the list. Does not start the run.",
                 "parameters": {
                     "type": "OBJECT",
                     "properties": {
-                        "goalMetric": {
+                        "optimizationType": {
                             "type": "STRING",
-                            "description": "The EnergyPlus optimization metric id (from EP_METRICS), e.g. 'minimize_total_site_energy' or 'minimize_heating_kwh'."
-                        },
-                        "goalType": {
-                            "type": "STRING",
-                            "description": "How to treat the goal. Must be one of 'maximize', 'minimize', or 'set-target'."
-                        },
-                        "targetValue": {
-                            "type": "NUMBER",
-                            "description": "Target numeric value used when goalType is 'set-target'."
-                        },
-                        "constraint": {
-                            "type": "STRING",
-                            "description": "Optional constraint, e.g. 'total_site_energy < 120', using EP_METRICS ids on the left-hand side."
-                        },
-                        "populationSize": {
-                            "type": "NUMBER",
-                            "description": "Population size for the GA."
-                        },
-                        "maxEvaluations": {
-                            "type": "NUMBER",
-                            "description": "Maximum number of EnergyPlus evaluations to run."
+                            "description": "The type of optimization: 'ssga' (Single-Objective) or 'moga' (Multi-Objective)."
                         },
                         "parameters": {
                             "type": "ARRAY",
-                            "description": "Up to 3 EnergyPlus parameter configs. Each must map to a MASTER_EP_PARAMETER_CONFIG id.",
+                            "description": "An array of parameter objects to add to the optimization. e.g., [ { \"id\": \"aperture_s_wwr\", \"min\": 0.2, \"max\": 0.8 }, { \"id\": \"shading_s_overhang_depth\", \"min\": 0.1, \"max\": 1.5 } ]",
                             "items": {
                                 "type": "OBJECT",
                                 "properties": {
-                                    "id": { "type": "STRING", "description": "The EnergyPlus parameter id from MASTER_EP_PARAMETER_CONFIG, e.g. 'heating_setpoint'." },
-                                    "min": { "type": "NUMBER", "description": "Minimum value for this parameter." },
-                                    "max": { "type": "NUMBER", "description": "Maximum value for this parameter." },
-                                    "step": { "type": "NUMBER", "description": "Step size between candidate values." }
+                                    "id": { "type": "STRING", "description": "The unique master parameter ID (e.g., 'aperture_s_wwr')." },
+                                    "min": { "type": "NUMBER", "description": "The minimum value for the range." },
+                                    "max": { "type": "NUMBER", "description": "The maximum value for the range." },
+                                    "step": { "type": "NUMBER", "description": "Optional step value. A sensible default will be used if not provided." }
                                 },
                                 "required": ["id", "min", "max"]
                             }
+                        },
+                        "objective1": {
+                            "type": "STRING",
+                            "description": "The primary objective metric, e.g., 'maximize_sDA' or 'minimize_ASE'. For SSGA, this is the main goal."
+                        },
+                        "objective2": {
+                            "type": "STRING",
+                            "description": "The secondary objective for MOGA, e.g., 'minimize_ASE'. Ignored by SSGA."
+                        },
+                        "constraint": {
+                            "type": "STRING",
+                            "description": "Optional constraint for SSGA only, e.g., 'ASE < 10'."
+                        },
+                        "populationSize": {
+                            "type": "NUMBER",
+                            "description": "Number of designs in the population (e.g., 20)."
+                        },
+                        "evaluations": {
+                            "type": "NUMBER",
+                            "description": "Total evaluations (SSGA) or generations (MOGA) to run (e.g., 50)."
                         }
                     },
-                    "required": ["goalMetric", "goalType"]
+                    "required": ["optimizationType", "objective1"]
                 }
             },
-            {
-                "name": "startEnergyPlusOptimization",
-                "description": "Starts or resumes an EnergyPlus-based optimization run using the EnergyPlus Optimization tab. Uses 'quick' for a small exploratory search, 'full' for full GA, or 'resume' to continue.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "mode": {
-                            "type": "STRING",
-                            "description": "The optimization mode. One of 'quick', 'full', or 'resume'. Defaults to 'full'."
-                        }
-                    }
-                }
-            },
-            {
-                "name": "analyzeEnergyPlusOptimizationResults",
-                "description": "Retrieves a structured summary of evaluated designs from the EnergyPlus optimizer (best designs, metric values, parameter trends) for LLM-side analysis.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {},
-                    "required": []
-                }
-            },
-            {
-              "name": "configureOptimization",
-          "description": "Pre-configures optimization settings by adding parameters to the list. Does not start the run.",
-          "parameters": {
-              "type": "OBJECT",
-              "properties": {
-                  "optimizationType": {
-                      "type": "STRING",
-                      "description": "The type of optimization: 'ssga' (Single-Objective) or 'moga' (Multi-Objective)."
-                  },
-                  "parameters": {
-                      "type": "ARRAY",
-                      "description": "An array of parameter objects to add to the optimization. e.g., [ { \"id\": \"aperture_s_wwr\", \"min\": 0.2, \"max\": 0.8 }, { \"id\": \"shading_s_overhang_depth\", \"min\": 0.1, \"max\": 1.5 } ]",
-                      "items": {
-                          "type": "OBJECT",
-                          "properties": {
-                              "id": { "type": "STRING", "description": "The unique master parameter ID (e.g., 'aperture_s_wwr')." },
-                              "min": { "type": "NUMBER", "description": "The minimum value for the range." },
-                              "max": { "type": "NUMBER", "description": "The maximum value for the range." },
-                              "step": { "type": "NUMBER", "description": "Optional step value. A sensible default will be used if not provided." }
-                          },
-                          "required": ["id", "min", "max"]
-                      }
-                  },
-                  "objective1": {
-                          "type": "STRING",
-                          "description": "The primary objective metric, e.g., 'maximize_sDA' or 'minimize_ASE'. For SSGA, this is the main goal."
-                      },
-                      "objective2": {
-                          "type": "STRING",
-                          "description": "The secondary objective for MOGA, e.g., 'minimize_ASE'. Ignored by SSGA."
-                      },
-                      "constraint": {
-                          "type": "STRING",
-                          "description": "Optional constraint for SSGA only, e.g., 'ASE < 10'."
-                      },
-                      "populationSize": {
-                          "type": "NUMBER",
-                          "description": "Number of designs in the population (e.g., 20)."
-                      },
-                      "evaluations": {
-                          "type": "NUMBER",
-                          "description": "Total evaluations (SSGA) or generations (MOGA) to run (e.g., 50)."
-                      }
-                  },
-                  "required": ["optimizationType", "objective1"]
-              }
-          },
             {
                 "name": "startOptimization",
                 "description": "Starts the generative optimization process. Can be run in 'full' mode using the user-defined settings, or 'quick' mode for a faster, more limited run.",
@@ -1053,7 +736,7 @@ const modelsByProvider = {
         { id: 'meta-llama/llama-3-8b-instruct', name: 'Meta Llama 3 8B Instruct' },
 
         // NVIDIA
-        { id: 'nvidia/nemotron-nano-9b-v2:free', name: 'NVIDIA Nemotron Nano V2 (free)' }, 
+        { id: 'nvidia/nemotron-nano-9b-v2:free', name: 'NVIDIA Nemotron Nano V2 (free)' },
 
         // Mistral
         { id: 'mistralai/mistral-large-2', name: 'Mistral Large 2' },
@@ -1102,7 +785,7 @@ Initializes the AI Assistant, setting up all necessary event listeners.
 function initAiAssistant() {
     dom = getDom();
     // Target the main flex container that holds all tab views
-    panelContentContainer = dom['helios-panel-content']; 
+    panelContentContainer = dom['helios-panel-content'];
     chatContainer = dom['ai-chat-messages']?.parentElement; // Keep for backward compat if needed locally
 
     // --- Settings Modal ---
@@ -1119,7 +802,7 @@ function initAiAssistant() {
         updateModelOptions(provider);
         toggleProviderInfo(provider);
         const storageKey = `ai_api_key_${provider}`;
-        if(dom['ai-secret-field']) {
+        if (dom['ai-secret-field']) {
             dom['ai-secret-field'].value = localStorage.getItem(storageKey) || '';
         }
     });
@@ -1164,7 +847,7 @@ function initAiAssistant() {
 
             // 3. Initialize/Show Radiance Optimization Panel
             let optPanel = document.getElementById('helios-optimization-content');
-            
+
             // Populate from template if empty
             if (optPanel && optPanel.children.length === 0) {
                 const template = document.getElementById('template-optimization-panel');
@@ -1198,54 +881,7 @@ function initAiAssistant() {
         });
     }
 
-    const epOptTab = document.getElementById('helios-ep-optimization-tab-btn');
-    if (epOptTab) {
-        epOptTab.addEventListener('click', () => {
-            if (!panelContentContainer) return;
 
-            // 1. Visual Tab State
-            const allTabs = dom['ai-chat-tabs']?.querySelectorAll('.ai-chat-tab') || [];
-            allTabs.forEach(t => t.classList.remove('active'));
-            epOptTab.classList.add('active');
-
-            // 2. Content Visibility
-            Array.from(panelContentContainer.children).forEach(child => {
-                child.classList.add('hidden');
-            });
-
-            // 3. Initialize/Show EP Optimization Panel
-            let epPanel = document.getElementById('helios-ep-optimization-content');
-            
-            if (epPanel && epPanel.children.length === 0) {
-                const template = document.getElementById('template-ep-optimization-panel');
-                if (template) {
-                    const templateContent = template.content.cloneNode(true);
-                    const templateRoot = templateContent.querySelector('#helios-ep-optimization-content');
-                    if (templateRoot) {
-                        while (templateRoot.firstChild) epPanel.appendChild(templateRoot.firstChild);
-                        epPanel.classList.add('flex-grow', 'p-4', 'space-y-4', 'overflow-y-auto');
-                    } else {
-                        epPanel.appendChild(templateContent);
-                    }
-                }
-            }
-
-            if (epPanel) {
-                epPanel.classList.remove('hidden');
-                if (!epPanel.dataset.initialized) {
-                    import('./energyplusOptimizationOrchestrator.js')
-                        .then(({ initEpOptimizationUI }) => {
-                            initEpOptimizationUI(epPanel);
-                            epPanel.dataset.initialized = 'true';
-                        })
-                        .catch(err => console.error('Failed to load EP optimization UI', err));
-                }
-            }
-
-            // Hide chat input
-            dom['ai-chat-input-container']?.classList.add('hidden');
-        });
-    }
 
     // Initialize with first conversation if none exist
     if (Object.keys(conversations).length === 0) {
@@ -1300,7 +936,7 @@ function switchConversation(conversationId) {
 
     // Update active status for all conversations
     for (const id in conversations) {
-    conversations[id].isActive = (id === conversationId);
+        conversations[id].isActive = (id === conversationId);
     }
 
     renderTabs();
@@ -1319,20 +955,20 @@ function closeConversation(event, conversationId) {
 
     // If we closed the active tab, we need to activate a new one
     if (activeConversationId === conversationId) {
-    const remainingIds = Object.keys(conversations);
-    if (remainingIds.length > 0) {
-    
-    // Switch to the last remaining conversation
-    switchConversation(remainingIds[remainingIds.length - 1]);
+        const remainingIds = Object.keys(conversations);
+        if (remainingIds.length > 0) {
+
+            // Switch to the last remaining conversation
+            switchConversation(remainingIds[remainingIds.length - 1]);
+        } else {
+
+            // If no tabs are left, create a new default chat
+            createNewConversation('chat');
+        }
     } else {
-    
-    // If no tabs are left, create a new default chat
-    createNewConversation('chat');
-    }
-    } else {
-    
-    // If we closed an inactive tab, just re-render the tabs
-    renderTabs();
+
+        // If we closed an inactive tab, just re-render the tabs
+        renderTabs();
     }
 }
 
@@ -1345,7 +981,7 @@ function renderTabs() {
 
     // Capture references to static optimization tabs by ID
     const optTab = document.getElementById('helios-optimization-tab-btn');
-    const epOptTab = document.getElementById('helios-ep-optimization-tab-btn');
+
 
     // Clear all existing children
     tabsContainer.innerHTML = '';
@@ -1377,11 +1013,6 @@ function renderTabs() {
         optTab.style.display = '';
         tabsContainer.appendChild(optTab);
     }
-    if (epOptTab) {
-        epOptTab.classList.remove('hidden');
-        epOptTab.style.display = '';
-        tabsContainer.appendChild(epOptTab);
-    }
 }
 
 /**
@@ -1401,7 +1032,7 @@ function renderActiveConversation() {
 
     // 1. Ensure the main chat content container is visible and others are hidden
     const chatContent = document.getElementById('ai-chat-content-1');
-    
+
     if (panelContentContainer) {
         Array.from(panelContentContainer.children).forEach(child => {
             if (child.id === 'ai-chat-content-1') {
@@ -1419,7 +1050,7 @@ function renderActiveConversation() {
     dom['run-inspector-btn']?.classList.add('hidden');
     dom['ai-critique-results']?.classList.add('hidden');
     dom['run-critique-btn']?.classList.add('hidden');
-    
+
     // 3. Ensure chat input is visible
     dom['ai-chat-input-container']?.classList.remove('hidden');
 
@@ -1494,7 +1125,7 @@ function updateApiKeyInput(provider) {
         const storageKey = `ai_api_key_${provider}`;
         keyInput.value = localStorage.getItem(storageKey) || '';
     }
-}async function handleRunInspector() {
+} async function handleRunInspector() {
     const resultsContainer = dom['ai-inspector-results'];
     if (!resultsContainer) return;
 
@@ -1569,9 +1200,9 @@ function displayInspectorResults(findings) {
 
         let actionButton = '';
         if (finding.action) {
-        // Encode params as a JSON string. Use single quotes for the attribute to contain the double-quoted JSON string.
-        const paramsJson = JSON.stringify(finding.params || {});
-        actionButton = `<button class="btn btn-xs btn-secondary finding-action-btn" data-action="${finding.action}" data-params='${paramsJson}'>${finding.actionLabel || 'Fix It'}</button>`;
+            // Encode params as a JSON string. Use single quotes for the attribute to contain the double-quoted JSON string.
+            const paramsJson = JSON.stringify(finding.params || {});
+            actionButton = `<button class="btn btn-xs btn-secondary finding-action-btn" data-action="${finding.action}" data-params='${paramsJson}'>${finding.actionLabel || 'Fix It'}</button>`;
         }
 
         el.innerHTML = `
@@ -1594,49 +1225,49 @@ function displayInspectorResults(findings) {
 * @param {object} critique - An object with an array of findings.
 */
 function displayCritiqueResults(critique) {
-  const container = dom['ai-critique-results'];
-  container.innerHTML = ''; // Clear previous results
+    const container = dom['ai-critique-results'];
+    container.innerHTML = ''; // Clear previous results
 
-  if (critique.findings.length === 0) {
-      container.innerHTML = `
+    if (critique.findings.length === 0) {
+        container.innerHTML = `
           <div class="inspector-finding type-success">
               <div class="finding-icon">✅</div>
               <div class="finding-content">
                   <p class="finding-message"><strong>Analysis Complete!</strong> The AI found no immediate issues or suggestions based on the current results.</p>
               </div>
           </div>`;
-      return;
-  }
+        return;
+    }
 
-  const createFindingElement = (finding) => {
-      const el = document.createElement('div');
-      // Reuse the inspector's styling by mapping critique types
-      const typeClass = finding.type === 'positive' ? 'success' : 'critique';
-      el.className = `inspector-finding type-${typeClass}`;
+    const createFindingElement = (finding) => {
+        const el = document.createElement('div');
+        // Reuse the inspector's styling by mapping critique types
+        const typeClass = finding.type === 'positive' ? 'success' : 'critique';
+        el.className = `inspector-finding type-${typeClass}`;
 
-      const icons = {
-          critique: '🧐',
-          suggestion: '💡',
-          positive: '✅'
-      };
+        const icons = {
+            critique: '🧐',
+            suggestion: '💡',
+            positive: '✅'
+        };
 
-      let actionButton = '';
-      if (finding.action) {
-          const paramsJson = JSON.stringify(finding.params || {});
-          actionButton = `<button class="btn btn-xs btn-secondary finding-action-btn" data-action="${finding.action}" data-params='${paramsJson}'>${finding.actionLabel || 'Apply Fix'}</button>`;
-      }
+        let actionButton = '';
+        if (finding.action) {
+            const paramsJson = JSON.stringify(finding.params || {});
+            actionButton = `<button class="btn btn-xs btn-secondary finding-action-btn" data-action="${finding.action}" data-params='${paramsJson}'>${finding.actionLabel || 'Apply Fix'}</button>`;
+        }
 
-      el.innerHTML = `
+        el.innerHTML = `
           <div class="finding-icon">${icons[finding.type] || '🧐'}</div>
           <div class="finding-content">
               <p class="finding-message">${finding.message}</p>
               ${actionButton}
           </div>
       `;
-      return el;
-  };
+        return el;
+    };
 
-  critique.findings.forEach(f => container.appendChild(createFindingElement(f)));
+    critique.findings.forEach(f => container.appendChild(createFindingElement(f)));
 }
 
 /**
@@ -1644,26 +1275,26 @@ function displayCritiqueResults(critique) {
 * @param {MouseEvent} event 
 */
 async function handleCritiqueActionClick(event) {
-  const button = event.target.closest('.finding-action-btn');
-  if (!button) return;
+    const button = event.target.closest('.finding-action-btn');
+    if (!button) return;
 
-  const action = button.dataset.action;
-  const params = JSON.parse(button.dataset.params);
+    const action = button.dataset.action;
+    const params = JSON.parse(button.dataset.params);
 
-  console.log(`Critique action clicked: ${action}`, params);
+    console.log(`Critique action clicked: ${action}`, params);
 
-  try {
-      const result = await _executeToolCall({ functionCall: { name: action, args: params } });
-      if (result.success) {
-          showAlert(result.message, 'Action Complete');
-      } else {
-          throw new Error(result.message);
-      }
-      
-  } catch (error) {
-      console.error(`Failed to execute critique action '${action}':`, error);
-      showAlert(`Action failed: ${error.message}`, 'Error');
-  }
+    try {
+        const result = await _executeToolCall({ functionCall: { name: action, args: params } });
+        if (result.success) {
+            showAlert(result.message, 'Action Complete');
+        } else {
+            throw new Error(result.message);
+        }
+
+    } catch (error) {
+        console.error(`Failed to execute critique action '${action}':`, error);
+        showAlert(`Action failed: ${error.message}`, 'Error');
+    }
 }
 
 /**
@@ -1671,29 +1302,29 @@ async function handleCritiqueActionClick(event) {
  * @param {MouseEvent} event 
  */
 async function handleInspectorActionClick(event) {
-  const button = event.target.closest('.finding-action-btn');
-  if (!button) return;
+    const button = event.target.closest('.finding-action-btn');
+    if (!button) return;
 
-  const action = button.dataset.action;
-  const params = JSON.parse(button.dataset.params);
+    const action = button.dataset.action;
+    const params = JSON.parse(button.dataset.params);
 
-  console.log(`Inspector action clicked: ${action}`, params);
+    console.log(`Inspector action clicked: ${action}`, params);
 
-  try {
-      // REFACTORED: Use the central tool execution function
-      const result = await _executeToolCall({ functionCall: { name: action, args: params } });
-      if (result.success) {
-          showAlert(result.message, 'Action Complete');
-      } else {
-          throw new Error(result.message);
-      }
+    try {
+        // REFACTORED: Use the central tool execution function
+        const result = await _executeToolCall({ functionCall: { name: action, args: params } });
+        if (result.success) {
+            showAlert(result.message, 'Action Complete');
+        } else {
+            throw new Error(result.message);
+        }
 
-      await handleRunInspector(); // Re-run to confirm the fix
+        await handleRunInspector(); // Re-run to confirm the fix
 
-  } catch (error) {
-      console.error(`Failed to execute inspector action '${action}':`, error);
-      showAlert(`Action failed: ${error.message}`, 'Error');
-  }
+    } catch (error) {
+        console.error(`Failed to execute inspector action '${action}':`, error);
+        showAlert(`Action failed: ${error.message}`, 'Error');
+    }
 }
 
 /**
@@ -1737,11 +1368,11 @@ function addMessage(sender, text) {
 
     const messagesContainer = dom['ai-chat-messages'];
     if (!messagesContainer) return;
-    
+
     // Add to history object
     const role = sender === 'ai' ? 'model' : 'user';
     conv.history.push({ role: role, parts: [{ text: text }] });
-    
+
     // Keep history from getting too long
     if (conv.history.length > 30) {
         conv.history.splice(0, conv.history.length - 30);
@@ -1864,39 +1495,6 @@ async function _createContextualSystemPrompt(userMessage) {
 - Identify **sensitive parameters** (e.g., "'Slat Angle' was the most critical driver of performance") and **insensitive parameters** (e.g., "'Slat Width' had almost no impact, so it can be chosen based on cost or aesthetics").
 - This analysis is more valuable than just stating the single best result.
 
-### 🔥 EnergyPlus Integration
-- Use 'generateEnergyPlusIdf' to build and store an EnergyPlus IDF from the current project and EnergyPlus configuration once geometry, loads, schedules, and systems are defined.
-- Use 'getEnergyPlusDiagnostics' to inspect the EnergyPlus configuration (envelope, zoning, schedules, loads, thermostats, daylighting, ventilation, etc.) and identify gaps or inconsistencies before or after IDF generation.
-- After EnergyPlus runs have been parsed into ResultsManager:
-  - Use 'listEnergyPlusRuns' to see available runs and their status.
-  - Use 'getEnergyPlusSummary' to retrieve KPIs (EUI, end uses, unmet hours, peak loads) for the latest or a specific run.
-  - Use 'getEnergyPlusErrors' to retrieve fatal/severe/warning messages and explain likely root causes and fixes.
-- When critiquing designs, correlate EnergyPlus KPIs and errors with:
-  - Envelope/transparency choices
-  - Schedules and internal gains
-  - Setpoints and HVAC assumptions
-  - Daylighting and lighting control strategies
-- Prefer using these tools instead of guessing about EnergyPlus behavior.
-
-### ⚙️ EnergyPlus Optimization Tab
-- Use 'openEnergyPlusOptimizationPanel' to switch Helios into the dedicated "EnergyPlus Optimization" tab.
-- Within that tab, use 'configureEnergyPlusOptimization' to:
-  - Select an optimization metric from EP_METRICS (e.g., total site energy, heating/cooling kWh, lighting kWh).
-  - Choose goal type: 'maximize', 'minimize', or 'set-target' (with a numeric target).
-  - Optionally define a constraint string using EP_METRICS identifiers (e.g., 'minimize_total_site_energy < 120').
-  - Configure GA settings such as population size and max evaluations.
-  - Select up to 3 EnergyPlus parameters from MASTER_EP_PARAMETER_CONFIG, each with min/max(/step) values.
-- Use 'startEnergyPlusOptimization' with:
-  - mode='quick' for a very small search (safe for exploration),
-  - mode='full' for a proper GA run,
-  - mode='resume' to continue from the last paused state (if supported).
-- Use 'analyzeEnergyPlusOptimizationResults' after runs to:
-  - Retrieve the evaluated designs and metrics from the EnergyPlus optimizer.
-  - Let the LLM explain why certain parameter combinations perform well or poorly.
-- All EnergyPlus optimization actions:
-  - Rely on the existing EnergyPlus config/IDF/IPC/results stack.
-  - Are separate from the Radiance shading optimizer to avoid cross-contamination of parameters.
-
 ### 👨‍🏫 Interactive Tutor
 - Provide step-by-step guidance through complex workflows
 - Teach users about specific simulation methods
@@ -1998,10 +1596,10 @@ async function handleSendMessage(event) {
         }
 
         if (!apiKey || !provider || !model) {
-        const errorMessage = 'AI settings are incomplete. Please configure the provider, model, and API key in settings.';
-        showAlert(errorMessage, 'Configuration Needed');
-        addMessage('ai', errorMessage);
-        setLoadingState(false);
+            const errorMessage = 'AI settings are incomplete. Please configure the provider, model, and API key in settings.';
+            showAlert(errorMessage, 'Configuration Needed');
+            addMessage('ai', errorMessage);
+            setLoadingState(false);
             return;
         }
 
@@ -2135,7 +1733,7 @@ async function _handleSceneTool(name, args) {
 async function _handleViewTool(name, args) {
     switch (name) {
         case 'changeView': {
-            
+
             const viewMap = { 'perspective': 'persp', 'top': 'top', 'front': 'front', 'back': 'back', 'left': 'left', 'right': 'right' };
             if (!viewMap[args.view]) throw new Error(`Invalid view: ${args.view}`);
             setCameraView(viewMap[args.view]);
@@ -2235,139 +1833,7 @@ async function _handleResultsTool(name, args) {
                 message: 'Retrieved imageless/annual glare result summary for Dataset A.'
             };
         }
-        case 'getEnergyPlusSummary': {
-            const runId = args?.runId || null;
-            const kpis = resultsManager.getEnergyPlusKpisForUi(runId);
-            if (!kpis) {
-                throw new Error("No EnergyPlus KPIs available. Ensure an EnergyPlus run has been parsed successfully.");
-            }
-            return {
-                success: true,
-                summary: kpis,
-                message: `Retrieved EnergyPlus KPIs for run '${kpis.runId}'.`
-            };
-        }
-        case 'getEnergyPlusErrors': {
-            const runId = args?.runId || null;
-            const errors = resultsManager.getEnergyPlusErrors(runId);
-            if (!errors) {
-                throw new Error("No EnergyPlus errors found or no EnergyPlus runs registered.");
-            }
-            return {
-                success: true,
-                errors,
-                message: 'Retrieved EnergyPlus error and warning messages.'
-            };
-        }
-        case 'listEnergyPlusRuns': {
-            const runs = Object.values(resultsManager.energyPlusRuns || {}).map(r => ({
-                runId: r.runId,
-                label: r.label,
-                recipeId: r.recipeId,
-                status: r.status,
-                hasMetrics: !!r.metrics
-            }));
-            return {
-                success: true,
-                runs,
-                message: `Found ${runs.length} EnergyPlus run(s) in the current session.`
-            };
-        }
-        case 'runEnergyPlusSimulation': {
-            if (!window.electronAPI || !window.electronAPI.runEnergyPlus) {
-                throw new Error("EnergyPlus execution is only available in the Electron desktop app.");
-            }
-            if (!project || !project.dirPath) {
-                throw new Error("Please save the project before running EnergyPlus so a project directory is available.");
-            }
 
-            // Ensure an IDF exists and is persisted at the canonical path used by the EnergyPlus runner.
-            let idf;
-            try {
-                idf = await generateAndStoreIdf();
-                if (!idf) {
-                    throw new Error('EnergyPlus IDF generation returned no content.');
-                }
-            } catch (err) {
-                throw new Error(err?.message || "Failed to generate IDF prior to running EnergyPlus.");
-            }
-
-            const projectDir = project.dirPath;
-            const idfPath = `${projectDir}/model.idf`;
-
-            // Persist model.idf to disk so the Electron EnergyPlus bridge can read it.
-            // This keeps generateAndStoreIdf focused on config/builder logic while guaranteeing the runner's contract.
-            if (window.electronAPI && typeof window.electronAPI.writeFile === 'function') {
-                try {
-                    await window.electronAPI.writeFile({
-                        projectPath: projectDir,
-                        filePath: 'model.idf',
-                        content: idf
-                    });
-                } catch (err) {
-                    throw new Error(err?.message || "Failed to write model.idf to the project directory before running EnergyPlus.");
-                }
-            }
-
-            // Resolve EPW and EnergyPlus executable paths from metadata.
-            // This keeps ai-assistant decoupled from specific UI elements.
-            const meta = (typeof project.getMetadata === 'function')
-                ? (project.getMetadata() || {})
-                : (project.metadata || {});
-            const epConfig = meta.energyPlusConfig || meta.energyplus || {};
-            const epWeather = (epConfig.weather && epConfig.weather.epwPath) || epConfig.weatherFilePath;
-            const epExe = meta.energyPlusExecutablePath || meta.energyPlusPath || meta.energyplusPath;
-
-            if (!epWeather) {
-                throw new Error("No EnergyPlus weather file is configured. Set energyPlusConfig.weather.epwPath before running a simulation.");
-            }
-            if (!epExe) {
-                throw new Error("No EnergyPlus executable path is configured. Set it in the application settings before running a simulation.");
-            }
-
-            const runId = `ep-${Date.now()}`;
-            const label = args?.label || `EnergyPlus Run ${new Date().toLocaleString()}`;
-            const runName = 'energyplus-direct';
-
-            // Register run as pending in ResultsManager
-            if (typeof resultsManager.registerEnergyPlusRun === 'function') {
-                resultsManager.registerEnergyPlusRun(runId, {
-                    label,
-                    recipeId: runName,
-                    baseDir: projectDir
-                });
-            }
-
-            // Subscribe once to EnergyPlus exit for this specific runId
-            if (typeof window.electronAPI.onceEnergyPlusExit === 'function') {
-                window.electronAPI.onceEnergyPlusExit((payload) => {
-                    if (!payload || payload.runId !== runId) return;
-                    if (typeof resultsManager.parseEnergyPlusResults === 'function') {
-                        resultsManager.parseEnergyPlusResults(runId, {
-                            baseDir: payload.outputDir || projectDir,
-                            errContent: payload.errContent,
-                            // csvContents: payload.csvContents // reserved for future extension
-                            statusFromRunner: payload.exitCode
-                        });
-                    }
-                });
-            }
-
-            // Fire-and-forget run; EnergyPlus bridge will emit progress + completion events.
-            window.electronAPI.runEnergyPlus({
-                idfPath,
-                epwPath: epWeather,
-                energyPlusPath: epExe,
-                runName,
-                runId
-            });
-
-            return {
-                success: true,
-                runId,
-                message: `EnergyPlus simulation started as '${runId}'. Use listEnergyPlusRuns, getEnergyPlusSummary, or getEnergyPlusErrors to inspect status and results once it completes.`
-            };
-        }
         case 'getLightingEnergySummary': {
             const key = (args && args.dataset ? String(args.dataset).toLowerCase() : 'a');
             if (!['a', 'b'].includes(key)) {
@@ -2707,7 +2173,7 @@ async function _handleGeneratorTool(name, args) {
 
             // 3. Update the UI to show the correct controls with the specified values
             updateGeneratorControls(patternType, parameters);
-            
+
             // 4. Set the context for the generator UI in case it wasn't set before
             setActiveGeneratorWall(wallDir);
 
@@ -2931,7 +2397,7 @@ function _analyzeCacheForOptimalRange(results, objectiveId) {
     }
 
     // 1. Find suggestedMin: Cut off the "worst" 15%
-    const minFitnessThreshold = isMaximize 
+    const minFitnessThreshold = isMaximize
         ? worstFitness + (fitnessRange * 0.15)
         : worstFitness - (fitnessRange * 0.15); // for minimize, worst is a large positive number
 
@@ -3085,287 +2551,139 @@ const toolHandlers = {
         };
     },
 
-    // EnergyPlus optimization tools
-    'openEnergyPlusOptimizationPanel': async () => {
-        // Ensure AI assistant panel is visible
-        if (dom['ai-assistant-panel'].classList.contains('hidden')) {
-            dom['ai-assistant-button']?.click();
-        }
 
-        const epTab = dom['helios-ep-optimization-tab-btn'];
-        if (!epTab) {
-            return { success: false, message: 'EnergyPlus Optimization tab is not available in this build.' };
-        }
 
-        epTab.classList.remove('hidden');
-        epTab.click();
-
-        // Wait briefly for template clone + orchestrator initEpOptimizationUI
-        await new Promise(resolve => setTimeout(resolve, 200));
-        return { success: true, message: 'Opened the EnergyPlus Optimization tab.' };
-    },
-
-    'configureEnergyPlusOptimization': async (args) => {
-        const { goalMetric, goalType, targetValue, constraint, populationSize, maxEvaluations, parameters } = args || {};
-
-        // Open / focus EP optimization tab
-        const openResult = await toolHandlers.openEnergyPlusOptimizationPanel();
-        if (!openResult.success) return openResult;
-
-        const panel = document.querySelector('#helios-ep-optimization-content');
-        if (!panel) {
-            throw new Error('EnergyPlus Optimization panel DOM not found after opening.');
-        }
-
-        // Set goal metric
-        if (goalMetric) {
-            const sel = panel.querySelector('#ep-opt-goal-metric');
-            if (sel) {
-                sel.value = goalMetric;
-                sel.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-        }
-
-        // Set goal type
-        if (goalType) {
-            const sel = panel.querySelector('#ep-opt-goal-type');
-            if (sel) {
-                sel.value = goalType;
-                sel.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-        }
-
-        // Set target value for set-target
-        if (goalType === 'set-target' && typeof targetValue === 'number') {
-            const inp = panel.querySelector('#ep-opt-goal-target-value');
-            if (inp) {
-                inp.value = targetValue;
-                inp.dispatchEvent(new Event('input', { bubbles: true }));
-                inp.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-        }
-
-        // Constraint
-        if (typeof constraint === 'string') {
-            const inp = panel.querySelector('#ep-opt-constraint');
-            if (inp) {
-                inp.value = constraint;
-                inp.dispatchEvent(new Event('input', { bubbles: true }));
-                inp.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-        }
-
-        // GA settings
-        if (typeof populationSize === 'number') {
-            const inp = panel.querySelector('#ep-opt-population-size');
-            if (inp) {
-                inp.value = populationSize;
-                inp.dispatchEvent(new Event('input', { bubbles: true }));
-                inp.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-        }
-        if (typeof maxEvaluations === 'number') {
-            const inp = panel.querySelector('#ep-opt-max-evals');
-            if (inp) {
-                inp.value = maxEvaluations;
-                inp.dispatchEvent(new Event('input', { bubbles: true }));
-                inp.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-        }
-
-        // Parameters: delegate to energyplusOptimizationOrchestrator to keep logic centralized
-        if (Array.isArray(parameters) && parameters.length) {
-            const { applyEpParameterConfigFromTool } = await import('./energyplusOptimizationOrchestrator.js');
-            try {
-                await applyEpParameterConfigFromTool(panel, parameters);
-            } catch (err) {
-                console.error('Failed to apply EnergyPlus parameter config from tool:', err);
-                return {
-                    success: false,
-                    message: `EnergyPlus parameters partially applied or failed: ${err.message}`
-                };
-            }
-        }
-
-        return {
-            success: true,
-            message: 'EnergyPlus Optimization configuration applied from AI tool call.'
-        };
-    },
-
-    'startEnergyPlusOptimization': async (args) => {
-        const mode = (args && args.mode) || 'full';
-        if (!['quick', 'full', 'resume'].includes(mode)) {
-            throw new Error(`Invalid EnergyPlus optimization mode: ${mode}`);
-        }
-
-        // Ensure EP tab is open
-        const openResult = await toolHandlers.openEnergyPlusOptimizationPanel();
-        if (!openResult.success) return openResult;
-
-        const { startEpOptimization } = await import('./energyplusOptimizationOrchestrator.js');
-        await startEpOptimization(mode);
-
-        return {
-            success: true,
-            message: `EnergyPlus optimization started in '${mode}' mode. Progress and logs will appear in the EnergyPlus Optimization tab.`
-        };
-    },
-
-    'analyzeEnergyPlusOptimizationResults': async () => {
-        try {
-            const { getEpOptimizationSummaryForTools } = await import('./energyplusOptimizationOrchestrator.js');
-            const summary = await getEpOptimizationSummaryForTools();
-            if (!summary) {
-                return {
-                    success: false,
-                    message: 'No EnergyPlus optimization results are available yet. Run an optimization first.'
-                };
-            }
-            return {
-                success: true,
-                message: 'Retrieved EnergyPlus optimization results for analysis.',
-                results: summary
-            };
-        } catch (err) {
-            console.error('Failed to analyze EnergyPlus optimization results:', err);
-            return {
-                success: false,
-                message: `Failed to read EnergyPlus optimization results: ${err.message}`
-            };
-        }
-    },
     'configureOptimization': async (args) => {
-  const { optimizationType, parameters, objective1, objective2, constraint, populationSize, evaluations } = args;
+        const { optimizationType, parameters, objective1, objective2, constraint, populationSize, evaluations } = args;
 
-  // Lazily import RECIPE_METRICS to avoid circular dependency issues and missing reference errors.
-  const { RECIPE_METRICS } = await import('./optimizationOrchestrator.js');
+        // Lazily import RECIPE_METRICS to avoid circular dependency issues and missing reference errors.
+        const { RECIPE_METRICS } = await import('./optimizationOrchestrator.js');
 
-  let messages = [];
+        let messages = [];
 
-  // Ensure the optimization panel is open
-  const optTab = dom['helios-optimization-tab-btn'];
-  if (optTab && !optTab.classList.contains('active')) {
-      optTab.click();
-      await new Promise(resolve => setTimeout(resolve, 100)); // Wait for panel
-  }
+        // Ensure the optimization panel is open
+        const optTab = dom['helios-optimization-tab-btn'];
+        if (optTab && !optTab.classList.contains('active')) {
+            optTab.click();
+            await new Promise(resolve => setTimeout(resolve, 100)); // Wait for panel
+        }
 
-  const optPanel = document.querySelector('#helios-optimization-content:not(.hidden)') || document.querySelector('#helios-optimization-content');
-  if (!optPanel) {
-      throw new Error('Could not find the optimization panel.');
-  }
+        const optPanel = document.querySelector('#helios-optimization-content:not(.hidden)') || document.querySelector('#helios-optimization-content');
+        if (!optPanel) {
+            throw new Error('Could not find the optimization panel.');
+        }
 
-  // Set optimization type
-  if (optimizationType) {
-      setUiValue('opt-type', optimizationType);
-      optPanel.querySelector('#opt-type')?.dispatchEvent(new Event('change', { bubbles: true }));
-      await new Promise(resolve => setTimeout(resolve, 100)); // Wait for panels to toggle
-      messages.push(`Optimization type set to ${optimizationType}.`);
-  }
+        // Set optimization type
+        if (optimizationType) {
+            setUiValue('opt-type', optimizationType);
+            optPanel.querySelector('#opt-type')?.dispatchEvent(new Event('change', { bubbles: true }));
+            await new Promise(resolve => setTimeout(resolve, 100)); // Wait for panels to toggle
+            messages.push(`Optimization type set to ${optimizationType}.`);
+        }
 
-  if (optimizationType === 'ssga') {
-      // --- Configure Single-Objective ---
-      if (objective1) {
-          const [goalType, metricId] = objective1.split('_'); // e.g., "maximize_sDA"
-          const recipe = Object.keys(RECIPE_METRICS).find(r => RECIPE_METRICS[r].some(m => m.id === objective1));
+        if (optimizationType === 'ssga') {
+            // --- Configure Single-Objective ---
+            if (objective1) {
+                const [goalType, metricId] = objective1.split('_'); // e.g., "maximize_sDA"
+                const recipe = Object.keys(RECIPE_METRICS).find(r => RECIPE_METRICS[r].some(m => m.id === objective1));
 
-          if (recipe) {
-              setUiValue('opt-simulation-recipe', recipe);
-              dom['opt-simulation-recipe']?.dispatchEvent(new Event('change', { bubbles: true }));
-              await new Promise(resolve => setTimeout(resolve, 50));
+                if (recipe) {
+                    setUiValue('opt-simulation-recipe', recipe);
+                    dom['opt-simulation-recipe']?.dispatchEvent(new Event('change', { bubbles: true }));
+                    await new Promise(resolve => setTimeout(resolve, 50));
 
-              setUiValue('opt-goal-metric', objective1);
-              setUiValue('opt-goal-type', goalType);
-              messages.push(`- Goal set to ${objective1}`);
-          }
-      }
-      if (constraint) {
-          setUiValue('opt-constraint', constraint);
-          messages.push(`- Constraint set to ${constraint}`);
-      }
+                    setUiValue('opt-goal-metric', objective1);
+                    setUiValue('opt-goal-type', goalType);
+                    messages.push(`- Goal set to ${objective1}`);
+                }
+            }
+            if (constraint) {
+                setUiValue('opt-constraint', constraint);
+                messages.push(`- Constraint set to ${constraint}`);
+            }
 
-  } else if (optimizationType === 'moga') {
-      // --- Configure Multi-Objective ---
-      const setupObjective = async (objStr, num) => {
-          if (!objStr) return;
-          const [goalType, metricId] = objStr.split('_');
-          const recipe = Object.keys(RECIPE_METRICS).find(r => RECIPE_METRICS[r].some(m => m.id === objStr));
+        } else if (optimizationType === 'moga') {
+            // --- Configure Multi-Objective ---
+            const setupObjective = async (objStr, num) => {
+                if (!objStr) return;
+                const [goalType, metricId] = objStr.split('_');
+                const recipe = Object.keys(RECIPE_METRICS).find(r => RECIPE_METRICS[r].some(m => m.id === objStr));
 
-          if (recipe) {
-              setUiValue(`opt-recipe-${num}`, recipe);
-              dom[`opt-recipe-${num}`]?.dispatchEvent(new Event('change', { bubbles: true }));
-              await new Promise(resolve => setTimeout(resolve, 50));
+                if (recipe) {
+                    setUiValue(`opt-recipe-${num}`, recipe);
+                    dom[`opt-recipe-${num}`]?.dispatchEvent(new Event('change', { bubbles: true }));
+                    await new Promise(resolve => setTimeout(resolve, 50));
 
-              setUiValue(`opt-goal-${num}`, objStr);
-              setUiValue(`opt-goal-type-${num}`, goalType);
-              messages.push(`- Objective ${num} set to ${objStr}`);
-          }
-      };
-      if (objective1) await setupObjective(objective1, 1);
-      if (objective2) await setupObjective(objective2, 2);
-  }
+                    setUiValue(`opt-goal-${num}`, objStr);
+                    setUiValue(`opt-goal-type-${num}`, goalType);
+                    messages.push(`- Objective ${num} set to ${objStr}`);
+                }
+            };
+            if (objective1) await setupObjective(objective1, 1);
+            if (objective2) await setupObjective(objective2, 2);
+        }
 
-  // --- Configure Common Parameters ---
-  if (populationSize) {
-      setUiValue('opt-population-size', populationSize);
-      messages.push(`- Population size set to ${populationSize}`);
-  }
-  if (evaluations) {
-      setUiValue('opt-generations', evaluations); // This ID maps to "Max Evals / Gens"
-      messages.push(`- Max Evals/Gens set to ${evaluations}`);
-  }
+        // --- Configure Common Parameters ---
+        if (populationSize) {
+            setUiValue('opt-population-size', populationSize);
+            messages.push(`- Population size set to ${populationSize}`);
+        }
+        if (evaluations) {
+            setUiValue('opt-generations', evaluations); // This ID maps to "Max Evals / Gens"
+            messages.push(`- Max Evals/Gens set to ${evaluations}`);
+        }
 
-  // --- Programmatically add parameters to the dynamic list ---
-  if (parameters && Array.isArray(parameters)) {
-      const container = optPanel.querySelector('#dynamic-opt-params-list');
-      const template = document.getElementById('template-dynamic-opt-param');
-      if (!container || !template) return { success: false, message: 'Parameter UI components not found.' };
+        // --- Programmatically add parameters to the dynamic list ---
+        if (parameters && Array.isArray(parameters)) {
+            const container = optPanel.querySelector('#dynamic-opt-params-list');
+            const template = document.getElementById('template-dynamic-opt-param');
+            if (!container || !template) return { success: false, message: 'Parameter UI components not found.' };
 
-      // Clear existing parameters before adding new ones
-      container.innerHTML = '';
-      messages.push(`- Clearing existing parameters.`);
+            // Clear existing parameters before adding new ones
+            container.innerHTML = '';
+            messages.push(`- Clearing existing parameters.`);
 
-      // Dynamic import to break circular dependency
-      const { MASTER_PARAMETER_CONFIG } = await import('./optimizationOrchestrator.js');
+            // Dynamic import to break circular dependency
+            const { MASTER_PARAMETER_CONFIG } = await import('./optimizationOrchestrator.js');
 
-      for (const param of parameters) {
-          const paramConfig = MASTER_PARAMETER_CONFIG[param.id];
-          if (paramConfig) {
-              const clone = template.content.cloneNode(true);
-              const item = clone.querySelector('.dynamic-opt-param-item');
-              item.dataset.paramId = param.id;
+            for (const param of parameters) {
+                const paramConfig = MASTER_PARAMETER_CONFIG[param.id];
+                if (paramConfig) {
+                    const clone = template.content.cloneNode(true);
+                    const item = clone.querySelector('.dynamic-opt-param-item');
+                    item.dataset.paramId = param.id;
 
-              clone.querySelector('.dynamic-opt-param-name').textContent = paramConfig.name;
+                    clone.querySelector('.dynamic-opt-param-name').textContent = paramConfig.name;
 
-              const minInput = clone.querySelector('.dynamic-opt-param-min');
-              const maxInput = clone.querySelector('.dynamic-opt-param-max');
-              const stepInput = clone.querySelector('.dynamic-opt-param-step');
+                    const minInput = clone.querySelector('.dynamic-opt-param-min');
+                    const maxInput = clone.querySelector('.dynamic-opt-param-max');
+                    const stepInput = clone.querySelector('.dynamic-opt-param-step');
 
-              minInput.value = param.min;
-              maxInput.value = param.max;
-              stepInput.value = param.step || paramConfig.default.step;
+                    minInput.value = param.min;
+                    maxInput.value = param.max;
+                    stepInput.value = param.step || paramConfig.default.step;
 
-              clone.querySelector('.remove-dynamic-opt-param-btn').addEventListener('click', (e) => {
-                  e.target.closest('.dynamic-opt-param-item').remove();
-              });
+                    clone.querySelector('.remove-dynamic-opt-param-btn').addEventListener('click', (e) => {
+                        e.target.closest('.dynamic-opt-param-item').remove();
+                    });
 
-              container.appendChild(clone);
-              messages.push(`- Added parameter ${paramConfig.name} with range [${param.min}, ${param.max}].`);
-          } else {
-              messages.push(`- Warning: Parameter ${param.id} not found in config.`);
-          }
-      }
-  }
+                    container.appendChild(clone);
+                    messages.push(`- Added parameter ${paramConfig.name} with range [${param.min}, ${param.max}].`);
+                } else {
+                    messages.push(`- Warning: Parameter ${param.id} not found in config.`);
+                }
+            }
+        }
 
-  return {
-          success: true,
-          message: messages.join('\n')
-      };
-  },
+        return {
+            success: true,
+            message: messages.join('\n')
+        };
+    },
     'startOptimization': async (args) => {
         const mode = args.mode || 'full';
         if (!['full', 'quick'].includes(mode)) {
-        throw new Error(`Invalid optimization mode: ${mode}. Must be 'full' or 'quick'.`);
+            throw new Error(`Invalid optimization mode: ${mode}. Must be 'full' or 'quick'.`);
         }
 
         // Dynamic import to break circular dependency
@@ -3510,14 +2828,14 @@ const toolHandlers = {
 
         I recommend setting your optimization parameter range to [${suggestedMin.toFixed(2)}, ${suggestedMax.toFixed(2)}] for the full run.`;
 
-            return {
-                success: true,
-                message: message,
-                analysis: { suggestedMin, suggestedMax, bestSolution }
-            };
-        },
+        return {
+            success: true,
+            message: message,
+            analysis: { suggestedMin, suggestedMax, bestSolution }
+        };
+    },
 
-        'analyzeOptimizationResults': async (args) => {
+    'analyzeOptimizationResults': async (args) => {
         // Dynamic import to break circular dependency
         const { getFitnessCache } = await import('./optimizationOrchestrator.js');
         const cache = getFitnessCache();
@@ -3543,33 +2861,33 @@ const toolHandlers = {
             } catch (e) {
                 console.warn("Could not parse cache entry:", key, e);
             }
+        }
+
+        if (allEvaluations.length === 0) {
+            return { success: false, message: "Found optimization data, but could not parse any valid evaluation results for analysis." };
+        }
+
+        return {
+            success: true,
+            message: `Successfully retrieved ${allEvaluations.length} evaluation results.`,
+            // Send the AI the list of parameters and all results
+            results: {
+                parametersAnalyzed: Array.from(paramKeys),
+                evaluations: allEvaluations
             }
+        };
+    },
 
-            if (allEvaluations.length === 0) {
-                return { success: false, message: "Found optimization data, but could not parse any valid evaluation results for analysis." };
-            }
-
-            return { 
-                success: true, 
-                message: `Successfully retrieved ${allEvaluations.length} evaluation results.`, 
-                // Send the AI the list of parameters and all results
-                results: {
-                    parametersAnalyzed: Array.from(paramKeys),
-                    evaluations: allEvaluations
-                }
-            };
-        },
-
-        // Special tools (handled directly)
-        'runDesignInspector': async (args) => {
+    // Special tools (handled directly)
+    'runDesignInspector': async (args) => {
 
         // These are handled by their own top-level functions, not this executor
         return { success: true, message: "Inspector/Critique initiated." };
-        },
-        'runResultsCritique': async (args) => {
-            // These are handled by their own top-level functions, not this executor
-            return { success: true, message: "Inspector/Critique initiated." };
-        }
+    },
+    'runResultsCritique': async (args) => {
+        // These are handled by their own top-level functions, not this executor
+        return { success: true, message: "Inspector/Critique initiated." };
+    }
 };
 
 async function _executeToolCall(toolCall) {
@@ -3677,7 +2995,7 @@ You MUST:
 - Inspect EnergyPlus-related settings using the normalized energyPlusConfig (simulationControl, weather, schedules, zone loads, thermostats, ventilation, outdoor air, shading, daylighting controls, etc.).
 - Look for:
   - Missing or inconsistent EnergyPlus inputs (e.g. no weather file, invalid run periods, no loads, missing setpoints, incomplete schedules).
-  - Obvious mismatches between geometry/usage and E+ assumptions.
+
   - Problematic Radiance parameters or workflows.
 
 When appropriate, suggest fixes using available tools, especially:
@@ -4050,7 +3368,7 @@ function loadSettings() {
     const modelSelect = dom['ai-model-select'];
     const customModelInput = dom['ai-custom-model-input'];
 
-   if (providerSelect && modelSelect && customModelInput && keyInput) {
+    if (providerSelect && modelSelect && customModelInput && keyInput) {
         const savedProvider = localStorage.getItem('ai_provider') || 'openrouter';
         providerSelect.value = savedProvider;
 
@@ -4310,7 +3628,7 @@ async function _applyDesignAndWaitForUpdate(designParams, targetWall, patternTyp
     await new Promise(resolve => {
         scheduleUpdate('optimizationFitnessEval');
         // A short timeout gives the renderer time to process the new geometry
-        setTimeout(resolve, 300); 
+        setTimeout(resolve, 300);
     });
 }
 
@@ -4331,7 +3649,7 @@ async function _performGenerativeDesign(args) {
 
     // Ensure the necessary recipe panel is open for configuration.
     await _executeToolCall({ functionCall: { name: 'openSimulationRecipe', args: { recipeType: recipeToRun } } });
-    
+
     // Add a status message to the chat that we can update with progress.
     const statusMessageElement = addMessage('ai', progressMessage + `Initializing (0/${steps})...`);
 
@@ -4347,77 +3665,77 @@ async function _performGenerativeDesign(args) {
         }
     }
 
-for (let i = 0; i < steps; i++) {
-    const currentValue = min + (i / (steps - 1)) * (max - min);
-    try {
-        // 1. Configure the design variable for this iteration.
-        if (variable === 'overhang depth') {
-            await _executeToolCall({
-                functionCall: {
-                    name: 'configureShading',
-                    args: { wall: targetElement, enable: true, deviceType: 'overhang', depth: currentValue }
-                }
+    for (let i = 0; i < steps; i++) {
+        const currentValue = min + (i / (steps - 1)) * (max - min);
+        try {
+            // 1. Configure the design variable for this iteration.
+            if (variable === 'overhang depth') {
+                await _executeToolCall({
+                    functionCall: {
+                        name: 'configureShading',
+                        args: { wall: targetElement, enable: true, deviceType: 'overhang', depth: currentValue }
+                    }
+                });
+            } else {
+                throw new Error(`This generative design workflow currently only supports the 'overhang depth' variable.`);
+            }
+
+            // Update progress message in the chat window.
+            statusMessageElement.querySelector('.message-bubble').innerHTML = progressMessage + `<p>Running simulation ${i + 1}/${steps} with depth ${currentValue.toFixed(2)}m...</p>`;
+
+            // 2. Generate the simulation package and run the script, waiting for completion.
+            const sdaPanel = document.querySelector('[data-template-id="template-recipe-sda-ase"]');
+            if (!sdaPanel) throw new Error("sDA/ASE recipe panel could not be found.");
+
+            const scriptInfo = await programmaticallyGeneratePackage(sdaPanel);
+            await runScriptAndWait(scriptInfo.shFile);
+
+            // 3. Load and query results from the output files.
+            const projectName = project.projectName || 'scene';
+            const aseFile = await _getFileFromElectron(`08_results/${projectName}_ASE_direct_only.ill`);
+            const sdaFile = await _getFileFromElectron(`08_results/${projectName}_sDA_final.ill`);
+
+            // Load into the results manager to calculate metrics.
+            await resultsManager.loadAndProcessFile(aseFile, 'a');
+            const aseMetrics = resultsManager.calculateAnnualMetrics('a', {});
+
+            await resultsManager.loadAndProcessFile(sdaFile, 'a');
+            const sdaMetrics = resultsManager.calculateAnnualMetrics('a', {});
+
+            const iterationResult = {
+                variableValue: currentValue,
+                sDA: sdaMetrics.sDA,
+                ASE: aseMetrics.ASE
+            };
+            results.push(iterationResult);
+
+            // Append this step's results to the progress message.
+            progressMessage += `<p>✅ Step ${i + 1}: Depth ${currentValue.toFixed(2)}m → sDA: ${iterationResult.sDA.toFixed(1)}%, ASE: ${iterationResult.ASE.toFixed(1)}%</p>`;
+            statusMessageElement.querySelector('.message-bubble').innerHTML = progressMessage;
+
+        } catch (error) {
+            console.error(`Generative design iteration ${i + 1} failed for value ${currentValue.toFixed(2)}m:`, error);
+
+            // Assign a "worst" fitness score and continue
+            results.push({
+                variableValue: currentValue,
+                sDA: 0, // Worst possible sDA
+                ASE: 100 // Worst possible ASE
             });
-        } else {
-            throw new Error(`This generative design workflow currently only supports the 'overhang depth' variable.`);
+
+            // Update the UI to show the failure for this step
+            progressMessage += `<p>❌ Step ${i + 1} (Depth ${currentValue.toFixed(2)}m): Simulation failed. Assigning worst result and continuing.</p>`;
+            statusMessageElement.querySelector('.message-bubble').innerHTML = progressMessage;
+
+            continue; // Move to the next iteration
         }
-
-        // Update progress message in the chat window.
-        statusMessageElement.querySelector('.message-bubble').innerHTML = progressMessage + `<p>Running simulation ${i + 1}/${steps} with depth ${currentValue.toFixed(2)}m...</p>`;
-
-        // 2. Generate the simulation package and run the script, waiting for completion.
-        const sdaPanel = document.querySelector('[data-template-id="template-recipe-sda-ase"]');
-        if (!sdaPanel) throw new Error("sDA/ASE recipe panel could not be found.");
-
-        const scriptInfo = await programmaticallyGeneratePackage(sdaPanel);
-        await runScriptAndWait(scriptInfo.shFile);
-
-        // 3. Load and query results from the output files.
-        const projectName = project.projectName || 'scene';
-        const aseFile = await _getFileFromElectron(`08_results/${projectName}_ASE_direct_only.ill`);
-        const sdaFile = await _getFileFromElectron(`08_results/${projectName}_sDA_final.ill`);
-
-        // Load into the results manager to calculate metrics.
-        await resultsManager.loadAndProcessFile(aseFile, 'a');
-        const aseMetrics = resultsManager.calculateAnnualMetrics('a', {});
-
-        await resultsManager.loadAndProcessFile(sdaFile, 'a');
-        const sdaMetrics = resultsManager.calculateAnnualMetrics('a', {});
-
-        const iterationResult = {
-            variableValue: currentValue,
-            sDA: sdaMetrics.sDA,
-            ASE: aseMetrics.ASE
-        };
-        results.push(iterationResult);
-
-        // Append this step's results to the progress message.
-        progressMessage += `<p>✅ Step ${i + 1}: Depth ${currentValue.toFixed(2)}m → sDA: ${iterationResult.sDA.toFixed(1)}%, ASE: ${iterationResult.ASE.toFixed(1)}%</p>`;
-        statusMessageElement.querySelector('.message-bubble').innerHTML = progressMessage;
-
-    } catch (error) {
-        console.error(`Generative design iteration ${i + 1} failed for value ${currentValue.toFixed(2)}m:`, error);
-
-        // Assign a "worst" fitness score and continue
-        results.push({
-            variableValue: currentValue,
-            sDA: 0, // Worst possible sDA
-            ASE: 100 // Worst possible ASE
-        });
-
-        // Update the UI to show the failure for this step
-        progressMessage += `<p>❌ Step ${i + 1} (Depth ${currentValue.toFixed(2)}m): Simulation failed. Assigning worst result and continuing.</p>`;
-        statusMessageElement.querySelector('.message-bubble').innerHTML = progressMessage;
-
-        continue; // Move to the next iteration
     }
-}
 
     // 4. Analyze all results to find the best option.
     const constraintRegex = /(sDA|ASE)\s*(<|<=|>|>=)\s*(\d+\.?\d*)/;
     const constraintMatch = constraints.match(constraintRegex);
     if (!constraintMatch) throw new Error("Could not parse the provided constraint string: " + constraints);
-    
+
     const [, constraintMetric, operator, constraintValueStr] = constraintMatch;
     const constraintValue = parseFloat(constraintValueStr);
 
@@ -4440,7 +3758,7 @@ for (let i = 0; i < steps; i++) {
     const sortDirection = goal.startsWith('maximize') ? -1 : 1;
 
     validOptions.sort((a, b) => (a[goalMetric] - b[goalMetric]) * sortDirection);
-    
+
     const bestOption = validOptions[0];
 
     let summary = `✅ **Generative Design Complete!**\n\nFound ${validOptions.length} valid options that met your constraint (${constraints}).\n\n**🏆 Best Result:**\n`;
@@ -4466,7 +3784,7 @@ function runScriptAndWait(scriptName) {
         if (!window.electronAPI?.runScript || !project.dirPath) {
             return reject(new Error("Simulation execution requires the Electron app and a saved project directory."));
         }
-        
+
         let output = '';
         const handleExit = (code) => {
             unsubscribeExit();
@@ -4498,20 +3816,20 @@ function runScriptAndWait(scriptName) {
  * @private
  */
 async function _performGenerativeOptimization(args) {
-    const { 
-        targetWall, 
-        patternType, 
-        optimizationGoal, 
-        constraints, 
+    const {
+        targetWall,
+        patternType,
+        optimizationGoal,
+        constraints,
         targetConstraint,
-        generations = 10, 
+        generations = 10,
         populationSize = 20,
         quality = 'medium'
     } = args;
 
     // Import the optimizer
     const { GeneticOptimizer } = await import('./optimizationEngine.js');
-    
+
     // Initialize the optimizer with the parameter constraints
     const optimizer = new GeneticOptimizer({
         populationSize: populationSize,
@@ -4524,7 +3842,7 @@ async function _performGenerativeOptimization(args) {
     let progressMessage = `## Optimization Progress\n\n`;
     let bestOverall = null;
     let bestOverallFitness = -Infinity;
-    
+
     // Add a status message that we can update
     const conv = conversations[activeConversationId];
     const messagesContainer = dom['ai-chat-messages'];
@@ -4542,12 +3860,12 @@ async function _performGenerativeOptimization(args) {
 
             // Evaluate this design
             const fitness = await _evaluateFitness(designParams, targetWall, patternType, optimizationGoal, targetConstraint, quality);
-            
+
             // Track the best overall
             if (fitness.score > bestOverallFitness) {
                 bestOverallFitness = fitness.score;
                 bestOverall = { params: designParams, fitness: fitness };
-                
+
                 // Report new best
                 progressMessage += `  ✨ New best: ${fitness.metricValue.toFixed(2)} (fitness: ${fitness.score.toFixed(2)})\n`;
                 statusMessageElement.querySelector('.message-bubble').innerHTML = progressMessage;
@@ -4566,15 +3884,15 @@ async function _performGenerativeOptimization(args) {
         }
 
         // Apply the best design to the scene
-        await _executeToolCall({ 
-            functionCall: { 
-                name: 'createShadingPattern', 
+        await _executeToolCall({
+            functionCall: {
+                name: 'createShadingPattern',
                 args: {
                     targetWall: targetWall,
                     patternType: patternType,
                     parameters: bestOverall.params
-                } 
-            } 
+                }
+            }
         });
 
         // Build summary message
@@ -4582,12 +3900,12 @@ async function _performGenerativeOptimization(args) {
         summary += `**Pattern Type:** ${patternType}\n`;
         summary += `**Target Wall:** ${targetWall}\n`;
         summary += `**${optimizationGoal.replace('_', ' ')}:** ${bestOverall.fitness.metricValue.toFixed(2)}${bestOverall.fitness.unit}\n\n`;
-        
+
         summary += `**Parameters:**\n`;
         for (const [key, value] of Object.entries(bestOverall.params)) {
             summary += `- ${key}: ${value.toFixed(3)}\n`;
         }
-        
+
         if (targetConstraint) {
             summary += `\n**Constraint Met:** ${targetConstraint} ✓\n`;
         }
@@ -4614,14 +3932,14 @@ async function _performGenerativeOptimization(args) {
  */
 async function _evaluateFitness(designParams, targetWall, patternType, optimizationGoal, targetConstraint, quality) {
     const wallDir = targetWall.toLowerCase();
-    
+
     // Step 1: Apply the design parameters to the scene
     const { setShadingState, storeGenerativeParams, setGenerativeSliderValues, scheduleUpdate } = await import('./ui.js');
-    
+
     setShadingState(wallDir, { enabled: true, type: 'generative' });
     storeGenerativeParams(wallDir, patternType, designParams);
     setGenerativeSliderValues(wallDir, designParams);
-    
+
     // Wait for scene update to complete
     await new Promise(resolve => {
         scheduleUpdate('optimizationFitnessEval');
@@ -4630,7 +3948,7 @@ async function _evaluateFitness(designParams, targetWall, patternType, optimizat
 
     // Step 2: Generate and run the simulation script
     const scriptContent = await _generateQuickSimScript(optimizationGoal, quality);
-    
+
     if (!window.electronAPI?.runScriptHeadless || !project.dirPath) {
         throw new Error("Optimization requires Electron app and a saved project directory.");
     }
@@ -4647,7 +3965,7 @@ async function _evaluateFitness(designParams, targetWall, patternType, optimizat
 
     // Step 3: Parse the results and calculate fitness
     const fitness = await _parseSimulationResult(optimizationGoal, targetConstraint);
-    
+
     return fitness;
 }
 
@@ -4661,11 +3979,11 @@ async function _evaluateFitness(designParams, targetWall, patternType, optimizat
 async function _generateQuickSimScript(optimizationGoal, quality) {
     // Determine which recipe to use based on the goal
     const recipeType = optimizationGoal.includes('DGP') ? 'dgp' : 'sda-ase';
-    
+
     // Open the appropriate recipe panel (if not already open)
     const templateId = getTemplateIdForRecipe(recipeType);
     let panel = document.querySelector(`.floating-window[data-template-id="${templateId}"]`);
-    
+
     if (!panel || panel.classList.contains('hidden')) {
         panel = openRecipePanelByType(templateId);
         if (!panel) {
@@ -4686,12 +4004,12 @@ async function _generateQuickSimScript(optimizationGoal, quality) {
 
     // Generate the simulation package
     const scriptInfo = await programmaticallyGeneratePackage(panel);
-    
+
     // Read the script file content
     if (!window.electronAPI?.readFile) {
         throw new Error("Reading script files requires Electron API.");
     }
-    
+
     const scriptFile = await window.electronAPI.readFile({
         projectPath: project.dirPath,
         filePath: `07_scripts/${scriptInfo.shFile}`
@@ -4704,7 +4022,7 @@ async function _generateQuickSimScript(optimizationGoal, quality) {
     // Convert buffer to string
     const decoder = new TextDecoder('utf-8');
     const scriptContent = decoder.decode(scriptFile.content.data);
-    
+
     return scriptContent;
 }
 
@@ -4717,7 +4035,7 @@ async function _generateQuickSimScript(optimizationGoal, quality) {
  */
 async function _parseSimulationResult(optimizationGoal, targetConstraint) {
     const projectName = project.projectName || 'scene';
-    
+
     try {
         let metricValue = 0;
         let unit = '';
@@ -4729,7 +4047,7 @@ async function _parseSimulationResult(optimizationGoal, targetConstraint) {
             const metrics = resultsManager.calculateAnnualMetrics('a', {});
             metricValue = metrics.sDA;
             unit = '%';
-            
+
         } else if (optimizationGoal === 'minimize_ASE') {
             // Load ASE result file
             const aseFile = await _getFileFromElectron(`08_results/${projectName}_ASE_direct_only.ill`);
@@ -4737,7 +4055,7 @@ async function _parseSimulationResult(optimizationGoal, targetConstraint) {
             const metrics = resultsManager.calculateAnnualMetrics('a', {});
             metricValue = metrics.ASE;
             unit = '%';
-            
+
         } else if (optimizationGoal === 'minimize_DGP_average') {
             // For DGP, we need to parse the output file
             // This is a simplified approach - you may need to adjust based on your DGP output format
@@ -4784,10 +4102,10 @@ function _checkConstraint(value, constraint) {
     const regex = /([\w]+)\s*(<|<=|>|>=|==)\s*([\d.]+)/;
     const match = constraint.match(regex);
     if (!match) return true; // No valid constraint, pass by default
-    
+
     const [, metric, operator, thresholdStr] = match;
     const threshold = parseFloat(thresholdStr);
-    
+
     switch (operator) {
         case '<': return value < threshold;
         case '<=': return value <= threshold;

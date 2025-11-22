@@ -11,7 +11,7 @@ Ray Modeler is a desktop application providing a graphical user interface (GUI) 
 
 - [Ray Modeler △](#ray-modeler-)
   - [Table of Contents](#table-of-contents)
-  - [🚀 Getting Started](#-getting-started)
+
   - [✨ Core Capabilities](#-core-capabilities)
   - [🤖 AI Assistant (Helios)](#-ai-assistant-helios)
     - [AI-Powered Actions (Tool Use)](#ai-powered-actions-tool-use)
@@ -32,47 +32,10 @@ Ray Modeler is a desktop application providing a graphical user interface (GUI) 
     - [📋 Scene Definition Panels](#-scene-definition-panels)
     - [📜 Simulation Modules (Recipes)](#-simulation-modules-recipes)
   - [Analysis Modules 📊](#analysis-modules-)
-    - [Desktop Integration (Electron)](#desktop-integration-electron)
-  - [🛠️ For Developers: Building from Source](#️-for-developers-building-from-source)
-    - [Prerequisites](#prerequisites)
-    - [Setup and Development](#setup-and-development)
-    - [Building for Distribution](#building-for-distribution)
-      - [Build for macOS 🍎](#build-for-macos-)
-      - [Build for Windows 💻 (from any platform)](#build-for-windows--from-any-platform)
-    - [Cross-Platform Building](#cross-platform-building)
-  - [🛠️ Technology Stack](#️-technology-stack)
+
   - [License 📄](#license-)
 
-## 🚀 Getting Started
 
-To use Ray Modeler, you need a modern web browser and a local installation of the Radiance Lighting Simulation Suite. The desktop version (recommended) offers the best experience.
-
-1. **Install Radiance**:
-   Download and install [Radiance](https://www.radiance-online.org/) from the official website or the [NREL](https://github.com/NREL/Radiance) GitHub repository. Ensure the Radiance `bin` directory is in your system's PATH.
-
-2. **Download Ray Modeler**:
-   Download the latest release for your operating system (macOS or Windows) from the project's Releases page.
-
-3. **Run the Application**:
-   - *Windows*: Run the Ray Modeler Setup `.exe` installer.
-   - *macOS*: Open the Ray Modeler `.dmg` and drag the application to your Applications folder.
-
-**Security Warnings on First Launch**:
-
-Because the app isn't code-signed, your OS might show a security warning. When a user on a Mac downloads and tries to open the unsigned app, they will be stopped by Gatekeeper, which will show a message like "Ray Modeler cannot be opened because the developer cannot be verified."
-
-- **On Windows (SmartScreen)**: Click "**More info**", then click "**Run anyway**".
-
-- **On macOS (Gatekeeper)**: **Right-click** (or Control-click) the app icon, select "**Open**" from the menu. A new dialog box will appear that is similar to the first one, but this time it will include an "**Open**" button. Clicking this will run the app. You only need to do this once. After the first successful launch, the app can be opened normally by double-clicking it. Or After you drag Ray Modeler.app to the Applications folder, do the following:
-
-- Open the Terminal app.
-- Copy and paste the following command exactly, then press Enter:
-
-```bash
-xattr -cr /Applications/Ray\ Modeler.app
-```
-
----
 
 ## ✨ Core Capabilities
 
@@ -600,108 +563,7 @@ The Analysis Sidebar uses a background Web Worker to parse various Radiance resu
 
 - **Automated Report Generation**: A "Generate Report" button compiles all project information, a 3D snapshot, key metrics, and all dashboard charts into a single, self-contained HTML file for printing or saving as a PDF.
 
-### Desktop Integration (Electron)
 
-Ray Modeler operates as an Electron-based desktop application, enabling direct interaction with your file system.
-
-- **Standardized Project Folder**: When you save a project, the application creates a complete, organized folder structure on your local machine.
-
-- **Simulation Console**: A built-in console window appears when you run a simulation, showing the live output from the Radiance processes and reporting the final exit code (success or failure).
-
-## 🛠️ For Developers: Building from Source
-
-You can run the application in a local development environment or build a distributable, single-click installer for macOS and Windows using `electron-builder`.
-
-### Prerequisites
-
-Before you begin, ensure you have the following installed on your system:
-
-- **Node.js and npm**: [Download & Install Node.js](https://nodejs.org/en) (npm is included).
-- **Git**: [Download & Install Git](https://git-scm.com/).
-
-### Setup and Development
-
-1. **Clone the Repository and Install Dependencies**
-
-    ```bash
-    # Clone the repository
-    git clone [https://github.com/your-username/ray-modeler.git](https://github.com/your-username/ray-modeler.git)
-    
-    # Navigate into the project directory
-    cd ray-modeler
-    
-    # Install the necessary npm packages
-    npm install
-
-    # Update the npm packages
-    npm update
-    ```
-
-2. **Run the App in Development Mode**
-
-    To run the full Electron application with all features (including file system access and simulation execution), use the start script:
-
-    ```bash
-    npm start
-    ```
-
-    This will launch the application in a development window with access to developer tools.
-
-### Building for Distribution
-
-The following commands use `electron-builder` to package the application into a distributable format. The final installer/application files will be located in the `dist/` directory.
-
-#### Build for macOS 🍎
-
-This command bundles the application into a standard `.dmg` disk image for macOS.
-
-```bash
-npm run build:mac
-```
-
-#### Build for Windows 💻 (from any platform)
-
-This command creates NSIS installers (`.exe`) for both **x64** and **arm64** Windows architectures.
-
-**Prerequisite for macOS/Linux users**: To build a Windows app on a non-Windows machine, you must have [Wine](https://www.winehq.org/) installed. You can install it easily with Homebrew:
-
-```Bash
-brew install --cask wine-stable
-```
-
-Once Wine is installed, run the build script:
-
-```Bash
-npm run build:win
-```
-
-This will generate two installers in the dist/ folder, for example: Ray Modeler Setup 1.1.0-x64.exe and Ray Modeler Setup 1.1.0-arm64.exe.
-
-### Cross-Platform Building
-
-While it's recommended to build for a specific platform on that platform (e.g., build for Windows on a Windows machine), `electron-builder` supports cross-platform compilation with some setup:
-
-- **Building for Windows on macOS/Linux**: Requires installing **Wine**.
-
-- **Building for macOS on Windows/Linux**: Requires a macOS machine for code signing, so it's not practically feasible.
-
-- **Building for Linux on macOS/Windows**: Can be done directly.
-
-For detailed instructions on cross-platform builds, please refer to the [electron-builder documentation](https://www.electron.build/multi-platform-build).
-
-## 🛠️ Technology Stack
-
-- **3D Rendering**: [Three.js](https://threejs.org/)
-
-- **Lighting Simulation Engine**: [Radiance](https://www.radiance-online.org/)
-
-- **Data Visualization**: [Chart.js](https://www.chartjs.org/)
-
-- **Mapping**: [Leaflet](https://leafletjs.com/)
-
-- **UI Framework**: [Vanilla JS](http://vanilla-js.com/), HTML5, [CSS3 with TailwindCSS utilities](https://tailwindcss.com/)
-
-- **Desktop App**: [Electron](https://www.electronjs.org/) (optional, for direct script execution)
 
 ## License 📄
 

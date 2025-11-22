@@ -49,7 +49,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // --- Methods for one-way communication or event listeners ---
   runScript: (args) => ipcRenderer.send('run-script', args),
-  runEnergyPlusScript: (args) => ipcRenderer.send('run-energyplus-script', args),
+
   onScriptOutput: (callback) => {
     const listener = (_event, value) => callback(value);
     ipcRenderer.on('script-output', listener);
@@ -61,42 +61,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return listener;
   },
 
-  // --- EnergyPlus integration ---
-  runEnergyPlus: (options) => {
-    ipcRenderer.send('run-energyplus', options);
-  },
 
-  // Streaming output (may be used multiple times per run).
-  onEnergyPlusOutput: (callback) => {
-    const listener = (_event, payload) => callback(payload);
-    ipcRenderer.on('energyplus-output', listener);
-    return listener;
-  },
-  onceEnergyPlusOutput: (callback) => {
-    const listener = (_event, payload) => callback(payload);
-    ipcRenderer.once('energyplus-output', listener);
-    return listener;
-  },
-  offEnergyPlusOutput: (callback) => {
-    if (typeof callback === 'function') {
-      ipcRenderer.removeListener('energyplus-output', callback);
-    }
-  },
 
-  // Run completion / metadata.
-  onEnergyPlusExit: (callback) => {
-    const listener = (_event, payload) => callback(payload);
-    ipcRenderer.on('energyplus-exit', listener);
-    return listener;
-  },
-  onceEnergyPlusExit: (callback) => {
-    const listener = (_event, payload) => callback(payload);
-    ipcRenderer.once('energyplus-exit', listener);
-    return listener;
-  },
-  offEnergyPlusExit: (callback) => {
-    if (typeof callback === 'function') {
-      ipcRenderer.removeListener('energyplus-exit', callback);
-    }
-  },
+
+
+
 });
