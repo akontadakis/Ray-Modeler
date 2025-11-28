@@ -61,5 +61,8 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     }
+  },
+  "dependencies": {
+    "three": "^0.181.2"
   }
 }
