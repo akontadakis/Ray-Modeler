@@ -4024,6 +4024,7 @@
                         <option value="openai">OpenAI</option>
                         <option value="gemini">Google Gemini</option>
                         <option value="anthropic">Anthropic</option>
+                        <option value="ollama">Ollama (Local)</option>
                     </select>
                 </div>
                 <div>
@@ -4037,10 +4038,14 @@
                     <p class="text-xs text-[--text-secondary] mt-1">Enter a custom model ID if your preferred model
                         isn't in the list above.</p>
                 </div>
-                <div>
-                    <label for="ai-model-access-token" class="label">API Key</label>
+                <div id="ai-api-key-container">
+                    <label for="ai-secret-field" class="label">API Key</label>
                     <input type="password" id="ai-secret-field" placeholder="Enter your API key" class="w-full"
                         autocomplete="new-password">
+                </div>
+                <div id="ai-ollama-url-container" class="hidden">
+                    <label for="ai-ollama-url" class="label">Ollama Base URL</label>
+                    <input type="text" id="ai-ollama-url" placeholder="http://localhost:11434" value="http://localhost:11434" class="w-full">
                 </div>
                 <div id="openrouter-info-box" class="info-box !text-xs hidden">
                     <b>Note:</b> To use free models on OpenRouter, you may need to adjust your

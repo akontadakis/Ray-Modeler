@@ -449,6 +449,24 @@ OpenRouter provides access to a wide variety of models from different providers 
 4. Give the key a name and click "`Create Key`".
 5. Copy the key and paste it into the API Key field in the Ray Modeler AI settings.
 
+#### Ollama Setup (Local AI) 🦙
+
+Ollama allows you to run powerful LLMs locally on your own machine, completely free and private.
+
+1. **Download Ollama**: Go to [ollama.com](https://ollama.com/) and download the installer for your OS (macOS, Windows, or Linux).
+2. **Install & Run**: Run the installer and open the Ollama application. It runs in the background.
+3. **Pull a Model**: Open your terminal or command prompt and run a command to download a model. For example:
+   ```bash
+   ollama pull llama3
+   ```
+   *Popular models*: `llama3`, `mistral`, `gemma`, `phi3`.
+4. **Configure Ray Modeler**:
+   - Open Ray Modeler and go to **AI Settings**.
+   - Select **Ollama (Local)** as the Provider.
+   - The **Base URL** defaults to `http://localhost:11434`, which is standard. Change it only if you have configured Ollama differently.
+   - Select your model from the list (e.g., Llama 3).
+   - *Note*: No API key is required for local Ollama.
+
 **Important**: Treat your API keys like passwords. Do not share them publicly or commit them to version control.
 
 ## UI Walkthrough 💻

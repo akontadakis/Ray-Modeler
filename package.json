@@ -1,6 +1,6 @@
 {
   "name": "ray-modeler",
-  "version": "1.9.8",
+  "version": "1.9.9",
   "description": "A web-based graphical user interface (GUI) for the Radiance Lighting Simulation Suite.",
   "main": "electron.js",
   "scripts": {
@@ -43,7 +43,7 @@
       "icon": "assets/icon.icns",
       "category": "public.app-category.graphics-design",
       "gatekeeperAssess": false
-  },
+    },
     "win": {
       "icon": "assets/icon.ico",
       "target": [

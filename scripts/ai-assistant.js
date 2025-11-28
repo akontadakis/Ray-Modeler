@@ -776,6 +776,14 @@ const modelsByProvider = {
         { id: 'claude-3-7-sonnet-20250219', name: 'Claude 3.7 Sonnet' },
         { id: 'claude-haiku-4-5-20251001', name: 'Claude 4.5 Haiku' },
         { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku' }
+    ],
+    ollama: [
+        { id: 'llama3', name: 'Llama 3' },
+        { id: 'mistral', name: 'Mistral' },
+        { id: 'gemma', name: 'Gemma' },
+        { id: 'qwen2.5', name: 'Qwen 2.5' },
+        { id: 'deepseek-r1', name: 'DeepSeek R1' },
+        { id: 'phi3', name: 'Phi-3' }
     ]
 };
 
@@ -1352,9 +1360,20 @@ function updateModelOptions(provider) {
  */
 function toggleProviderInfo(provider) {
     const infoBox = dom['openrouter-info-box'];
-    if (!infoBox) return;
+    if (infoBox) {
+        infoBox.classList.toggle('hidden', provider !== 'openrouter');
+    }
 
-    infoBox.classList.toggle('hidden', provider !== 'openrouter');
+    const apiKeyContainer = dom['ai-api-key-container'];
+    const ollamaUrlContainer = dom['ai-ollama-url-container'];
+
+    if (apiKeyContainer) {
+        apiKeyContainer.classList.toggle('hidden', provider === 'ollama');
+    }
+
+    if (ollamaUrlContainer) {
+        ollamaUrlContainer.classList.toggle('hidden', provider !== 'ollama');
+    }
 }
 
 /**
@@ -2938,6 +2957,12 @@ async function _callModelAPI(payload, provider, apiKey, model) {
             headers['x-api-key'] = apiKey;
             headers['anthropic-version'] = '2023-06-01';
             break;
+        case 'ollama':
+            const baseUrl = localStorage.getItem('ai_ollama_url') || 'http://localhost:11434';
+            // Use the OpenAI-compatible endpoint for Ollama
+            apiUrl = `${baseUrl.replace(/\/$/, '')}/v1/chat/completions`;
+            headers['Authorization'] = `Bearer ${apiKey || 'ollama'}`;
+            break;
         default:
             throw new Error(`Unsupported provider: ${provider}`);
     }
@@ -2976,8 +3001,8 @@ async function performAIInspection() {
             throw new Error('AI settings are incomplete. Please configure them first.');
         }
 
-        if (provider !== 'openrouter' && provider !== 'openai') {
-            throw new Error(`AI Inspection currently requires an OpenAI or OpenRouter provider that supports JSON mode.`);
+        if (provider !== 'openrouter' && provider !== 'openai' && provider !== 'ollama') {
+            throw new Error(`AI Inspection currently requires an OpenAI, OpenRouter, or Ollama provider that supports JSON mode.`);
         }
 
         const projectData = await project.gatherAllProjectData();
@@ -3081,8 +3106,8 @@ async function _performAICritique() {
             throw new Error('AI settings are incomplete. Please configure them first.');
         }
 
-        if (provider !== 'openrouter' && provider !== 'openai') {
-            throw new Error(`AI Critique currently requires an OpenAI or OpenRouter provider that supports JSON mode.`);
+        if (provider !== 'openrouter' && provider !== 'openai' && provider !== 'ollama') {
+            throw new Error(`AI Critique currently requires an OpenAI, OpenRouter, or Ollama provider that supports JSON mode.`);
         }
 
         const projectData = await project.gatherAllProjectData();
@@ -3355,6 +3380,10 @@ function saveSettings(event) {
     localStorage.setItem('ai_model', modelSelect.value);
     localStorage.setItem('ai_custom_model', customModelInput.value.trim());
 
+    if (dom['ai-ollama-url']) {
+        localStorage.setItem('ai_ollama_url', dom['ai-ollama-url'].value.trim());
+    }
+
     showAlert('AI settings saved.', 'Success');
     closeSettingsModal();
 }
@@ -3381,6 +3410,12 @@ function loadSettings() {
 
         const savedModel = localStorage.getItem('ai_model');
         const savedCustomModel = localStorage.getItem('ai_custom_model');
+        const savedOllamaUrl = localStorage.getItem('ai_ollama_url');
+
+        if (dom['ai-ollama-url'] && savedOllamaUrl) {
+            dom['ai-ollama-url'].value = savedOllamaUrl;
+        }
+
         if (savedCustomModel) {
             customModelInput.value = savedCustomModel;
         }
