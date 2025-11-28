@@ -152,6 +152,49 @@
             top: 56px;
             /* Adjust to be below the docked top toolbar */
         }
+
+        /* Thought Process Styles */
+        .thought-process {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            border-left: 2px solid var(--highlight-color);
+            padding-left: 0.5rem;
+        }
+
+        .thought-header {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+
+        .thought-header:hover {
+            opacity: 1;
+        }
+
+        .thought-details {
+            display: none;
+            margin-top: 0.25rem;
+            background: rgba(0, 0, 0, 0.05);
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+
+        .thought-process.expanded .thought-details {
+            display: block;
+        }
+
+        /* YOLO Mode Active State */
+        #ai-yolo-toggle-btn[data-enabled="true"] {
+            color: #ef4444;
+            /* Red color for danger/active */
+            background-color: rgba(239, 68, 68, 0.1);
+        }
     </style>
 
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
@@ -3721,6 +3764,17 @@
                 </div>
                 <div class="window-controls">
                     <div class="action-button-container">
+                        <button id="ai-yolo-toggle-btn" class="btn btn-icon" aria-label="Autonomous Mode"
+                            data-enabled="false">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 30 30">
+                                <path
+                                    style="opacity:1;fill:currentColor;fill-opacity:1;stroke:none;stroke-width:1.99999988;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+                                    d="M21.186 3.002s-8.765 10.801-9.202 11.719c-.268 1.05.892 1.953 2 1.953h.598L10 27s8.763-10.801 9.2-11.719c.268-1.05-.893-1.953-2-1.953h-.598zm-13.78.039-2.414 8h1.963l.404-1.72h2.332l.416 1.72h2.008l-2.412-8Zm1.12 1.373.841 3.533H7.682Z" />
+                            </svg>
+                        </button>
+                        <span class="tooltip" role="tooltip">Autonomous Mode (YOLO)</span>
+                    </div>
+                    <div class="action-button-container">
                         <button id="ai-settings-btn" class="btn btn-icon" aria-label="Settings">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
                                 xmlns="http://www.w3.org/2000/svg">
@@ -4045,7 +4099,8 @@
                 </div>
                 <div id="ai-ollama-url-container" class="hidden">
                     <label for="ai-ollama-url" class="label">Ollama Base URL</label>
-                    <input type="text" id="ai-ollama-url" placeholder="http://localhost:11434" value="http://localhost:11434" class="w-full">
+                    <input type="text" id="ai-ollama-url" placeholder="http://localhost:11434"
+                        value="http://localhost:11434" class="w-full">
                 </div>
                 <div id="openrouter-info-box" class="info-box !text-xs hidden">
                     <b>Note:</b> To use free models on OpenRouter, you may need to adjust your

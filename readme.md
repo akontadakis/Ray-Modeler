@@ -134,7 +134,23 @@ Ray Modeler is packed with features that automate and enhance the Radiance workf
 
 ## 🤖 AI Assistant (Helios)
 
-The AI Assistant panel provides a chat interface to help you with your workflow. It understands the application's current state and can perform actions on your behalf using natural language commands.
+The AI Assistant panel provides a chat interface to help you with your workflow. It has been upgraded to a **semi-autonomous agent** capable of multi-step reasoning, complex task execution, and long-term memory.
+
+### 🧠 Agentic Capabilities (New)
+
+-   **Autonomous Execution (YOLO Mode)**:
+    -   **Standard Mode**: For safety, the agent asks for confirmation before executing any tool (e.g., "Shall I add the window?").
+    -   **YOLO Mode (⚡)**: Toggle this mode to allow the agent to execute safe actions immediately without interruption.
+    -   **Safety First**: Destructive actions (like deleting geometry or resetting projects) *always* require confirmation, even in YOLO mode.
+
+-   **Visible Thought Process**:
+    -   See exactly what the agent is thinking. The chat now displays a collapsible "Thinking..." section where you can watch the agent plan its next steps, choose tools, and analyze results in real-time.
+
+-   **Long-Term Memory**:
+    -   Helios now remembers your preferences and project details across sessions. Tell it your favorite analysis settings once, and it will recall them next time.
+
+-   **Active Context Awareness**:
+    -   The agent knows what you are looking at. Select a wall or object in the 3D view, and simply say "add a window here" or "change this material" without needing to specify the object name.
 
 ---
 

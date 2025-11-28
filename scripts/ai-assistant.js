@@ -3,6 +3,8 @@
 import { loadKnowledgeBase, searchKnowledgeBase } from './knowledgeBase.js';
 import { project } from './project.js';
 import { resultsManager } from './resultsManager.js';
+import { Agent } from './agent-core.js';
+import { selectedWallId } from './ui.js';
 import { showAlert, getNewZIndex, togglePanelVisibility, highlightSensorPoint, clearSensorHighlights, clearAllResultsDisplay, getSensorGridParams, setCameraView, scheduleUpdate, setShadingState, setUiValue, generateAndStoreOccupancyCsv } from './ui.js';
 
 import { getDom } from './dom.js';
@@ -24,6 +26,9 @@ let conversationCounter = 0; // Simple incrementing ID for new conversations
 
 let currentMode = 'master';
 let activeWalkthrough = null; // State for the interactive tutor
+
+// Initialize Agent
+// Initialize Agent (Moved below availableTools)
 
 // Master mode configuration - combines all previous modes
 const MASTER_MODE = {
@@ -663,6 +668,9 @@ const availableTools = [
         ]
     }
 ];
+
+// Initialize Agent
+const agent = new Agent(availableTools, '');
 
 import { getRecipeById } from './recipes/RecipeRegistry.js';
 
@@ -1610,6 +1618,10 @@ Please help the user with their request using any of your available capabilities
  * Handles the form submission for sending a new chat message.
  * @param {Event} event - The form submission event.
  */
+/**
+ * Handles the form submission for sending a new chat message.
+ * @param {Event} event - The form submission event.
+ */
 async function handleSendMessage(event) {
     event.preventDefault();
     const input = dom['ai-chat-input'];
@@ -1617,6 +1629,7 @@ async function handleSendMessage(event) {
 
     if (!message) return;
 
+    // Add user message to UI immediately
     addMessage('user', message);
     input.value = '';
 
@@ -1628,7 +1641,6 @@ async function handleSendMessage(event) {
         let model = localStorage.getItem('ai_model');
         const customModel = localStorage.getItem('ai_custom_model');
 
-        // Use custom model if provided, otherwise use selected model
         if (customModel && customModel.trim()) {
             model = customModel.trim();
         }
@@ -1641,34 +1653,85 @@ async function handleSendMessage(event) {
             return;
         }
 
-        // --- Contextual System Prompt ---
+        // Update Agent Settings
+        const yoloEnabled = document.getElementById('ai-yolo-toggle-btn')?.dataset.enabled === 'true';
+        agent.setYoloMode(yoloEnabled);
+
+        // Prepare Context
         const systemPrompt = await _createContextualSystemPrompt(message);
+        agent.systemPrompt = systemPrompt; // Update prompt with fresh context
 
-        // --- Tutor Mode Injection ---
-        if (activeWalkthrough) {
-            const tutorContext = `
-\n\n*** INTERACTIVE TUTOR MODE ACTIVE ***
-You are currently guiding the user through a "${activeWalkthrough.topic}" workflow.
-Current Step: ${activeWalkthrough.step}
+        const context = {
+            selectedWallId: selectedWallId || null,
+            // Add other relevant context here
+        };
 
-Your goal is to explain the current step clearly, provide the necessary tools to complete it, and then wait for the user to confirm or ask for the next step.
-Do not overwhelm the user. One step at a time.
-Use the 'endWalkthrough' tool if the user asks to stop or if the workflow is complete.
-`;
-            // Append to the system prompt or insert it
-            // For simplicity, we'll append it to the user message to ensure it's seen as immediate context,
-            // or we can modify the system prompt function itself.
-            // Let's modify _createContextualSystemPrompt instead (see below).
-        }
+        // Create a placeholder for the AI response to stream thoughts
+        const responseWrapper = addMessage('ai', '');
+        const bubble = responseWrapper.querySelector('.message-bubble');
+        let thoughtContainer = null;
 
-        const responseText = await callGenerativeAI(apiKey, provider, model, systemPrompt);
-        addMessage('ai', responseText);
+        // Call Agent Process
+        const finalResponse = await agent.process(
+            message,
+            context,
+            // onThought
+            (thoughtText) => {
+                if (!thoughtContainer) {
+                    thoughtContainer = document.createElement('div');
+                    thoughtContainer.className = 'thought-process';
+                    thoughtContainer.innerHTML = `
+                        <div class="thought-header" onclick="this.parentElement.classList.toggle('expanded')">
+                            <span>Thinking...</span>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </div>
+                        <div class="thought-details"></div>
+                    `;
+                    bubble.appendChild(thoughtContainer);
+                }
+                const details = thoughtContainer.querySelector('.thought-details');
+                details.textContent += thoughtText + '\n';
+                // Scroll to bottom of details
+                details.scrollTop = details.scrollHeight;
+            },
+            // onToolCall (Confirmation)
+            async (toolName, args) => {
+                // For now, we'll use a simple confirm dialog. 
+                // In a real app, this should be a nice custom modal.
+                // Since this is async, we can await the user's response.
+                return new Promise(resolve => {
+                    // Use a timeout to allow UI to render
+                    setTimeout(() => {
+                        const approved = confirm(`Agent wants to execute '${toolName}'. Proceed?`);
+                        resolve(approved);
+                    }, 10);
+                });
+            },
+            // llmExecutor
+            async (messages, prompt) => {
+                // Adapt Agent messages to Provider format
+                // This reuses the logic inside callGenerativeAI but we need to extract it
+                // For now, let's call a new helper _generateRawResponse
+                return await _generateRawResponse(apiKey, provider, model, prompt, messages);
+            },
+            // toolExecutor
+            async (name, args) => {
+                const result = await _executeToolCall({ functionCall: { name, args } });
+                if (!result.success) throw new Error(result.message);
+                return result.message; // Return success message
+            }
+        );
+
+        // Append Final Response
+        const finalContent = document.createElement('div');
+        // Convert markdown
+        finalContent.innerHTML = finalResponse.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+        bubble.appendChild(finalContent);
 
     } catch (error) {
         console.error('AI Assistant Error:', error);
         const errorMessage = `Sorry, I encountered an error: ${error.message}`;
         addMessage('ai', errorMessage);
-        showAlert(`Error communicating with the AI model: ${error.message}`, 'API Error');
     } finally {
         setLoadingState(false);
     }
@@ -4244,3 +4307,111 @@ async function _getFileFromElectron(filePath) {
     const blob = new Blob([buffer]);
     return new File([blob], name, { type: 'application/octet-stream' });
 }
+
+/**
+ * Generates a raw response from the AI model without automatically executing tools.
+ * Used by the Agent class.
+ * @param {string} apiKey 
+ * @param {string} provider 
+ * @param {string} model 
+ * @param {string} systemPrompt 
+ * @param {Array} agentMessages - Full history from Agent class
+ * @returns {Promise<{text: string, toolCalls: Array}>}
+ */
+async function _generateRawResponse(apiKey, provider, model, systemPrompt, agentMessages) {
+    // Map Agent messages to Provider messages
+    let messages = [];
+
+    if (provider === 'openrouter' || provider === 'openai') {
+        messages = agentMessages.map(m => {
+            const msg = { role: m.role, content: m.content };
+            if (m.tool_calls) msg.tool_calls = m.tool_calls;
+            if (m.tool_call_id) msg.tool_call_id = m.tool_call_id;
+            if (m.name) msg.name = m.name;
+            return msg;
+        });
+        messages.unshift({ role: 'system', content: systemPrompt });
+
+        const openAITools = convertGeminiToolsToOpenAI(availableTools);
+        const payload = { model, messages, tools: openAITools, tool_choice: "auto" };
+
+        const data = await _callModelAPI(payload, provider, apiKey, model);
+        const choice = data.choices?.[0]?.message;
+
+        if (!choice) throw new Error("Invalid response from AI provider");
+
+        return {
+            text: choice.content,
+            toolCalls: choice.tool_calls ? choice.tool_calls.map(tc => ({
+                id: tc.id,
+                name: tc.function.name,
+                args: JSON.parse(tc.function.arguments)
+            })) : []
+        };
+    } else if (provider === 'gemini') {
+        // Basic Gemini mapping (simplified)
+        const geminiContents = agentMessages.map(m => {
+            let role = m.role === 'user' ? 'user' : 'model';
+            let parts = [{ text: m.content || '' }];
+            if (m.role === 'tool') {
+                role = 'function';
+                parts = [{ functionResponse: { name: m.name, response: { content: m.content } } }];
+            }
+            return { role, parts };
+        });
+
+        const payload = {
+            contents: geminiContents,
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            tools: availableTools
+        };
+
+        const data = await _callModelAPI(payload, provider, apiKey, model);
+        const candidate = data.candidates?.[0]?.content;
+        const part = candidate?.parts?.[0];
+
+        if (part?.functionCall) {
+            return {
+                text: null,
+                toolCalls: [{
+                    id: 'gemini_call_' + Date.now(),
+                    name: part.functionCall.name,
+                    args: part.functionCall.args
+                }]
+            };
+        }
+
+        return {
+            text: part?.text || '',
+            toolCalls: []
+        };
+    }
+
+    throw new Error(`Provider ${provider} not fully supported in Agent mode yet.`);
+}
+
+// Initialize YOLO Toggle Listener
+(function initAgentUI() {
+    const yoloBtn = document.getElementById('ai-yolo-toggle-btn');
+    if (yoloBtn) {
+        yoloBtn.addEventListener('click', () => {
+            const isEnabled = yoloBtn.dataset.enabled === 'true';
+            const newState = !isEnabled;
+            yoloBtn.dataset.enabled = newState.toString();
+
+            // Visual feedback
+            if (newState) {
+                yoloBtn.style.color = '#ef4444'; // Red
+                yoloBtn.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+            } else {
+                yoloBtn.style.color = '';
+                yoloBtn.style.backgroundColor = '';
+            }
+
+            // Update Agent
+            if (typeof agent !== 'undefined') {
+                agent.setYoloMode(newState);
+            }
+        });
+    }
+})();
