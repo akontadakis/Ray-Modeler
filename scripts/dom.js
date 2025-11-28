@@ -164,7 +164,7 @@ export function setupDOM() {
         'opt-goal-metric', 'opt-constraint', 'opt-population-size', 'opt-generations',
         'opt-quality', 'start-optimization-btn', 'resume-optimization-btn',
         'cancel-optimization-btn', 'optimization-log',
-        'ai-chat-tab-1', 'ai-assistant-panel', 'ai-inspector-results', 'ai-critique-results',
+        'ai-chat-tab-1', 'ai-assistant-panel', 'ai-inspector-results', 'ai-critique-results', 'ai-assistant-header',
         'run-inspector-btn', 'run-critique-btn',
 
         // Other

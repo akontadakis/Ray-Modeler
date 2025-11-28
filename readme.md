@@ -177,6 +177,16 @@ After a simulation completes, the AI can analyze the results, identify problems,
 
 The AI can act as a tutor to guide new users through complex simulation workflows step-by-step, teaching them the process as they go.
 
+#### The User Experience
+
+*   **Activation**: You ask Helios to "Start a walkthrough for Daylight Factor" or "Teach me how to run a glare analysis."
+*   **Visual Change**: The chat header turns blue (accent color), and a "🎓 Tutor Mode Active" badge appears at the top of the chat. This confirms you are in a guided session.
+*   **Step-by-Step Guidance**: Instead of a generic response, Helios will:
+    *   Explain the goal of the current step (e.g., "First, we need to set the location").
+    *   Provide specific instructions or even use tools to open the relevant panels for you.
+    *   Wait for you to confirm you've done it before moving to the next step.
+*   **Completion**: Once the workflow is done, or if you click "End" on the badge, Helios returns to its normal "Master Assistant" mode.
+
 > **User**: "How do I run a glare simulation?"
 
 > **AI**: "Of course! To calculate DGP, we need a 180° fisheye view. Your current viewpoint is set to Perspective. Would you like me to change it for you?"

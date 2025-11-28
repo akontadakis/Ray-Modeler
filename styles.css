@@ -2857,3 +2857,31 @@ body.left-sidebar-docked.ai-sidebar-open #render-container {
   margin-left: 60px;
   width: calc(100% - 60px - var(--ai-sidebar-width));
 }
+/* Tutor Mode Styles */
+.window-header.tutor-mode {
+    background-color: var(--accent-color);
+    color: white;
+}
+
+.tutor-badge {
+    background-color: rgba(59, 130, 246, 0.1);
+    border: 1px solid var(--accent-color);
+    border-radius: 4px;
+    padding: 8px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    color: var(--accent-color);
+    font-weight: 500;
+}
+
+.tutor-badge button {
+    color: var(--text-secondary);
+    text-decoration: underline;
+}
+
+.tutor-badge button:hover {
+    color: var(--text-primary);
+}

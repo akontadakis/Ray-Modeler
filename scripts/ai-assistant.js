@@ -23,6 +23,7 @@ let activeConversationId = null;
 let conversationCounter = 0; // Simple incrementing ID for new conversations
 
 let currentMode = 'master';
+let activeWalkthrough = null; // State for the interactive tutor
 
 // Master mode configuration - combines all previous modes
 const MASTER_MODE = {
@@ -1462,8 +1463,26 @@ async function _createContextualSystemPrompt(userMessage) {
         const appState = { projectConfiguration: dataForPrompt, loadedResultsSummary: resultsData };
         const appStateJSON = JSON.stringify(appState, null, 2);
 
-        const systemPrompt = `You are Ray Modeler's Master AI Assistant - a comprehensive, unified assistant that combines all capabilities in one interface. You have access to extensive tools and can help users with any aspect of their daylighting and lighting simulation project, including new typed result outputs and EN-compliance workflows.
+        let systemPrompt = `You are Ray Modeler's Master AI Assistant - a comprehensive, unified assistant that combines all capabilities in one interface. You have access to extensive tools and can help users with any aspect of their daylighting and lighting simulation project, including new typed result outputs and EN-compliance workflows.
 
+You are helpful, precise, and expert in Radiance and EnergyPlus.
+`;
+
+        if (activeWalkthrough) {
+            systemPrompt += `
+\n*** INTERACTIVE TUTOR MODE ACTIVE ***
+TOPIC: ${activeWalkthrough.topic}
+STEP: ${activeWalkthrough.step}
+
+You are acting as an interactive tutor. Guide the user step-by-step through the "${activeWalkthrough.topic}" workflow.
+- Explain the "Why" and "How" of the current step.
+- Use tools to help them set up the scene or simulation if appropriate.
+- Wait for user confirmation before moving to the next step.
+- If the user has completed the workflow, call 'endWalkthrough'.
+`;
+        }
+
+        systemPrompt += `
 ## Your Core Capabilities
 
 ### 💬 General Chat & Help
@@ -1622,7 +1641,25 @@ async function handleSendMessage(event) {
             return;
         }
 
+        // --- Contextual System Prompt ---
         const systemPrompt = await _createContextualSystemPrompt(message);
+
+        // --- Tutor Mode Injection ---
+        if (activeWalkthrough) {
+            const tutorContext = `
+\n\n*** INTERACTIVE TUTOR MODE ACTIVE ***
+You are currently guiding the user through a "${activeWalkthrough.topic}" workflow.
+Current Step: ${activeWalkthrough.step}
+
+Your goal is to explain the current step clearly, provide the necessary tools to complete it, and then wait for the user to confirm or ask for the next step.
+Do not overwhelm the user. One step at a time.
+Use the 'endWalkthrough' tool if the user asks to stop or if the workflow is complete.
+`;
+            // Append to the system prompt or insert it
+            // For simplicity, we'll append it to the user message to ensure it's seen as immediate context,
+            // or we can modify the system prompt function itself.
+            // Let's modify _createContextualSystemPrompt instead (see below).
+        }
 
         const responseText = await callGenerativeAI(apiKey, provider, model, systemPrompt);
         addMessage('ai', responseText);
@@ -2319,12 +2356,48 @@ async function _handleProjectTool(name, args) {
     }
 }
 
+
+
+function switchToTutorMode() {
+    const header = dom['ai-assistant-header'];
+    if (header) {
+        header.classList.add('tutor-mode');
+        const title = header.querySelector('h3');
+        if (title) title.textContent = `🎓 Tutor: ${activeWalkthrough.topic}`;
+    }
+
+    // Add a visual indicator to the chat
+    const chatContainer = dom['ai-chat-messages'];
+    if (chatContainer) {
+        const badge = document.createElement('div');
+        badge.className = 'tutor-badge';
+        badge.innerHTML = `<span>🎓 Tutor Mode Active</span><button class="btn-xs btn-text" onclick="document.dispatchEvent(new CustomEvent('end-walkthrough'))">End</button>`;
+        chatContainer.prepend(badge);
+    }
+}
+
+function switchToChatMode() {
+    const header = dom['ai-assistant-header'];
+    if (header) {
+        header.classList.remove('tutor-mode');
+        const title = header.querySelector('h3');
+        if (title) title.textContent = MASTER_MODE.title;
+    }
+
+    // Remove visual indicator
+    const chatContainer = dom['ai-chat-messages'];
+    if (chatContainer) {
+        const badge = chatContainer.querySelector('.tutor-badge');
+        if (badge) badge.remove();
+    }
+}
+
 async function _handleTutorTool(name, args) {
     switch (name) {
         case 'startWalkthrough': {
             activeWalkthrough = { topic: args.topic, step: 1 };
             switchToTutorMode();
-            return { success: true, message: `Walkthrough for topic '${args.topic}' has been initiated.` };
+            return { success: true, message: `Walkthrough for topic '${args.topic}' has been initiated. I am ready to guide you.` };
         }
         case 'endWalkthrough': {
             activeWalkthrough = null;
