@@ -4942,26 +4942,8 @@
     </ul>
 
     <h2>What Happens When You Click "Start"</h2>
-    <p>The <code>_evaluateEpDesignHeadless</code> function orchestrates the entire process for each design:
-    </p>
-    <ol>
-        <li>Clones the current <code>energyPlusConfig</code> from the project.</li>
-        <li>Applies the new design parameters (e.g., <code>tset_cool: 25</code>,
-            <code>lpd_multiplier: 0.8</code>).
-        </li>
-        <li>Calls <code>generateAndStoreIdf(project)</code> to create a new <strong>model.idf</strong> file
-            reflecting these changes.</li>
-        <li>Calls <code>window.electronAPI.runEnergyPlus</code> with a unique <code>runId</code> to simulate
-            this specific <strong>model.idf</strong>.</li>
-        <li>Waits for the <code>onEnergyPlusExit</code> event from the Electron backend.</li>
-        <li>Calls <code>resultsManager.parseEnergyPlusResults</code> to read the simulation outputs.</li>
-        <li>Extracts the target KPI (e.g.,
-            <code>resultsManager.getEnergyPlusKpisForUi(runId).siteEui</code>).
-        </li>
-        <li>Calculates a fitness score from this KPI (e.g., <code>score = -siteEui</code> for minimization).
-        </li>
-        <li>Returns this score to the optimizer, which then repeats the loop.</li>
-    </ol>
+    <p>The optimization process automatically iterates through design options to find the best configuration based on
+        your objectives.</p>
     <p class="mt-4"><strong>Final Result:</strong> When the process is complete, the results list will show
         the best solution. You must click **"Apply Best Design"** to save these parameters to your main
         project configuration.</p>

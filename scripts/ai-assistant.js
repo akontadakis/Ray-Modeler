@@ -2236,32 +2236,7 @@ async function _handleSimulationTool(name, args) {
                 message: 'Generated/updated occupancy schedule CSV using current UI settings.'
             };
         }
-        case 'generateEnergyPlusIdf': {
-            try {
-                const idf = await generateAndStoreIdf();
-                if (!idf) {
-                    throw new Error('IDF generation returned no content.');
-                }
-                return {
-                    success: true,
-                    message: 'EnergyPlus IDF generated and stored in project simulation files as model.idf.'
-                };
-            } catch (err) {
-                throw new Error(err?.message || 'EnergyPlus IDF generation failed. Check diagnostics or console for details.');
-            }
-        }
-        case 'getEnergyPlusDiagnostics': {
-            try {
-                const diagnostics = await generateEnergyPlusDiagnostics();
-                return {
-                    success: true,
-                    diagnostics,
-                    message: 'Retrieved EnergyPlus configuration diagnostics summary.'
-                };
-            } catch (err) {
-                throw new Error(err?.message || 'Failed to generate EnergyPlus diagnostics.');
-            }
-        }
+
         default:
             throw new Error(`Unknown simulation tool: ${name}`);
     }

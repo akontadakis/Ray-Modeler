@@ -78,28 +78,6 @@ app.whenReady().then(() => {
     });
   });
 
-  /**
-
-   *
-
-   *   idfPath,
-   *   epwPath,
-
-   *   runName?,   // e.g. "annual", "heating-design", ...
-   *   runId?      // optional; if omitted, we generate one
-   * })
-   *
-   * Emits to renderer:
-
-   *        runId,
-   *        exitCode,
-   *        outputDir,
-   *        errContent?,      // optional eplusout.err contents
-   *        csvContents?      // reserved for future use
-   *    }
-   *
-   * Multiple runs may be in-flight; all events are tagged by runId.
-   */
   // Resolve a path coming from the renderer:
   // - If absolute, use as-is.
   // - If relative, interpret as relative to the current working directory

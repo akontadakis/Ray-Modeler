@@ -864,13 +864,11 @@ function setupHeliosPanel() {
     const dom = getDom();
 
     const optimizationTab = dom['helios-optimization-tab-btn'];          // Radiance / daylight optimization
-    const epOptimizationTab = dom['helios-ep-optimization-tab-btn'];    // EnergyPlus optimization
     const chatTab = dom['ai-chat-tab-1'];
     const chatContent = dom['ai-chat-content-1'];
 
     // Always make both optimization tabs available; content visibility is managed by ai-assistant.js
     if (optimizationTab) optimizationTab.classList.remove('hidden');
-    if (epOptimizationTab) epOptimizationTab.classList.remove('hidden');
 
     // Ensure there is always at least one active tab (chat) if none is set yet
     if (chatTab && chatContent && dom['ai-chat-tabs'] && !dom['ai-chat-tabs'].querySelector('.ai-chat-tab.active')) {
