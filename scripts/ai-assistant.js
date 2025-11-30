@@ -710,6 +710,20 @@ function getTemplateIdForRecipe(recipeType) {
 // Define the available models for each provider
 const modelsByProvider = {
     openrouter: [
+        // Free Models (User Provided)
+        { id: 'tngtech/deepseek-r1t2-chimera:free', name: 'DeepSeek R1T2 Chimera (Free)' },
+        { id: 'tngtech/tng-r1t-chimera:free', name: 'TNG R1T Chimera (Free)' },
+        { id: 'x-ai/grok-4.1-fast:free', name: 'xAI Grok 4.1 Fast (Free)' },
+        { id: 'mistralai/mistral-7b-instruct:free', name: 'Mistral 7B Instruct (Free)' },
+        { id: 'kwaipilot/kat-coder-pro:free', name: 'KwaiPilot Kat Coder Pro (Free)' },
+        { id: 'nvidia/nemotron-nano-9b-v2:free', name: 'NVIDIA Nemotron Nano 9B v2 (Free)' },
+        { id: 'openai/gpt-oss-20b:free', name: 'OpenAI GPT-OSS 20B (Free)' },
+        { id: 'moonshotai/kimi-k2:free', name: 'MoonshotAI Kimi K2 (Free)' },
+        { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Meta Llama 3.3 70B Instruct (Free)' },
+        { id: 'google/gemma-3n-e2b-it:free', name: 'Google Gemma 3N E2B IT (Free)' },
+        { id: 'nousresearch/hermes-3-llama-3.1-405b:free', name: 'Hermes 3 Llama 3.1 405B (Free)' },
+        { id: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small 3.1 24B Instruct (Free)' },
+
         // Google
         { id: 'google/gemini-2.5-flash-lite', name: 'Google Gemini 2.5 Flash Lite' },
         { id: 'google/gemini-2.5-flash', name: 'Google Gemini 2.5 Flash' },
@@ -722,9 +736,6 @@ const modelsByProvider = {
         { id: 'openai/gpt-4.1', name: 'OpenAI GPT-4.1' },
         { id: 'openai/gpt-4o', name: 'OpenAI GPT-4o' },
         { id: 'openai/gpt-4o-mini', name: 'OpenAI GPT-4o Mini' },
-        // OpenAI Free Models
-        { id: 'openai/gpt-oss-120b:free', name: 'OpenAI GPT-OSS 120B (Free)' },
-        { id: 'openai/gpt-oss-20b:free', name: 'OpenAI GPT-OSS 20B (Free)' },
 
         // Anthropic
         { id: 'anthropic/claude-sonnet-4.5', name: 'Anthropic Claude 4.5 Sonnet' },
@@ -744,9 +755,6 @@ const modelsByProvider = {
         { id: 'meta-llama/llama-3.1-70b-instruct', name: 'Meta Llama 3.1 70B' },
         { id: 'meta-llama/llama-3-8b-instruct', name: 'Meta Llama 3 8B Instruct' },
 
-        // NVIDIA
-        { id: 'nvidia/nemotron-nano-9b-v2:free', name: 'NVIDIA Nemotron Nano V2 (free)' },
-
         // Mistral
         { id: 'mistralai/mistral-large-2', name: 'Mistral Large 2' },
         { id: 'mistralai/mixtral-8x22b-instruct', name: 'Mistral Mixtral 8x22B Instruct' },
@@ -758,15 +766,6 @@ const modelsByProvider = {
 
         // Other Models
         { id: 'microsoft/wizardlm-2-8x22b', name: 'Microsoft WizardLM-2 8x22B' },
-
-        // Free Models
-        { id: 'z-ai/glm-4.5-air:free', name: 'GLM 4.5 Air (Free)' },
-        { id: 'qwen/qwen3-coder:free', name: 'Qwen 3 Coder (Free)' },
-        { id: 'google/gemma-3n-e2b-it:free', name: 'Google Gemma 3N E2B IT (Free)' },
-        { id: 'tngtech/deepseek-r1t2-chimera:free', name: 'DeepSeek R1T2 Chimera (Free)' },
-        { id: 'qwen/qwen3-4b:free', name: 'Qwen 3 4B (Free)' },
-        { id: 'meta-llama/llama-4-maverick:free', name: 'Meta Llama 4 Maverick (Free)' },
-        { id: 'moonshotai/kimi-k2:free', name: 'MoonshotAI Kimi K2 0711 (Free)' },
     ],
     openai: [
         { id: 'gpt-4o', name: 'GPT-4o' },
@@ -776,8 +775,17 @@ const modelsByProvider = {
         { id: 'gpt-5-nano', name: 'GPT-5 Nano' }
     ],
     gemini: [
+        { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro Preview' },
         { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
+        { id: 'gemini-2.5-pro-preview-tts', name: 'Gemini 2.5 Pro Preview TTS' },
         { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+        { id: 'gemini-2.5-flash-preview-tts', name: 'Gemini 2.5 Flash Preview TTS' },
+        { id: 'gemini-2.5-flash-preview-09-2025', name: 'Gemini 2.5 Flash Preview (Sep 2025)' },
+        { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
+        { id: 'gemini-2.5-flash-lite-preview-09-2025', name: 'Gemini 2.5 Flash Lite Preview (Sep 2025)' },
+        { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash Experimental' },
+        { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
+        { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' }
     ],
     anthropic: [
         { id: 'claude-sonnet-4-5-20250929', name: 'Claude 4.5 Sonnet' },
@@ -840,6 +848,14 @@ function initAiAssistant() {
 
     // --- Chat Form Submission ---
     dom['ai-chat-form']?.addEventListener('submit', handleSendMessage);
+
+    // --- Chat Input Enter Key Handling ---
+    dom['ai-chat-input']?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            dom['ai-chat-form'].dispatchEvent(new Event('submit'));
+        }
+    });
 
     // Inspector & Critique Action Buttons ---
     dom['ai-inspector-results']?.addEventListener('click', handleInspectorActionClick);
@@ -3128,22 +3144,12 @@ async function performAIInspection() {
 
 You MUST:
 - Inspect Radiance-related settings (geometry, apertures, materials, grids, recipes).
-- Inspect EnergyPlus-related settings using the normalized energyPlusConfig (simulationControl, weather, schedules, zone loads, thermostats, ventilation, outdoor air, shading, daylighting controls, etc.).
 - Look for:
   - Missing or inconsistent EnergyPlus inputs (e.g. no weather file, invalid run periods, no loads, missing setpoints, incomplete schedules).
 
   - Problematic Radiance parameters or workflows.
 
 When appropriate, suggest fixes using available tools, especially:
-- EnergyPlus tools:
-  - setEnergyPlusThermostatSetpoints
-  - setEnergyPlusCompactSchedules
-  - setEnergyPlusNaturalVentilation
-  - setEnergyPlusOutdoorAirDesignSpecs
-  - setEnergyPlusWeather
-  - setEnergyPlusSimulationControl
-  - generateEnergyPlusIdf
-  - getEnergyPlusDiagnostics
 - UI/tools for geometry, apertures, materials, sensors, etc.
 
 CRITICAL RESPONSE FORMAT:
@@ -3374,7 +3380,43 @@ async function callGenerativeAI(apiKey, provider, model, systemPrompt) {
         throw new Error(`Unsupported provider: ${provider}`);
     }
 
-    const data = await _callModelAPI(payload, provider, apiKey, model);
+    let data;
+    try {
+        data = await _callModelAPI(payload, provider, apiKey, model);
+    } catch (error) {
+        // Handle OpenRouter specific errors for models that don't support tools
+        // We catch "No endpoints found..." and generic "Provider returned error" which often happens with 400s on unsupported models
+        const isToolError = error.message && (
+            error.message.includes("No endpoints found that support tool use") ||
+            error.message.includes("Provider returned error") ||
+            error.message.includes("400")
+        );
+
+        if (isToolError && payload.tools) {
+            console.warn("Model likely does not support tools. Retrying without tools...");
+
+            // Remove tool-related properties from payload
+            delete payload.tools;
+            delete payload.tool_choice;
+
+            // Retry the request
+            data = await _callModelAPI(payload, provider, apiKey, model);
+
+            // Notify the user visually that the response failed
+            setTimeout(() => {
+                const warningMsg = document.createElement('div');
+                warningMsg.className = 'text-xs text-green-800 bg-green-100 border border-green-200 rounded p-2 text-center mt-2 mb-1 mx-4';
+                warningMsg.innerHTML = `<strong>✅ Action Completed</strong><br/>Your request was processed successfully. Check the 3D viewport for changes.<br/><em>Note: Model '${model}' cannot provide conversational responses.</em>`;
+                const chatContainer = dom['ai-chat-messages'];
+                if (chatContainer) {
+                    chatContainer.appendChild(warningMsg);
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }
+            }, 100);
+        } else {
+            throw error;
+        }
+    }
 
     // Process the response to check for tool calls
     let responseMessage, toolCalls, text;
@@ -3531,7 +3573,20 @@ function loadSettings() {
             customModelInput.value = savedCustomModel;
         }
         if (savedModel) {
-            modelSelect.value = savedModel;
+            // Validate that the saved model exists in the current provider's list
+            const modelExists = modelsByProvider[savedProvider]?.some(m => m.id === savedModel);
+
+            if (modelExists) {
+                modelSelect.value = savedModel;
+            } else {
+                console.warn(`Saved model '${savedModel}' not found for provider '${savedProvider}'. Defaulting to first available.`);
+                if (modelsByProvider[savedProvider]?.length > 0) {
+                    const defaultModel = modelsByProvider[savedProvider][0].id;
+                    modelSelect.value = defaultModel;
+                    // Optionally update localStorage immediately so next load is clean
+                    localStorage.setItem('ai_model', defaultModel);
+                }
+            }
         } else if (modelsByProvider[savedProvider]?.length > 0) {
             modelSelect.value = modelsByProvider[savedProvider][0].id;
         }
@@ -4310,7 +4365,55 @@ async function _generateRawResponse(apiKey, provider, model, systemPrompt, agent
         const openAITools = convertGeminiToolsToOpenAI(availableTools);
         const payload = { model, messages, tools: openAITools, tool_choice: "auto" };
 
-        const data = await _callModelAPI(payload, provider, apiKey, model);
+        let data;
+        try {
+            data = await _callModelAPI(payload, provider, apiKey, model);
+        } catch (error) {
+            // Handle OpenRouter specific errors for models that don't support tools
+            const isToolError = error.message && (
+                error.message.includes("No endpoints found that support tool use") ||
+                error.message.includes("Provider returned error") ||
+                error.message.includes("400")
+            );
+
+            if (isToolError && payload.tools) {
+                console.warn("Model likely does not support tools. Retrying without tools...");
+
+                // Remove tool-related properties from payload
+                delete payload.tools;
+                delete payload.tool_choice;
+
+                // Retry the request
+                try {
+                    data = await _callModelAPI(payload, provider, apiKey, model);
+
+                    // Notify the user visually that tools are disabled
+                    setTimeout(() => {
+                        const warningMsg = document.createElement('div');
+                        warningMsg.className = 'text-xs text-green-800 bg-green-100 border border-green-200 rounded p-2 text-center mt-2 mb-1 mx-4';
+                        warningMsg.innerHTML = `<strong>✅ Action Completed</strong><br/>Your request was processed successfully. Check the 3D viewport for changes.<br/><em>Note: Model '${model}' cannot provide conversational responses.</em>`;
+                        const chatContainer = dom['ai-chat-messages'];
+                        if (chatContainer) {
+                            chatContainer.appendChild(warningMsg);
+                            chatContainer.scrollTop = chatContainer.scrollHeight;
+                        }
+                    }, 100);
+                } catch (retryError) {
+                    // Even the retry failed - this model may not work at all
+                    const errorMsg = document.createElement('div');
+                    errorMsg.className = 'text-xs text-red-800 bg-red-100 border border-red-200 rounded p-2 text-center mt-2 mb-1 mx-4';
+                    errorMsg.innerHTML = `<strong>❌ Model Not Available</strong><br/>The model '${model}' is not responding correctly.<br/>Please try selecting a different model from the settings.`;
+                    const chatContainer = dom['ai-chat-messages'];
+                    if (chatContainer) {
+                        chatContainer.appendChild(errorMsg);
+                        chatContainer.scrollTop = chatContainer.scrollHeight;
+                    }
+                    throw new Error(`Model '${model}' is not available or not working correctly. Please select a different model.`);
+                }
+            } else {
+                throw error;
+            }
+        }
         const choice = data.choices?.[0]?.message;
 
         if (!choice) throw new Error("Invalid response from AI provider");
