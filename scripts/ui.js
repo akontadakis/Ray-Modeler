@@ -3,7 +3,7 @@
 import { getDom, setupDOM } from './dom.js'; // <--- Added setupDOM here
 import { initSidebar } from './sidebar.js';
 import { AperturePanelUI } from './AperturePanelUI.js'; // <--- Added Class Import
-import { updateScene, axesObject, updateSensorGridColors, roomObject, shadingObject, sensorMeshes, wallSelectionGroup, highlightWall, clearWallHighlights, updateHighlightColor, furnitureObject, addFurniture, updateFurnitureColor, resizeHandlesObject, contextObject, vegetationObject, addImportedAsset, getWallGroupById } from './geometry.js';
+import { updateScene, axesObject, updateSensorGridColors, roomObject, shadingObject, sensorMeshes, wallSelectionGroup, highlightWall, clearWallHighlights, updateHighlightColor, furnitureObject, addFurniture, updateFurnitureColor, resizeHandlesObject, contextObject, vegetationObject, addImportedAsset, getWallGroupById, setIsCustomGeometry } from './geometry.js';
 
 import { activeCamera, perspectiveCamera, orthoCamera, setActiveCamera, onWindowResize, controls, transformControls, sensorTransformControls, viewpointCamera, scene, updateLiveViewType, renderer, toggleFirstPersonView as sceneToggleFPV, isFirstPersonView as sceneIsFPV, fpvOrthoCamera, updateViewpointFromUI, setGizmoVisibility, setUpdatingFromSliders, isUpdatingCameraFromSliders, setGizmoMode } from './scene.js';
 import * as THREE from 'three';
@@ -14,6 +14,8 @@ export { generateAndStoreOccupancyCsv, getDom };
 import { resultsManager, palettes } from './resultsManager.js';
 import * as MESH from '../scripts/scene.js';
 import { initHdrViewer, openHdrViewer } from './hdrViewer.js';
+import { startDrawingMode, cancelDrawing, showDrawSetupModal, startPartitionDrawingMode } from './drawingTool.js';
+import { injectCustomWallUI } from './customApertureManager.js';
 
 
 // --- SHORTCUTS ---
@@ -419,7 +421,7 @@ export function scheduleUpdate(id = null) {
     if (updateScheduled) return;
     updateScheduled = true;
     requestAnimationFrame(() => {
-        updateScene(id);
+        updateScene(id, selectedWallId);
         updateScheduled = false;
     });
 }
@@ -929,6 +931,23 @@ export async function setupEventListeners() {
     dom['mode-import-btn']?.addEventListener('click', () => switchGeometryMode('import'));
     dom['load-model-btn']?.addEventListener('click', handleModelImport);
 
+    // Welcome Screen Options
+    dom['start-with-draw']?.addEventListener('click', () => {
+        // Hide welcome screen
+        const welcomeScreen = document.getElementById('welcome-screen');
+        if (welcomeScreen) welcomeScreen.classList.add('hidden');
+        // Show drawing setup modal (for optional floor plan loading)
+        showDrawSetupModal();
+    });
+
+    dom['start-with-import']?.addEventListener('click', () => {
+        // Hide welcome screen
+        const welcomeScreen = document.getElementById('welcome-screen');
+        if (welcomeScreen) welcomeScreen.classList.add('hidden');
+        // Trigger import
+        handleModelImport();
+    });
+
 
     Object.keys(dom).forEach(id => {
         const el = dom[id];
@@ -1293,6 +1312,13 @@ export async function setupEventListeners() {
     // Listener for the new EP optimization info modal
     dom['ep-opt-info-modal-close-btn']?.addEventListener('click', () => {
         dom['ep-optimization-info-modal']?.classList.replace('flex', 'hidden');
+    });
+
+    // --- Partition Drawing Button Listener ---
+    dom['draw-partition-btn']?.addEventListener('click', () => {
+        import('./drawingTool.js').then(({ startPartitionDrawingMode }) => {
+            startPartitionDrawingMode();
+        });
     });
 
     // Listeners for the new transform sliders with real-time feedback
@@ -1868,7 +1894,6 @@ function setupPanelToggleButtons() {
         'toggle-panel-sensor-btn': 'panel-sensor',
         'toggle-panel-viewpoint-btn': 'panel-viewpoint',
         'toggle-panel-scene-btn': 'panel-scene-elements',
-        'toggle-panel-energyplus-btn': 'panel-energyplus',
         'info-button': 'panel-info',
         'recipe-guides-btn': 'panel-recipe-guides',
         'toggle-modules-btn': 'panel-simulation-modules',
@@ -2657,6 +2682,13 @@ async function handleInputChange(e) {
         else if (id.startsWith('wwr-') && !id.includes('sill')) unit = '%';
         else if (id.includes('fov') || id.includes('orientation') || id.includes('tilt') || id.includes('angle')) unit = '°';
         updateValueLabel(valEl, val, unit, id);
+    }
+
+    // If the user changes the main dimensions, switch back to parametric mode
+    if (id === 'width' || id === 'length' || id === 'height') {
+        setIsCustomGeometry(false);
+        // Trigger parametric room regeneration
+        updateScene();
     }
 
     // Add specific handler for viewpoint sliders to update the gizmo in real-time
@@ -4546,6 +4578,15 @@ function onSceneClick(event) {
     const objectsToIntersect = [wallSelectionGroup, furnitureObject, contextObject];
     const intersects = raycaster.intersectObjects(objectsToIntersect, true);
 
+    if (intersects.length > 0) {
+        console.log("Raycaster hits:", intersects.map(i => ({
+            name: i.object.name,
+            type: i.object.type,
+            userData: i.object.userData,
+            parentUserData: i.object.parent ? i.object.parent.userData : 'no-parent'
+        })));
+    }
+
     const wallIntersect = intersects.find(i => i.object.userData.isSelectableWall === true);
     const furnitureIntersect = intersects.find(i => i.object.userData.isFurniture === true);
     const vegetationIntersect = intersects.find(i => i.object.userData.isVegetation === true);
@@ -4571,19 +4612,49 @@ function onSceneClick(event) {
 * @param {boolean} [resetLock=true] - Whether this selection should reset the lock state.
 */
 function handleWallSelection(wallGroup, resetLock = true) {
-    // Set the selected wall ID
-    selectedWallId = wallGroup.userData.canonicalId;
+    const dom = getDom();
+    const wallId = wallGroup.userData.canonicalId;
 
     // Find the actual mesh within the group to highlight
     // The geometry function `highlightWall` will clear any previous highlight.
     const wallMesh = wallGroup.children.find(c => c.isMesh && c.userData.isSelectableWall);
-    if (wallMesh) {
-        // Highlight the selected wall mesh in the 3D view
-        highlightWall(wallMesh);
-    }
 
-    // Show the specific aperture/shading controls for the selected wall
-    showApertureControlsFor(selectedWallId);
+    console.log("handleWallSelection:", wallId, "Mesh found:", !!wallMesh);
+
+    // If we clicked the same wall again, do nothing (or maybe toggle selection?)
+    if (selectedWallId === wallId) return;
+
+    // Deselect previous wall
+    handleWallDeselection();
+
+    selectedWallId = wallId;
+
+    // Highlight the selected wall mesh in the 3D view
+    highlightWall(wallMesh);
+
+    // Check if it's a custom wall
+    if (wallId.startsWith('wall_')) {
+        // Import dynamically to avoid circular dependency issues at top level if any
+        import('./customApertureManager.js').then(({ injectCustomWallUI }) => {
+            injectCustomWallUI(wallId);
+        });
+
+        // Ensure panel is visible
+        const panel = dom['panel-aperture'];
+        if (panel.classList.contains('hidden')) {
+            panel.classList.remove('hidden');
+            dom['toggle-panel-aperture-btn']?.classList.add('active');
+        }
+    } else {
+        // Standard wall
+        // Ensure custom UI is hidden
+        import('./customApertureManager.js').then(({ hideCustomWallUI }) => {
+            hideCustomWallUI();
+        });
+
+        // Show the specific aperture/shading controls for the selected wall
+        showApertureControlsFor(selectedWallId);
+    }
 
     // Only reset the lock state if instructed to do so (e.g., manual click)
     // AI actions might pass false here to prevent unlocking
@@ -4602,6 +4673,11 @@ function handleWallDeselection() {
         selectedWallId = null;
         clearWallHighlights();
         showApertureControlsFor(null);
+
+        // Also hide custom UI
+        import('./customApertureManager.js').then(({ hideCustomWallUI }) => {
+            hideCustomWallUI();
+        });
     }
 }
 
@@ -6119,6 +6195,22 @@ function handleSceneClick(event) {
 }
 
 /**
+ * Toggles the UI state for custom geometry mode (hiding Width/Length/Height sliders).
+ * @param {boolean} isActive - True if custom geometry mode is active.
+ */
+export function setCustomGeometryUI(isActive) {
+    const dom = getDom();
+    if (isActive) {
+        document.body.classList.add('custom-geometry-active');
+        // Ensure the panel itself is visible so other controls (Elevation, etc.) can be used
+        dom['parametric-controls']?.classList.remove('hidden');
+        dom['import-controls']?.classList.add('hidden');
+    } else {
+        document.body.classList.remove('custom-geometry-active');
+    }
+}
+
+/**
  * Changes the cursor style when hovering over a resize handle.
  */
 function updateResizeCursor(event) {
@@ -6147,10 +6239,14 @@ function updateResizeCursor(event) {
     }
 }
 
-export function switchGeometryMode(mode) {
+export async function switchGeometryMode(mode) {
     const dom = getDom();
 
     const isParametric = mode === 'parametric';
+    console.log(`[UI] switchGeometryMode called with mode: ${mode}, isParametric: ${isParametric}`);
+
+    // 1. Ensure drawing mode is completely exited (silently)
+    cancelDrawing(true);
 
     // Toggle button active state
     dom['mode-parametric-btn']?.classList.toggle('active', isParametric);
@@ -6160,23 +6256,99 @@ export function switchGeometryMode(mode) {
     dom['parametric-controls']?.classList.toggle('hidden', !isParametric);
     dom['import-controls']?.classList.toggle('hidden', isParametric);
 
-    // Using an async IIFE to handle the dynamic import
-    (async () => {
-        const { clearImportedModel, roomObject, wallSelectionGroup, shadingObject } = await import('./geometry.js');
-        if (!isParametric) {
-            // When switching to import mode, hide the parametric geometry
-            roomObject.visible = false;
-            wallSelectionGroup.visible = false;
-            shadingObject.visible = false; // Hide parametric shading too
-        } else {
-            // When switching back to parametric, restore geometry visibility and clear any imported model.
-            clearImportedModel();
-            roomObject.visible = true;
-            wallSelectionGroup.visible = true;
-            shadingObject.visible = true;
-            scheduleUpdate(); // Rebuild parametric geometry
+    // Import all necessary functions and objects
+    const {
+        clearImportedModel,
+        roomObject,
+        wallSelectionGroup,
+        shadingObject,
+        setIsCustomGeometry,
+        updateScene
+    } = await import('./geometry.js');
+
+    if (!isParametric) {
+        // When switching to import mode, hide the parametric geometry
+        roomObject.visible = false;
+        wallSelectionGroup.visible = false;
+        shadingObject.visible = false;
+        console.log('[UI] switchGeometryMode: Hidden parametric geometry for import mode');
+    } else {
+        // When switching back to parametric mode:
+        console.log('[UI] switchGeometryMode: Entering parametric mode');
+
+        // 1. Clear any imported model
+        clearImportedModel();
+
+        // 2. Exit custom geometry mode
+        console.log('[UI] switchGeometryMode: Resetting isCustomGeometry to false');
+        setIsCustomGeometry(false);
+        setCustomGeometryUI(false); // Reset UI to show all controls
+
+        // 3. Re-create parametric geometry
+        console.log('[UI] switchGeometryMode: Re-creating parametric geometry');
+        setIsCustomGeometry(false);
+
+        // 3. Clear the custom geometry groups to ensure they're empty
+        while (roomObject.children.length > 0) {
+            roomObject.remove(roomObject.children[0]);
         }
-    })();
+        while (wallSelectionGroup.children.length > 0) {
+            wallSelectionGroup.remove(wallSelectionGroup.children[0]);
+        }
+        console.log('[UI] switchGeometryMode: Cleared existing geometry groups');
+
+        // 4. Make geometry visible - CRITICAL FIX
+        roomObject.visible = true;
+        wallSelectionGroup.visible = true;
+        shadingObject.visible = true;
+        console.log('[UI] switchGeometryMode: Set geometry visible');
+
+        // 5. Force a complete scene rebuild
+        // Apply default values as requested by user
+        dom.width.value = '4.0';
+        dom.length.value = '7.0';
+        dom.height.value = '3.0';
+        dom['surface-thickness'].value = '0.20';
+
+        if (dom['width-val']) dom['width-val'].textContent = '4.0m';
+        if (dom['length-val']) dom['length-val'].textContent = '7.0m';
+        if (dom['height-val']) dom['height-val'].textContent = '3.0m';
+        if (dom['surface-thickness-val']) dom['surface-thickness-val'].textContent = '0.20m';
+
+        console.log('[UI] switchGeometryMode: Reset dimension values to defaults');
+        console.log('[UI] switchGeometryMode: Calling updateScene...');
+
+        try {
+            // Force a small delay to ensure DOM updates have propagated if necessary, though await should handle it.
+            await new Promise(resolve => setTimeout(resolve, 50));
+            await updateScene(null, selectedWallId);
+            console.log('[UI] switchGeometryMode: updateScene completed');
+        } catch (error) {
+            console.error('[UI] switchGeometryMode: Error during updateScene:', error);
+            showAlert(`Error initializing parametric model: ${error.message}`, 'Initialization Error');
+        }
+
+        console.log(`[UI] switchGeometryMode: Scene state - roomObject children: ${roomObject.children.length}, wallSelectionGroup children: ${wallSelectionGroup.children.length}`);
+
+        // 6. Reset Camera and FORCE Controls enable (fixes locked drawing controls)
+        if (controls) {
+            controls.enabled = true;
+            controls.enableRotate = true;
+            console.log('[UI] switchGeometryMode: Camera controls enabled');
+        }
+
+        // Force camera to look at the scene center
+        setCameraView('persp');
+        console.log('[UI] switchGeometryMode: Camera view reset to perspective');
+
+        // CRITICAL FIX: Force a render update to ensure geometry is displayed
+        if (renderer) {
+            renderer.render(scene, activeCamera);
+            console.log('[UI] switchGeometryMode: Forced renderer update');
+        }
+
+        console.log('[UI] switchGeometryMode: Parametric mode setup complete');
+    }
 }
 
 async function handleModelImport() {
@@ -7798,3 +7970,4 @@ The final output is a text file containing the total annual solar radiation valu
         guideContentDiv.innerHTML = recipeGuides[e.target.value] || '<p class="text-[--text-secondary]">Please select a recipe from the dropdown above to see its guide.</p>';
     });
 }
+

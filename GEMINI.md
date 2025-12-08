@@ -19,9 +19,20 @@ The UI is designed around a system of floating panels that can be dragged, resiz
     *   **`scripts/scene.js`**: Encapsulates all Three.js logic. This includes setting up multiple cameras (perspective, orthographic, and quad-view), controls (`OrbitControls` for navigation, `TransformControls` for object manipulation), and post-processing effects like the Fisheye shader.
     *   **`scripts/geometry.js`**: Responsible for creating and updating all 3D meshes. It uses `THREE.Group` objects (`roomObject`, `shadingObject`, etc.) to organize the scene graph and procedurally generates geometry based on UI parameters.
     *   **`scripts/project.js`**: Handles the logic for saving and loading the entire project state. It gathers all parameters from the DOM, bundles them into a single `.json` file, and can also restore the application state from such a file.
-    *   **`scripts/simulation.js`**: Implements a "recipe-based" engine. It dynamically creates UI panels for different simulation types (e.g., illuminance, glare) and generates the corresponding Radiance shell scripts.
-    *   **`scripts/ai-assistant.js`**: Powers the integrated AI chat. It defines a set of "tools" (functions) that the AI can call to interact with the application, such as modifying scene parameters, running simulations, or querying results.
+    
+    *   **`scripts/simulation.js`**: Acts as the UI coordinator for the simulation engine. It manages the "Simulation Modules" panel, dynamically loading UI templates based on the selected recipe from the `RecipeRegistry`.
+    *   **`scripts/recipes/`**: Contains the modular recipe engine.
+        *   **`RecipeRegistry.js`**: The central registry and source of truth for all simulation recipes. Defines contracts (`RecipeDefinition`) and manages recipe registration.
+        *   **`runtimeEnvironment.js`**: Handles environment detection (OS, shell availability) for recipes.
+        *   **`*Recipe.js`**: Individual recipe modules (e.g., `illuminanceRecipe.js`, `annual3PhaseRecipe.js`) that implement specific simulation logic, input validation, and script generation.
 
+    *   **`scripts/agent-core.js`**: Implements the core AI Agent logic, including the Reason-Act-Observe loop and a `MemoryManager` for long-term persistence (user preferences, project facts) via `localStorage`.
+    *   **`scripts/ai-assistant.js`**: Connects the core Agent to the UI. It defines the specific "tools" (functions) the AI can call to interact with the application (e.g., modifying scene parameters, running simulations).
+
+    *   **`scripts/results/`**:
+        *   **`ResultsRegistry.js`**: A central registry for typed analysis results. It defines result types, file matching patterns, storage strategies, and visualization hints, decoupling result identification from processing logic.
+
+    *   **`scripts/AperturePanelUI.js`**: Manages the specific UI logic for the "Apertures & Shading" panel, including wall selection, sun ray tracing toggles, and orientation-specific shading controls.
     *   **`scripts/annualDashboard.js`**: Manages the creation and updates of various charts and dashboards for annual simulations.
     *   **`scripts/hdrViewer.js`**: Provides a viewer for High Dynamic Range (HDR) images, with exposure and false color controls.
     *   **`scripts/knowledgeBase.js`**: Loads and searches a local knowledge base for the AI assistant.
@@ -32,8 +43,8 @@ The UI is designed around a system of floating panels that can be dragged, resiz
     *   **`scripts/parsingWorker.js`**: A web worker for parsing large simulation result files without blocking the main UI thread.
     *   **`scripts/radiance.js`**: Contains functions to generate Radiance-specific file content (`.rad`, `.vf`, etc.).
     *   **`scripts/reportGenerator.js`**: Generates a self-contained HTML report of the project and simulation results.
-    *   **`scripts/resultsManager.js`**: Manages loading, processing, and statistical analysis of simulation results.
-    *   **`scripts/scriptGenerator.js`**: Generates the shell scripts (`.sh`, `.bat`) for running Radiance simulations.
+    *   **`scripts/resultsManager.js`**: Manages loading, processing, and statistical analysis of simulation results, utilizing the `ResultsRegistry` to identify and handle different data types.
+    *   **`scripts/scriptGenerator.js`**: Generates the shell scripts (`.sh`, `.bat`) for running Radiance simulations, delegating specific script content generation to the active recipe.
     *   **`scripts/sidebar.js`**: Manages the docking and undocking behavior of the sidebars.
     *   **`scripts/sunTracer.js`**: Implements the sun ray tracing visualization.
 
@@ -66,14 +77,14 @@ The project uses `npm` for dependency management and `electron-builder` for crea
 ## Development Conventions
 
 *   **Code Style:** The project uses vanilla JavaScript with ES6 modules (`import`/`export`). The code is well-structured, with a clear separation of concerns between UI, 3D scene management, and application logic.
-*   **UI:** The user interface is built with floating panels that can be moved, resized, and collapsed. UI elements are defined in `index.html` and managed in `scripts/ui.js`.
+*   **UI:** The user interface is built with floating panels that can be moved, resized, and collapsed. UI elements are defined in `index.html` and managed in `scripts/ui.js` and specific UI classes (e.g., `AperturePanelUI`).
 *   **State Management:** The application state (scene parameters, material properties, etc.) is primarily managed through the DOM. The `project.js` module gathers this state from the UI inputs to save and load projects.
 *   **3D:** All 3D rendering is handled by the Three.js library. The main 3D objects are grouped into `THREE.Group` instances (e.g., `roomObject`, `shadingObject`) in `scripts/geometry.js` and added to the main scene in `scripts/scene.js`.
 *   **File System Access:** Due to the security model of the renderer process, all file system interactions are brokered through the Electron main process via IPC channels defined in `electron.js` and `preload.js`. The main process provides handlers for opening dialogs (`dialog:openDirectory`), saving project files (`fs:saveProject`), and running simulation scripts (`run-script`, `run-script-headless`, `run-simulations-parallel`).
-*   **Simulation Workflow:**
+*   **Simulation Workflow (Recipe-Based):**
     1.  The user configures the scene using the UI panels.
-    2.  The user opens a "recipe" from the Simulation Modules panel.
-    3.  `simulation.js` creates the UI for that specific recipe.
-    4.  When "Generate Package" is clicked, `project.js` gathers all data and `scriptGenerator.js` creates the appropriate `.sh` and `.bat` scripts.
-    5.  These scripts, along with Radiance input files (`.rad`, `.vf`, `.pts`), are saved to a standardized folder structure on the user's local disk (e.g., `01_geometry`, `07_scripts`).
-    6.  When "Run Simulation" is clicked, an IPC call is made to `electron.js`, which executes the generated script using a child process.
+    2.  The user selects a "recipe" from the Simulation Modules panel (populated by `RecipeRegistry`).
+    3.  `simulation.js` renders the specific parameters for that recipe into the UI.
+    4.  When "Generate Package" is clicked, the recipe's `generateScripts` function (in `scripts/recipes/*`) is called via `scriptGenerator.js`.
+    5.  The resulting scripts (`.sh`, `.bat`) and Radiance input files (`.rad`, `.vf`, `.pts`) are saved to the standardized folder structure.
+    6.  When "Run Simulation" is clicked, an IPC call is made to `electron.js` to execute the script.

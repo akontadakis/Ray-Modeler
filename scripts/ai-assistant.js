@@ -1489,7 +1489,7 @@ async function _createContextualSystemPrompt(userMessage) {
 
         let systemPrompt = `You are Ray Modeler's Master AI Assistant - a comprehensive, unified assistant that combines all capabilities in one interface. You have access to extensive tools and can help users with any aspect of their daylighting and lighting simulation project, including new typed result outputs and EN-compliance workflows.
 
-You are helpful, precise, and expert in Radiance and EnergyPlus.
+You are helpful, precise, and expert in Radiance, daylighting metrics, and artificial lighting simulation.
 `;
 
         if (activeWalkthrough) {
@@ -1991,92 +1991,7 @@ async function _handleResultsTool(name, args) {
                 message: `Retrieved lighting energy metrics for dataset ${key.toUpperCase()}.`
             };
         }
-        case 'setEnergyPlusThermostatSetpoints': {
-            try {
-                setThermostatSetpoints(project, args.setpoints || []);
-                return { success: true, message: `Updated ${Array.isArray(args.setpoints) ? args.setpoints.length : 0} thermostat setpoint definition(s).` };
-            } catch (err) {
-                throw new Error(err?.message || 'Failed to update thermostat setpoints.');
-            }
-        }
-        case 'setEnergyPlusCompactSchedules': {
-            try {
-                setSchedulesCompact(project, args.schedules || []);
-                return { success: true, message: `Updated compact schedules (${Array.isArray(args.schedules) ? args.schedules.length : 0} entries).` };
-            } catch (err) {
-                throw new Error(err?.message || 'Failed to update compact schedules.');
-            }
-        }
-        case 'setEnergyPlusNaturalVentilation': {
-            try {
-                setNaturalVentilation(project, args.naturalVentilation || {});
-                return { success: true, message: 'Updated natural ventilation configuration.' };
-            } catch (err) {
-                throw new Error(err?.message || 'Failed to update natural ventilation configuration.');
-            }
-        }
-        case 'setEnergyPlusOutdoorAirDesignSpecs': {
-            try {
-                setOutdoorAirDesignSpecs(project, args.designSpecs || []);
-                return { success: true, message: `Updated outdoor air design specs (${Array.isArray(args.designSpecs) ? args.designSpecs.length : 0} entries).` };
-            } catch (err) {
-                throw new Error(err?.message || 'Failed to update outdoor air design specs.');
-            }
-        }
-        case 'setEnergyPlusWeather': {
-            try {
-                setWeather(project, args.weather || {});
-                return { success: true, message: 'Updated EnergyPlus weather configuration.' };
-            } catch (err) {
-                throw new Error(err?.message || 'Failed to update EnergyPlus weather configuration.');
-            }
-        }
-        case 'setEnergyPlusSimulationControl': {
-            try {
-                setSimulationControl(project, args.simulationControl || {});
-                return { success: true, message: 'Updated EnergyPlus simulation control configuration.' };
-            } catch (err) {
-                throw new Error(err?.message || 'Failed to update EnergyPlus simulation control configuration.');
-            }
-        }
-        case 'setEnergyPlusRunPeriod': {
-            try {
-                setRunPeriod(project, args.runPeriod || {});
-                return { success: true, message: 'Updated EnergyPlus RunPeriod configuration.' };
-            } catch (err) {
-                throw new Error(err?.message || 'Failed to update EnergyPlus RunPeriod configuration.');
-            }
-        }
-        case 'setEnergyPlusZoneLoads': {
-            try {
-                setZoneLoadsCanonical(project, args.zoneLoads || []);
-                return {
-                    success: true,
-                    message: `Updated zone-level loads for ${Array.isArray(args.zoneLoads) ? args.zoneLoads.length : 0} zone(s).`
-                };
-            } catch (err) {
-                throw new Error(err?.message || 'Failed to update EnergyPlus zone loads.');
-            }
-        }
-        case 'assignEnergyPlusThermostatsToZones': {
-            try {
-                setZoneThermostatAssignments(project, args.assignments || []);
-                return {
-                    success: true,
-                    message: `Assigned thermostats to ${Array.isArray(args.assignments) ? args.assignments.length : 0} zone(s).`
-                };
-            } catch (err) {
-                throw new Error(err?.message || 'Failed to assign thermostats to zones.');
-            }
-        }
-        case 'setEnergyPlusIdealLoadsParameters': {
-            try {
-                setIdealLoadsParameters(project, args.idealLoads || {});
-                return { success: true, message: 'Updated EnergyPlus IdealLoads parameters.' };
-            } catch (err) {
-                throw new Error(err?.message || 'Failed to update IdealLoads parameters.');
-            }
-        }
+
         case 'compareMetrics': {
             if (!resultsManager.datasets.a?.stats || !resultsManager.datasets.b?.stats) throw new Error("Both dataset A and dataset B must be loaded to compare.");
             let resultA, resultB;
@@ -2309,8 +2224,7 @@ async function _handleUITool(name, args) {
                 info: 'panel-info',
                 aiAssistant: 'panel-ai-assistant',
                 simulationModules: 'panel-simulation-modules',
-                analysisModules: 'panel-analysis-modules',
-                energyplus: 'panel-energyplus'
+                analysisModules: 'panel-analysis-modules'
             };
 
             const panelId = panelMap[args.panelName];
@@ -2603,15 +2517,7 @@ const toolHandlers = {
     'getEnUgrSummary': (args) => _handleResultsTool('getEnUgrSummary', args),
     'getCircadianMetricsSummary': (args) => _handleResultsTool('getCircadianMetricsSummary', args),
     'getImagelessGlareSummary': (args) => _handleResultsTool('getImagelessGlareSummary', args),
-    'getEnergyPlusSummary': (args) => _handleResultsTool('getEnergyPlusSummary', args),
-    'getEnergyPlusErrors': (args) => _handleResultsTool('getEnergyPlusErrors', args),
-    'listEnergyPlusRuns': (args) => _handleResultsTool('listEnergyPlusRuns', args),
-    'runEnergyPlusSimulation': (args) => _handleResultsTool('runEnergyPlusSimulation', args),
     'getLightingEnergySummary': (args) => _handleResultsTool('getLightingEnergySummary', args),
-    'setEnergyPlusRunPeriod': (args) => _handleResultsTool('setEnergyPlusRunPeriod', args),
-    'setEnergyPlusZoneLoads': (args) => _handleResultsTool('setEnergyPlusZoneLoads', args),
-    'assignEnergyPlusThermostatsToZones': (args) => _handleResultsTool('assignEnergyPlusThermostatsToZones', args),
-    'setEnergyPlusIdealLoadsParameters': (args) => _handleResultsTool('setEnergyPlusIdealLoadsParameters', args),
     'compareMetrics': (args) => _handleResultsTool('compareMetrics', args),
     'filterAndHighlightPoints': (args) => _handleResultsTool('filterAndHighlightPoints', args),
     'queryResultsData': (args) => _handleResultsTool('queryResultsData', args),
@@ -2629,8 +2535,7 @@ const toolHandlers = {
     'setGlobalRadianceParameter': (args) => _handleSimulationTool('setGlobalRadianceParameter', args),
     'configureDaylightingSystem': (args) => _handleSimulationTool('configureDaylightingSystem', args),
     'runOccupancyAnalysis': (args) => _handleSimulationTool('runOccupancyAnalysis', args),
-    'generateEnergyPlusIdf': (args) => _handleSimulationTool('generateEnergyPlusIdf', args),
-    'getEnergyPlusDiagnostics': (args) => _handleSimulationTool('getEnergyPlusDiagnostics', args),
+    'runOccupancyAnalysis': (args) => _handleSimulationTool('runOccupancyAnalysis', args),
 
     // UI tools
     'toggleUIPanel': (args) => _handleUITool('toggleUIPanel', args),
@@ -3140,13 +3045,11 @@ async function performAIInspection() {
         }
         const appStateJSON = JSON.stringify(dataForPrompt, null, 2);
 
-        const systemPrompt = `You are a building performance simulation expert for Radiance AND EnergyPlus. Your task is to analyze the project's configuration JSON and identify potential issues.
+        const systemPrompt = `You are a building performance simulation expert for Radiance. Your task is to analyze the project's configuration JSON and identify potential issues.
 
 You MUST:
 - Inspect Radiance-related settings (geometry, apertures, materials, grids, recipes).
 - Look for:
-  - Missing or inconsistent EnergyPlus inputs (e.g. no weather file, invalid run periods, no loads, missing setpoints, incomplete schedules).
-
   - Problematic Radiance parameters or workflows.
 
 When appropriate, suggest fixes using available tools, especially:
@@ -3168,8 +3071,7 @@ Schema:
   "warnings": [ { ...same shape... } ],
   "suggestions": [ { ...same shape... } ]
 }
-
-Use EnergyPlus-specific checks where possible (e.g. if no weather.epwPath, missing runPeriod, no loads, no thermostats, etc.).`;
+`;
         const userMessage = `Project JSON to analyze: \n\n${appStateJSON}`;
 
         const messages = [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMessage }];
@@ -3238,12 +3140,7 @@ async function _performAICritique() {
             datasetA: resultsManager.datasets.a ? { fileName: resultsManager.datasets.a.fileName, stats: resultsManager.datasets.a.stats, glareResult: !!resultsManager.datasets.a.glareResult, isAnnual: resultsManager.hasAnnualData('a') } : null,
             datasetB: resultsManager.datasets.b ? { fileName: resultsManager.datasets.b.fileName, stats: resultsManager.datasets.b.stats, glareResult: !!resultsManager.datasets.b.glareResult, isAnnual: resultsManager.hasAnnualData('b') } : null
         };
-        const epLatestKpis = resultsManager.getEnergyPlusKpisForUi
-            ? resultsManager.getEnergyPlusKpisForUi(null)
-            : null;
-        const epLatestErrors = resultsManager.getEnergyPlusErrors
-            ? resultsManager.getEnergyPlusErrors(null)
-            : null;
+
         const lightingEnergyA = resultsManager.getResult
             ? resultsManager.getResult('a', 'lighting-energy')
             : null;
@@ -3254,11 +3151,6 @@ async function _performAICritique() {
         const appState = {
             projectConfiguration: dataForPrompt,
             loadedResultsSummary: resultsData,
-            energyPlus: {
-                latestRun: epLatestKpis || null,
-                latestErrors: epLatestErrors || null,
-                runs: resultsManager.energyPlusRuns || {}
-            },
             lightingEnergy: {
                 datasetA: lightingEnergyA || null,
                 datasetB: lightingEnergyB || null
@@ -3266,31 +3158,22 @@ async function _performAICritique() {
         };
         const appStateJSON = JSON.stringify(appState, null, 2);
 
-        const systemPrompt = `You are a building performance simulation expert for Radiance AND EnergyPlus. Your task is to analyze the project's configuration and its simulation results (typed + legacy), and provide a holistic design critique.
+        const systemPrompt = `You are a building performance simulation expert for Radiance. Your task is to analyze the project's configuration and its simulation results (typed + legacy), and provide a holistic design critique.
 
 You MUST:
-1. Read configuration (geometry, apertures, materials, sensors, lighting, energyPlusConfig, etc.).
+1. Read configuration (geometry, apertures, materials, sensors, lighting, etc.).
 2. Use available typed results when present:
    - EN 17037, EN 12464-1 illuminance, EN-UGR
    - Annual illuminance / glare
    - Circadian / spectral metrics
    - Lighting-energy metrics
-   - EnergyPlus run results via "ep-results" (exposed through resultsManager.getEnergyPlusKpisForUi / getEnergyPlusErrors).
 3. Identify key findings:
    - Daylight/visual comfort issues
    - Lighting energy or control issues
-   - Thermal/energy issues from EnergyPlus KPIs:
-     - High EUI / end uses
-     - Large unmet hours
-     - Extreme peaks
-     - Serious errors/warnings
 4. Correlate findings with configuration:
-   - E.g. high cooling EUI with large unshaded glazing and low SHGC
+   - E.g. high glare with large unshaded glazing
    - High lighting energy vs missing daylighting controls or low reflectances
-   - Unmet hours vs weak HVAC / schedules / setpoints
-5. Propose specific, actionable changes using available tools, including EnergyPlus tools:
-   - setEnergyPlusThermostatSetpoints / setEnergyPlusCompactSchedules / setEnergyPlusNaturalVentilation / setEnergyPlusOutdoorAirDesignSpecs / setEnergyPlusWeather / setEnergyPlusSimulationControl
-   - generateEnergyPlusIdf / runEnergyPlusSimulation (if available)
+5. Propose specific, actionable changes using available tools:
    - getLightingEnergySummary, configureDaylightingSystem, etc.
 
 RESPONSE FORMAT (STRICT):

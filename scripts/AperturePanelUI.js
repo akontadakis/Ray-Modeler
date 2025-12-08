@@ -28,19 +28,32 @@ export class AperturePanelUI {
         const content = document.createElement('div');
         content.className = 'window-content space-y-5';
 
+        // --- Standard Content Container ---
+        const standardContent = document.createElement('div');
+        standardContent.id = 'aperture-standard-content';
+        standardContent.className = 'space-y-5';
+
         // 1. Wall Selection
-        content.appendChild(this.createWallSelectionSection());
+        standardContent.appendChild(this.createWallSelectionSection());
 
         // 2. Sun Ray Tracing (Global)
-        content.appendChild(this.createSunRayTraceSection());
+        standardContent.appendChild(this.createSunRayTraceSection());
 
         // 3. Orientation Controls (N, S, E, W)
         this.orientations.forEach(orient => {
-            content.appendChild(this.createOrientationSection(orient));
+            standardContent.appendChild(this.createOrientationSection(orient));
         });
 
         // 4. Frame Controls (Global)
-        content.appendChild(this.createFrameControls());
+        standardContent.appendChild(this.createFrameControls());
+
+        content.appendChild(standardContent);
+
+        // --- Custom Content Container ---
+        const customContent = document.createElement('div');
+        customContent.id = 'aperture-custom-content';
+        customContent.className = 'hidden space-y-5';
+        content.appendChild(customContent);
 
         this.container.appendChild(content);
         this.appendResizeHandles();
@@ -356,19 +369,20 @@ export class AperturePanelUI {
         return div;
     }
 
-    createFrameControls() {
+    createFrameControls(suffix = '') {
+        const s = suffix ? `-${suffix}` : '';
         const div = document.createElement('div');
         div.className = 'pt-4 border-t border-[--grid-color]';
         div.innerHTML = `
-            <label for="frame-toggle" class="flex items-center cursor-pointer">
-                <input type="checkbox" id="frame-toggle" checked>
+            <label for="frame-toggle${s}" class="flex items-center cursor-pointer">
+                <input type="checkbox" id="frame-toggle${s}" checked>
                 <span class="ml-3 text-sm font-normal text-[--text-primary]">Add Frame To All Windows</span>
             </label>
-            <div id="frame-controls" class="mt-4 space-y-2"></div>`;
+            <div id="frame-controls${s}" class="mt-4 space-y-2"></div>`;
 
-        const controls = div.querySelector('#frame-controls');
-        controls.appendChild(this.createRangeControl('frame-thick', 'Frame Thick. (m)', 0, 1, 0.01, 0.01, 'm'));
-        controls.appendChild(this.createRangeControl('frame-depth', 'Frame Depth (m)', 0, 1, 0.05, 0.01, 'm'));
+        const controls = div.querySelector(`#frame-controls${s}`);
+        controls.appendChild(this.createRangeControl(`frame-thick${s}`, 'Frame Thick. (m)', 0, 1, 0.01, 0.01, 'm'));
+        controls.appendChild(this.createRangeControl(`frame-depth${s}`, 'Frame Depth (m)', 0, 1, 0.05, 0.01, 'm'));
 
         return div;
     }
@@ -392,6 +406,180 @@ export class AperturePanelUI {
         });
 
         return wrapper;
+    }
+
+
+    /**
+     * Renders the full suite of controls for a custom wall into the given container.
+     * @param {HTMLElement} container - The container to render into.
+     * @param {string} wallId - The unique ID of the custom wall.
+     * @param {object} wallData - The data object for the wall.
+     * @param {function} onUpdate - Callback function triggered on any change.
+     */
+    renderCustomWallControls(container, wallId, wallData, onUpdate) {
+        container.innerHTML = '';
+        const suffix = wallId;
+
+        // 1. Initial Data Binding Helper
+        // We defer this because inputs are created by sub-functions
+        const bindInput = (id, value) => {
+            const el = container.querySelector(`#${id}`);
+            if (el) {
+                if (el.type === 'checkbox') el.checked = value;
+                else el.value = value;
+                // Trigger visual update for range sliders
+                el.dispatchEvent(new Event('input'));
+            }
+        };
+
+        // 2. Create Sections
+
+        // A. Aperture Type (Window / Door)
+        const typeDiv = document.createElement('div');
+        typeDiv.className = 'pt-2';
+        typeDiv.innerHTML = `
+            <label class="label">Aperture Type</label>
+            <div class="btn-group mt-1">
+                <button id="type-window-btn-${suffix}" class="btn ${(!wallData.apertures.type || wallData.apertures.type === 'window') ? 'active' : ''}">Window</button>
+                <button id="type-door-btn-${suffix}" class="btn ${wallData.apertures.type === 'door' ? 'active' : ''}">Door</button>
+            </div>`;
+        container.appendChild(typeDiv);
+
+        // B. Window Count & Mode
+        container.appendChild(this.createRangeControl(`win-count-${suffix}`, '# of Apertures', 0, 10, wallData.apertures.count || 0, 1));
+
+        const modeDiv = document.createElement('div');
+        modeDiv.className = 'pt-2';
+        modeDiv.innerHTML = `
+            <label class="label">Mode</label>
+            <div class="btn-group mt-1">
+                <button id="mode-wwr-btn-${suffix}" class="btn ${wallData.apertures.mode === 'wwr' ? 'active' : ''}">WWR</button>
+                <button id="mode-manual-btn-${suffix}" class="btn ${wallData.apertures.mode === 'manual' ? 'active' : ''}">Manual</button>
+            </div>`;
+        container.appendChild(modeDiv);
+
+        // B. WWR Controls
+        const wwrContainer = document.createElement('div');
+        wwrContainer.id = `wwr-controls-${suffix}`;
+        wwrContainer.className = wallData.apertures.mode === 'wwr' ? 'space-y-5 mt-4' : 'hidden space-y-5 mt-4';
+        wwrContainer.appendChild(this.createRangeControl(`wwr-${suffix}`, 'WWR (%)', 0, 0.99, wallData.apertures.wwr || 0.4, 0.01, '%', true));
+        wwrContainer.appendChild(this.createRangeControl(`wwr-sill-height-${suffix}`, 'Sill Height (m)', 0, 10, wallData.apertures.sillHeight || 1.0, 0.05, 'm'));
+        wwrContainer.appendChild(this.createRangeControl(`win-depth-pos-${suffix}`, 'Window Depth Position (m)', 0, 0.2, wallData.apertures.depthPos || 0.1, 0.01, 'm'));
+        container.appendChild(wwrContainer);
+
+        // C. Manual Controls
+        const manualContainer = document.createElement('div');
+        manualContainer.id = `manual-controls-${suffix}`;
+        manualContainer.className = wallData.apertures.mode === 'manual' ? 'space-y-5 mt-4' : 'hidden space-y-5 mt-4';
+        manualContainer.appendChild(this.createRangeControl(`win-width-${suffix}`, 'Win. Width (m)', 0.1, 20, wallData.apertures.width || 1.5, 0.1, 'm'));
+        manualContainer.appendChild(this.createRangeControl(`win-height-${suffix}`, 'Win. Height (m)', 0.1, 10, wallData.apertures.height || 1.2, 0.1, 'm'));
+        manualContainer.appendChild(this.createRangeControl(`sill-height-${suffix}`, 'Sill Height (m)', 0, 10, wallData.apertures.sillHeight || 1.0, 0.05, 'm'));
+        manualContainer.appendChild(this.createRangeControl(`win-depth-pos-${suffix}-manual`, 'Window Depth Position (m)', 0, 0.2, wallData.apertures.depthPos || 0.1, 0.01, 'm'));
+        container.appendChild(manualContainer);
+
+        // D. Shading Section
+        const shadingContainer = this.createShadingSection(suffix, 'Custom');
+        container.appendChild(shadingContainer);
+
+        // E. Frame Section (Custom specific wrapper or reuse global)
+        // The global createFrameControls uses specific IDs (frame-thick, frame-depth).
+        // For custom walls, we need unique IDs if we want per-wall control, OR we maintain one global frame setting for the room.
+        // The user asked for "same panel", usually Parametric has GLOBAL frame settings.
+        // But for custom, maybe per-wall?
+        // Let's stick to generating unique IDs for custom walls to allow independence?
+        // Or if the request implies uniformity, maybe we use a custom frame section with suffix.
+        const frameContainer = this.createFrameControls(suffix);
+        container.appendChild(frameContainer);
+
+
+        // 3. Bind Values & Attach Listeners
+        // We iterate over all inputs in the container
+        const inputs = container.querySelectorAll('input, select');
+        inputs.forEach(input => {
+            // Initialize values from wallData if possible? 
+            // Note: createRangeControl set default values.
+            // But we passed wallData values into the create calls above.
+            // So visual state is correct.
+
+            // Attach listener
+            input.addEventListener('input', (e) => {
+                const target = e.target;
+                // Parse ID to find property?
+                // Or just pass the raw event to the callback and let manager handle it?
+                // Better: Manager handles mapping ID -> Data.
+                onUpdate(target.id, target.type === 'checkbox' ? target.checked : target.value);
+            });
+            input.addEventListener('change', (e) => {
+                const target = e.target;
+                onUpdate(target.id, target.type === 'checkbox' ? target.checked : target.value);
+            });
+        });
+
+        // Mode Toggles
+        const wwrBtn = container.querySelector(`#mode-wwr-btn-${suffix}`);
+        const manualBtn = container.querySelector(`#mode-manual-btn-${suffix}`);
+
+        wwrBtn.addEventListener('click', () => {
+            wwrBtn.classList.add('active');
+            manualBtn.classList.remove('active');
+            wwrContainer.classList.remove('hidden');
+            manualContainer.classList.add('hidden');
+            onUpdate(`mode-${suffix}`, 'wwr');
+        });
+
+        manualBtn.addEventListener('click', () => {
+            manualBtn.classList.add('active');
+            wwrBtn.classList.remove('active');
+            manualContainer.classList.remove('hidden');
+            wwrContainer.classList.add('hidden');
+            onUpdate(`mode-${suffix}`, 'manual');
+        });
+
+        // Type Toggles
+        const typeWinBtn = container.querySelector(`#type-window-btn-${suffix}`);
+        const typeDoorBtn = container.querySelector(`#type-door-btn-${suffix}`);
+
+        typeWinBtn.addEventListener('click', () => {
+            typeWinBtn.classList.add('active');
+            typeDoorBtn.classList.remove('active');
+            onUpdate(`type-${suffix}`, 'window');
+        });
+
+        typeDoorBtn.addEventListener('click', () => {
+            typeDoorBtn.classList.add('active');
+            typeWinBtn.classList.remove('active');
+            onUpdate(`type-${suffix}`, 'door');
+        });
+
+        // Shading Toggle Logic
+        const shadeToggle = container.querySelector(`#shading-${suffix}-toggle`);
+        const shadeControls = container.querySelector(`#shading-controls-${suffix}`);
+        shadeToggle.checked = wallData.shading?.enabled || false;
+        shadeControls.classList.toggle('hidden', !shadeToggle.checked);
+
+        shadeToggle.addEventListener('change', (e) => {
+            shadeControls.classList.toggle('hidden', !e.target.checked);
+        });
+
+    }
+
+    // Override createFrameControls to accept suffix
+    createFrameControls(suffix = '') {
+        const s = suffix ? `-${suffix}` : '';
+        const div = document.createElement('div');
+        div.className = 'pt-4 border-t border-[--grid-color]';
+        div.innerHTML = `
+            <label for="frame-toggle${s}" class="flex items-center cursor-pointer">
+                <input type="checkbox" id="frame-toggle${s}" checked>
+                <span class="ml-3 text-sm font-normal text-[--text-primary]">Add Frame To All Windows</span>
+            </label>
+            <div id="frame-controls${s}" class="mt-4 space-y-2"></div>`;
+
+        const controls = div.querySelector(`#frame-controls${s}`);
+        controls.appendChild(this.createRangeControl(`frame-thick${s}`, 'Frame Thick. (m)', 0, 1, 0.05, 0.01, 'm'));
+        controls.appendChild(this.createRangeControl(`frame-depth${s}`, 'Frame Depth (m)', 0, 1, 0.15, 0.01, 'm'));
+
+        return div;
     }
 
     appendResizeHandles() {

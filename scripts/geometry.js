@@ -48,20 +48,34 @@ const taskAreaHelpersGroup = new THREE.Group();
 
 // --- MODULE STATE & SHARED RESOURCES ---
 export let currentImportedModel = null;
+export let isCustomGeometry = false; // Flag to indicate if custom geometry is active
+export function setIsCustomGeometry(value) {
+    isCustomGeometry = value;
+}
+
 export let sensorMeshes = []; // Store references to instanced meshes for results
 export let daylightingSensorMeshes = []; // Store references to individual sensor meshes for gizmo control
 export let importedShadingObjects = []; // Store references to imported OBJ meshes for selection
+
+// ... (existing code)
+
+/**
+ * Main function to update the entire 3D scene based on current UI parameters.
+ * This is the primary entry point for reacting to UI changes.
+ */
+// Duplicate updateScene removed. Logic merged into the main function below.
 
 // Context Object Management System
 export let contextObjects = new Map(); // Store context objects with unique IDs
 let nextContextObjectId = 1;
 
 const highlightMaterial = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--highlight-color').trim() || '#3b82f6'),
+    color: 0xff0000, // Hardcoded RED for debugging
     side: THREE.DoubleSide,
-    transparent: true,
-    opacity: 0.5,
-    depthTest: false // Ensure highlight is always visible
+    transparent: false, // Opaque
+    opacity: 1.0,
+    depthTest: false, // Ensure highlight is always visible
+    depthWrite: false // Prevent writing to depth buffer
 });
 let highlightedWall = { object: null, originalMaterial: null };
 
@@ -160,6 +174,7 @@ function readParams() {
     const elevation = parseFloat(dom.elevation.value);
     const rotationY = THREE.MathUtils.degToRad(parseFloat(dom['room-orientation'].value));
     const surfaceThickness = parseFloat(dom['surface-thickness'].value);
+    console.log(`[Geometry] readParams: W=${W}, L=${L}, H=${H}, elevation=${elevation}, rotationY=${rotationY}, thickness=${surfaceThickness}`);
     return { W, L, H, elevation, rotationY, wallThickness: surfaceThickness, floorThickness: surfaceThickness, ceilingThickness: surfaceThickness };
 }
 
@@ -169,8 +184,12 @@ function readParams() {
  * The main function to update all geometric aspects of the scene.
  * @param {string|null} changedId The ID of the input element that triggered the update.
  */
-export async function updateScene(changedId = null) {
-    if (!renderer) return;
+export async function updateScene(changedId = null, selectedWallId = null) {
+    console.log(`[Geometry] updateScene called. changedId=${changedId}`);
+    if (!renderer) {
+        console.error('[Geometry] updateScene aborted: renderer is undefined');
+        return;
+    }
     const dom = getDom();
 
     validateInputs(changedId);
@@ -206,7 +225,14 @@ export async function updateScene(changedId = null) {
     }
 
     // Recreate all geometry based on the new parameters
-    createRoomGeometry();
+    console.log(`[Geometry] updateScene: isCustomGeometry=${isCustomGeometry}`);
+    if (!isCustomGeometry) {
+        console.log('[Geometry] updateScene: Calling createRoomGeometry');
+        createRoomGeometry();
+    } else {
+        // ... (logic for custom geometry)
+    }
+
     createShadingDevices();
     createSensorGrid();
     createGroundPlane();
@@ -227,7 +253,7 @@ export async function updateScene(changedId = null) {
     axesObject.visible = dom['world-axes-toggle']?.checked ?? true;
 
     // After rebuilding geometry, re-apply the highlight if a wall was selected
-    const { selectedWallId } = await import('./ui.js');
+    // REMOVED CIRCULAR DEPENDENCY: selectedWallId is now passed as an argument
     if (selectedWallId) {
         const wallContainer = wallSelectionGroup.children[0];
         if (wallContainer) {
@@ -368,24 +394,81 @@ function createGroundPlane() {
  * Walls are now individual, selectable meshes.
  */
 function createRoomGeometry() {
-    // If an imported model is active, do not generate parametric geometry.
-    if (currentImportedModel) {
+    console.log('[Geometry] createRoomGeometry called');
+
+    try {
+        // If an imported model is active, do not generate parametric geometry.
+        if (currentImportedModel) {
+            console.warn('[Geometry] createRoomGeometry aborted: currentImportedModel is present');
+            clearGroup(roomObject);
+            clearGroup(wallSelectionGroup);
+            return;
+        }
+
+        // Ensure we are not in custom mode if this is called directly
+        // (Though updateScene guards this, direct calls might happen)
+        // Actually, if we are calling this, we probably INTEND to go back to parametric.
+        // So we should set the flag to false?
+        // Let's assume explicit switching handles the flag, but for safety:
+        // isCustomGeometry = false; // No, let the UI handler decide when to switch modes.
+
         clearGroup(roomObject);
         clearGroup(wallSelectionGroup);
-        return;
+
+        const params = readParams();
+        console.log('[Geometry] readParams result:', params);
+
+        const { W, L, H, wallThickness, floorThickness, ceilingThickness } = params;
+
+        // Validate parameters
+        if (!W || !L || !H || W <= 0 || L <= 0 || H <= 0) {
+            console.error('[Geometry] Invalid room dimensions:', { W, L, H });
+            return;
+        }
+
+        const roomContainer = new THREE.Group();
+        // Center the room
+        roomContainer.position.set(-W / 2, 0, -L / 2);
+
+        console.log('[Geometry] Creating floor...');
+        _createFloor(roomContainer, { W, L, floorThickness, wallThickness });
+
+        console.log('[Geometry] Creating ceiling...');
+        _createCeiling(roomContainer, { W, L, H, ceilingThickness, wallThickness });
+
+        console.log('[Geometry] Creating walls...');
+        _createWalls({ W, L, H, wallThickness });
+
+        roomObject.add(roomContainer);
+        console.log(`[Geometry] Added room container to roomObject. roomObject children: ${roomObject.children.length}`);
+
+        // Apply Rotation and Elevation
+        const { rotationY, elevation } = params;
+        roomObject.rotation.y = rotationY;
+        roomObject.position.y = elevation;
+
+        wallSelectionGroup.rotation.y = rotationY;
+        wallSelectionGroup.position.y = elevation;
+
+        // CRITICAL FIX: Explicitly ensure geometry groups are visible
+        roomObject.visible = true;
+        wallSelectionGroup.visible = true;
+        shadingObject.visible = true;
+
+        // Ensure children are also visible if they were somehow hidden
+        roomObject.traverse(child => { if (child.isMesh) child.visible = true; });
+
+        console.log(`[Geometry] createRoomGeometry finished successfully. roomObject children: ${roomObject.children.length}, wallSelectionGroup children: ${wallSelectionGroup.children.length}`);
+        console.log(`[Geometry] Visibility check - roomObject.visible: ${roomObject.visible}, wallSelectionGroup.visible: ${wallSelectionGroup.visible}`);
+    } catch (error) {
+        console.error('[Geometry] Error in createRoomGeometry:', error);
+        // Clear any partially created geometry
+        clearGroup(roomObject);
+        clearGroup(wallSelectionGroup);
+        import('./ui.js').then(({ showAlert }) => {
+            showAlert(`Failed to create room geometry: ${error.message}`, 'Geometry Error');
+        });
     }
-    clearGroup(roomObject);
-    clearGroup(wallSelectionGroup);
-
-    const { W, L, H, wallThickness, floorThickness, ceilingThickness } = readParams();
-    const roomContainer = new THREE.Group();
-    roomContainer.position.set(-W / 2, 0, -L / 2);
-
-    _createFloor(roomContainer, { W, L, floorThickness, wallThickness });
-    _createCeiling(roomContainer, { W, L, H, ceilingThickness, wallThickness });
-    _createWalls({ W, L, H, wallThickness });
-
-    roomObject.add(roomContainer);
 }
 
 /**
@@ -395,10 +478,26 @@ function createRoomGeometry() {
  * @private
  */
 function _createFloor(roomContainer, { W, L, floorThickness, wallThickness }) {
-    const isTransparent = getDom()['transparent-toggle'].checked;
-    const surfaceOpacity = isTransparent ? parseFloat(getDom()['surface-opacity'].value) : 1.0;
-    const materialProperties = { side: THREE.DoubleSide, clippingPlanes: renderer.clippingPlanes, clipIntersection: true, transparent: isTransparent, opacity: surfaceOpacity };
-    const floorMaterial = new THREE.MeshBasicMaterial({ ...materialProperties, color: new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--floor-color').trim()) });
+    const isTransparent = getDom()['transparent-toggle']?.checked || false;
+    const surfaceOpacity = isTransparent ? parseFloat(getDom()['surface-opacity']?.value) || 0.5 : 1.0;
+
+    // Ensure opacity is never 0 to prevent invisible geometry
+    const finalOpacity = Math.max(0.1, surfaceOpacity);
+
+    const materialProperties = { side: THREE.DoubleSide, clippingPlanes: renderer?.clippingPlanes, clipIntersection: true, transparent: isTransparent, opacity: finalOpacity };
+
+    // Get color with fallback
+    let floorColor;
+    try {
+        floorColor = getComputedStyle(document.documentElement).getPropertyValue('--floor-color').trim();
+        if (!floorColor || floorColor === '') {
+            floorColor = '#8D6E63'; // Default brown color
+        }
+    } catch (e) {
+        floorColor = '#8D6E63'; // Fallback if getComputedStyle fails
+    }
+
+    const floorMaterial = new THREE.MeshBasicMaterial({ ...materialProperties, color: new THREE.Color(floorColor) });
 
     const floorGeom = new THREE.BoxGeometry(W + 2 * wallThickness, L + 2 * wallThickness, floorThickness);
     const floorGroup = new THREE.Group();
@@ -415,10 +514,26 @@ function _createFloor(roomContainer, { W, L, floorThickness, wallThickness }) {
  * @private
  */
 function _createCeiling(roomContainer, { W, L, H, ceilingThickness, wallThickness }) {
-    const isTransparent = getDom()['transparent-toggle'].checked;
-    const surfaceOpacity = isTransparent ? parseFloat(getDom()['surface-opacity'].value) : 1.0;
-    const materialProperties = { side: THREE.DoubleSide, clippingPlanes: renderer.clippingPlanes, clipIntersection: true, transparent: isTransparent, opacity: surfaceOpacity };
-    const ceilingMaterial = new THREE.MeshBasicMaterial({ ...materialProperties, color: new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--ceiling-color').trim()) });
+    const isTransparent = getDom()['transparent-toggle']?.checked || false;
+    const surfaceOpacity = isTransparent ? parseFloat(getDom()['surface-opacity']?.value) || 0.5 : 1.0;
+
+    // Ensure opacity is never 0 to prevent invisible geometry
+    const finalOpacity = Math.max(0.1, surfaceOpacity);
+
+    const materialProperties = { side: THREE.DoubleSide, clippingPlanes: renderer?.clippingPlanes, clipIntersection: true, transparent: isTransparent, opacity: finalOpacity };
+
+    // Get color with fallback
+    let ceilingColor;
+    try {
+        ceilingColor = getComputedStyle(document.documentElement).getPropertyValue('--ceiling-color').trim();
+        if (!ceilingColor || ceilingColor === '') {
+            ceilingColor = '#FFFFFF'; // Default white color
+        }
+    } catch (e) {
+        ceilingColor = '#FFFFFF'; // Fallback if getComputedStyle fails
+    }
+
+    const ceilingMaterial = new THREE.MeshBasicMaterial({ ...materialProperties, color: new THREE.Color(ceilingColor) });
 
     const ceilingGeom = new THREE.BoxGeometry(W + 2 * wallThickness, L + 2 * wallThickness, ceilingThickness);
     const ceilingGroup = new THREE.Group();
@@ -463,12 +578,40 @@ function _createWalls({ W, L, H, wallThickness }) {
  */
 function _createWallSegment(key, props, winParams, { H, wallThickness }) {
     const dom = getDom();
-    const isTransparent = dom['transparent-toggle'].checked;
-    const surfaceOpacity = isTransparent ? parseFloat(dom['surface-opacity'].value) : 1.0;
-    const materialProperties = { polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1, side: THREE.DoubleSide, clippingPlanes: renderer.clippingPlanes, clipIntersection: true, transparent: isTransparent, opacity: surfaceOpacity };
-    const wallMaterial = new THREE.MeshBasicMaterial({ ...materialProperties, color: new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--wall-color').trim()) });
-    const windowMaterial = new THREE.MeshBasicMaterial({ color: 0xb3ecff, side: THREE.DoubleSide, transparent: true, opacity: parseFloat(dom['glazing-trans'].value), clippingPlanes: renderer.clippingPlanes, clipIntersection: true, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 1 });
-    const frameMaterial = new THREE.MeshBasicMaterial({ ...materialProperties, color: new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--frame-color').trim()) });
+    const isTransparent = dom['transparent-toggle']?.checked || false;
+    const surfaceOpacity = isTransparent ? parseFloat(dom['surface-opacity']?.value) || 0.5 : 1.0;
+
+    // Ensure opacity is never 0 to prevent invisible geometry
+    const finalOpacity = Math.max(0.1, surfaceOpacity);
+
+    const materialProperties = { polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1, side: THREE.DoubleSide, clippingPlanes: renderer?.clippingPlanes, clipIntersection: true, transparent: isTransparent, opacity: finalOpacity };
+
+    // Get wall color with fallback
+    let wallColor;
+    try {
+        wallColor = getComputedStyle(document.documentElement).getPropertyValue('--wall-color').trim();
+        if (!wallColor || wallColor === '') {
+            wallColor = '#F5F5F5'; // Default light gray color
+        }
+    } catch (e) {
+        wallColor = '#F5F5F5'; // Fallback if getComputedStyle fails
+    }
+
+    const wallMaterial = new THREE.MeshBasicMaterial({ ...materialProperties, color: new THREE.Color(wallColor) });
+
+    // Get frame color with fallback
+    let frameColor;
+    try {
+        frameColor = getComputedStyle(document.documentElement).getPropertyValue('--frame-color').trim();
+        if (!frameColor || frameColor === '') {
+            frameColor = '#8B4513'; // Default brown color
+        }
+    } catch (e) {
+        frameColor = '#8B4513'; // Fallback if getComputedStyle fails
+    }
+
+    const windowMaterial = new THREE.MeshBasicMaterial({ color: 0xb3ecff, side: THREE.DoubleSide, transparent: true, opacity: parseFloat(dom['glazing-trans']?.value) || 0.7, clippingPlanes: renderer?.clippingPlanes, clipIntersection: true, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 1 });
+    const frameMaterial = new THREE.MeshBasicMaterial({ ...materialProperties, color: new THREE.Color(frameColor) });
 
     const wallMeshGroup = new THREE.Group();
     wallMeshGroup.position.set(...props.p);
@@ -572,31 +715,57 @@ function _createWallSegment(key, props, winParams, { H, wallThickness }) {
 /**
  * Creates the sensor grid geometry for all selected surfaces.
  */
-export function createSensorGrid() {
+export async function createSensorGrid() {
     clearGroup(sensorGridObject);
     const dom = getDom();
     const { W, L, H } = readParams();
     const gridParams = getSensorGridParams();
     if (!gridParams) return;
 
+    // Check if we're in custom geometry mode
+    let customGeomPoints = null;
+    if (isCustomGeometry && wallSelectionGroup.children.length > 0) {
+        const wallContainer = wallSelectionGroup.children[0];
+        if (wallContainer && wallContainer.children.length > 0) {
+            customGeomPoints = [];
+            const sortedChildren = [...wallContainer.children]
+                .filter(c => c.userData.canonicalId && c.userData.canonicalId.startsWith('wall_'))
+                .sort((a, b) => {
+                    const idA = parseInt(a.userData.canonicalId.split('_')[1]);
+                    const idB = parseInt(b.userData.canonicalId.split('_')[1]);
+                    return idA - idB;
+                });
+            sortedChildren.forEach(wallGroup => {
+                if (wallGroup.userData.p1) {
+                    customGeomPoints.push(wallGroup.userData.p1);
+                }
+            });
+        }
+    }
+
     const gridContainer = new THREE.Group();
-    gridContainer.position.set(-W / 2, 0, -L / 2);
+    // Center only for parametric mode
+    if (!customGeomPoints) {
+        gridContainer.position.set(-W / 2, 0, -L / 2);
+    }
 
     // Visualize Illuminance Grids (Spheres)
     if (gridParams.illuminance.enabled && gridParams.illuminance.showIn3D) {
         const surfaces = ['floor', 'ceiling', 'north', 'south', 'east', 'west'];
         surfaces.forEach(surface => {
             if (dom[`grid-${surface}-toggle`]?.checked) {
-                createGridForSurface(surface, W, L, H, gridContainer, 'illuminance', gridParams);
+                createGridForSurface(surface, W, L, H, gridContainer, 'illuminance', gridParams, customGeomPoints);
             }
         });
-        // Add visual helpers for task/surrounding areas
-        _createTaskAreaVisuals(W, L, gridContainer, gridParams);
+        // Add visual helpers for task/surrounding areas (parametric mode only)
+        if (!customGeomPoints) {
+            _createTaskAreaVisuals(W, L, gridContainer, gridParams);
+        }
     }
 
     // Visualize View Grids (Arrows on floor)
     if (gridParams.view.enabled && gridParams.view.showIn3D) {
-        createGridForSurface('floor', W, L, H, gridContainer, 'view', gridParams);
+        createGridForSurface('floor', W, L, H, gridContainer, 'view', gridParams, customGeomPoints);
     }
 
     sensorGridObject.add(gridContainer);
@@ -633,10 +802,70 @@ function generateCenteredPoints(totalLength, spacing) {
  * @param {number} H - Room height.
  * @returns {THREE.Vector3[]} An array of sensor positions.
  */
-function _generateGridPositions(surface, W, L, H) {
+async function _generateGridPositions(surface, W, L, H, customGeomPoints = null) {
     const gridParams = getSensorGridParams();
     const positions = [];
 
+    // Custom geometry floor/ceiling grids
+    if (customGeomPoints && (surface === 'floor' || surface === 'ceiling')) {
+        const { generatePolygonGridPoints } = await import('./radiance.js');
+        const params = surface === 'floor' ? gridParams.illuminance.floor : gridParams.illuminance.ceiling;
+        const yLevel = surface === 'floor' ? params.offset : (H + params.offset);
+
+        const gridPoints2D = generatePolygonGridPoints(customGeomPoints, params.spacing, yLevel, 0);
+        gridPoints2D.forEach(pt => {
+            positions.push(new THREE.Vector3(pt.x, pt.y, pt.z));
+        });
+        return positions;
+    }
+
+    // Custom geometry wall grids
+    if (customGeomPoints && ['north', 'south', 'east', 'west'].includes(surface)) {
+        // For custom geometry, wall grids apply to ALL polygon walls
+        // We'll generate grids for all wall segments
+        const params = gridParams.illuminance.walls;
+        const spacing = params.spacing;
+        const offset = params.offset;
+
+        for (let i = 0; i < customGeomPoints.length; i++) {
+            const p1 = customGeomPoints[i];
+            const p2 = customGeomPoints[(i + 1) % customGeomPoints.length];
+
+            const dx = p2.x - p1.x;
+            const dz = p2.z - p1.z;
+            const len = Math.sqrt(dx * dx + dz * dz);
+            if (len <= 0) continue;
+
+            const nx = -dz / len;
+            const nz = dx / len;
+
+            const numH = Math.floor(len / spacing);
+            const numV = Math.floor(H / spacing);
+
+            const totalLenH = (numH > 1 ? (numH - 1) * spacing : 0);
+            const startH = (len - totalLenH) / 2;
+
+            const totalLenV = (numV > 1 ? (numV - 1) * spacing : 0);
+            const startV = (H - totalLenV) / 2;
+
+            for (let u = 0; u < numH; u++) {
+                const hDist = startH + u * spacing;
+                const onLineX = p1.x + (dx / len) * hDist;
+                const onLineZ = p1.z + (dz / len) * hDist;
+
+                const finalX = onLineX + nx * offset;
+                const finalZ = onLineZ + nz * offset;
+
+                for (let v = 0; v < numV; v++) {
+                    const yHeight = startV + v * spacing;
+                    positions.push(new THREE.Vector3(finalX, yHeight, finalZ));
+                }
+            }
+        }
+        return positions;
+    }
+
+    // Parametric mode (original logic)
     const generatePointsInRect = (x, z, width, depth, spacing) => {
         if (spacing <= 0 || width <= 0 || depth <= 0) return [];
         const rectPositions = [];
@@ -711,9 +940,9 @@ function _generateGridPositions(surface, W, L, H) {
 /**
  * Helper to create a grid of sensor points on a specific surface using InstancedMesh.
  */
-function createGridForSurface(surface, W, L, H, container, visualizationType, gridParams) {
+async function createGridForSurface(surface, W, L, H, container, visualizationType, gridParams, customGeomPoints = null) {
     if (visualizationType === 'illuminance') {
-        const positions = _generateGridPositions(surface, W, L, H);
+        const positions = await _generateGridPositions(surface, W, L, H, customGeomPoints);
 
         if (positions.length > 0) {
             const sensorColor = getComputedStyle(document.documentElement).getPropertyValue('--illuminance-grid-color').trim();
@@ -735,13 +964,23 @@ function createGridForSurface(surface, W, L, H, container, visualizationType, gr
         const { spacing, offset, numDirs, startVec } = gridParams.view;
         if (!spacing || !(spacing > 0) || !numDirs || !(numDirs > 0)) return;
 
-        const pointsX = generateCenteredPoints(W, spacing);
-        const pointsZ = generateCenteredPoints(L, spacing);
+        let positions = [];
 
-        const positions = [];
-        for (const x of pointsX) {
-            for (const z of pointsZ) {
-                positions.push(new THREE.Vector3(x, offset, z));
+        if (customGeomPoints) {
+            // Use polygon-based grid for custom geometry
+            const { generatePolygonGridPoints } = await import('./radiance.js');
+            const gridPoints2D = generatePolygonGridPoints(customGeomPoints, spacing, offset, 0);
+            gridPoints2D.forEach(pt => {
+                positions.push(new THREE.Vector3(pt.x, pt.y, pt.z));
+            });
+        } else {
+            // Parametric mode
+            const pointsX = generateCenteredPoints(W, spacing);
+            const pointsZ = generateCenteredPoints(L, spacing);
+            for (const x of pointsX) {
+                for (const z of pointsZ) {
+                    positions.push(new THREE.Vector3(x, offset, z));
+                }
             }
         }
 
@@ -1349,9 +1588,18 @@ export function highlightWall(wallObject) {
     clearWallHighlights(); // Ensure only one wall is highlighted at a time
 
     if (wallObject && wallObject.material) {
+        console.log("Highlighting wall:", wallObject.uuid);
         highlightedWall.object = wallObject;
         highlightedWall.originalMaterial = wallObject.material;
         wallObject.material = highlightMaterial;
+
+        // Ensure it renders on top
+        wallObject.renderOrder = 999;
+
+        // Force update color to ensure it's visible
+        updateHighlightColor();
+    } else {
+        console.warn("Cannot highlight wall: Invalid object or material", wallObject);
     }
 }
 

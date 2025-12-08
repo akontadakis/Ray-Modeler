@@ -96,7 +96,7 @@ export function _parseAndBinSpectralData(fileContent, binConfigKey = 'lark-9') {
             return 0; // Default to 0 if no data points fall within a bin.
         }
         const sum = valuesInBin.reduce((acc, p) => acc + p.value, 0);
-       return sum / valuesInBin.length;
+        return sum / valuesInBin.length;
     });
 
     return binnedValues;
@@ -177,44 +177,44 @@ function transmittanceToTransmissivity(Tn) {
     // Correct implementation based on Stokes' equations for a single pane of glass (n=1.52)
     // This formula is a simplified approximation and assumes Rn (reflectance) is ~0.08
     if (Tn <= 0) return 0;
-    const Rn = 0.08; 
-    const term1 = Math.sqrt((1 - Rn)**4 + 4 * (Rn**2) * (Tn**2));
-    const term2 = (1 - Rn)**2;
+    const Rn = 0.08;
+    const term1 = Math.sqrt((1 - Rn) ** 4 + 4 * (Rn ** 2) * (Tn ** 2));
+    const term2 = (1 - Rn) ** 2;
     const tn = (term1 - term2) / (2 * Rn * Tn);
     // Clamp the result to a physically plausible range [0, 1]
     return Math.max(0, Math.min(1, tn));
 }
 
 function generateRadBox(topVerts, thickness, material, name, transformFunc) {
-  if (topVerts.length !== 4) return '';
+    if (topVerts.length !== 4) return '';
 
-  const v1t_vec = new THREE.Vector3().fromArray(topVerts[0]);
-  const v2t_vec = new THREE.Vector3().fromArray(topVerts[1]);
-  const v3t_vec = new THREE.Vector3().fromArray(topVerts[2]);
-  const v4t_vec = new THREE.Vector3().fromArray(topVerts[3]);
+    const v1t_vec = new THREE.Vector3().fromArray(topVerts[0]);
+    const v2t_vec = new THREE.Vector3().fromArray(topVerts[1]);
+    const v3t_vec = new THREE.Vector3().fromArray(topVerts[2]);
+    const v4t_vec = new THREE.Vector3().fromArray(topVerts[3]);
 
-  const H = new THREE.Vector3().subVectors(v2t_vec, v1t_vec);
-  const D = new THREE.Vector3().subVectors(v4t_vec, v1t_vec);
-  const normal = new THREE.Vector3().crossVectors(H, D).normalize();
-  const thicknessVector = normal.clone().multiplyScalar(thickness);
+    const H = new THREE.Vector3().subVectors(v2t_vec, v1t_vec);
+    const D = new THREE.Vector3().subVectors(v4t_vec, v1t_vec);
+    const normal = new THREE.Vector3().crossVectors(H, D).normalize();
+    const thicknessVector = normal.clone().multiplyScalar(thickness);
 
-  const v1b_vec = new THREE.Vector3().subVectors(v1t_vec, thicknessVector);
-  const v2b_vec = new THREE.Vector3().subVectors(v2t_vec, thicknessVector);
-  const v3b_vec = new THREE.Vector3().subVectors(v3t_vec, thicknessVector);
-  const v4b_vec = new THREE.Vector3().subVectors(v4t_vec, thicknessVector);
+    const v1b_vec = new THREE.Vector3().subVectors(v1t_vec, thicknessVector);
+    const v2b_vec = new THREE.Vector3().subVectors(v2t_vec, thicknessVector);
+    const v3b_vec = new THREE.Vector3().subVectors(v3t_vec, thicknessVector);
+    const v4b_vec = new THREE.Vector3().subVectors(v4t_vec, thicknessVector);
 
-  const v1t = v1t_vec.toArray(), v2t = v2t_vec.toArray(), v3t = v3t_vec.toArray(), v4t = v4t_vec.toArray();
-  const v1b = v1b_vec.toArray(), v2b = v2b_vec.toArray(), v3b = v3b_vec.toArray(), v4b = v4b_vec.toArray();
+    const v1t = v1t_vec.toArray(), v2t = v2t_vec.toArray(), v3t = v3t_vec.toArray(), v4t = v4t_vec.toArray();
+    const v1b = v1b_vec.toArray(), v2b = v2b_vec.toArray(), v3b = v3b_vec.toArray(), v4b = v4b_vec.toArray();
 
-  const f = (verts) => verts.map(v => transformFunc(v)).join('\n');
-let radString = `\n# Box: ${name}\n`;
-radString += `${material} polygon ${name}_top\n0\n0\n12\n`   + f([v1t, v2t, v3t, v4t]) + `\n\n`;
-radString += `${material} polygon ${name}_bottom\n0\n0\n12\n`+ f([v1b, v4b, v3b, v2b]) + `\n\n`;
-radString += `${material} polygon ${name}_front\n0\n0\n12\n` + f([v4t, v3t, v3b, v4b]) + `\n\n`;
-radString += `${material} polygon ${name}_back\n0\n0\n12\n`  + f([v2t, v1t, v1b, v2b]) + `\n\n`;
-radString += `${material} polygon ${name}_left\n0\n0\n12\n`  + f([v1t, v4t, v4b, v1b]) + `\n\n`;
-radString += `${material} polygon ${name}_right\n0\n0\n12\n` + f([v2t, v2b, v3b, v3t]) + `\n\n`;
-  return radString;
+    const f = (verts) => verts.map(v => transformFunc(v)).join('\n');
+    let radString = `\n# Box: ${name}\n`;
+    radString += `${material} polygon ${name}_top\n0\n0\n12\n` + f([v1t, v2t, v3t, v4t]) + `\n\n`;
+    radString += `${material} polygon ${name}_bottom\n0\n0\n12\n` + f([v1b, v4b, v3b, v2b]) + `\n\n`;
+    radString += `${material} polygon ${name}_front\n0\n0\n12\n` + f([v4t, v3t, v3b, v4b]) + `\n\n`;
+    radString += `${material} polygon ${name}_back\n0\n0\n12\n` + f([v2t, v1t, v1b, v2b]) + `\n\n`;
+    radString += `${material} polygon ${name}_left\n0\n0\n12\n` + f([v1t, v4t, v4b, v1b]) + `\n\n`;
+    radString += `${material} polygon ${name}_right\n0\n0\n12\n` + f([v2t, v2b, v3b, v3t]) + `\n\n`;
+    return radString;
 }
 
 /**
@@ -228,12 +228,12 @@ radString += `${material} polygon ${name}_right\n0\n0\n12\n` + f([v2t, v2b, v3b,
  * @returns {string} A formatted string "x y z" for Radiance.
  */
 function transformAndFormatPoint(localPoint, W, L, cosA, sinA) {
-  const p = { x: localPoint[0], y: localPoint[1], z: localPoint[2] };
-  const centered_x = p.x - W / 2;
-  const centered_y = p.y - L / 2; // Y is depth
-  const rx = centered_x * cosA - centered_y * sinA;
-  const ry = centered_x * sinA + centered_y * cosA;
-  return `${rx.toFixed(4)} ${ry.toFixed(4)} ${p.z.toFixed(4)}`; // Z is height
+    const p = { x: localPoint[0], y: localPoint[1], z: localPoint[2] };
+    const centered_x = p.x - W / 2;
+    const centered_y = p.y - L / 2; // Y is depth
+    const rx = centered_x * cosA - centered_y * sinA;
+    const ry = centered_x * sinA + centered_y * cosA;
+    return `${rx.toFixed(4)} ${ry.toFixed(4)} ${p.z.toFixed(4)}`; // Z is height
 }
 
 /**
@@ -342,7 +342,7 @@ function generateSimpleGenerativePattern(patternType, parameters, winParams, ori
     const winId = `${orientation}_${windowIndex + 1}`;
 
     const inwardNormal = { 'N': [0, 1, 0], 'S': [0, -1, 0], 'W': [1, 0, 0], 'E': [-1, 0, 0] }[orientation];
-    
+
     // This is a simplified positioning logic. It assumes the generative pattern is centered on the window.
     // A more robust implementation would get the exact window position from the `allWindows` loop.
     const createFin = (u0, u1, v0, v1, finIndex, finType) => {
@@ -377,292 +377,347 @@ function generateSimpleGenerativePattern(patternType, parameters, winParams, ori
 
 
 export async function generateRadFileContent(options = {}) {
-  const { channelSet, clippingPlanes } = options; // e.g., 'c1-3', 'c4-6', 'c7-9' for spectral runs
-  const dom = getDom();
-  const { currentImportedModel } = await import('./geometry.js');
+    const { channelSet, clippingPlanes } = options; // e.g., 'c1-3', 'c4-6', 'c7-9' for spectral runs
+    const dom = getDom();
+    const { currentImportedModel } = await import('./geometry.js');
 
 
-  // --- Headers and Setup ---
-  let geoHeader = `# Radiance scene geometry generated on ${new Date().toISOString()}\n`;
-  geoHeader += `# Room Orientation: ${dom['room-orientation'].value} degrees from North (Radiance -Y)\n`;
-  geoHeader += `# Coordinate System: Right-Handed, Z-up\n`;
+    // --- Headers and Setup ---
+    let geoHeader = `# Radiance scene geometry generated on ${new Date().toISOString()}\n`;
+    geoHeader += `# Room Orientation: ${dom['room-orientation'].value} degrees from North (Radiance -Y)\n`;
+    geoHeader += `# Coordinate System: Right-Handed, Z-up\n`;
 
-  let matHeader = `# Radiance material definitions generated on ${new Date().toISOString()}\n\n`;
+    let matHeader = `# Radiance material definitions generated on ${new Date().toISOString()}\n\n`;
 
-  let radMaterials = `# --- BASE MATERIAL DEFINITIONS ---\n`;
-  let radGeometry = `\n# --- GEOMETRY ---\n`;
-  let shadingGeometry = '\n# --- SHADING DEVICES ---\n';
-  let dynamicMaterialDefs = '\n# --- DYNAMIC MATERIAL DEFINITIONS (e.g., roller shades) ---\n';
+    let radMaterials = `# --- BASE MATERIAL DEFINITIONS ---\n`;
+    let radGeometry = `\n# --- GEOMETRY ---\n`;
+    let shadingGeometry = '\n# --- SHADING DEVICES ---\n';
+    let dynamicMaterialDefs = '\n# --- DYNAMIC MATERIAL DEFINITIONS (e.g., roller shades) ---\n';
 
-  // --- Material Generation ---
- function getMaterialDef(type) {
-    const matName = `${type}_mat`;
-    
-    // Check if the main material type selector exists, use default if not
-    const matTypeElement = dom[`${type}-mat-type`];
-    const matType = matTypeElement ? matTypeElement.value.toLowerCase() : 'plastic';
-    
-    // Safely get spec and rough values with defaults
-    const specElement = dom[`${type}-spec`];
-    const roughElement = dom[`${type}-rough`];
-    const spec = specElement ? parseFloat(specElement.value) : 0;
-    const rough = roughElement ? parseFloat(roughElement.value) : 0;
+    // --- Material Generation ---
+    function getMaterialDef(type) {
+        const matName = `${type}_mat`;
 
-    // Dynamically check for spectral mode for the given material type
-    const modeElement = dom[`${type}-mode-srd`];
-    const mode = modeElement?.classList.contains('active') ? 'srd' : 'refl';
-    const spectralFileKey = `${type}-srd-file`;
-    const spectralFile = project.simulationFiles[spectralFileKey];
+        // Check if the main material type selector exists, use default if not
+        const matTypeElement = dom[`${type}-mat-type`];
+        const matType = matTypeElement ? matTypeElement.value.toLowerCase() : 'plastic';
 
-    if ((type === 'wall' || type === 'floor' || type === 'ceiling') && mode === 'srd' && channelSet && spectralFile?.content) {
-        const binnedValues = _parseAndBinSpectralData(spectralFile.content, 'lark-9');
+        // Safely get spec and rough values with defaults
+        const specElement = dom[`${type}-spec`];
+        const roughElement = dom[`${type}-rough`];
+        const spec = specElement ? parseFloat(specElement.value) : 0;
+        const rough = roughElement ? parseFloat(roughElement.value) : 0;
 
-        if (binnedValues && binnedValues.length === 9) {
-            let values;
-            if (channelSet === 'c1-3')      values = binnedValues.slice(0, 3);
-            else if (channelSet === 'c4-6') values = binnedValues.slice(3, 6);
-            else if (channelSet === 'c7-9') values = binnedValues.slice(6, 9);
+        // Dynamically check for spectral mode for the given material type
+        const modeElement = dom[`${type}-mode-srd`];
+        const mode = modeElement?.classList.contains('active') ? 'srd' : 'refl';
+        const spectralFileKey = `${type}-srd-file`;
+        const spectralFile = project.simulationFiles[spectralFileKey];
 
-            if (values) {
-                const [v1, v2, v3] = values.map(v => v.toFixed(4));
-                // Note: Uses the material type from the UI. Assumes plastic/metal are appropriate.
-                if (matType === 'plastic' || matType === 'metal') {
-                    return `void ${matType} ${matName}\n0\n0\n5 ${v1} ${v2} ${v3} ${spec} ${rough}\n`;
+        if ((type === 'wall' || type === 'floor' || type === 'ceiling') && mode === 'srd' && channelSet && spectralFile?.content) {
+            const binnedValues = _parseAndBinSpectralData(spectralFile.content, 'lark-9');
+
+            if (binnedValues && binnedValues.length === 9) {
+                let values;
+                if (channelSet === 'c1-3') values = binnedValues.slice(0, 3);
+                else if (channelSet === 'c4-6') values = binnedValues.slice(3, 6);
+                else if (channelSet === 'c7-9') values = binnedValues.slice(6, 9);
+
+                if (values) {
+                    const [v1, v2, v3] = values.map(v => v.toFixed(4));
+                    // Note: Uses the material type from the UI. Assumes plastic/metal are appropriate.
+                    if (matType === 'plastic' || matType === 'metal') {
+                        return `void ${matType} ${matName}\n0\n0\n5 ${v1} ${v2} ${v3} ${spec} ${rough}\n`;
+                    }
                 }
             }
         }
+
+        // Fallback to original simple reflectance behavior with null check
+        const reflElement = dom[`${type}-refl`];
+        const refl = reflElement ? parseFloat(reflElement.value) : 0.5;
+
+        switch (matType) {
+            case 'plastic': return `void plastic ${matName}\n0\n0\n5 ${refl} ${refl} ${refl} ${spec} ${rough}\n`;
+            case 'glass': return `void glass ${matName}\n0\n0\n3 ${refl} ${refl} ${refl}\n`;
+            case 'metal': return `void metal ${matName}\n0\n0\n5 ${refl} ${refl} ${refl} ${spec} ${rough}\n`;
+            default: return `void plastic ${matName}\n0\n0\n5 ${refl} ${refl} ${refl} ${spec} ${rough}\n`;
+        }
     }
 
-    // Fallback to original simple reflectance behavior with null check
-    const reflElement = dom[`${type}-refl`];
-    const refl = reflElement ? parseFloat(reflElement.value) : 0.5;
-    
-    switch (matType) {
-      case 'plastic': return `void plastic ${matName}\n0\n0\n5 ${refl} ${refl} ${refl} ${spec} ${rough}\n`;
-      case 'glass':   return `void glass ${matName}\n0\n0\n3 ${refl} ${refl} ${refl}\n`;
-      case 'metal':   return `void metal ${matName}\n0\n0\n5 ${refl} ${refl} ${refl} ${spec} ${rough}\n`;
-      default:        return `void plastic ${matName}\n0\n0\n5 ${refl} ${refl} ${refl} ${spec} ${rough}\n`;
+    radMaterials += getMaterialDef('wall');
+    radMaterials += getMaterialDef('floor');
+    radMaterials += getMaterialDef('ceiling');
+    radMaterials += getMaterialDef('frame');
+    radMaterials += getMaterialDef('shading');
+    radMaterials += getMaterialDef('furniture');
+    radMaterials += getMaterialDef('context');
+    radMaterials += `void plastic ground_mat\n0\n0\n5 0.15 0.15 0.15 0 0\n\n`; // A dark, diffuse ground material
+    radMaterials += `void trans vegetation_canopy_mat\n0\n0\n7 0.1 0.2 0.1 0 0.5 0.3 0\n\n`; // Green, diffuse, 30% transparent material for canopy
+
+    const Tn = parseFloat(dom['glazing-trans'].value);
+    const tn = transmittanceToTransmissivity(Tn);
+    radMaterials += `void glass glass_mat\n0\n0\n3 ${tn} ${tn} ${tn}\n\n`;
+
+    // --- Geometry Generation ---
+    // Check if we have optimized geometry (Precedence 1)
+    if (options.geometry && options.geometry.optimizedGeometry) {
+        radGeometry += `\n# --- OPTIMIZED GEOMETRY ---\n`;
+        const surfaceTypeToMaterialName = {
+            'INTERIOR_WALL': 'wall_mat',
+            'INTERIOR_FLOOR': 'floor_mat',
+            'INTERIOR_CEILING': 'ceiling_mat',
+            'GLAZING': 'glass_mat',
+            'FRAME': 'frame_mat',
+            'SHADING_DEVICE': 'shading_mat',
+            'VEGETATION_CANOPY': 'vegetation_canopy_mat',
+            'VEGETATION_TRUNK': 'furniture_mat',
+            'EXTERIOR_WALL': 'wall_mat', // Fallback
+            'EXTERIOR_FLOOR': 'floor_mat',
+            'EXTERIOR_CEILING': 'ceiling_mat',
+            'generic_wall': 'wall_mat', // Fallback for unmatched
+            'context': 'context_mat',
+            'furniture': 'furniture_mat'
+        };
+
+        // Transform from Three.js Y-up to Radiance Z-up
+        const threeToRadTransform = (p) => `${p[0].toFixed(4)} ${p[2].toFixed(4)} ${p[1].toFixed(4)}`;
+
+        options.geometry.optimizedGeometry.traverse(child => {
+            if (child.isMesh) {
+                // Fallback for material name if surfaceType is missing or custom
+                let radMaterialName = 'wall_mat';
+                const surfaceType = child.userData.surfaceType;
+
+                if (surfaceType && surfaceTypeToMaterialName[surfaceType]) {
+                    radMaterialName = surfaceTypeToMaterialName[surfaceType];
+                } else if (child.userData.isFurniture) {
+                    radMaterialName = 'furniture_mat';
+                } else if (child.userData.isContext || child.userData.isMassingBlock) {
+                    radMaterialName = 'context_mat';
+                }
+
+                // If specialized material/userData handling is needed, add here.
+
+                radGeometry += _generateRadFromMesh(
+                    child,
+                    radMaterialName,
+                    `${child.name || 'opt'}_${child.uuid.substring(0, 6)}`,
+                    threeToRadTransform,
+                    child.name // Use name as group hint if available
+                );
+            }
+        });
+
+        return {
+            materials: matHeader + radMaterials + dynamicMaterialDefs,
+            geometry: geoHeader + radGeometry
+        };
     }
-  }
 
-  radMaterials += getMaterialDef('wall');
-  radMaterials += getMaterialDef('floor');
-  radMaterials += getMaterialDef('ceiling');
-  radMaterials += getMaterialDef('frame');
-  radMaterials += getMaterialDef('shading');
- radMaterials += getMaterialDef('furniture');
-  radMaterials += getMaterialDef('context');
-  radMaterials += `void plastic ground_mat\n0\n0\n5 0.15 0.15 0.15 0 0\n\n`; // A dark, diffuse ground material
-  radMaterials += `void trans vegetation_canopy_mat\n0\n0\n7 0.1 0.2 0.1 0 0.5 0.3 0\n\n`; // Green, diffuse, 30% transparent material for canopy
+    // Check if we are in imported geometry mode (Precedence 2)
+    if (currentImportedModel) {
+        radGeometry += `\n# --- IMPORTED GEOMETRY ---\n`;
 
-  const Tn = parseFloat(dom['glazing-trans'].value);
-  const tn = transmittanceToTransmissivity(Tn);
-  radMaterials += `void glass glass_mat\n0\n0\n3 ${tn} ${tn} ${tn}\n\n`;
+        const surfaceTypeToMaterialName = {
+            'INTERIOR_WALL': 'wall_mat',
+            'INTERIOR_FLOOR': 'floor_mat',
+            'INTERIOR_CEILING': 'ceiling_mat',
+            'GLAZING': 'glass_mat',
+            'FRAME': 'frame_mat',
+            'SHADING_DEVICE': 'shading_mat',
+            'VEGETATION_CANOPY': 'vegetation_canopy_mat',
+            'VEGETATION_TRUNK': 'furniture_mat',
+        };
+        // Transform from Three.js Y-up to Radiance Z-up
+        const threeToRadTransform = (p) => `${p[0].toFixed(4)} ${p[2].toFixed(4)} ${p[1].toFixed(4)}`;
 
-  // --- Geometry Generation ---
-  // Check if we are in imported geometry mode
-  if (currentImportedModel) {
-      radGeometry += `\n# --- IMPORTED GEOMETRY ---\n`;
-      
-      const surfaceTypeToMaterialName = {
-          'INTERIOR_WALL': 'wall_mat',
-          'INTERIOR_FLOOR': 'floor_mat',
-          'INTERIOR_CEILING': 'ceiling_mat',
-          'GLAZING': 'glass_mat',
-          'FRAME': 'frame_mat',
-          'SHADING_DEVICE': 'shading_mat',
-          'VEGETATION_CANOPY': 'vegetation_canopy_mat',
-          'VEGETATION_TRUNK': 'furniture_mat',
-      };
-      // Transform from Three.js Y-up to Radiance Z-up
-      const threeToRadTransform = (p) => `${p[0].toFixed(4)} ${p[2].toFixed(4)} ${p[1].toFixed(4)}`;
+        currentImportedModel.traverse(child => {
+            if (child.isMesh) {
+                const materials = Array.isArray(child.material) ? child.material : [child.material];
+                materials.forEach(mat => {
+                    const surfaceType = mat.userData.surfaceType;
+                    const radMaterialName = surfaceTypeToMaterialName[surfaceType];
 
-      currentImportedModel.traverse(child => {
-          if (child.isMesh) {
-              const materials = Array.isArray(child.material) ? child.material : [child.material];
-              materials.forEach(mat => {
-                  const surfaceType = mat.userData.surfaceType;
-                  const radMaterialName = surfaceTypeToMaterialName[surfaceType];
+                    if (radMaterialName) {
+                        radGeometry += _generateRadFromMesh(
+                            child,
+                            radMaterialName,
+                            `${child.name || 'imported'}_${mat.name.replace(/\s/g, '_')}`,
+                            threeToRadTransform,
+                            mat.name
+                        );
+                    }
+                });
+            }
+        });
 
-                  if (radMaterialName) {
-                      radGeometry += _generateRadFromMesh(
-                          child, 
-                          radMaterialName, 
-                          `${child.name || 'imported'}_${mat.name.replace(/\s/g, '_')}`, 
-                          threeToRadTransform,
-                          mat.name 
-                      );
-                  }
-              });
-          }
-      });
-      
-      // Return early after processing the imported model
-      return {
-          materials: matHeader + radMaterials + dynamicMaterialDefs,
-          geometry: geoHeader + radGeometry
-      };
-  }
+        // Return early after processing the imported model
+        return {
+            materials: matHeader + radMaterials + dynamicMaterialDefs,
+            geometry: geoHeader + radGeometry
+        };
+    }
 
     const W = parseFloat(dom.width.value), L = parseFloat(dom.length.value), H = parseFloat(dom.height.value);
     const allWindows = getAllWindowParams();
     const allShading = getAllShadingParams();
 
-  const alphaRad = THREE.MathUtils.degToRad(parseFloat(dom['room-orientation'].value));
-  const cosA = Math.cos(alphaRad);
-  const sinA = Math.sin(alphaRad);
-  const transformAndFormat = (p) => transformAndFormatPoint(p, W, L, cosA, sinA);
-  const { 'surface-thickness': surfaceThickness } = getDom();
+    const alphaRad = THREE.MathUtils.degToRad(parseFloat(dom['room-orientation'].value));
+    const cosA = Math.cos(alphaRad);
+    const sinA = Math.sin(alphaRad);
+    const transformAndFormat = (p) => transformAndFormatPoint(p, W, L, cosA, sinA);
+    const surfaceThickness = parseFloat(dom['surface-thickness']?.value) || 0.2;
 
-  // --- Floor ---
-  const floorTopVerts = [[0, 0, 0], [W, 0, 0], [W, L, 0], [0, L, 0]];
-  radGeometry += generateRadBox(floorTopVerts, surfaceThickness, 'floor_mat', 'floor', transformAndFormat);
+    // --- Floor ---
+    const floorTopVerts = [[0, 0, 0], [W, 0, 0], [W, L, 0], [0, L, 0]];
+    radGeometry += generateRadBox(floorTopVerts, surfaceThickness, 'floor_mat', 'floor', transformAndFormat);
 
-  // --- Ceiling ---
-  const ceilTopVerts = [[0, 0, H], [W, 0, H], [W, L, H], [0, L, H]];
-  radGeometry += generateRadBox(ceilTopVerts, surfaceThickness, 'ceiling_mat', 'ceiling', transformAndFormat);
+    // --- Ceiling ---
+    const ceilTopVerts = [[0, 0, H], [W, 0, H], [W, L, H], [0, L, H]];
+    radGeometry += generateRadBox(ceilTopVerts, surfaceThickness, 'ceiling_mat', 'ceiling', transformAndFormat);
 
-  function quadVerts(orientation, u0, u1, v0, v1) {
-    switch (orientation) {
-      case 'N': return [[u0, 0, v0], [u1, 0, v0], [u1, 0, v1], [u0, 0, v1]];
-      case 'S': return [[u1, L, v0], [u0, L, v0], [u0, L, v1], [u1, L, v1]];
-      case 'W': return [[0, u1, v0], [0, u0, v0], [0, u0, v1], [0, u1, v1]];
-      case 'E': return [[W, u0, v0], [W, u1, v0], [W, u1, v1], [W, u0, v1]];
-    }
-    return [];
-  }
-
-  function generateThickWall(orientation, wallWidth, windows) {
-    let rad = '';
-    const thickness = surfaceThickness;
-    const normal = { 'N': [0, -1, 0], 'S': [0, 1, 0], 'W': [-1, 0, 0], 'E': [1, 0, 0] }[orientation];
-
-    // Sort windows by horizontal position
-    windows.sort((a, b) => a.u0 - b.u0);
-
-    let last_u = 0;
-    windows.forEach((win, i) => {
-        // Wall segment before this window
-        if (win.u0 > last_u) {
-            const verts = quadVerts(orientation, last_u, win.u0, 0, H);
-            rad += generateRadBox(verts, thickness, 'wall_mat', `wall_${orientation}_pier_${i}`, transformAndFormat);
+    function quadVerts(orientation, u0, u1, v0, v1) {
+        switch (orientation) {
+            case 'N': return [[u0, 0, v0], [u1, 0, v0], [u1, 0, v1], [u0, 0, v1]];
+            case 'S': return [[u1, L, v0], [u0, L, v0], [u0, L, v1], [u1, L, v1]];
+            case 'W': return [[0, u1, v0], [0, u0, v0], [0, u0, v1], [0, u1, v1]];
+            case 'E': return [[W, u0, v0], [W, u1, v0], [W, u1, v1], [W, u0, v1]];
         }
-        // Wall segment below this window (sill)
-        if (win.v0 > 0) {
-            const verts = quadVerts(orientation, win.u0, win.u1, 0, win.v0);
-            rad += generateRadBox(verts, thickness, 'wall_mat', `wall_${orientation}_sill_${i}`, transformAndFormat);
-        }
-        // Wall segment above this window (header)
-        if (win.v1 < H) {
-            const verts = quadVerts(orientation, win.u0, win.u1, win.v1, H);
-            rad += generateRadBox(verts, thickness, 'wall_mat', `wall_${orientation}_header_${i}`, transformAndFormat);
-        }
-        last_u = win.u1;
-    });
-
-    // Final wall segment after all windows
-    if (last_u < wallWidth) {
-        const verts = quadVerts(orientation, last_u, wallWidth, 0, H);
-        rad += generateRadBox(verts, thickness, 'wall_mat', `wall_${orientation}_pier_end`, transformAndFormat);
+        return [];
     }
 
-    // If there are no windows, create a single solid wall
-    if (windows.length === 0) {
-        const verts = quadVerts(orientation, 0, wallWidth, 0, H);
-        rad += generateRadBox(verts, thickness, 'wall_mat', `wall_${orientation}_solid`, transformAndFormat);
+    function generateThickWall(orientation, wallWidth, windows) {
+        let rad = '';
+        const thickness = surfaceThickness;
+        const normal = { 'N': [0, -1, 0], 'S': [0, 1, 0], 'W': [-1, 0, 0], 'E': [1, 0, 0] }[orientation];
+
+        // Sort windows by horizontal position
+        windows.sort((a, b) => a.u0 - b.u0);
+
+        let last_u = 0;
+        windows.forEach((win, i) => {
+            // Wall segment before this window
+            if (win.u0 > last_u) {
+                const verts = quadVerts(orientation, last_u, win.u0, 0, H);
+                rad += generateRadBox(verts, thickness, 'wall_mat', `wall_${orientation}_pier_${i}`, transformAndFormat);
+            }
+            // Wall segment below this window (sill)
+            if (win.v0 > 0) {
+                const verts = quadVerts(orientation, win.u0, win.u1, 0, win.v0);
+                rad += generateRadBox(verts, thickness, 'wall_mat', `wall_${orientation}_sill_${i}`, transformAndFormat);
+            }
+            // Wall segment above this window (header)
+            if (win.v1 < H) {
+                const verts = quadVerts(orientation, win.u0, win.u1, win.v1, H);
+                rad += generateRadBox(verts, thickness, 'wall_mat', `wall_${orientation}_header_${i}`, transformAndFormat);
+            }
+            last_u = win.u1;
+        });
+
+        // Final wall segment after all windows
+        if (last_u < wallWidth) {
+            const verts = quadVerts(orientation, last_u, wallWidth, 0, H);
+            rad += generateRadBox(verts, thickness, 'wall_mat', `wall_${orientation}_pier_end`, transformAndFormat);
+        }
+
+        // If there are no windows, create a single solid wall
+        if (windows.length === 0) {
+            const verts = quadVerts(orientation, 0, wallWidth, 0, H);
+            rad += generateRadBox(verts, thickness, 'wall_mat', `wall_${orientation}_solid`, transformAndFormat);
+        }
+
+        return rad;
     }
 
-    return rad;
-}
+    const walls = { 'N': { width: W }, 'S': { width: W }, 'W': { width: L }, 'E': { width: L } };
+    for (const orientation of Object.keys(walls)) {
+        const winParams = allWindows[orientation];
+        const { ww, wh, sh, wallWidth, winCount, mode } = winParams || {};
 
-const walls = {'N': { width: W },'S': { width: W },'W': { width: L },'E': { width: L }};
-for (const orientation of Object.keys(walls)) {
-    const winParams = allWindows[orientation];
-    const { ww, wh, sh, wallWidth, winCount, mode } = winParams || {};
+        let windowsU = [];
+        if (ww > 0 && wh > 0 && winCount > 0) {
+            const spacing = (mode === 'wwr') ? 0.1 : ww / 2;
+            const groupWidth = (winCount * ww) + (Math.max(0, winCount - 1) * spacing);
+            const startOffset = (wallWidth - groupWidth) / 2;
+            for (let i = 0; i < winCount; i++) {
+                const u0 = startOffset + i * (ww + spacing);
+                const u1 = u0 + ww;
+                windowsU.push({ u0, u1, v0: sh, v1: sh + wh });
+            }
+        }
+        radGeometry += generateThickWall(orientation, wallWidth, windowsU);
+    }
 
-    let windowsU = [];
-    if (ww > 0 && wh > 0 && winCount > 0) {
+    // --- Generate Glazing and Frames ---
+    const addFrame = dom['frame-toggle'].checked;
+    const ft = addFrame ? parseFloat(dom['frame-thick'].value) : 0;
+    const fd = addFrame ? parseFloat(dom['frame-depth'].value) : 0;
+
+    for (const [orientation, winParams] of Object.entries(allWindows)) {
+        const { ww, wh, sh, wallWidth, winCount, mode, winDepthPos } = winParams || {};
+        if (!(ww > 0 && wh > 0 && winCount > 0)) continue;
+
         const spacing = (mode === 'wwr') ? 0.1 : ww / 2;
         const groupWidth = (winCount * ww) + (Math.max(0, winCount - 1) * spacing);
         const startOffset = (wallWidth - groupWidth) / 2;
+
         for (let i = 0; i < winCount; i++) {
-            const u0 = startOffset + i * (ww + spacing);
-            const u1 = u0 + ww;
-            windowsU.push({ u0, u1, v0: sh, v1: sh + wh });
+            const winId = `${orientation}_${i + 1}`;
+            const offset = startOffset + i * (ww + spacing);
+
+            // 1. Glazing
+            const glassWidth = Math.max(0, ww - 2 * ft);
+            const glassHeight = Math.max(0, wh - 2 * ft);
+            const glass_sh = sh + ft;
+            const glass_offset = offset + ft;
+
+            if (glassWidth > 0 && glassHeight > 0) {
+                const p_gl_base = quadVerts(orientation, glass_offset, glass_offset + glassWidth, glass_sh, glass_sh + glassHeight);
+                const inwardNormal = { 'N': [0, 1, 0], 'S': [0, -1, 0], 'W': [1, 0, 0], 'E': [-1, 0, 0] }[orientation];
+                const depthVec = inwardNormal.map(n => n * (winDepthPos - (surfaceThickness / 2)));
+                const p_gl = p_gl_base.map(v => [v[0] + depthVec[0], v[1] + depthVec[1], v[2] + depthVec[2]]);
+
+                radGeometry += `\n# Glazing Pane ${winId}\n` +
+                    `glass_mat polygon glazing_${winId}\n0\n0\n12\n` +
+                    p_gl.map(v => transformAndFormat(v)).join('\n') + '\n';
+            }
+
+            // 2. Frame
+            if (addFrame && ft > 0 && fd > 0) {
+                const frame_u0 = offset;
+                const frame_u1 = offset + ww;
+                const frame_v0 = sh;
+                const frame_v1 = sh + wh;
+                const inwardNormal = { 'N': [0, 1, 0], 'S': [0, -1, 0], 'W': [1, 0, 0], 'E': [-1, 0, 0] }[orientation];
+                const depthVec = inwardNormal.map(n => n * (winDepthPos - (surfaceThickness / 2) - fd / 2));
+
+
+                // Frame Bottom
+                const botVerts = quadVerts(orientation, frame_u0, frame_u1, frame_v0, frame_v0 + ft);
+                const p_botVerts = botVerts.map(v => [v[0] + depthVec[0], v[1] + depthVec[1], v[2] + depthVec[2]]);
+                shadingGeometry += generateRadBox(p_botVerts, fd, 'frame_mat', `frame_${winId}_bot`, transformAndFormat);
+                // Frame Top
+                const topVerts = quadVerts(orientation, frame_u0, frame_u1, frame_v1 - ft, frame_v1);
+                const p_topVerts = topVerts.map(v => [v[0] + depthVec[0], v[1] + depthVec[1], v[2] + depthVec[2]]);
+                shadingGeometry += generateRadBox(p_topVerts, fd, 'frame_mat', `frame_${winId}_top`, transformAndFormat);
+                // Frame Left
+                const leftVerts = quadVerts(orientation, frame_u0, frame_u0 + ft, frame_v0 + ft, frame_v1 - ft);
+                const p_leftVerts = leftVerts.map(v => [v[0] + depthVec[0], v[1] + depthVec[1], v[2] + depthVec[2]]);
+                shadingGeometry += generateRadBox(p_leftVerts, fd, 'frame_mat', `frame_${winId}_left`, transformAndFormat);
+                // Frame Right
+                const rightVerts = quadVerts(orientation, frame_u1 - ft, frame_u1, frame_v0 + ft, frame_v1 - ft);
+                const p_rightVerts = rightVerts.map(v => [v[0] + depthVec[0], v[1] + depthVec[1], v[2] + depthVec[2]]);
+                shadingGeometry += generateRadBox(p_rightVerts, fd, 'frame_mat', `frame_${winId}_right`, transformAndFormat);
+            }
         }
     }
-    radGeometry += generateThickWall(orientation, wallWidth, windowsU);
-}
 
-// --- Generate Glazing and Frames ---
-const addFrame = dom['frame-toggle'].checked;
-const ft = addFrame ? parseFloat(dom['frame-thick'].value) : 0;
-const fd = addFrame ? parseFloat(dom['frame-depth'].value) : 0;
-
-for (const [orientation, winParams] of Object.entries(allWindows)) {
-    const { ww, wh, sh, wallWidth, winCount, mode, winDepthPos } = winParams || {};
-    if (!(ww > 0 && wh > 0 && winCount > 0)) continue;
-
-    const spacing = (mode === 'wwr') ? 0.1 : ww / 2;
-    const groupWidth = (winCount * ww) + (Math.max(0, winCount - 1) * spacing);
-    const startOffset = (wallWidth - groupWidth) / 2;
-
-    for (let i = 0; i < winCount; i++) {
-        const winId = `${orientation}_${i + 1}`;
-        const offset = startOffset + i * (ww + spacing);
-
-        // 1. Glazing
-        const glassWidth = Math.max(0, ww - 2 * ft);
-        const glassHeight = Math.max(0, wh - 2 * ft);
-        const glass_sh = sh + ft;
-        const glass_offset = offset + ft;
-
-        if (glassWidth > 0 && glassHeight > 0) {
-            const p_gl_base = quadVerts(orientation, glass_offset, glass_offset + glassWidth, glass_sh, glass_sh + glassHeight);
-            const inwardNormal = { 'N': [0, 1, 0], 'S': [0, -1, 0], 'W': [1, 0, 0], 'E': [-1, 0, 0] }[orientation];
-            const depthVec = inwardNormal.map(n => n * (winDepthPos - (surfaceThickness / 2)));
-            const p_gl = p_gl_base.map(v => [v[0] + depthVec[0], v[1] + depthVec[1], v[2] + depthVec[2]]);
-
-            radGeometry += `\n# Glazing Pane ${winId}\n` +
-                         `glass_mat polygon glazing_${winId}\n0\n0\n12\n` +
-                         p_gl.map(v => transformAndFormat(v)).join('\n') + '\n';
-        }
-
-        // 2. Frame
-        if (addFrame && ft > 0 && fd > 0) {
-            const frame_u0 = offset;
-            const frame_u1 = offset + ww;
-            const frame_v0 = sh;
-            const frame_v1 = sh + wh;
-            const inwardNormal = { 'N': [0, 1, 0], 'S': [0, -1, 0], 'W': [1, 0, 0], 'E': [-1, 0, 0] }[orientation];
-            const depthVec = inwardNormal.map(n => n * (winDepthPos - (surfaceThickness / 2) - fd/2));
-
-
-            // Frame Bottom
-            const botVerts = quadVerts(orientation, frame_u0, frame_u1, frame_v0, frame_v0 + ft);
-            const p_botVerts = botVerts.map(v => [v[0] + depthVec[0], v[1] + depthVec[1], v[2] + depthVec[2]]);
-            shadingGeometry += generateRadBox(p_botVerts, fd, 'frame_mat', `frame_${winId}_bot`, transformAndFormat);
-            // Frame Top
-            const topVerts = quadVerts(orientation, frame_u0, frame_u1, frame_v1 - ft, frame_v1);
-            const p_topVerts = topVerts.map(v => [v[0] + depthVec[0], v[1] + depthVec[1], v[2] + depthVec[2]]);
-            shadingGeometry += generateRadBox(p_topVerts, fd, 'frame_mat', `frame_${winId}_top`, transformAndFormat);
-            // Frame Left
-            const leftVerts = quadVerts(orientation, frame_u0, frame_u0 + ft, frame_v0 + ft, frame_v1 - ft);
-            const p_leftVerts = leftVerts.map(v => [v[0] + depthVec[0], v[1] + depthVec[1], v[2] + depthVec[2]]);
-            shadingGeometry += generateRadBox(p_leftVerts, fd, 'frame_mat', `frame_${winId}_left`, transformAndFormat);
-            // Frame Right
-            const rightVerts = quadVerts(orientation, frame_u1 - ft, frame_u1, frame_v0 + ft, frame_v1 - ft);
-            const p_rightVerts = rightVerts.map(v => [v[0] + depthVec[0], v[1] + depthVec[1], v[2] + depthVec[2]]);
-            shadingGeometry += generateRadBox(p_rightVerts, fd, 'frame_mat', `frame_${winId}_right`, transformAndFormat);
-        }
-    }
-}
-
-// --- Generate Imported OBJ Shading ---
-// Find the Three.js objects for imported shading from the scene
-const { importedShadingObjects, furnitureObject, contextObject, vegetationObject } = await import('./geometry.js');
+    // --- Generate Imported OBJ Shading ---
+    // Find the Three.js objects for imported shading from the scene
+    const { importedShadingObjects, furnitureObject, contextObject, vegetationObject } = await import('./geometry.js');
     importedShadingObjects.forEach((objGroup, index) => {
-    // Traverse the group to find the actual mesh
+        // Traverse the group to find the actual mesh
         objGroup.traverse(child => {
             if (child.isMesh) {
                 shadingGeometry += _generateRadFromMesh(child, 'shading_mat', `imported_obj_${index}`, transformAndFormat);
@@ -703,177 +758,177 @@ const { importedShadingObjects, furnitureObject, contextObject, vegetationObject
         const shadeParams = allShading[orientation];
         if (!shadeParams) continue;
 
-    for (let i = 0; i < winCount; i++) {
-      const offset = startOffset + i * (ww + spacing);
-      const winId = `${orientation}_${i + 1}`;
+        for (let i = 0; i < winCount; i++) {
+            const offset = startOffset + i * (ww + spacing);
+            const winId = `${orientation}_${i + 1}`;
 
-      if (shadeParams.type === 'overhang' && shadeParams.overhang) {
-          const { depth, tilt, distAbove, extension, thick } = shadeParams.overhang;
-          if (thick > 0 && depth > 0) {
-              const hingeY = sh + wh + distAbove;
-              const hingeVerts = quadVerts(orientation, offset - extension, offset + ww + extension, hingeY, hingeY);
-              const p1_hinge = [hingeVerts[0][0], hingeVerts[0][1], hingeVerts[0][2]];
-              const p2_hinge = [hingeVerts[1][0], hingeVerts[1][1], hingeVerts[1][2]];
-              const tiltRad = THREE.MathUtils.degToRad(-tilt);
-              const dv = depth * Math.sin(tiltRad);
-              const dh = depth * Math.cos(tiltRad);
-              let p3_outer, p4_outer;
-              if (orientation === 'N')      { p3_outer = [p2_hinge[0], p2_hinge[1]-dh, p2_hinge[2] + dv]; p4_outer = [p1_hinge[0], p1_hinge[1]-dh, p1_hinge[2] + dv]; }
-              else if (orientation === 'S') { p3_outer = [p2_hinge[0], p2_hinge[1]+dh, p2_hinge[2] + dv]; p4_outer = [p1_hinge[0], p1_hinge[1]+dh, p1_hinge[2] + dv]; }
-              else if (orientation === 'W') { p3_outer = [p2_hinge[0]-dh, p2_hinge[1], p2_hinge[2] + dv]; p4_outer = [p1_hinge[0]-dh, p1_hinge[1], p1_hinge[2] + dv]; }
-              else                          { p3_outer = [p2_hinge[0]+dh, p2_hinge[1], p2_hinge[2] + dv]; p4_outer = [p1_hinge[0]+dh, p1_hinge[1], p1_hinge[2] + dv]; }
-              const topVerts = [p1_hinge, p2_hinge, p3_outer, p4_outer];
-              shadingGeometry += generateRadBox(topVerts, thick, 'shading_mat', `overhang_${winId}`, transformAndFormat);
-          }
-      } else if (shadeParams.type === 'lightshelf' && shadeParams.lightshelf) {
-          const { placeExt, placeInt, placeBoth, depthExt, depthInt, tiltExt, tiltInt, distBelowExt, distBelowInt, thickExt, thickInt } = shadeParams.lightshelf;
-          const createShelf = (isExt) => {
-              const depth = isExt ? depthExt : depthInt, thick = isExt ? thickExt : thickInt, tilt = isExt ? tiltExt : tiltInt, distBelow = isExt ? distBelowExt : distBelowInt;
-              if (depth <= 0 || thick <= 0) return;
-              const hingeY = sh + wh - distBelow;
-              const hingeVerts = quadVerts(orientation, offset, offset + ww, hingeY, hingeY);
-              const p1_hinge = [hingeVerts[0][0], hingeVerts[0][1], hingeVerts[0][2]];
-              const p2_hinge = [hingeVerts[1][0], hingeVerts[1][1], hingeVerts[1][2]];
-              const z_dir = isExt ? -1 : 1;
-              const tiltRad = THREE.MathUtils.degToRad(-tilt);
-              const dv = depth * Math.sin(tiltRad), dh = depth * Math.cos(tiltRad) * z_dir;
-              let p3_outer, p4_outer;
-              if (orientation === 'N')      { p3_outer = [p2_hinge[0], p2_hinge[1] + dh, p2_hinge[2] + dv]; p4_outer = [p1_hinge[0], p1_hinge[1] + dh, p1_hinge[2] + dv]; }
-              else if (orientation === 'S') { p3_outer = [p2_hinge[0], p2_hinge[1] - dh, p2_hinge[2] + dv]; p4_outer = [p1_hinge[0], p1_hinge[1] - dh, p1_hinge[2] + dv]; }
-              else if (orientation === 'W') { p3_outer = [p2_hinge[0] + dh, p2_hinge[1], p2_hinge[2] + dv]; p4_outer = [p1_hinge[0] + dh, p1_hinge[1], p1_hinge[2] + dv]; }
-              else                          { p3_outer = [p2_hinge[0] - dh, p2_hinge[1], p2_hinge[2] + dv]; p4_outer = [p1_hinge[0] - dh, p1_hinge[1], p1_hinge[2] + dv]; }
-              const topVerts = [p1_hinge, p2_hinge, p3_outer, p4_outer];
-              shadingGeometry += generateRadBox(topVerts, thick, 'shading_mat', `lightshelf_${isExt ? 'e' : 'i'}_${winId}`, transformAndFormat);
-        };
-          if (placeExt || placeBoth) createShelf(true);
-          if (placeInt || placeBoth) createShelf(false);
-      } else if (shadeParams.type === 'louver' && shadeParams.louver) {
-          const { isExterior, isHorizontal, slatWidth, slatSep, slatThick, slatAngle, distToGlass } = shadeParams.louver;
-          if (slatWidth <= 0 || slatSep <= 0 || slatThick <= 0) continue;
-          const inwardNormal = {'N': [0, 1, 0], 'S': [0, -1, 0], 'W': [1, 0, 0], 'E': [-1, 0, 0]}[orientation];
-          const zOffsetVec = inwardNormal.map(n => n * (isExterior ? -distToGlass : distToGlass));
-          if (isHorizontal) {
-              const numSlats = Math.floor(wh / slatSep);
-              for (let j = 0; j < numSlats; j++) {
-                  const slatY = sh + j * slatSep + slatSep / 2;
-                  const hingeVerts = quadVerts(orientation, offset, offset + ww, slatY, slatY);
-                  const p1_hinge = [hingeVerts[0][0], hingeVerts[0][1], hingeVerts[0][2]];
-                  const p2_hinge = [hingeVerts[1][0], hingeVerts[1][1], hingeVerts[1][2]];
-                  const center = p1_hinge.map((c, i) => (c + p2_hinge[i]) / 2 + zOffsetVec[i]);
-                  const angleRad = THREE.MathUtils.degToRad(-slatAngle);
-                  const dv = slatWidth / 2 * Math.sin(angleRad), dh = slatWidth / 2 * Math.cos(angleRad);
-                  let p_front1, p_front2, p_back1, p_back2;
-                  if (orientation === 'N' || orientation === 'S') {
-                      p_front1 = [center[0] - ww / 2, center[1] - dh, center[2] + dv];
-                      p_front2 = [center[0] + ww / 2, center[1] - dh, center[2] + dv];
-                      p_back1 = [center[0] - ww / 2, center[1] + dh, center[2] - dv];
-                      p_back2 = [center[0] + ww / 2, center[1] + dh, center[2] - dv];
-                  } else { // E or W
-                    p_front1 = [center[0] - dh, center[1] - ww / 2, center[2] + dv];
-                    p_front2 = [center[0] - dh, center[1] + ww / 2, center[2] + dv];
-                    p_back1 = [center[0] + dh, center[1] - ww / 2, center[2] - dv];
-                    p_back2 = [center[0] + dh, center[1] + ww / 2, center[2] - dv];
-                  }
-                  shadingGeometry += generateRadBox([p_back1, p_back2, p_front2, p_front1], slatThick, 'shading_mat', `louver_${winId}_${j}`, transformAndFormat);
-              }
-          } else { // Vertical
-                const numSlats = Math.floor(ww / slatSep);
-                for (let j = 0; j < numSlats; j++) {
-                    const slatU = offset + j * slatSep + slatSep / 2;
-                    const hingeVerts = quadVerts(orientation, slatU, slatU, sh, sh + wh);
+            if (shadeParams.type === 'overhang' && shadeParams.overhang) {
+                const { depth, tilt, distAbove, extension, thick } = shadeParams.overhang;
+                if (thick > 0 && depth > 0) {
+                    const hingeY = sh + wh + distAbove;
+                    const hingeVerts = quadVerts(orientation, offset - extension, offset + ww + extension, hingeY, hingeY);
                     const p1_hinge = [hingeVerts[0][0], hingeVerts[0][1], hingeVerts[0][2]];
-                    const p2_hinge = [hingeVerts[3][0], hingeVerts[3][1], hingeVerts[3][2]];
-                    const center = p1_hinge.map((c, i) => (c + p2_hinge[i]) / 2 + zOffsetVec[i]);
-                    const angleRad = THREE.MathUtils.degToRad(slatAngle);
-                    const p_front = new THREE.Vector3(), p_back = new THREE.Vector3();
-                    const dx = slatWidth / 2 * Math.cos(angleRad);
-                    const dy = slatWidth / 2 * Math.sin(angleRad);
-
-                  if (orientation === 'N' || orientation === 'S') {
-                      p_front.set(center[0] - dx, center[1] - dy, center[2]);
-                      p_back.set(center[0] + dx, center[1] + dy, center[2]);
-                    } else { // E or W
-                    p_front.set(center[0] - dy, center[1] + dx, center[2]);
-                    p_back.set(center[0] + dy, center[1] - dx, center[2]);
+                    const p2_hinge = [hingeVerts[1][0], hingeVerts[1][1], hingeVerts[1][2]];
+                    const tiltRad = THREE.MathUtils.degToRad(-tilt);
+                    const dv = depth * Math.sin(tiltRad);
+                    const dh = depth * Math.cos(tiltRad);
+                    let p3_outer, p4_outer;
+                    if (orientation === 'N') { p3_outer = [p2_hinge[0], p2_hinge[1] - dh, p2_hinge[2] + dv]; p4_outer = [p1_hinge[0], p1_hinge[1] - dh, p1_hinge[2] + dv]; }
+                    else if (orientation === 'S') { p3_outer = [p2_hinge[0], p2_hinge[1] + dh, p2_hinge[2] + dv]; p4_outer = [p1_hinge[0], p1_hinge[1] + dh, p1_hinge[2] + dv]; }
+                    else if (orientation === 'W') { p3_outer = [p2_hinge[0] - dh, p2_hinge[1], p2_hinge[2] + dv]; p4_outer = [p1_hinge[0] - dh, p1_hinge[1], p1_hinge[2] + dv]; }
+                    else { p3_outer = [p2_hinge[0] + dh, p2_hinge[1], p2_hinge[2] + dv]; p4_outer = [p1_hinge[0] + dh, p1_hinge[1], p1_hinge[2] + dv]; }
+                    const topVerts = [p1_hinge, p2_hinge, p3_outer, p4_outer];
+                    shadingGeometry += generateRadBox(topVerts, thick, 'shading_mat', `overhang_${winId}`, transformAndFormat);
                 }
-                const topVerts = [
-                    [p_back.x, p_back.y, center[2] - wh / 2],
-                      [p_back.x, p_back.y, center[2] + wh / 2],
-                      [p_front.x, p_front.y, center[2] + wh / 2],
-                      [p_front.x, p_front.y, center[2] - wh / 2]
-                  ];
-                  shadingGeometry += generateRadBox(topVerts, slatThick, 'shading_mat', `louver_${winId}_${j}`, transformAndFormat);
-              }
-          }
-      } else if (shadeParams.type === 'roller' && shadeParams.roller) {
-        const { visRefl, visTrans, solarRefl, solarTrans, topOpening, bottomOpening, leftOpening, rightOpening, distToGlass, thickness } = shadeParams.roller;
-        if (thickness <= 0) continue;
-        const matName = `roller_mat_${winId}`;
-        // A physically-based BRTDfunc is more accurate for diffuse shades than 'trans'.
-        // This assumes 0 specular reflection/transmission and uses the visible diffuse
-        // components for both reflection (Rdiff) and transmission (Tdiff).
-        dynamicMaterialDefs += `void BRTDfunc ${matName}\n0\n0\n12 0 0 0 0 0 0 ${visRefl} ${visRefl} ${visRefl} ${visTrans} ${visTrans} ${visTrans}\n\n`;
-        const rollerWidth = ww - leftOpening - rightOpening;
-        const rollerHeight = wh - topOpening - bottomOpening;
-        if (rollerWidth <= 0 || rollerHeight <= 0) continue;
-        const u0 = offset + leftOpening, u1 = u0 + rollerWidth, v0 = sh + bottomOpening, v1 = v0 + rollerHeight;
-        const innerVerts = quadVerts(orientation, u0, u1, v0, v1);
-        const inwardNormal = { 'N': [0, 1, 0], 'S': [0, -1, 0], 'W': [1, 0, 0], 'E': [-1, 0, 0] }[orientation];
-        const distVec = inwardNormal.map(n => n * distToGlass);
-        const p = innerVerts.map(v => [v[0] + distVec[0], v[1] + distVec[1], v[2] + distVec[2]]);
-        const thickVec = inwardNormal.map(n => n * thickness);
-        const q = p.map(v => [v[0] + thickVec[0], v[1] + thickVec[1], v[2] + thickVec[2]]);
-        shadingGeometry += `\n# Roller Shade: ${winId}\n`;
-        shadingGeometry += `${matName} polygon roller_${winId}_front\n0\n0\n12\n${[q[0], q[3], q[2], q[1]].map(v => transformAndFormat(v)).join('\n')}\n\n`;
-        shadingGeometry += `${matName} polygon roller_${winId}_back\n0\n0\n12\n${[p[0], p[1], p[2], p[3]].map(v => transformAndFormat(v)).join('\n')}\n\n`;
-        shadingGeometry += `${matName} polygon roller_${winId}_bottom\n0\n0\n12\n${[p[0], q[0], q[1], p[1]].map(v => transformAndFormat(v)).join('\n')}\n\n`;
-        shadingGeometry += `${matName} polygon roller_${winId}_right\n0\n0\n12\n${[p[1], q[1], q[2], p[2]].map(v => transformAndFormat(v)).join('\n')}\n\n`;
-        shadingGeometry += `${matName} polygon roller_${winId}_top\n0\n0\n12\n${[p[2], q[2], q[3], p[3]].map(v => transformAndFormat(v)).join('\n')}\n\n`;
-        shadingGeometry += `${matName} polygon roller_${winId}_left\n0\n0\n12\n${[p[3], q[3], q[0], p[0]].map(v => transformAndFormat(v)).join('\n')}\n\n`;
-      } else if (shadeParams.type === 'generative' && shadeParams.parameters) {
-          const patternType = shadeParams.patternType;
+            } else if (shadeParams.type === 'lightshelf' && shadeParams.lightshelf) {
+                const { placeExt, placeInt, placeBoth, depthExt, depthInt, tiltExt, tiltInt, distBelowExt, distBelowInt, thickExt, thickInt } = shadeParams.lightshelf;
+                const createShelf = (isExt) => {
+                    const depth = isExt ? depthExt : depthInt, thick = isExt ? thickExt : thickInt, tilt = isExt ? tiltExt : tiltInt, distBelow = isExt ? distBelowExt : distBelowInt;
+                    if (depth <= 0 || thick <= 0) return;
+                    const hingeY = sh + wh - distBelow;
+                    const hingeVerts = quadVerts(orientation, offset, offset + ww, hingeY, hingeY);
+                    const p1_hinge = [hingeVerts[0][0], hingeVerts[0][1], hingeVerts[0][2]];
+                    const p2_hinge = [hingeVerts[1][0], hingeVerts[1][1], hingeVerts[1][2]];
+                    const z_dir = isExt ? -1 : 1;
+                    const tiltRad = THREE.MathUtils.degToRad(-tilt);
+                    const dv = depth * Math.sin(tiltRad), dh = depth * Math.cos(tiltRad) * z_dir;
+                    let p3_outer, p4_outer;
+                    if (orientation === 'N') { p3_outer = [p2_hinge[0], p2_hinge[1] + dh, p2_hinge[2] + dv]; p4_outer = [p1_hinge[0], p1_hinge[1] + dh, p1_hinge[2] + dv]; }
+                    else if (orientation === 'S') { p3_outer = [p2_hinge[0], p2_hinge[1] - dh, p2_hinge[2] + dv]; p4_outer = [p1_hinge[0], p1_hinge[1] - dh, p1_hinge[2] + dv]; }
+                    else if (orientation === 'W') { p3_outer = [p2_hinge[0] + dh, p2_hinge[1], p2_hinge[2] + dv]; p4_outer = [p1_hinge[0] + dh, p1_hinge[1], p1_hinge[2] + dv]; }
+                    else { p3_outer = [p2_hinge[0] - dh, p2_hinge[1], p2_hinge[2] + dv]; p4_outer = [p1_hinge[0] - dh, p1_hinge[1], p1_hinge[2] + dv]; }
+                    const topVerts = [p1_hinge, p2_hinge, p3_outer, p4_outer];
+                    shadingGeometry += generateRadBox(topVerts, thick, 'shading_mat', `lightshelf_${isExt ? 'e' : 'i'}_${winId}`, transformAndFormat);
+                };
+                if (placeExt || placeBoth) createShelf(true);
+                if (placeInt || placeBoth) createShelf(false);
+            } else if (shadeParams.type === 'louver' && shadeParams.louver) {
+                const { isExterior, isHorizontal, slatWidth, slatSep, slatThick, slatAngle, distToGlass } = shadeParams.louver;
+                if (slatWidth <= 0 || slatSep <= 0 || slatThick <= 0) continue;
+                const inwardNormal = { 'N': [0, 1, 0], 'S': [0, -1, 0], 'W': [1, 0, 0], 'E': [-1, 0, 0] }[orientation];
+                const zOffsetVec = inwardNormal.map(n => n * (isExterior ? -distToGlass : distToGlass));
+                if (isHorizontal) {
+                    const numSlats = Math.floor(wh / slatSep);
+                    for (let j = 0; j < numSlats; j++) {
+                        const slatY = sh + j * slatSep + slatSep / 2;
+                        const hingeVerts = quadVerts(orientation, offset, offset + ww, slatY, slatY);
+                        const p1_hinge = [hingeVerts[0][0], hingeVerts[0][1], hingeVerts[0][2]];
+                        const p2_hinge = [hingeVerts[1][0], hingeVerts[1][1], hingeVerts[1][2]];
+                        const center = p1_hinge.map((c, i) => (c + p2_hinge[i]) / 2 + zOffsetVec[i]);
+                        const angleRad = THREE.MathUtils.degToRad(-slatAngle);
+                        const dv = slatWidth / 2 * Math.sin(angleRad), dh = slatWidth / 2 * Math.cos(angleRad);
+                        let p_front1, p_front2, p_back1, p_back2;
+                        if (orientation === 'N' || orientation === 'S') {
+                            p_front1 = [center[0] - ww / 2, center[1] - dh, center[2] + dv];
+                            p_front2 = [center[0] + ww / 2, center[1] - dh, center[2] + dv];
+                            p_back1 = [center[0] - ww / 2, center[1] + dh, center[2] - dv];
+                            p_back2 = [center[0] + ww / 2, center[1] + dh, center[2] - dv];
+                        } else { // E or W
+                            p_front1 = [center[0] - dh, center[1] - ww / 2, center[2] + dv];
+                            p_front2 = [center[0] - dh, center[1] + ww / 2, center[2] + dv];
+                            p_back1 = [center[0] + dh, center[1] - ww / 2, center[2] - dv];
+                            p_back2 = [center[0] + dh, center[1] + ww / 2, center[2] - dv];
+                        }
+                        shadingGeometry += generateRadBox([p_back1, p_back2, p_front2, p_front1], slatThick, 'shading_mat', `louver_${winId}_${j}`, transformAndFormat);
+                    }
+                } else { // Vertical
+                    const numSlats = Math.floor(ww / slatSep);
+                    for (let j = 0; j < numSlats; j++) {
+                        const slatU = offset + j * slatSep + slatSep / 2;
+                        const hingeVerts = quadVerts(orientation, slatU, slatU, sh, sh + wh);
+                        const p1_hinge = [hingeVerts[0][0], hingeVerts[0][1], hingeVerts[0][2]];
+                        const p2_hinge = [hingeVerts[3][0], hingeVerts[3][1], hingeVerts[3][2]];
+                        const center = p1_hinge.map((c, i) => (c + p2_hinge[i]) / 2 + zOffsetVec[i]);
+                        const angleRad = THREE.MathUtils.degToRad(slatAngle);
+                        const p_front = new THREE.Vector3(), p_back = new THREE.Vector3();
+                        const dx = slatWidth / 2 * Math.cos(angleRad);
+                        const dy = slatWidth / 2 * Math.sin(angleRad);
 
-          // Strategy 1: Simple patterns - generate Radiance primitives directly for efficiency
-          if (['vertical_fins', 'horizontal_fins', 'grid'].includes(patternType)) {
-              shadingGeometry += generateSimpleGenerativePattern(
-                  patternType,
-                  shadeParams.parameters,
-                  winParams,
-                  orientation,
-                  i, // window index
-                  transformAndFormat
-              );
-          }
-          // Strategy 2: Complex patterns - convert the THREE.js mesh to Radiance polygons
-          else {
-              const deviceGroup = getGenerativeDeviceFromScene(orientation, i);
-              if (deviceGroup) {
-                  deviceGroup.traverse(mesh => {
-                      if (mesh.isMesh) {
-                          shadingGeometry += _generateRadFromMesh(
-                              mesh,
-                              'shading_mat', // Use the standard shading material
-                              `generative_${patternType}_${winId}`,
-                              transformAndFormat
-                          );
-                      }
-                  });
-              }
-          }
-      }
+                        if (orientation === 'N' || orientation === 'S') {
+                            p_front.set(center[0] - dx, center[1] - dy, center[2]);
+                            p_back.set(center[0] + dx, center[1] + dy, center[2]);
+                        } else { // E or W
+                            p_front.set(center[0] - dy, center[1] + dx, center[2]);
+                            p_back.set(center[0] + dy, center[1] - dx, center[2]);
+                        }
+                        const topVerts = [
+                            [p_back.x, p_back.y, center[2] - wh / 2],
+                            [p_back.x, p_back.y, center[2] + wh / 2],
+                            [p_front.x, p_front.y, center[2] + wh / 2],
+                            [p_front.x, p_front.y, center[2] - wh / 2]
+                        ];
+                        shadingGeometry += generateRadBox(topVerts, slatThick, 'shading_mat', `louver_${winId}_${j}`, transformAndFormat);
+                    }
+                }
+            } else if (shadeParams.type === 'roller' && shadeParams.roller) {
+                const { visRefl, visTrans, solarRefl, solarTrans, topOpening, bottomOpening, leftOpening, rightOpening, distToGlass, thickness } = shadeParams.roller;
+                if (thickness <= 0) continue;
+                const matName = `roller_mat_${winId}`;
+                // A physically-based BRTDfunc is more accurate for diffuse shades than 'trans'.
+                // This assumes 0 specular reflection/transmission and uses the visible diffuse
+                // components for both reflection (Rdiff) and transmission (Tdiff).
+                dynamicMaterialDefs += `void BRTDfunc ${matName}\n0\n0\n12 0 0 0 0 0 0 ${visRefl} ${visRefl} ${visRefl} ${visTrans} ${visTrans} ${visTrans}\n\n`;
+                const rollerWidth = ww - leftOpening - rightOpening;
+                const rollerHeight = wh - topOpening - bottomOpening;
+                if (rollerWidth <= 0 || rollerHeight <= 0) continue;
+                const u0 = offset + leftOpening, u1 = u0 + rollerWidth, v0 = sh + bottomOpening, v1 = v0 + rollerHeight;
+                const innerVerts = quadVerts(orientation, u0, u1, v0, v1);
+                const inwardNormal = { 'N': [0, 1, 0], 'S': [0, -1, 0], 'W': [1, 0, 0], 'E': [-1, 0, 0] }[orientation];
+                const distVec = inwardNormal.map(n => n * distToGlass);
+                const p = innerVerts.map(v => [v[0] + distVec[0], v[1] + distVec[1], v[2] + distVec[2]]);
+                const thickVec = inwardNormal.map(n => n * thickness);
+                const q = p.map(v => [v[0] + thickVec[0], v[1] + thickVec[1], v[2] + thickVec[2]]);
+                shadingGeometry += `\n# Roller Shade: ${winId}\n`;
+                shadingGeometry += `${matName} polygon roller_${winId}_front\n0\n0\n12\n${[q[0], q[3], q[2], q[1]].map(v => transformAndFormat(v)).join('\n')}\n\n`;
+                shadingGeometry += `${matName} polygon roller_${winId}_back\n0\n0\n12\n${[p[0], p[1], p[2], p[3]].map(v => transformAndFormat(v)).join('\n')}\n\n`;
+                shadingGeometry += `${matName} polygon roller_${winId}_bottom\n0\n0\n12\n${[p[0], q[0], q[1], p[1]].map(v => transformAndFormat(v)).join('\n')}\n\n`;
+                shadingGeometry += `${matName} polygon roller_${winId}_right\n0\n0\n12\n${[p[1], q[1], q[2], p[2]].map(v => transformAndFormat(v)).join('\n')}\n\n`;
+                shadingGeometry += `${matName} polygon roller_${winId}_top\n0\n0\n12\n${[p[2], q[2], q[3], p[3]].map(v => transformAndFormat(v)).join('\n')}\n\n`;
+                shadingGeometry += `${matName} polygon roller_${winId}_left\n0\n0\n12\n${[p[3], q[3], q[0], p[0]].map(v => transformAndFormat(v)).join('\n')}\n\n`;
+            } else if (shadeParams.type === 'generative' && shadeParams.parameters) {
+                const patternType = shadeParams.patternType;
+
+                // Strategy 1: Simple patterns - generate Radiance primitives directly for efficiency
+                if (['vertical_fins', 'horizontal_fins', 'grid'].includes(patternType)) {
+                    shadingGeometry += generateSimpleGenerativePattern(
+                        patternType,
+                        shadeParams.parameters,
+                        winParams,
+                        orientation,
+                        i, // window index
+                        transformAndFormat
+                    );
+                }
+                // Strategy 2: Complex patterns - convert the THREE.js mesh to Radiance polygons
+                else {
+                    const deviceGroup = getGenerativeDeviceFromScene(orientation, i);
+                    if (deviceGroup) {
+                        deviceGroup.traverse(mesh => {
+                            if (mesh.isMesh) {
+                                shadingGeometry += _generateRadFromMesh(
+                                    mesh,
+                                    'shading_mat', // Use the standard shading material
+                                    `generative_${patternType}_${winId}`,
+                                    transformAndFormat
+                                );
+                            }
+                        });
+                    }
+                }
+            }
+        }
     }
-  }
 
-  let contextGeometry = '\n# --- CONTEXT & SITE ---\n';
-  if (contextObject.visible && contextObject.children.length > 0) {
-      contextObject.children.forEach((mesh, index) => {
-         // Context geometry is already in world coordinates, so we use a direct transform
-          const directTransform = (p) => `${p[0].toFixed(4)} ${p[2].toFixed(4)} ${p[1].toFixed(4)}`;
-          contextGeometry += _generateRadFromMesh(mesh, 'context_mat', `context_building_${index}`, directTransform);
-      });
-  }
+    let contextGeometry = '\n# --- CONTEXT & SITE ---\n';
+    if (contextObject.visible && contextObject.children.length > 0) {
+        contextObject.children.forEach((mesh, index) => {
+            // Context geometry is already in world coordinates, so we use a direct transform
+            const directTransform = (p) => `${p[0].toFixed(4)} ${p[2].toFixed(4)} ${p[1].toFixed(4)}`;
+            contextGeometry += _generateRadFromMesh(mesh, 'context_mat', `context_building_${index}`, directTransform);
+        });
+    }
 
-  // Add ground plane geometry (flat or topographic)
+    // Add ground plane geometry (flat or topographic)
     const { groundObject } = await import('./geometry.js');
     if (groundObject.visible && groundObject.children.length > 0) {
         groundObject.children.forEach((mesh) => {
@@ -884,93 +939,272 @@ const { importedShadingObjects, furnitureObject, contextObject, vegetationObject
         });
     }
 
-  let clippingGeometry = '';
-  if (clippingPlanes) {
-      clippingGeometry = "\n# --- CLIPPING PLANES ---\n";
-      const S = 1000; // A very large number for the plane size
-      let clipMatDefined = false;
+    let clippingGeometry = '';
+    if (clippingPlanes) {
+        clippingGeometry = "\n# --- CLIPPING PLANES ---\n";
+        const S = 1000; // A very large number for the plane size
+        let clipMatDefined = false;
 
-      // Radiance is Z-up. Our scene is Y-up.
-      // A horizontal cut in our scene at a Y value is a cut at a Z value in Radiance.
-      if (clippingPlanes.horizontal !== null) {
-          clippingGeometry += `void glow clip_mat 0 0 4 0 0 0 0\n\n`;
-          clipMatDefined = true;
-          const zCut = clippingPlanes.horizontal;
-          // A large plane cutting everything above it. Normal points down.
-          const pts = [ [-S, S, zCut], [S, S, zCut], [S, -S, zCut], [-S, -S, zCut] ];
-          clippingGeometry += `clip_mat polygon h_clip_plane\n0\n0\n12\n${pts.map(p => p.join(' ')).join('\n')}\n\n`;
-      }
+        // Radiance is Z-up. Our scene is Y-up.
+        // A horizontal cut in our scene at a Y value is a cut at a Z value in Radiance.
+        if (clippingPlanes.horizontal !== null) {
+            clippingGeometry += `void glow clip_mat 0 0 4 0 0 0 0\n\n`;
+            clipMatDefined = true;
+            const zCut = clippingPlanes.horizontal;
+            // A large plane cutting everything above it. Normal points down.
+            const pts = [[-S, S, zCut], [S, S, zCut], [S, -S, zCut], [-S, -S, zCut]];
+            clippingGeometry += `clip_mat polygon h_clip_plane\n0\n0\n12\n${pts.map(p => p.join(' ')).join('\n')}\n\n`;
+        }
 
-      // A vertical cut in our scene at an X value (from corner) is a cut at an X value in Radiance (from center).
-      if (clippingPlanes.vertical !== null) {
-           if (!clipMatDefined) {
-              clippingGeometry += `void glow clip_mat 0 0 4 0 0 0 0\n\n`;
-           }
-           // Convert UI's corner-relative distance to Radiance's center-relative coordinate
-           const xCut = clippingPlanes.vertical - (W / 2);
-           // A large plane cutting everything to one side. Normal points towards origin.
-           const pts = [ [xCut, S, -S], [xCut, -S, -S], [xCut, -S, S], [xCut, S, S] ];
-           clippingGeometry += `clip_mat polygon v_clip_plane\n0\n0\n12\n${pts.map(p => p.join(' ')).join('\n')}\n\n`;
-      }
-  }
+        // A vertical cut in our scene at an X value (from corner) is a cut at an X value in Radiance (from center).
+        if (clippingPlanes.vertical !== null) {
+            if (!clipMatDefined) {
+                clippingGeometry += `void glow clip_mat 0 0 4 0 0 0 0\n\n`;
+            }
+            // Convert UI's corner-relative distance to Radiance's center-relative coordinate
+            const xCut = clippingPlanes.vertical - (W / 2);
+            // A large plane cutting everything to one side. Normal points towards origin.
+            const pts = [[xCut, S, -S], [xCut, -S, -S], [xCut, -S, S], [xCut, S, S]];
+            clippingGeometry += `clip_mat polygon v_clip_plane\n0\n0\n12\n${pts.map(p => p.join(' ')).join('\n')}\n\n`;
+        }
+    }
 
-  return {
-      materials: matHeader + radMaterials + dynamicMaterialDefs,
-      geometry: geoHeader + radGeometry + shadingGeometry + furnitureGeometry + vegetationGeometry + contextGeometry + clippingGeometry
-  };
+    return {
+        materials: matHeader + radMaterials + dynamicMaterialDefs,
+        geometry: geoHeader + radGeometry + shadingGeometry + furnitureGeometry + vegetationGeometry + contextGeometry + clippingGeometry
+    };
+}
+
+/**
+ * Generates grid points within a polygon at a specific height.
+ * @param {Array<{x: number, z: number}>} polygonPoints - Array of 2D points defining the polygon (x, z).
+ * @param {number} spacing - Grid spacing.
+ * @param {number} yLevel - The Y height for the points.
+ * @param {number} offset - Offset from the polygon edge (negative for inward offset).
+ * @returns {Array<{x: number, y: number, z: number}>} Array of valid 3D points.
+ */
+export function generatePolygonGridPoints(polygonPoints, spacing, yLevel, offset = 0) {
+    if (!polygonPoints || polygonPoints.length < 3) return [];
+
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    polygonPoints.forEach(p => {
+        minX = Math.min(minX, p.x);
+        maxX = Math.max(maxX, p.x);
+        minZ = Math.min(minZ, p.z);
+        maxZ = Math.max(maxZ, p.z);
+    });
+
+    // Apply offset to bounding box optimization
+    const startX = minX + offset;
+    const endX = maxX - offset;
+    const startZ = minZ + offset;
+    const endZ = maxZ - offset;
+
+    if (startX >= endX || startZ >= endZ) return [];
+
+    const points = [];
+
+    // Helper for Point-in-Polygon (Ray Casting)
+    const isPointInPolygon = (x, z) => {
+        let inside = false;
+        for (let i = 0, j = polygonPoints.length - 1; i < polygonPoints.length; j = i++) {
+            const xi = polygonPoints[i].x, zi = polygonPoints[i].z;
+            const xj = polygonPoints[j].x, zj = polygonPoints[j].z;
+
+            const intersect = ((zi > z) !== (zj > z)) &&
+                (x < (xj - xi) * (z - zi) / (zj - zi) + xi);
+            if (intersect) inside = !inside;
+        }
+        return inside;
+    };
+
+    // Helper for Distance to Polygon Edge (for accurate offsetting)
+    const distToPolygonEdge = (x, z) => {
+        let minDist = Infinity;
+        for (let i = 0, j = polygonPoints.length - 1; i < polygonPoints.length; j = i++) {
+            const p1 = polygonPoints[i];
+            const p2 = polygonPoints[j];
+
+            let l2 = (p1.x - p2.x) ** 2 + (p1.z - p2.z) ** 2;
+            if (l2 === 0) {
+                minDist = Math.min(minDist, Math.sqrt((x - p1.x) ** 2 + (z - p1.z) ** 2));
+                continue;
+            }
+
+            let t = ((x - p1.x) * (p2.x - p1.x) + (z - p1.z) * (p2.z - p1.z)) / l2;
+            t = Math.max(0, Math.min(1, t));
+
+            const px = p1.x + t * (p2.x - p1.x);
+            const pz = p1.z + t * (p2.z - p1.z);
+
+            const dist = Math.sqrt((x - px) ** 2 + (z - pz) ** 2);
+            minDist = Math.min(minDist, dist);
+        }
+        return minDist;
+    };
+
+    const numX = Math.floor((endX - startX) / spacing);
+    const numZ = Math.floor((endZ - startZ) / spacing);
+
+    // Center the grid within the valid bounding box
+    const totalLenX = numX * spacing;
+    const totalLenZ = numZ * spacing;
+    const x0 = startX + (endX - startX - totalLenX) / 2;
+    const z0 = startZ + (endZ - startZ - totalLenZ) / 2;
+
+    for (let i = 0; i <= numX; i++) {
+        for (let j = 0; j <= numZ; j++) {
+            const px = x0 + i * spacing;
+            const pz = z0 + j * spacing;
+
+            if (isPointInPolygon(px, pz)) {
+                // If we have a significant offset, strictly check distance to edge
+                // Simple Point-in-Polygon is strictly "inside/outside".
+                // Bounding box offset handles coarse offset.
+                // For precise buffering, we check distance.
+                if (offset > 0) {
+                    if (distToPolygonEdge(px, pz) >= offset) {
+                        points.push({ x: px, y: yLevel, z: pz });
+                    }
+                } else {
+                    points.push({ x: px, y: yLevel, z: pz });
+                }
+            }
+        }
+    }
+    return points;
 }
 
 export async function generateRayFileContent() {
     const { getDom, getSensorGridParams } = await import('./ui.js');
+    const { project } = await import('./project.js'); // Access project data
     const dom = getDom();
     const gridParams = getSensorGridParams();
     if (!gridParams?.view?.enabled) {
         return "# View grid is not enabled. No rays generated.";
     }
 
-    const W = parseFloat(dom.width.value);
-    const L = parseFloat(dom.length.value);
-    const alphaRad = THREE.MathUtils.degToRad(parseFloat(dom['room-orientation'].value));
-    const cosA = Math.cos(alphaRad);
-    const sinA = Math.sin(alphaRad);
-
     const { spacing, offset, numDirs, startVec } = gridParams.view;
-    
-    const generateCenteredPoints = (totalLength, spacing) => {
-        if (spacing <= 0 || totalLength <= 0) return [];
-        const numPoints = Math.floor(totalLength / spacing);
-        if (numPoints === 0) return [totalLength / 2];
-        const totalGridLength = (numPoints - 1) * spacing;
-        const start = (totalLength - totalGridLength) / 2;
-        return Array.from({ length: numPoints }, (_, i) => start + i * spacing);
-    };
-
-    const pointsX = generateCenteredPoints(W, spacing);
-    const pointsZ = generateCenteredPoints(L, spacing);
-    const rays = [];
-
     const startVector = new THREE.Vector3().fromArray(startVec).normalize();
     const upVector = new THREE.Vector3(0, 1, 0);
+    const rays = [];
 
-    for (const x of pointsX) {
-        for (const z of pointsZ) {
-            const localOrigin = new THREE.Vector3(x, offset, z);
+    // Check for Custom Geometry
+    const projectData = await project.gatherAllProjectData(); // This might be heavy, but needed for points
+    const customGeom = projectData.geometry.customGeometry;
+    const isCustom = projectData.geometry.mode === 'custom' || (customGeom && customGeom.points && customGeom.points.length > 2);
 
-            const p = { x: localOrigin.x - W / 2, y: localOrigin.z - L / 2, z: localOrigin.y };
-            const originRx = p.x * cosA - p.y * sinA;
-            const originRy = p.x * sinA + p.y * cosA;
-            const originString = `${originRx.toFixed(4)} ${originRy.toFixed(4)} ${p.z.toFixed(4)}`;
+    if (isCustom) {
+        // Custom Geometry Mode: Use polygon points
+        const polygonPoints = customGeom.points; // Array of {x, z} (or x, y from 2D context)
+        // Note: customGeom.points usually comes from drawing tool which is 2D {x, z} (or x, y -> mapped to x,z in 3D). 
+        // Let's verify structure. customGeometryManager uses {x, z}.
+
+        // Generate points at height = offset
+        const validPoints = generatePolygonGridPoints(polygonPoints, spacing, offset, 0); // View grid usually offset from floor
+
+        const alphaRad = THREE.MathUtils.degToRad(parseFloat(dom['room-orientation'].value));
+        const cosA = Math.cos(alphaRad);
+        const sinA = Math.sin(alphaRad);
+
+        // Room dimensions for transform (Coordinate System Origin)
+        // In Custom Mode, W and L might be arbitrary or bounding box.
+        // transformThreePointToRadianceArray centers based on W/L.
+        // We must be consistent with how geometry is exported.
+        // In radiance.js -> generateRadFileContent -> it uses W, L from DOM even for custom geometry?
+        // No, generateRadFileContent for 'optimizedGeometry' or 'imported' uses direct transform or centers?
+        // Let's check generateRadFileContent behavior for Optimized/Custom.
+        // It seems for Optimized, it calls THREE transform?
+        // Optimized geometry traversal:
+        // `threeToRadTransform` = p => p[0], p[2], p[1] (Y-up to Z-up reordering only).
+        // It DOES NOT apply room rotation or centering if it's "Optimized Geometry"?
+        // Wait, the "Optimized Geometry" block (lines 483-484) defines:
+        // `const threeToRadTransform = (p) => `${p[0].toFixed(4)} ${p[2].toFixed(4)} ${p[1].toFixed(4)}`;`
+        // It implies Optimized Geometry is ALREADY transformed or we trust its World Coords?
+        // Actually, `transformThreePointToRadianceArray` rotates and centers.
+        // Ideally, custom geometry is already centered in the scene?
+        // If `customGeometryManager` creates points, it centers them or uses raw coords?
+        // `createCustomRoom` uses raw points.
+
+        // If Ray Generation uses `transformThreePointToRadianceArray` (which rotates/centers),
+        // we assume the Custom Geometry is ALSO going to be rotated/centered by Radiance via `!xform`?
+        // OR, does `generateRadFileContent` manually rot/trans every vertex?
+        // For 'parametric', it uses `transformAndFormatPoint`.
+        // For 'optimized', it uses `threeToRadTransform` (NO centering/rotation??).
+
+        // CRITICAL: `generateRadFileContent` for optimized geometry (which custom becomes)
+        // DOES NOT apply `transformAndFormatPoint`. It applies direct XYZ swap.
+        // This means Custom Geometry is exported "As Is" in World Space.
+
+        // Therefore, Ray Tracing points must ALSO be in World Space (Three.js space),
+        // and then simply swapped Y-Z for Radiance.
+        // We should NOT use `transformThreePointToRadianceArray` if the geometry isn't using it.
+
+        // Let's stick to this assumption: Custom Geometry = Direct Export.
+        // So Rays should be Direct Export too.
+
+        for (const pt of validPoints) {
+            // pt is {x, y, z} in Three.js coords.
+            // But generatePolygonGridPoints returned y=yLevel.
+            // View grid: Offset is usually 'height from floor'.
+            // So y = offset.
+
+            // Radiance Point (Z-up): x -> x, y -> z, z -> y
+            const originString = `${pt.x.toFixed(4)} ${pt.z.toFixed(4)} ${pt.y.toFixed(4)}`;
 
             for (let k = 0; k < numDirs; k++) {
                 const angle = (k / numDirs) * 2 * Math.PI;
+                // Direction in Three.js (Y-up)
+                // StartVec is relative to Y-up?
                 const localDir = startVector.clone().applyAxisAngle(upVector, angle);
 
-                const v = { x: localDir.x, y: localDir.z, z: localDir.y };
-                const dirRx = v.x * cosA - v.y * sinA;
-                const dirRy = v.x * sinA + v.y * cosA;
-                const dirString = `${dirRx.toFixed(4)} ${dirRy.toFixed(4)} ${v.z.toFixed(4)}`;
-                
+                // Radiance Vector: x->x, y->z, z->y
+                const dirString = `${localDir.x.toFixed(4)} ${localDir.z.toFixed(4)} ${localDir.y.toFixed(4)}`;
+
                 rays.push(`${originString} ${dirString}`);
+            }
+        }
+
+    } else {
+        // Parametric Mode (Original Logic)
+        const W = parseFloat(dom.width.value);
+        const L = parseFloat(dom.length.value);
+        const alphaRad = THREE.MathUtils.degToRad(parseFloat(dom['room-orientation'].value));
+        const cosA = Math.cos(alphaRad);
+        const sinA = Math.sin(alphaRad);
+
+        const generateCenteredPoints = (totalLength, spacing) => {
+            if (spacing <= 0 || totalLength <= 0) return [];
+            const numPoints = Math.floor(totalLength / spacing);
+            if (numPoints === 0) return [totalLength / 2];
+            const totalGridLength = (numPoints - 1) * spacing;
+            const start = (totalLength - totalGridLength) / 2;
+            return Array.from({ length: numPoints }, (_, i) => start + i * spacing);
+        };
+
+        const pointsX = generateCenteredPoints(W, spacing);
+        const pointsZ = generateCenteredPoints(L, spacing);
+
+        for (const x of pointsX) {
+            for (const z of pointsZ) {
+                const localOrigin = new THREE.Vector3(x, offset, z);
+
+                const p = { x: localOrigin.x - W / 2, y: localOrigin.z - L / 2, z: localOrigin.y };
+                const originRx = p.x * cosA - p.y * sinA;
+                const originRy = p.x * sinA + p.y * cosA;
+                const originString = `${originRx.toFixed(4)} ${originRy.toFixed(4)} ${p.z.toFixed(4)}`;
+
+                for (let k = 0; k < numDirs; k++) {
+                    const angle = (k / numDirs) * 2 * Math.PI;
+                    const localDir = startVector.clone().applyAxisAngle(upVector, angle);
+
+                    const v = { x: localDir.x, y: localDir.z, z: localDir.y };
+                    const dirRx = v.x * cosA - v.y * sinA;
+                    const dirRy = v.x * sinA + v.y * cosA;
+                    const dirString = `${dirRx.toFixed(4)} ${dirRy.toFixed(4)} ${v.z.toFixed(4)}`;
+
+                    rays.push(`${originString} ${dirString}`);
+                }
             }
         }
     }
@@ -978,7 +1212,7 @@ export async function generateRayFileContent() {
     if (rays.length === 0) {
         return "# No view grid points generated.";
     }
-    
+
     return "# Radiance Rays (X Y Z Vx Vy Vz)\n" + rays.join('\n');
 }
 
@@ -1046,8 +1280,8 @@ function _generateRadFromMesh(mesh, material, name, transformFunc, targetMateria
                     const vA = vertices[index.getX(i)];
                     const vB = vertices[index.getX(i + 1)];
                     const vC = vertices[index.getX(i + 2)];
-                    
-                    radString += `${radMaterialName} polygon ${name}_g${groupIndex}_f${i/3}\n0\n0\n9\n`;
+
+                    radString += `${radMaterialName} polygon ${name}_g${groupIndex}_f${i / 3}\n0\n0\n9\n`;
                     radString += transformFunc(vA) + '\n';
                     radString += transformFunc(vB) + '\n';
                     radString += transformFunc(vC) + '\n\n';
@@ -1059,20 +1293,20 @@ function _generateRadFromMesh(mesh, material, name, transformFunc, targetMateria
             const vA = vertices[index.getX(i)];
             const vB = vertices[index.getX(i + 1)];
             const vC = vertices[index.getX(i + 2)];
-            radString += `${material} polygon ${name}_face_${i/3}\n0\n0\n9\n`;
+            radString += `${material} polygon ${name}_face_${i / 3}\n0\n0\n9\n`;
             radString += transformFunc(vA) + '\n';
             radString += transformFunc(vB) + '\n';
             radString += transformFunc(vC) + '\n\n';
         }
     } else { // Single material, non-indexed
         for (let i = 0; i < vertices.length; i += 3) {
-             const vA = vertices[i];
-             const vB = vertices[i + 1];
-             const vC = vertices[i + 2];
-             radString += `${material} polygon ${name}_face_${i/3}\n0\n0\n9\n`;
-             radString += transformFunc(vA) + '\n';
-             radString += transformFunc(vB) + '\n';
-             radString += transformFunc(vC) + '\n\n';
+            const vA = vertices[i];
+            const vB = vertices[i + 1];
+            const vC = vertices[i + 2];
+            radString += `${material} polygon ${name}_face_${i / 3}\n0\n0\n9\n`;
+            radString += transformFunc(vA) + '\n';
+            radString += transformFunc(vB) + '\n';
+            radString += transformFunc(vC) + '\n\n';
         }
     }
     return radString;

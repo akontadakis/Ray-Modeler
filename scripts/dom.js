@@ -12,7 +12,11 @@ export function setupDOM() {
         // Global
         'theme-btn-light', 'theme-btn-dark', 'theme-btn-cyber', 'theme-btn-cafe58', 'theme-switcher-container',
         'render-container', 'sidebar-wrapper', 'right-sidebar',
-        'welcome-screen', 'glow-canvas', 'start-with-shoebox', 'start-with-import', 'welcome-effect-switcher', 'cycle-effect-btn',
+        'welcome-screen', 'glow-canvas', 'start-with-shoebox', 'start-with-import', 'start-with-draw', 'welcome-effect-switcher', 'cycle-effect-btn',
+        'draw-height-modal', 'draw-height-input', 'draw-height-confirm-btn', 'template-custom-wall-controls', 'drawing-input-tooltip',
+        'draw-setup-modal', 'draw-floor-plan-input', 'draw-floor-plan-name', 'draw-floor-plan-width',
+        'draw-floor-plan-scale-section', 'draw-floor-plan-preview-img', 'draw-setup-skip', 'draw-setup-confirm',
+
 
         // Main Panels & Toggles
         'panel-energyplus', 'panel-simulation-modules', 'globals-toggle', 'globals-controls', 'panel-analysis-modules', 'toggle-modules-btn', 'toggle-analysis-btn',

@@ -78,6 +78,11 @@ Ray Modeler is packed with features that automate and enhance the Radiance workf
 
 - **Interior Furniture Library**: Place simple furniture and partition objects from a pre-built library via drag-and-drop or import custom `.obj` assets..
 
+- **Enhanced Drawing Tools**:
+  - **Floor Plan Overlay**: Import a floor plan image (JPG/PNG) to use as a tracing guide with adjustable scale.
+  - **Interior Partitions**: Draw internal partitions to subdivide spaces with intuitive wall thickening and real-time dimension rulers.
+  - **Precision Controls**: Numeric input for exact lengths and snapping toggles for accuracy.
+
 - **Radiance Material Editor**: Configure standard Radiance materials (`plastic`, `metal`, `glass`) by adjusting properties like reflectance, specularity, and roughness. It also supports spectral data (`.dat`) files for advanced material definitions.
 
 - **Advanced Glazing Systems**: Model glazing using simple transmittance values or incorporate complex fenestration data via Bidirectional Scattering Distribution Function (BSDF) `.xml` files. The application converts intuitive transmittance to physically-based transmissivity for simulations.
@@ -101,6 +106,8 @@ Ray Modeler is packed with features that automate and enhance the Radiance workf
 - **Advanced Annual Analysis**: Generate and view temporal heatmaps, glare rose diagrams, and combined daylight/glare scatter plots to deeply understand annual performance.
 
 - **Recipe-Based Simulation Engine**: Automate complex Radiance workflows with pre-configured "recipes." The application generates all necessary geometry files, material definitions, and executable run scripts (`.sh`, `.bat`) in a standardized project folder. Includes recipes for `IES LM-83 (sDA/ASE)`, `EN 17037`, and `EN 12464-1`.
+
+- **Geometry Optimization**: Automatic geometry cleanup process that removes overlapping surfaces and optimizes the model structure for efficient and error-free Radiance simulations.
 
 - **Advanced Annual Methods**: Support for industry-standard annual simulation methods, including 3-Phase and 5-Phase Daylight Analysis.
 

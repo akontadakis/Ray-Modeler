@@ -220,7 +220,11 @@ class Project {
                     elevation: getValue('elevation', parseFloat),
                     'room-orientation': getValue('room-orientation', parseFloat),
                 },
-                mode: dom['mode-import-btn']?.classList.contains('active') ? 'imported' : 'parametric',
+                mode: await (async () => {
+                    const { isCustomGeometry } = await import('./geometry.js');
+                    if (isCustomGeometry) return 'custom';
+                    return dom['mode-import-btn']?.classList.contains('active') ? 'imported' : 'parametric';
+                })(),
                 apertures: getAllWindowParams(),
                 shading: getAllShadingParams(),
                 frames: {
@@ -277,6 +281,50 @@ class Project {
                         }
                     });
                     return massingData;
+                })(),
+                customGeometry: (async () => {
+                    const { isCustomGeometry, wallSelectionGroup } = await import('./geometry.js');
+                    if (!isCustomGeometry) return null;
+
+                    const { getCustomWallData } = await import('./customApertureManager.js');
+                    const wallContainer = wallSelectionGroup.children[0];
+                    if (!wallContainer) return null;
+
+                    // Reconstruct points from wall data
+                    // We stored p1, p2 in userData
+                    const points = [];
+                    // We only need p1 from each wall, plus p2 of the last wall?
+                    // Or just all p1s.
+                    // The walls are ordered wall_0, wall_1...
+                    // Let's iterate by ID
+                    const walls = [];
+                    let height = 3.0; // Default
+
+                    // Sort children by ID to ensure order
+                    const sortedChildren = [...wallContainer.children].sort((a, b) => {
+                        const idA = parseInt(a.userData.canonicalId.split('_')[1]);
+                        const idB = parseInt(b.userData.canonicalId.split('_')[1]);
+                        return idA - idB;
+                    });
+
+                    sortedChildren.forEach(wallGroup => {
+                        points.push(wallGroup.userData.p1);
+                        // Store wall specific data (apertures, shading)
+                        const wallData = getCustomWallData(wallGroup.userData.canonicalId);
+                        if (wallData) {
+                            walls.push({
+                                id: wallGroup.userData.canonicalId,
+                                data: wallData
+                            });
+                            height = wallData.dimensions.height; // Assume uniform height
+                        }
+                    });
+
+                    return {
+                        points: points,
+                        height: height,
+                        walls: walls
+                    };
                 })(),
             },
             materials: (() => {
@@ -382,6 +430,7 @@ class Project {
         projectData.geometry.furniture = await projectData.geometry.furniture;
         projectData.geometry.vegetation = await projectData.geometry.vegetation;
         projectData.geometry.contextMassing = await projectData.geometry.contextMassing;
+        projectData.geometry.customGeometry = await projectData.geometry.customGeometry;
 
         return projectData;
     }
@@ -424,6 +473,7 @@ class Project {
     async generateSimulationPackage(panelElement, uniqueId = null) {
         const { showAlert } = await import('./ui.js');
         const { generateRadFileContent, generateRayFileContent } = await import('./radiance.js');
+        const { GeometryOptimizer } = await import('./geometryOptimizer.js');
 
         // 1. Check if a project directory is open
         if (!this.dirHandle && !this.dirPath) {
@@ -431,8 +481,18 @@ class Project {
             return null;
         }
 
+        // --- NEW: Optimization Step ---
+        const optimizer = new GeometryOptimizer();
+        const optimizedGroup = await optimizer.run();
+
         // 2. Gather data and generate script content
         const projectData = await this.gatherAllProjectData();
+
+        // Inject optimized geometry if available
+        if (optimizedGroup) {
+            projectData.geometry.optimizedGeometry = optimizedGroup;
+        }
+
         const projectName = projectData.projectInfo['project-name']?.replace(/\s+/g, '_') || 'scene';
         this.projectName = projectName;
 
@@ -891,57 +951,175 @@ class Project {
                 }
             }
         } else { // gridType === 'all'
-            // This is the original logic of the function
-            const generateCenteredPoints = (totalLength, spacing) => {
-                if (spacing <= 0 || totalLength <= 0) return [];
-                const numPoints = Math.floor(totalLength / spacing);
-                if (numPoints === 0) return [totalLength / 2];
-                const totalGridLength = (numPoints - 1) * spacing;
-                const start = (totalLength - totalGridLength) / 2;
-                return Array.from({ length: numPoints }, (_, i) => start + i * spacing);
-            };
+            // Handle Custom Geometry vs Parametric
+            const projectData = await this.gatherAllProjectData();
+            const customGeom = projectData.geometry.customGeometry;
+            const isCustom = projectData.geometry.mode === 'custom' || (customGeom && customGeom.points && customGeom.points.length > 2);
 
-            const surfaces = [
-                { name: 'floor', enabled: dom['grid-floor-toggle']?.checked }, { name: 'ceiling', enabled: dom['grid-ceiling-toggle']?.checked },
-                { name: 'north', enabled: dom['grid-north-toggle']?.checked }, { name: 'south', enabled: dom['grid-south-toggle']?.checked },
-                { name: 'east', enabled: dom['grid-east-toggle']?.checked }, { name: 'west', enabled: dom['grid-west-toggle']?.checked },
-            ];
+            console.log('[DEBUG] _generateSensorPointsContent:');
+            console.log('  gridType:', gridType);
+            console.log('  geometry.mode:', projectData.geometry.mode);
+            console.log('  isCustom:', isCustom);
+            console.log('  customGeom:', customGeom);
+            if (customGeom && customGeom.points) {
+                console.log('  customGeom.points.length:', customGeom.points.length);
+                console.log('  customGeom.points[0]:', customGeom.points[0]);
+            }
 
-            surfaces.forEach(({ name, enabled }) => {
-                if (!enabled) return;
-                let spacing, offset, points1, points2, positionFunc, normalVector;
-                if (name === 'floor' || name === 'ceiling') {
-                    spacing = getDimension(`${name}-grid-spacing`);
-                    offset = getDimension(`${name}-grid-offset`);
-                    points1 = generateCenteredPoints(W, spacing);
-                    points2 = generateCenteredPoints(L, spacing);
-                    // CORRECTED: Define normals in Three.js coordinate system (Y-up)
-                    normalVector = (name === 'floor') ? [0, 1, 0] : [0, -1, 0];
-                    positionFunc = (p1, p2) => [p1, name === 'floor' ? offset : H + offset, p2]; // Y is height
-                } else {
-                    spacing = getDimension('wall-grid-spacing');
-                    offset = getDimension('wall-grid-offset');
-                    points2 = generateCenteredPoints(H, spacing); // Height is vertical span
-                    const wallLength = (name === 'north' || name === 'south') ? W : L;
-                    points1 = generateCenteredPoints(wallLength, spacing); // Width/Length is horizontal span
+            if (isCustom) {
+                console.log('[DEBUG] Using custom geometry grid generation');
+                const { generatePolygonGridPoints } = await import('./radiance.js');
+                const polygonPoints = customGeom.points; // {x, z}
 
-                    // CORRECTED: Define normals in Three.js coordinate system (Y-up) and adjust positionFunc
-                    switch (name) {
-                        case 'north': normalVector = [0, 0, 1]; positionFunc = (p1, p2) => [p1, p2, offset]; break;
-                        case 'south': normalVector = [0, 0, -1]; positionFunc = (p1, p2) => [p1, p2, L - offset]; break;
-                        case 'west': normalVector = [1, 0, 0]; positionFunc = (p1, p2) => [offset, p2, p1]; break;
-                        case 'east': normalVector = [-1, 0, 0]; positionFunc = (p1, p2) => [W - offset, p2, p1]; break;
+                // --- Floor Grid ---
+                if (dom['grid-floor-toggle']?.checked) {
+                    const spacing = getDimension('floor-grid-spacing');
+                    const offset = getDimension('floor-grid-offset');
+                    console.log('[DEBUG] Generating floor grid: spacing=', spacing, 'offset=', offset);
+                    const gridPoints = generatePolygonGridPoints(polygonPoints, spacing, offset, 0); // y = offset
+                    console.log('[DEBUG] Generated', gridPoints.length, 'floor grid points');
+
+                    // Radiance Up Vector (Z-up) corresponds to Three.js Y-up (0,1,0)
+                    // Normal in Radiance format: 0 0 1
+                    const radNormal = "0 0 1";
+
+                    for (const pt of gridPoints) {
+                        // pt is Three {x, y, z}. Radiance is {x, z, y}
+                        points.push(`${pt.x.toFixed(4)} ${pt.z.toFixed(4)} ${pt.y.toFixed(4)} ${radNormal}`);
                     }
                 }
-                for (const p1 of points1) {
-                    for (const p2 of points2) {
-                        const localPos = positionFunc(p1, p2);
-                        const worldPos = transformPoint(localPos);
-                        const worldNorm = transformVector(normalVector);
-                        points.push(`${worldPos.map(c => c.toFixed(4)).join(' ')} ${worldNorm.map(c => c.toFixed(4)).join(' ')}`);
+
+                // --- Ceiling Grid ---
+                if (dom['grid-ceiling-toggle']?.checked) {
+                    const spacing = getDimension('ceiling-grid-spacing');
+                    const offset = getDimension('ceiling-grid-offset');
+                    const gridPoints = generatePolygonGridPoints(polygonPoints, spacing, H - offset, 0); // y = H - offset
+
+                    // Normal in Radiance format: 0 0 -1 (Down)
+                    const radNormal = "0 0 -1";
+
+                    for (const pt of gridPoints) {
+                        points.push(`${pt.x.toFixed(4)} ${pt.z.toFixed(4)} ${pt.y.toFixed(4)} ${radNormal}`);
                     }
                 }
-            });
+
+                // --- Wall Grids ---
+                // If ANY wall grid is enabled, we assume user wants wall grids for the custom room
+                const wallGridEnabled = dom['grid-north-toggle']?.checked || dom['grid-south-toggle']?.checked ||
+                    dom['grid-east-toggle']?.checked || dom['grid-west-toggle']?.checked;
+
+                if (wallGridEnabled) {
+                    const spacing = getDimension('wall-grid-spacing');
+                    const offset = getDimension('wall-grid-offset'); // Inward offset from wall surface
+
+                    if (spacing > 0) {
+                        for (let i = 0; i < polygonPoints.length; i++) {
+                            const p1 = polygonPoints[i];
+                            const p2 = polygonPoints[(i + 1) % polygonPoints.length];
+
+                            const dx = p2.x - p1.x;
+                            const dz = p2.z - p1.z;
+                            const len = Math.sqrt(dx * dx + dz * dz);
+                            if (len <= 0) continue;
+
+                            // Calculate segment normal (Inward for CCW logic?)
+                            // If points are CCW, normal (-dy, dx) is Inward (Left turn).
+                            // We want to offset INWARD.
+                            // Unit Normal
+                            const nx = -dz / len;
+                            const nz = dx / len;
+
+                            // Grid iterations
+                            const numH = Math.floor(len / spacing);
+                            const numV = Math.floor(H / spacing);
+
+                            // Center checks
+                            // We'll just start from edge + spacing? Or center?
+                            // Parametric logic centers it.
+                            const totalLenH = (numH - 1) * spacing;
+                            const startH = (len - totalLenH) / 2;
+
+                            const totalLenV = (numV - 1) * spacing;
+                            const startV = (H - totalLenV) / 2;
+
+                            // Radiance Normal for this wall
+                            // Wall Normal in Three: (nx, 0, nz)
+                            // Radiance: (nx, nz, 0)
+                            const radNormStr = `${nx.toFixed(4)} ${nz.toFixed(4)} 0`;
+
+                            for (let u = 0; u < numH; u++) {
+                                const hDist = startH + u * spacing;
+                                // Point on line
+                                const onLineX = p1.x + (dx / len) * hDist;
+                                const onLineZ = p1.z + (dz / len) * hDist;
+
+                                // Apply Inward Offset
+                                const finalX = onLineX + nx * offset;
+                                const finalZ = onLineZ + nz * offset;
+
+                                for (let v = 0; v < numV; v++) {
+                                    const yHeight = startV + v * spacing;
+                                    // Radiance Point: X, Z, Y
+                                    points.push(`${finalX.toFixed(4)} ${finalZ.toFixed(4)} ${yHeight.toFixed(4)} ${radNormStr}`);
+                                }
+                            }
+                        }
+                    }
+                }
+
+            } else {
+                // Parametric Logic (Original)
+                const generateCenteredPoints = (totalLength, spacing) => {
+                    if (spacing <= 0 || totalLength <= 0) return [];
+                    const numPoints = Math.floor(totalLength / spacing);
+                    if (numPoints === 0) return [totalLength / 2];
+                    const totalGridLength = (numPoints - 1) * spacing;
+                    const start = (totalLength - totalGridLength) / 2;
+                    return Array.from({ length: numPoints }, (_, i) => start + i * spacing);
+                };
+
+                const surfaces = [
+                    { name: 'floor', enabled: dom['grid-floor-toggle']?.checked }, { name: 'ceiling', enabled: dom['grid-ceiling-toggle']?.checked },
+                    { name: 'north', enabled: dom['grid-north-toggle']?.checked }, { name: 'south', enabled: dom['grid-south-toggle']?.checked },
+                    { name: 'east', enabled: dom['grid-east-toggle']?.checked }, { name: 'west', enabled: dom['grid-west-toggle']?.checked },
+                ];
+
+                surfaces.forEach(({ name, enabled }) => {
+                    if (!enabled) return;
+                    let spacing, offset, points1, points2, positionFunc, normalVector;
+                    if (name === 'floor' || name === 'ceiling') {
+                        spacing = getDimension(`${name}-grid-spacing`);
+                        offset = getDimension(`${name}-grid-offset`);
+                        points1 = generateCenteredPoints(W, spacing);
+                        points2 = generateCenteredPoints(L, spacing);
+                        // CORRECTED: Define normals in Three.js coordinate system (Y-up)
+                        normalVector = (name === 'floor') ? [0, 1, 0] : [0, -1, 0];
+                        positionFunc = (p1, p2) => [p1, name === 'floor' ? offset : H + offset, p2]; // Y is height
+                    } else {
+                        spacing = getDimension('wall-grid-spacing');
+                        offset = getDimension('wall-grid-offset');
+                        points2 = generateCenteredPoints(H, spacing); // Height is vertical span
+                        const wallLength = (name === 'north' || name === 'south') ? W : L;
+                        points1 = generateCenteredPoints(wallLength, spacing); // Width/Length is horizontal span
+
+                        // CORRECTED: Define normals in Three.js coordinate system (Y-up) and adjust positionFunc
+                        switch (name) {
+                            case 'north': normalVector = [0, 0, 1]; positionFunc = (p1, p2) => [p1, p2, offset]; break;
+                            case 'south': normalVector = [0, 0, -1]; positionFunc = (p1, p2) => [p1, p2, L - offset]; break;
+                            case 'west': normalVector = [1, 0, 0]; positionFunc = (p1, p2) => [offset, p2, p1]; break;
+                            case 'east': normalVector = [-1, 0, 0]; positionFunc = (p1, p2) => [W - offset, p2, p1]; break;
+                        }
+                    }
+                    for (const p1 of points1) {
+                        for (const p2 of points2) {
+                            const localPos = positionFunc(p1, p2);
+                            const worldPos = transformPoint(localPos);
+                            const worldNorm = transformVector(normalVector);
+                            points.push(`${worldPos.map(c => c.toFixed(4)).join(' ')} ${worldNorm.map(c => c.toFixed(4)).join(' ')}`);
+                        }
+                    }
+                });
+            }
         }
 
         if (points.length === 0) {
@@ -1397,17 +1575,106 @@ class Project {
             const viewsToLoad = settings.savedViews.map(view => ({
                 ...view,
                 cameraState: {
+                    ...view.cameraState,
                     position: new THREE.Vector3().fromArray(view.cameraState.position),
                     quaternion: new THREE.Quaternion().fromArray(view.cameraState.quaternion),
-                    zoom: view.cameraState.zoom,
-                    target: new THREE.Vector3().fromArray(view.cameraState.target),
-                    viewType: view.cameraState.viewType,
-                    fov: view.cameraState.fov
+                    target: new THREE.Vector3().fromArray(view.cameraState.target)
                 }
             }));
             ui.loadSavedViews(viewsToLoad);
+        }
+
+        // --- Custom Geometry ---
+        if (settings.geometry.customGeometry) {
+            const cg = settings.geometry.customGeometry;
+            const { createCustomRoom } = await import('./customGeometryManager.js');
+            const { registerCustomWall } = await import('./customApertureManager.js');
+            const { setIsCustomGeometry } = await import('./geometry.js');
+
+            // 1. Set Flag
+            setIsCustomGeometry(true);
+
+            // 2. Restore Wall Data
+            // 2. Restore Wall Data
+            if (cg.walls) {
+                // Import outside the loop
+                const { getCustomWallData } = await import('./customApertureManager.js');
+
+                cg.walls.forEach(wall => {
+                    registerCustomWall(wall.id, wall.data.dimensions);
+                    // We need to fully restore the aperture/shading data
+                    // We already have registerCustomWall.
+                    // But registerCustomWall resets data to default.
+                    // We need a way to set full data.
+                    // Let's modify customApertureManager to allow setting full data or update it here.
+                });
+
+                // Better approach: Modify registerCustomWall or add setCustomWallData
+                // For now, let's just manually update the map if we can access it? No, it's private.
+                // We need to export a restore function in customApertureManager.
+            }
+
+            // Reconstruct points
+            const points = cg.points.map(p => new THREE.Vector3(p.x, p.y, p.z));
+
+            // 3. Create Room
+            createCustomRoom(points, cg.height);
+
+            // 4. Apply saved aperture data
+            // We need to do this AFTER createCustomRoom because createCustomRoom calls registerCustomWall (reseting it).
+            // Wait, createCustomRoom calls registerCustomWall.
+            // So we should pass the saved data TO createCustomRoom?
+            // Or we should update the data AFTER createCustomRoom.
+
+            if (cg.walls) {
+                const { getCustomWallData: getCWD } = await import('./customApertureManager.js');
+
+                cg.walls.forEach(wall => {
+                    const data = getCWD(wall.id);
+                    if (data) {
+                        // Merge saved data
+                        Object.assign(data.apertures, wall.data.apertures);
+                        Object.assign(data.shading, wall.data.shading);
+                        // Trigger update
+                        // We need to import updateCustomWall from customGeometryManager
+                    }
+                });
+
+                // We need to call updateCustomWall for each wall to reflect changes?
+                // createCustomRoom creates geometry based on current data.
+                // If createCustomRoom resets data, we are in trouble.
+                // Let's check createCustomRoom.
+                // It calls registerCustomWall.
+                // registerCustomWall overwrites with defaults.
+
+                // FIX: We need createCustomRoom to NOT reset if data exists?
+                // Or we restore data AFTER createCustomRoom, then regenerate?
+                // Regenerating everything twice is bad.
+
+                // Better: createCustomRoom should take optional "restoreData" or we separate registration.
+                // Let's go with: Restore data AFTER, then update all.
+                // Or modify customApertureManager to have a `restoreCustomWalls` function that sets the map,
+                // and modify createCustomRoom to NOT register if already exists?
+
+                // Let's stick to the plan:
+                // 1. createCustomRoom will register (reset) everything.
+                // 2. We overwrite with saved data.
+                // 3. We call updateCustomWall for each wall.
+
+                const { updateCustomWall } = await import('./customGeometryManager.js');
+                cg.walls.forEach(wall => {
+                    const data = getCWD(wall.id);
+                    if (data) {
+                        Object.assign(data.apertures, wall.data.apertures);
+                        Object.assign(data.shading, wall.data.shading);
+                        updateCustomWall(wall.id);
+                    }
+                });
+            }
         } else {
-            ui.loadSavedViews([]); // Clear views if none are in the project file
+            // Ensure flag is false if not custom
+            const { setIsCustomGeometry } = await import('./geometry.js');
+            setIsCustomGeometry(false);
         }
 
         // --- Topography ---
