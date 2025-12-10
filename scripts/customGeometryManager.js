@@ -51,6 +51,17 @@ export function getCustomRoomHeight() {
     return currentRoomHeight;
 }
 
+// State for finalized geometry
+let isGeometryFinalized = false;
+
+export function setGeometryFinalized(isFinalized) {
+    isGeometryFinalized = isFinalized;
+}
+
+export function isFinalized() {
+    return isGeometryFinalized;
+}
+
 export function createCustomRoom(points2D, height, thickness = 0.2) {
     console.log('[CustomGeometry] createCustomRoom called');
     console.log('[CustomGeometry] points2D:', points2D);

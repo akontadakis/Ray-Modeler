@@ -4634,7 +4634,14 @@ function handleWallSelection(wallGroup, resetLock = true) {
     if (wallId.startsWith('wall_') || wallId.startsWith('partition_')) {
         // Import dynamically to avoid circular dependency issues at top level if any
         import('./customApertureManager.js').then(({ injectCustomWallUI }) => {
-            injectCustomWallUI(wallId);
+            // CHECK: If finalized, do NOT open panel automatically
+            import('./customGeometryManager.js').then(({ isFinalized }) => {
+                if (!isFinalized()) {
+                    injectCustomWallUI(wallId);
+                } else {
+                    console.log("Geometry finalized - skipping auto-panel open.");
+                }
+            });
         });
 
 

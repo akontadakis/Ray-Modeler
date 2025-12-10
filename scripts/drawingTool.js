@@ -214,6 +214,9 @@ export function startDrawingMode() {
 
     // --- FIX: Clear existing parametric geometry ---
     setIsCustomGeometry(true); // Prevent parametric updates
+    import('./customGeometryManager.js').then(({ setGeometryFinalized }) => {
+        setGeometryFinalized(false);
+    });
     while (roomObject.children.length > 0) roomObject.remove(roomObject.children[0]);
     while (wallSelectionGroup.children.length > 0) wallSelectionGroup.remove(wallSelectionGroup.children[0]);
     updateScene(); // Refresh scene state
@@ -323,6 +326,18 @@ export function startPartitionDrawingMode() {
         };
 
         showAlert("Partition Drawing Mode.<br>Click to start chain. Double-click to finish chain. Esc to exit.<br>Press 'O' to toggle diagonal drawing.", "Drawing Mode");
+
+        // Show Finalize Button
+        const finalizeContainer = document.getElementById('finalize-geometry-container');
+        if (finalizeContainer) {
+            finalizeContainer.classList.remove('hidden');
+            const btn = document.getElementById('finalize-geometry-btn');
+            if (btn) {
+                // Remove potential old listener first
+                btn.removeEventListener('click', finalizeGeometry);
+                btn.addEventListener('click', finalizeGeometry);
+            }
+        }
     });
 
     const drawingColor = getThemeDrawingColor();
@@ -829,18 +844,44 @@ function finishDrawing() {
     }
 }
 
+/**
+ * NEW: Finalize Geometry (Exit Drawing Mode via Button)
+ */
+export function finalizeGeometry() {
+    console.log("Finalizing geometry via button");
+
+    // 1. Mark as finalized
+    import('./customGeometryManager.js').then(({ setGeometryFinalized }) => {
+        setGeometryFinalized(true);
+    });
+
+    // 2. Exit drawing mode
+    cancelDrawing();
+}
+
 export function cancelDrawing(silent = false) {
     const wasPartitionMode = isDrawingPartition;
     isDrawing = false;
     isDrawingPartition = false;
     cleanupHelpers();
 
+    // Hide Finalize Button
+    const finalizeContainer = document.getElementById('finalize-geometry-container');
+    if (finalizeContainer) {
+        finalizeContainer.classList.add('hidden');
+        // Clean up listener to be safe, though repeated adds might be okay if we clone or careful
+        const btn = document.getElementById('finalize-geometry-btn');
+        if (btn) {
+            btn.removeEventListener('click', finalizeGeometry);
+        }
+    }
+
     if (!silent) {
         import('./ui.js').then(({ showAlert, setCustomGeometryUI, setCameraView }) => {
             if (wasPartitionMode) {
                 // If we were drawing partitions, just exit to the 3D view
                 // Don't restore welcome screen - room already exists
-                showAlert("Partition drawing finished.", "Info");
+                showAlert("Geometry Finalized.", "Success");
                 setCameraView('persp'); // Return to 3D perspective view
             } else {
                 showAlert("Drawing cancelled.", "Info");
