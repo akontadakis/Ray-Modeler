@@ -78,10 +78,12 @@ Ray Modeler is packed with features that automate and enhance the Radiance workf
 
 - **Interior Furniture Library**: Place simple furniture and partition objects from a pre-built library via drag-and-drop or import custom `.obj` assets..
 
-- **Enhanced Drawing Tools**:
+- **Enhanced Drawing Tools (Draw Model Mode)**:
   - **Floor Plan Overlay**: Import a floor plan image (JPG/PNG) to use as a tracing guide with adjustable scale.
-  - **Interior Partitions**: Draw internal partitions to subdivide spaces with intuitive wall thickening and real-time dimension rulers.
-  - **Precision Controls**: Numeric input for exact lengths and snapping toggles for accuracy.
+  - **Interior Partitions**: Draw internal partitions to subdivide spaces with support for doors and interior windows.
+  - **Precision Controls**: Numeric input for exact lengths, with real-time dimension rulers and wall thickness visualization.
+  - **Keyboard Shortcuts**: Toggle snapping (`S`) and ortho lock (`O`) on-the-fly for freeform or constrained drawing.
+  - **Finalize Geometry Popup**: A streamlined workflow with a dedicated "Finalize" button popup to complete geometry drawing, replacing the need for keyboard shortcuts.
 
 - **Radiance Material Editor**: Configure standard Radiance materials (`plastic`, `metal`, `glass`) by adjusting properties like reflectance, specularity, and roughness. It also supports spectral data (`.dat`) files for advanced material definitions.
 
@@ -159,6 +161,9 @@ The AI Assistant panel provides a chat interface to help you with your workflow.
 -   **Active Context Awareness**:
     -   The agent knows what you are looking at. Select a wall or object in the 3D view, and simply say "add a window here" or "change this material" without needing to specify the object name.
 
+-   **Draw Model Mode Intelligence**:
+    -   Helios understands custom geometry created in Draw Model mode. It can query the current geometry mode, list all custom walls and partitions, retrieve detailed wall properties (dimensions, apertures, shading), and add or modify windows and doors on any wall using natural language commands.
+
 ---
 
 ### AI-Powered Actions (Tool Use)
@@ -181,6 +186,11 @@ Beyond answering questions, the assistant can directly manipulate the UI and que
 - **File Management**:
   - **Load Results**: `"Load a results file into dataset A."`
   - **Clear Results**: `"Clear all loaded results data."`
+- **Draw Model Mode Queries & Modifications**:
+  - **Mode Query**: `"What geometry mode am I in?"` or `"Am I in Draw Model mode?"`
+  - **List Walls**: `"List all the walls in my custom geometry."` or `"Show me all the partitions."`
+  - **Wall Details**: `"Get the details of wall_0."` or `"What are the apertures on partition_123?"`
+  - **Modify Apertures**: `"Add 2 windows to wall_1 that are 1.5m wide and 1.2m tall."` or `"Add a door to the interior partition."`
 
 ### Design Inspector
 
