@@ -18,3 +18,7 @@ yarn-error.log*
 
 # Environment variables
 .env
+# AI Agent & Documentation
+.gemini/
+docs/
+GEMINI.md
