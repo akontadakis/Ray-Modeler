@@ -4,8 +4,8 @@ import { roomObject, wallSelectionGroup, updateScene, setIsCustomGeometry } from
 import { getDom } from './dom.js';
 import { createCustomRoom, addCustomPartition, getCustomRoomHeight } from './customGeometryManager.js';
 
-let isDrawing = false;
-let isDrawingPartition = false; // New flag for partition mode
+export let isDrawing = false;
+export let isDrawingPartition = false; // New flag for partition mode
 let points = []; // Array of THREE.Vector3
 let activeLine = null;
 let cursorMarker = null;
@@ -17,6 +17,7 @@ let tempGroup = new THREE.Group();
 // State for precision input
 let currentInput = "";
 let isSnappingEnabled = true;
+let isOrthoLockEnabled = true; // When true, walls snap to horizontal/vertical only
 
 // Floor plan image state
 let floorPlanMesh = null;
@@ -258,7 +259,7 @@ export function startDrawingMode() {
         // Let's set LEFT to null to be safe for drawing.
         controls.mouseButtons.LEFT = null;
 
-        showAlert("Top-Down Drawing Mode Active.<br>Click to start. Double-click to finish. Type numbers to define length.", "Drawing Mode");
+        showAlert("Top-Down Drawing Mode Active.<br>Click to start. Double-click to finish. Type numbers for length.<br>Press 'O' to toggle diagonal drawing, 'S' for snapping.", "Drawing Mode");
     });
 
     // Visual Helpers - Use theme-aware colors
@@ -321,7 +322,7 @@ export function startPartitionDrawingMode() {
             RIGHT: THREE.MOUSE.PAN
         };
 
-        showAlert("Partition Drawing Mode.<br>Click to start chain. Double-click to finish chain. Esc to exit.", "Drawing Mode");
+        showAlert("Partition Drawing Mode.<br>Click to start chain. Double-click to finish chain. Esc to exit.<br>Press 'O' to toggle diagonal drawing.", "Drawing Mode");
     });
 
     const drawingColor = getThemeDrawingColor();
@@ -338,9 +339,17 @@ export function startPartitionDrawingMode() {
     canvas.addEventListener('mousemove', onMouseMove);
     canvas.addEventListener('click', onClick);
     canvas.addEventListener('dblclick', onDoubleClick);
+    canvas.addEventListener('contextmenu', onContextMenu); // Right-click to finish
     window.addEventListener('keydown', onKeyDown, true);
     window.addEventListener('resize', onWindowResize);
     controls.addEventListener('change', updateAllLabels);
+}
+
+function onContextMenu(e) {
+    if (!isDrawingPartition) return;
+    e.preventDefault();
+    console.log("Right-click detected - calling finishDrawing");
+    finishDrawing();
 }
 
 function onWindowResize() {
@@ -375,8 +384,8 @@ function onMouseMove(e) {
 
     let target = getMousePosition(e);
 
-    // Ortho Lock Logic
-    if (points.length > 0) {
+    // Ortho Lock Logic (only when enabled)
+    if (points.length > 0 && isOrthoLockEnabled) {
         const last = points[points.length - 1];
         const dx = Math.abs(target.x - last.x);
         const dz = Math.abs(target.z - last.z);
@@ -433,7 +442,7 @@ function onMouseMove(e) {
         // Scale: X=Length, Y=Height(dummy small), Z=Thickness
         // BoxGeometry(1,1,1) -> Scale(dist, 0.1, thickness)
         // Note: In ThreeJS BoxGeometry, if we rotate Y, the X axis aligns with length.
-        activeLine.scale.set(dist, 0.01, thickness);
+        activeLine.scale.set(dist, 0.1, thickness);
 
         // --- 2. RULER VISUALIZATION ---
         updateRuler(lastPoint, target, dist, angle);
@@ -548,6 +557,9 @@ function updateTooltip(screenX, screenY, targetPos) {
     if (!isSnappingEnabled) {
         text += " [NoSnap]";
     }
+    if (!isOrthoLockEnabled) {
+        text += " [Free]";
+    }
 
     valSpan.textContent = text;
     valSpan.style.whiteSpace = 'pre';
@@ -615,7 +627,7 @@ function addPoint(pt) {
         // Transform (show raw drawn length, no extension during drawing phase)
         segment.position.set(midX, 0, midZ);
         segment.rotation.y = angle;
-        segment.scale.set(dist, 0.01, thickness);
+        segment.scale.set(dist, 0.1, thickness);
         segment.renderOrder = 997;
 
         tempGroup.add(segment);
@@ -658,7 +670,7 @@ function onKeyDown(e) {
     // Handle Numeric Input & Control Keys
     // We use stopPropagation to prevent global shortcuts (like View switching) from firing
     const isNumber = (e.key >= '0' && e.key <= '9') || e.key === '.';
-    const isControl = e.key === 'Backspace' || e.key === 'Enter' || e.key === 'Escape' || e.key.toLowerCase() === 's';
+    const isControl = e.key === 'Backspace' || e.key === 'Enter' || e.key === 'Escape' || e.key.toLowerCase() === 's' || e.key.toLowerCase() === 'o';
 
     if (isNumber || isControl) {
         e.stopPropagation();
@@ -671,6 +683,13 @@ function onKeyDown(e) {
         isSnappingEnabled = !isSnappingEnabled;
         // Force tooltip update
         import('./ui.js').then(({ showAlert }) => showAlert(`Snapping ${isSnappingEnabled ? 'Enabled' : 'Disabled'}`, 'Info', 1000));
+        return;
+    }
+
+    // Ortho Lock Toggle (allows diagonal drawing when disabled)
+    if (e.key.toLowerCase() === 'o') {
+        isOrthoLockEnabled = !isOrthoLockEnabled;
+        import('./ui.js').then(({ showAlert }) => showAlert(`Ortho Lock ${isOrthoLockEnabled ? 'Enabled (H/V only)' : 'Disabled (Free Draw)'}`, 'Info', 1000));
         return;
     }
 
@@ -700,20 +719,25 @@ function onKeyDown(e) {
             tooltip.style.backgroundColor = 'var(--panel-bg)';
         }
     }
-    else if (e.key === 'Enter' && currentInput.length > 0 && points.length > 0) {
-        // Calculate point based on direction and typed length
-        const last = points[points.length - 1];
-        const cursor = cursorMarker.position;
+    else if (e.key === 'Enter') {
+        if (currentInput.length > 0 && points.length > 0) {
+            // Calculate point based on direction and typed length
+            const last = points[points.length - 1];
+            const cursor = cursorMarker.position;
 
-        const direction = new THREE.Vector3().subVectors(cursor, last).normalize();
+            const direction = new THREE.Vector3().subVectors(cursor, last).normalize();
 
-        // Fallback if cursor is exactly on last point (no direction)
-        if (direction.lengthSq() === 0) return;
+            // Fallback if cursor is exactly on last point (no direction)
+            if (direction.lengthSq() === 0) return;
 
-        const dist = parseFloat(currentInput);
-        const newPt = last.clone().add(direction.multiplyScalar(dist));
+            const dist = parseFloat(currentInput);
+            const newPt = last.clone().add(direction.multiplyScalar(dist));
 
-        addPoint(newPt);
+            addPoint(newPt);
+        } else if (isDrawingPartition && points.length >= 2) {
+            // Finish drawing on Enter if not inputting value
+            finishDrawing();
+        }
     }
     else if (e.key === 'Escape') {
         cancelDrawing();
@@ -778,6 +802,8 @@ function finishDrawing() {
             // Remove listeners
             confirmBtn.removeEventListener('click', onConfirm);
             cancelBtn.removeEventListener('click', onCancel);
+
+            startPartitionDrawingMode();
         };
 
         const onCancel = () => {
@@ -804,19 +830,26 @@ function finishDrawing() {
 }
 
 export function cancelDrawing(silent = false) {
+    const wasPartitionMode = isDrawingPartition;
     isDrawing = false;
     isDrawingPartition = false;
     cleanupHelpers();
 
     if (!silent) {
-        import('./ui.js').then(({ showAlert, setCustomGeometryUI }) => {
-            showAlert("Drawing cancelled.", "Info");
-            setCustomGeometryUI(false); // Reset UI
+        import('./ui.js').then(({ showAlert, setCustomGeometryUI, setCameraView }) => {
+            if (wasPartitionMode) {
+                // If we were drawing partitions, just exit to the 3D view
+                // Don't restore welcome screen - room already exists
+                showAlert("Partition drawing finished.", "Info");
+                setCameraView('persp'); // Return to 3D perspective view
+            } else {
+                showAlert("Drawing cancelled.", "Info");
+                setCustomGeometryUI(false); // Reset UI
+                // Restore Welcome Screen only if no room was created
+                const welcomeScreen = document.getElementById('welcome-screen');
+                if (welcomeScreen) welcomeScreen.classList.remove('hidden');
+            }
         });
-
-        // Restore Welcome Screen
-        const welcomeScreen = document.getElementById('welcome-screen');
-        if (welcomeScreen) welcomeScreen.classList.remove('hidden');
     }
 }
 
@@ -828,6 +861,7 @@ function cleanupHelpers(partial = false) {
         canvas.removeEventListener('mousemove', onMouseMove);
         canvas.removeEventListener('click', onClick);
         canvas.removeEventListener('dblclick', onDoubleClick);
+        canvas.removeEventListener('contextmenu', onContextMenu);
         window.removeEventListener('keydown', onKeyDown, true);
         window.removeEventListener('resize', onWindowResize);
         controls.removeEventListener('change', updateAllLabels);

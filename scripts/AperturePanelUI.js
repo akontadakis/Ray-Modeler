@@ -419,6 +419,8 @@ export class AperturePanelUI {
     renderCustomWallControls(container, wallId, wallData, onUpdate) {
         container.innerHTML = '';
         const suffix = wallId;
+        const isDoor = wallData.apertures.type === 'door';
+        const ceilingHeight = wallData.dimensions?.height || 3.0; // Get ceiling height for door max
 
         // 1. Initial Data Binding Helper
         // We defer this because inputs are created by sub-functions
@@ -440,13 +442,18 @@ export class AperturePanelUI {
         typeDiv.innerHTML = `
             <label class="label">Aperture Type</label>
             <div class="btn-group mt-1">
-                <button id="type-window-btn-${suffix}" class="btn ${(!wallData.apertures.type || wallData.apertures.type === 'window') ? 'active' : ''}">Window</button>
-                <button id="type-door-btn-${suffix}" class="btn ${wallData.apertures.type === 'door' ? 'active' : ''}">Door</button>
+                <button id="type-window-btn-${suffix}" class="btn ${!isDoor ? 'active' : ''}">Window</button>
+                <button id="type-door-btn-${suffix}" class="btn ${isDoor ? 'active' : ''}">Door</button>
             </div>`;
         container.appendChild(typeDiv);
 
-        // B. Window Count & Mode
-        container.appendChild(this.createRangeControl(`win-count-${suffix}`, '# of Apertures', 0, 10, wallData.apertures.count || 0, 1));
+        // === WINDOW CONTROLS CONTAINER ===
+        const windowControlsContainer = document.createElement('div');
+        windowControlsContainer.id = `window-controls-container-${suffix}`;
+        windowControlsContainer.className = isDoor ? 'hidden' : '';
+
+        // Window Count & Mode
+        windowControlsContainer.appendChild(this.createRangeControl(`win-count-${suffix}`, '# of Windows', 0, 10, wallData.apertures.count || 0, 1));
 
         const modeDiv = document.createElement('div');
         modeDiv.className = 'pt-2';
@@ -456,39 +463,50 @@ export class AperturePanelUI {
                 <button id="mode-wwr-btn-${suffix}" class="btn ${wallData.apertures.mode === 'wwr' ? 'active' : ''}">WWR</button>
                 <button id="mode-manual-btn-${suffix}" class="btn ${wallData.apertures.mode === 'manual' ? 'active' : ''}">Manual</button>
             </div>`;
-        container.appendChild(modeDiv);
+        windowControlsContainer.appendChild(modeDiv);
 
-        // B. WWR Controls
+        // WWR Controls
         const wwrContainer = document.createElement('div');
         wwrContainer.id = `wwr-controls-${suffix}`;
         wwrContainer.className = wallData.apertures.mode === 'wwr' ? 'space-y-5 mt-4' : 'hidden space-y-5 mt-4';
         wwrContainer.appendChild(this.createRangeControl(`wwr-${suffix}`, 'WWR (%)', 0, 0.99, wallData.apertures.wwr || 0.4, 0.01, '%', true));
         wwrContainer.appendChild(this.createRangeControl(`wwr-sill-height-${suffix}`, 'Sill Height (m)', 0, 10, wallData.apertures.sillHeight || 1.0, 0.05, 'm'));
-        wwrContainer.appendChild(this.createRangeControl(`win-depth-pos-${suffix}`, 'Window Depth Position (m)', 0, 0.2, wallData.apertures.depthPos || 0.1, 0.01, 'm'));
-        container.appendChild(wwrContainer);
+        wwrContainer.appendChild(this.createRangeControl(`win-depth-pos-${suffix}`, 'Window Depth Position (m)', 0, 1, wallData.apertures.depthPos || 0.1, 0.05, 'm'));
+        windowControlsContainer.appendChild(wwrContainer);
 
-        // C. Manual Controls
+        // Manual Controls
         const manualContainer = document.createElement('div');
         manualContainer.id = `manual-controls-${suffix}`;
         manualContainer.className = wallData.apertures.mode === 'manual' ? 'space-y-5 mt-4' : 'hidden space-y-5 mt-4';
         manualContainer.appendChild(this.createRangeControl(`win-width-${suffix}`, 'Win. Width (m)', 0.1, 20, wallData.apertures.width || 1.5, 0.1, 'm'));
         manualContainer.appendChild(this.createRangeControl(`win-height-${suffix}`, 'Win. Height (m)', 0.1, 10, wallData.apertures.height || 1.2, 0.1, 'm'));
         manualContainer.appendChild(this.createRangeControl(`sill-height-${suffix}`, 'Sill Height (m)', 0, 10, wallData.apertures.sillHeight || 1.0, 0.05, 'm'));
-        manualContainer.appendChild(this.createRangeControl(`win-depth-pos-${suffix}-manual`, 'Window Depth Position (m)', 0, 0.2, wallData.apertures.depthPos || 0.1, 0.01, 'm'));
-        container.appendChild(manualContainer);
+        manualContainer.appendChild(this.createRangeControl(`win-depth-pos-${suffix}-manual`, 'Window Depth Position (m)', 0, 1, wallData.apertures.depthPos || 0.1, 0.05, 'm'));
+        windowControlsContainer.appendChild(manualContainer);
+
+        container.appendChild(windowControlsContainer);
+
+        // === DOOR CONTROLS CONTAINER ===
+        const doorControlsContainer = document.createElement('div');
+        doorControlsContainer.id = `door-controls-container-${suffix}`;
+        doorControlsContainer.className = isDoor ? 'space-y-5 mt-4' : 'hidden space-y-5 mt-4';
+
+        doorControlsContainer.appendChild(this.createRangeControl(`door-count-${suffix}`, '# of Doors', 0, 10, wallData.apertures.doorCount || 0, 1));
+        doorControlsContainer.appendChild(this.createRangeControl(`door-spacing-${suffix}`, 'Distance between Doors (m)', 0, 10, wallData.apertures.doorSpacing || 0.5, 0.05, 'm'));
+        doorControlsContainer.appendChild(this.createRangeControl(`door-height-${suffix}`, 'Door Height (m)', 0.5, ceilingHeight, wallData.apertures.doorHeight || 2.1, 0.05, 'm'));
+        doorControlsContainer.appendChild(this.createRangeControl(`door-width-${suffix}`, 'Door Width (m)', 0.3, 5, wallData.apertures.doorWidth || 0.9, 0.05, 'm'));
+        doorControlsContainer.appendChild(this.createRangeControl(`door-depth-pos-${suffix}`, 'Door Depth Position (m)', 0, 1, wallData.apertures.doorDepthPos || 0.1, 0.05, 'm'));
+
+        container.appendChild(doorControlsContainer);
 
         // D. Shading Section
         const shadingContainer = this.createShadingSection(suffix, 'Custom');
         container.appendChild(shadingContainer);
 
-        // E. Frame Section (Custom specific wrapper or reuse global)
-        // The global createFrameControls uses specific IDs (frame-thick, frame-depth).
-        // For custom walls, we need unique IDs if we want per-wall control, OR we maintain one global frame setting for the room.
-        // The user asked for "same panel", usually Parametric has GLOBAL frame settings.
-        // But for custom, maybe per-wall?
-        // Let's stick to generating unique IDs for custom walls to allow independence?
-        // Or if the request implies uniformity, maybe we use a custom frame section with suffix.
+        // E. Frame Section (only for windows)
         const frameContainer = this.createFrameControls(suffix);
+        frameContainer.id = `frame-container-${suffix}`;
+        frameContainer.classList.toggle('hidden', isDoor);
         container.appendChild(frameContainer);
 
 
@@ -496,17 +514,9 @@ export class AperturePanelUI {
         // We iterate over all inputs in the container
         const inputs = container.querySelectorAll('input, select');
         inputs.forEach(input => {
-            // Initialize values from wallData if possible? 
-            // Note: createRangeControl set default values.
-            // But we passed wallData values into the create calls above.
-            // So visual state is correct.
-
             // Attach listener
             input.addEventListener('input', (e) => {
                 const target = e.target;
-                // Parse ID to find property?
-                // Or just pass the raw event to the callback and let manager handle it?
-                // Better: Manager handles mapping ID -> Data.
                 onUpdate(target.id, target.type === 'checkbox' ? target.checked : target.value);
             });
             input.addEventListener('change', (e) => {
@@ -515,11 +525,11 @@ export class AperturePanelUI {
             });
         });
 
-        // Mode Toggles
+        // Mode Toggles (for windows)
         const wwrBtn = container.querySelector(`#mode-wwr-btn-${suffix}`);
         const manualBtn = container.querySelector(`#mode-manual-btn-${suffix}`);
 
-        wwrBtn.addEventListener('click', () => {
+        wwrBtn?.addEventListener('click', () => {
             wwrBtn.classList.add('active');
             manualBtn.classList.remove('active');
             wwrContainer.classList.remove('hidden');
@@ -527,7 +537,7 @@ export class AperturePanelUI {
             onUpdate(`mode-${suffix}`, 'wwr');
         });
 
-        manualBtn.addEventListener('click', () => {
+        manualBtn?.addEventListener('click', () => {
             manualBtn.classList.add('active');
             wwrBtn.classList.remove('active');
             manualContainer.classList.remove('hidden');
@@ -535,32 +545,39 @@ export class AperturePanelUI {
             onUpdate(`mode-${suffix}`, 'manual');
         });
 
-        // Type Toggles
+        // Type Toggles (Window/Door)
         const typeWinBtn = container.querySelector(`#type-window-btn-${suffix}`);
         const typeDoorBtn = container.querySelector(`#type-door-btn-${suffix}`);
 
-        typeWinBtn.addEventListener('click', () => {
+        typeWinBtn?.addEventListener('click', () => {
             typeWinBtn.classList.add('active');
             typeDoorBtn.classList.remove('active');
+            windowControlsContainer.classList.remove('hidden');
+            doorControlsContainer.classList.add('hidden');
+            frameContainer.classList.remove('hidden');
             onUpdate(`type-${suffix}`, 'window');
         });
 
-        typeDoorBtn.addEventListener('click', () => {
+        typeDoorBtn?.addEventListener('click', () => {
             typeDoorBtn.classList.add('active');
             typeWinBtn.classList.remove('active');
+            doorControlsContainer.classList.remove('hidden');
+            windowControlsContainer.classList.add('hidden');
+            frameContainer.classList.add('hidden');
             onUpdate(`type-${suffix}`, 'door');
         });
 
         // Shading Toggle Logic
         const shadeToggle = container.querySelector(`#shading-${suffix}-toggle`);
         const shadeControls = container.querySelector(`#shading-controls-${suffix}`);
-        shadeToggle.checked = wallData.shading?.enabled || false;
-        shadeControls.classList.toggle('hidden', !shadeToggle.checked);
+        if (shadeToggle && shadeControls) {
+            shadeToggle.checked = wallData.shading?.enabled || false;
+            shadeControls.classList.toggle('hidden', !shadeToggle.checked);
 
-        shadeToggle.addEventListener('change', (e) => {
-            shadeControls.classList.toggle('hidden', !e.target.checked);
-        });
-
+            shadeToggle.addEventListener('change', (e) => {
+                shadeControls.classList.toggle('hidden', !e.target.checked);
+            });
+        }
     }
 
     // Override createFrameControls to accept suffix

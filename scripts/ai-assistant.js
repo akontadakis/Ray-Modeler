@@ -10,7 +10,9 @@ import { showAlert, getNewZIndex, togglePanelVisibility, highlightSensorPoint, c
 import { getDom } from './dom.js';
 import { openGlareRoseDiagram, openCombinedAnalysisPanel } from './annualDashboard.js';
 import { openRecipePanelByType, programmaticallyGeneratePackage } from './simulation.js';
-import { addFurniture, addVegetation, getWallGroupById, highlightWall } from './geometry.js';
+import { addFurniture, addVegetation, getWallGroupById, highlightWall, isCustomGeometry, getWallListFromGroup, currentImportedModel } from './geometry.js';
+import { getAllCustomWalls, getCustomWallData } from './customApertureManager.js';
+import { updateCustomWall } from './customGeometryManager.js';
 import * as THREE from 'three';
 // Removed static import from './optimizationOrchestrator.js' to break circular dependency
 
@@ -237,6 +239,54 @@ const availableTools = [
                         "tilt": { "type": "NUMBER", "description": "The tilt angle in degrees (e.g., for an overhang)." }
                     },
                     "required": ["wall"]
+                }
+            },
+            {
+                "name": "getGeometryMode",
+                "description": "Returns the current geometry mode of the project ('parametric', 'custom' for Draw Model, or 'import') and basic information about the current model.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {},
+                    "required": []
+                }
+            },
+            {
+                "name": "listCustomWalls",
+                "description": "Lists all walls in the current Draw Model geometry, including their IDs, lengths, heights, and aperture counts. Only works in 'custom' (Draw Model) mode.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {},
+                    "required": []
+                }
+            },
+            {
+                "name": "getWallDetails",
+                "description": "Gets detailed information about a specific wall in Draw Model mode, including dimensions, apertures, shading, and frame configuration.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "wallId": { "type": "STRING", "description": "The wall identifier, e.g., 'wall_0', 'wall_1', or 'partition_123456'." }
+                    },
+                    "required": ["wallId"]
+                }
+            },
+            {
+                "name": "modifyCustomWallApertures",
+                "description": "Adds or modifies windows and doors on a specific wall in Draw Model mode. This replaces existing apertures on that wall.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "wallId": { "type": "STRING", "description": "The custom wall ID to modify, e.g., 'wall_0' or 'wall_1'." },
+                        "type": { "type": "STRING", "description": "The aperture type: 'window' or 'door'. Defaults to 'window'." },
+                        "count": { "type": "NUMBER", "description": "The number of windows to add." },
+                        "width": { "type": "NUMBER", "description": "The width of each window in meters." },
+                        "height": { "type": "NUMBER", "description": "The height of each window in meters." },
+                        "sillHeight": { "type": "NUMBER", "description": "The sill height (distance from floor to bottom of window) in meters." },
+                        "doorCount": { "type": "NUMBER", "description": "The number of doors to add (when type is 'door')." },
+                        "doorWidth": { "type": "NUMBER", "description": "The width of each door in meters." },
+                        "doorHeight": { "type": "NUMBER", "description": "The height of each door in meters." }
+                    },
+                    "required": ["wallId"]
                 }
             }
         ]
@@ -1885,6 +1935,179 @@ async function _handleViewTool(name, args) {
     }
 }
 
+/**
+ * Handles AI tools for custom (Draw Model) geometry queries and modifications.
+ * @param {string} name - The tool name.
+ * @param {object} args - The tool arguments.
+ * @returns {Promise<object>} The tool result.
+ */
+async function _handleCustomGeometryTool(name, args) {
+    switch (name) {
+        case 'getGeometryMode': {
+            // Determine current mode
+            let mode = 'parametric';
+            let roomInfo = {};
+
+            if (currentImportedModel) {
+                mode = 'import';
+                roomInfo = { description: 'Imported 3D model' };
+            } else if (isCustomGeometry) {
+                mode = 'custom';
+                const wallList = getWallListFromGroup();
+                const customWalls = getAllCustomWalls();
+                roomInfo = {
+                    wallCount: wallList.length,
+                    partitionCount: wallList.filter(w => w.isPartition).length
+                };
+            } else {
+                // Parametric mode - get dimensions from DOM
+                const domRef = getDom();
+                roomInfo = {
+                    width: parseFloat(domRef.width?.value) || 0,
+                    length: parseFloat(domRef.length?.value) || 0,
+                    height: parseFloat(domRef.height?.value) || 0
+                };
+            }
+
+            return {
+                success: true,
+                mode: mode,
+                roomInfo: roomInfo,
+                message: `Current geometry mode: ${mode === 'custom' ? 'Draw Model' : mode}`
+            };
+        }
+
+        case 'listCustomWalls': {
+            if (!isCustomGeometry) {
+                throw new Error("This tool only works in Draw Model mode. Current mode is " +
+                    (currentImportedModel ? 'Import' : 'Parametric'));
+            }
+
+            const wallList = getWallListFromGroup();
+            const customWalls = getAllCustomWalls();
+
+            const wallSummaries = wallList.map(wall => {
+                const wallData = customWalls.get(wall.id);
+                const length = wall.p1 && wall.p2
+                    ? Math.sqrt(Math.pow(wall.p2.x - wall.p1.x, 2) + Math.pow(wall.p2.z - wall.p1.z, 2))
+                    : 0;
+
+                return {
+                    id: wall.id,
+                    isPartition: wall.isPartition,
+                    length: Math.round(length * 100) / 100,
+                    height: wallData?.dimensions?.height || 0,
+                    windowCount: wallData?.apertures?.count || 0,
+                    doorCount: wallData?.apertures?.doorCount || 0,
+                    hasShading: wallData?.shading?.enabled || false
+                };
+            });
+
+            return {
+                success: true,
+                walls: wallSummaries,
+                message: `Found ${wallSummaries.length} wall(s) in the Draw Model geometry.`
+            };
+        }
+
+        case 'getWallDetails': {
+            if (!isCustomGeometry) {
+                throw new Error("This tool only works in Draw Model mode. Current mode is " +
+                    (currentImportedModel ? 'Import' : 'Parametric'));
+            }
+
+            const { wallId } = args;
+            if (!wallId) throw new Error("wallId is required.");
+
+            const wallData = getCustomWallData(wallId);
+            if (!wallData) {
+                throw new Error(`Wall with ID '${wallId}' not found. Use listCustomWalls to see available walls.`);
+            }
+
+            // Get geometry info from wall list
+            const wallList = getWallListFromGroup();
+            const wallGeom = wallList.find(w => w.id === wallId);
+
+            let length = 0;
+            if (wallGeom?.p1 && wallGeom?.p2) {
+                length = Math.sqrt(
+                    Math.pow(wallGeom.p2.x - wallGeom.p1.x, 2) +
+                    Math.pow(wallGeom.p2.z - wallGeom.p1.z, 2)
+                );
+            }
+
+            return {
+                success: true,
+                wallId: wallId,
+                isPartition: wallGeom?.isPartition || false,
+                geometry: {
+                    length: Math.round(length * 100) / 100,
+                    height: wallData.dimensions?.height || 0,
+                    p1: wallGeom?.p1,
+                    p2: wallGeom?.p2
+                },
+                apertures: wallData.apertures,
+                shading: wallData.shading,
+                frame: wallData.frame,
+                message: `Retrieved details for ${wallId}.`
+            };
+        }
+
+        case 'modifyCustomWallApertures': {
+            if (!isCustomGeometry) {
+                throw new Error("This tool only works in Draw Model mode. Current mode is " +
+                    (currentImportedModel ? 'Import' : 'Parametric'));
+            }
+
+            const { wallId, type, count, width, height, sillHeight, doorCount, doorWidth, doorHeight } = args;
+            if (!wallId) throw new Error("wallId is required.");
+
+            const wallData = getCustomWallData(wallId);
+            if (!wallData) {
+                throw new Error(`Wall with ID '${wallId}' not found. Use listCustomWalls to see available walls.`);
+            }
+
+            // Update aperture properties
+            const apertureType = type || 'window';
+            wallData.apertures.type = apertureType;
+
+            if (apertureType === 'window') {
+                if (count !== undefined) wallData.apertures.count = count;
+                if (width !== undefined) wallData.apertures.width = width;
+                if (height !== undefined) wallData.apertures.height = height;
+                if (sillHeight !== undefined) wallData.apertures.sillHeight = sillHeight;
+                wallData.apertures.mode = 'manual';
+            } else if (apertureType === 'door') {
+                if (doorCount !== undefined) wallData.apertures.doorCount = doorCount;
+                if (doorWidth !== undefined) wallData.apertures.doorWidth = doorWidth;
+                if (doorHeight !== undefined) wallData.apertures.doorHeight = doorHeight;
+                wallData.apertures.sillHeight = 0; // Doors start at floor
+            }
+
+            // Trigger geometry update
+            updateCustomWall(wallId);
+
+            // Also trigger scene update
+            const { updateScene } = await import('./geometry.js');
+            updateScene();
+
+            const summary = apertureType === 'window'
+                ? `${wallData.apertures.count} window(s)`
+                : `${wallData.apertures.doorCount} door(s)`;
+
+            return {
+                success: true,
+                message: `Modified ${wallId}: ${summary} configured.`,
+                wallId: wallId,
+                apertures: wallData.apertures
+            };
+        }
+
+        default:
+            throw new Error(`Unknown custom geometry tool: ${name}`);
+    }
+}
+
 async function _handleResultsTool(name, args) {
     switch (name) {
         case 'getResultsRegistryTypes': {
@@ -2559,6 +2782,12 @@ const toolHandlers = {
     // Generator tools
     'setShadingContext': (args) => _handleGeneratorTool('setShadingContext', args),
     'createShadingPattern': (args) => _handleGeneratorTool('createShadingPattern', args),
+
+    // Custom Geometry (Draw Model) tools
+    'getGeometryMode': (args) => _handleCustomGeometryTool('getGeometryMode', args),
+    'listCustomWalls': (args) => _handleCustomGeometryTool('listCustomWalls', args),
+    'getWallDetails': (args) => _handleCustomGeometryTool('getWallDetails', args),
+    'modifyCustomWallApertures': (args) => _handleCustomGeometryTool('modifyCustomWallApertures', args),
 
     // Optimization tools (Radiance / shading)
     'openOptimizationPanel': async (args) => {

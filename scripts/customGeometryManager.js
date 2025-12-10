@@ -220,25 +220,149 @@ export function updateCustomWall(wallId) {
     }
 }
 
+/**
+ * Finds a wall that contains the given point on its edge (within tolerance).
+ * @param {THREE.Vector3} point - The point to check (in local coordinates).
+ * @param {number} tolerance - Distance tolerance for "on-line" detection.
+ * @returns {object|null} { wallGroup, t } where t is the position along the wall (0-1), or null.
+ */
+function findWallAtPoint(point, tolerance = 0.3) {
+    if (wallSelectionGroup.children.length === 0) return null;
+    const container = wallSelectionGroup.children[0];
+
+    for (const wallGroup of container.children) {
+        // Skip partitions - only consider exterior walls
+        if (wallGroup.userData.isPartition) continue;
+
+        const p1 = wallGroup.userData.p1;
+        const p2 = wallGroup.userData.p2;
+        if (!p1 || !p2) continue;
+
+        // Calculate distance from point to line segment p1-p2
+        const lineVec = new THREE.Vector3().subVectors(p2, p1);
+        const lineLen = lineVec.length();
+        if (lineLen < 0.01) continue;
+
+        const lineDir = lineVec.clone().normalize();
+        const pointVec = new THREE.Vector3().subVectors(point, p1);
+
+        // Project point onto line
+        const t = pointVec.dot(lineDir) / lineLen;
+
+        // Check if projection is within the segment (with small margin)
+        if (t < 0.05 || t > 0.95) continue; // Don't split at corners
+
+        // Calculate closest point on line
+        const closestPoint = p1.clone().add(lineDir.multiplyScalar(t * lineLen));
+        const distance = point.distanceTo(closestPoint);
+
+        if (distance < tolerance) {
+            return { wallGroup, t, splitPoint: closestPoint };
+        }
+    }
+    return null;
+}
+
+/**
+ * Splits a wall at the specified position, creating two new wall segments.
+ * @param {THREE.Group} wallGroup - The wall group to split.
+ * @param {number} t - Position along the wall (0-1) where to split.
+ * @param {THREE.Vector3} splitPoint - The exact split point.
+ */
+function splitWallAtPoint(wallGroup, t, splitPoint) {
+    const container = wallSelectionGroup.children[0];
+    if (!container) return;
+
+    const { p1, p2, isCCW, thickness, canonicalId } = wallGroup.userData;
+    const height = currentRoomHeight;
+
+    // Calculate the original wall's properties
+    const originalAngle = Math.atan2(p2.z - p1.z, p2.x - p1.x);
+
+    // Create two new wall segments
+    // Segment 1: from p1 to splitPoint
+    const len1 = p1.distanceTo(splitPoint);
+    const wallId1 = `${canonicalId}_a`;
+    registerCustomWall(wallId1, { length: len1, height: height });
+    const wall1 = createCustomWallGeometry(wallId1, p1, splitPoint, height, thickness, originalAngle, isCCW, len1, 0);
+
+    // Segment 2: from splitPoint to p2
+    const len2 = splitPoint.distanceTo(p2);
+    const wallId2 = `${canonicalId}_b`;
+    registerCustomWall(wallId2, { length: len2, height: height });
+    const wall2 = createCustomWallGeometry(wallId2, splitPoint, p2, height, thickness, originalAngle, isCCW, len2, 0);
+
+    // Remove original wall
+    container.remove(wallGroup);
+    // Dispose geometry
+    wallGroup.traverse(child => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+            if (Array.isArray(child.material)) {
+                child.material.forEach(m => m.dispose());
+            } else {
+                child.material.dispose();
+            }
+        }
+    });
+
+    // Add new walls
+    container.add(wall1);
+    container.add(wall2);
+
+    console.log(`[CustomGeometry] Split wall ${canonicalId} into ${wallId1} and ${wallId2}`);
+}
+
 export function addCustomPartition(p1, p2, height = currentRoomHeight, thickness = 0.1) {
     const wallId = `partition_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
-    const len = p1.distanceTo(p2);
+    // Ensure we have a container to add to
+    if (wallSelectionGroup.children.length === 0) {
+        const newContainer = new THREE.Group();
+        wallSelectionGroup.add(newContainer);
+    }
+    const container = wallSelectionGroup.children[0];
+
+    // Coordinate Transformation: World -> Local
+    // This ensures that partitions are placed correctly relative to the room,
+    // even if the room is rotated or elevated.
+    wallSelectionGroup.updateMatrixWorld(true); // Ensure transforms are up to date
+
+    const p1Local = p1.clone();
+    const p2Local = p2.clone();
+
+    container.worldToLocal(p1Local);
+    container.worldToLocal(p2Local);
+
+    // --- Wall Splitting Logic ---
+    // Check if either endpoint touches an exterior wall and split it
+    const wall1Hit = findWallAtPoint(p1Local);
+    if (wall1Hit) {
+        splitWallAtPoint(wall1Hit.wallGroup, wall1Hit.t, wall1Hit.splitPoint);
+    }
+
+    const wall2Hit = findWallAtPoint(p2Local);
+    if (wall2Hit) {
+        splitWallAtPoint(wall2Hit.wallGroup, wall2Hit.t, wall2Hit.splitPoint);
+    }
+    // --- End Wall Splitting Logic ---
+
+    const len = p1Local.distanceTo(p2Local);
     registerCustomWall(wallId, { length: len, height: height });
 
-    const angle = Math.atan2(p2.z - p1.z, p2.x - p1.x);
+    const angle = Math.atan2(p2Local.z - p1Local.z, p2Local.x - p1Local.x);
 
     // Create Partition Geometry
     const wallGroup = new THREE.Group();
-    const midX = (p1.x + p2.x) / 2;
-    const midZ = (p1.z + p2.z) / 2;
+    const midX = (p1Local.x + p2Local.x) / 2;
+    const midZ = (p1Local.z + p2Local.z) / 2;
 
     wallGroup.position.set(midX, height / 2, midZ);
     wallGroup.rotation.y = -angle;
 
     wallGroup.userData.canonicalId = wallId;
-    wallGroup.userData.p1 = p1;
-    wallGroup.userData.p2 = p2;
+    wallGroup.userData.p1 = p1Local; // Store local points for consistency
+    wallGroup.userData.p2 = p2Local;
     wallGroup.userData.angle = angle;
     wallGroup.userData.isCCW = true; // Default for _buildWallContent
     wallGroup.userData.thickness = thickness;
@@ -255,14 +379,7 @@ export function addCustomPartition(p1, p2, height = currentRoomHeight, thickness
     wallGroup.children.forEach(c => c.position.z += thickness / 2);
 
     // Add to existing container
-    // We assume createCustomRoom was called and wallSelectionGroup has a child container
-    if (wallSelectionGroup.children.length > 0) {
-        wallSelectionGroup.children[0].add(wallGroup);
-    } else {
-        const wallContainer = new THREE.Group();
-        wallSelectionGroup.add(wallContainer);
-        wallContainer.add(wallGroup);
-    }
+    container.add(wallGroup);
 
     updateScene();
     return wallId;
@@ -429,6 +546,32 @@ function _buildWallContent(wallGroup, wallData, len, height, wallThickness, isCC
 
                 wallGroup.add(frameMesh);
             }
+        }
+    }
+
+    // Add Holes for Doors
+    if (apertures && apertures.type === 'door' && apertures.doorCount > 0) {
+        const dw = apertures.doorWidth || 0.9;
+        const dh = apertures.doorHeight || 2.1;
+        const doorSpacing = apertures.doorSpacing || 0.5;
+        const doorDepthPos = apertures.doorDepthPos || 0.1;
+
+        // Calculate group width to center doors
+        const doorGroupWidth = apertures.doorCount * dw + Math.max(0, apertures.doorCount - 1) * doorSpacing;
+        const startX = -doorGroupWidth / 2;
+
+        for (let i = 0; i < apertures.doorCount; i++) {
+            // Calculate center X - doors start from bottom (floor)
+            const doorCenterX = startX + dw / 2 + i * (dw + doorSpacing);
+            const doorCenterY = dh / 2 - height / 2; // Door starts at floor level
+
+            const doorHolePath = new THREE.Path();
+            doorHolePath.moveTo(doorCenterX - dw / 2, doorCenterY - dh / 2);
+            doorHolePath.lineTo(doorCenterX + dw / 2, doorCenterY - dh / 2);
+            doorHolePath.lineTo(doorCenterX + dw / 2, doorCenterY + dh / 2);
+            doorHolePath.lineTo(doorCenterX - dw / 2, doorCenterY + dh / 2);
+            doorHolePath.closePath();
+            wallShape.holes.push(doorHolePath);
         }
     }
 

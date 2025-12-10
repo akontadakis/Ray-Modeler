@@ -14,7 +14,7 @@ export { generateAndStoreOccupancyCsv, getDom };
 import { resultsManager, palettes } from './resultsManager.js';
 import * as MESH from '../scripts/scene.js';
 import { initHdrViewer, openHdrViewer } from './hdrViewer.js';
-import { startDrawingMode, cancelDrawing, showDrawSetupModal, startPartitionDrawingMode } from './drawingTool.js';
+import { startDrawingMode, cancelDrawing, showDrawSetupModal, startPartitionDrawingMode, isDrawing, isDrawingPartition } from './drawingTool.js';
 import { injectCustomWallUI } from './customApertureManager.js';
 
 
@@ -1316,9 +1316,7 @@ export async function setupEventListeners() {
 
     // --- Partition Drawing Button Listener ---
     dom['draw-partition-btn']?.addEventListener('click', () => {
-        import('./drawingTool.js').then(({ startPartitionDrawingMode }) => {
-            startPartitionDrawingMode();
-        });
+        startPartitionDrawingMode();
     });
 
     // Listeners for the new transform sliders with real-time feedback
@@ -4632,19 +4630,14 @@ function handleWallSelection(wallGroup, resetLock = true) {
     // Highlight the selected wall mesh in the 3D view
     highlightWall(wallMesh);
 
-    // Check if it's a custom wall
-    if (wallId.startsWith('wall_')) {
+    // Check if it's a custom wall or partition (interior wall)
+    if (wallId.startsWith('wall_') || wallId.startsWith('partition_')) {
         // Import dynamically to avoid circular dependency issues at top level if any
         import('./customApertureManager.js').then(({ injectCustomWallUI }) => {
             injectCustomWallUI(wallId);
         });
 
-        // Ensure panel is visible
-        const panel = dom['panel-aperture'];
-        if (panel.classList.contains('hidden')) {
-            panel.classList.remove('hidden');
-            dom['toggle-panel-aperture-btn']?.classList.add('active');
-        }
+
     } else {
         // Standard wall
         // Ensure custom UI is hidden
@@ -6111,6 +6104,9 @@ function onPointerUp(event) {
  */
 function handleSceneClick(event) {
     const dom = getDom();
+
+    // Skip selection when in drawing mode - drawing has its own click handlers
+    if (isDrawing || isDrawingPartition) return;
 
     if (transformControls.dragging || sensorTransformControls.dragging || isResizeMode) return;
 

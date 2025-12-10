@@ -57,6 +57,21 @@ export let sensorMeshes = []; // Store references to instanced meshes for result
 export let daylightingSensorMeshes = []; // Store references to individual sensor meshes for gizmo control
 export let importedShadingObjects = []; // Store references to imported OBJ meshes for selection
 
+/**
+ * Returns a list of wall metadata from the wallSelectionGroup for AI assistant queries.
+ * @returns {Array} Array of wall objects with id, isPartition, p1, p2 coordinates.
+ */
+export function getWallListFromGroup() {
+    if (wallSelectionGroup.children.length === 0) return [];
+    const container = wallSelectionGroup.children[0];
+    return container.children.map(wallGroup => ({
+        id: wallGroup.userData.canonicalId,
+        isPartition: wallGroup.userData.isPartition || false,
+        p1: wallGroup.userData.p1 ? { x: wallGroup.userData.p1.x, z: wallGroup.userData.p1.z } : null,
+        p2: wallGroup.userData.p2 ? { x: wallGroup.userData.p2.x, z: wallGroup.userData.p2.z } : null
+    }));
+}
+
 // ... (existing code)
 
 /**

@@ -16,7 +16,13 @@ export function registerCustomWall(id, dimensions) {
             sillHeight: 1.0,
             width: 1.5,
             height: 1.2,
-            depthPos: 0.1
+            depthPos: 0.1,
+            // Door-specific properties
+            doorCount: 0,
+            doorSpacing: 0.5,
+            doorHeight: 2.1,
+            doorWidth: 0.9,
+            doorDepthPos: 0.1
         },
         shading: {
             type: 'none',
@@ -41,6 +47,14 @@ export function clearCustomWalls() {
 
 export function getCustomWallData(id) {
     return customWalls.get(id);
+}
+
+/**
+ * Returns a copy of all custom wall data for AI assistant queries.
+ * @returns {Map} A copy of all custom walls with their data.
+ */
+export function getAllCustomWalls() {
+    return new Map(customWalls);
 }
 
 export function injectCustomWallUI(wallId) {
@@ -151,6 +165,13 @@ function handleCustomWallChange(wallId, inputId, value) {
     else if (key === 'win-width') wallData.apertures.width = parseFloat(value);
     else if (key === 'win-height') wallData.apertures.height = parseFloat(value);
     else if (key === 'sill-height') wallData.apertures.sillHeight = parseFloat(value);
+
+    // Door-specific properties
+    else if (key === 'door-count') wallData.apertures.doorCount = parseInt(value);
+    else if (key === 'door-spacing') wallData.apertures.doorSpacing = parseFloat(value);
+    else if (key === 'door-height') wallData.apertures.doorHeight = parseFloat(value);
+    else if (key === 'door-width') wallData.apertures.doorWidth = parseFloat(value);
+    else if (key === 'door-depth-pos') wallData.apertures.doorDepthPos = parseFloat(value);
 
     // 2. Shading
     else if (inputId.includes('shading-')) {
