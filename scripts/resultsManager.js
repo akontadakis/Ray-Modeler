@@ -426,7 +426,7 @@ class ResultsManager {
             labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
             min: monthly.map(m => m.min),
             max: monthly.map(m => m.max),
-            avg: monthly.map(m => m.sum / m.count)
+            avg: monthly.map(m => m.count > 0 ? m.sum / m.count : 0)
         };
     }
 
@@ -527,7 +527,8 @@ class ResultsManager {
             const scheduleValues = scheduleFile.content
                 .trim()
                 .split(/\r?\n/)
-                .map(v => parseInt(v, 10));
+                .map(v => parseInt(v, 10))
+                .filter(v => !isNaN(v));
             if (scheduleValues.length === 8760 && scheduleValues.every(v => v === 0 || v === 1)) {
                 for (let h = 0; h < 8760; h++) {
                     mask[h] = scheduleValues[h] === 1;

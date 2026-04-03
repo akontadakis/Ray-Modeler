@@ -101,6 +101,10 @@ export function showDrawSetupModal() {
             // Load the floor plan and then start drawing
             loadFloorPlanImage(pendingFloorPlanFile, pendingFloorPlanWidth).then(() => {
                 startDrawingMode();
+            }).catch((err) => {
+                console.error('[DrawingTool] Failed to load floor plan:', err);
+                import('./ui.js').then(({ showAlert }) => showAlert('Failed to load floor plan image.', 'Error'));
+                startDrawingMode(); // Start drawing mode anyway, without floor plan
             });
         } else {
             startDrawingMode();
@@ -278,8 +282,17 @@ export function startDrawingMode() {
         tempGroup.add(cursorMarker);
     }
 
-    // Add event listeners
+    // Remove any stale listeners before adding to prevent stacking
     const canvas = dom['render-container'];
+    canvas.removeEventListener('mousemove', onMouseMove);
+    canvas.removeEventListener('click', onClick);
+    canvas.removeEventListener('dblclick', onDoubleClick);
+    canvas.removeEventListener('contextmenu', onContextMenu);
+    window.removeEventListener('keydown', onKeyDown, true);
+    window.removeEventListener('resize', onWindowResize);
+    controls.removeEventListener('change', updateAllLabels);
+
+    // Add event listeners
     canvas.addEventListener('mousemove', onMouseMove);
     canvas.addEventListener('click', onClick);
     canvas.addEventListener('dblclick', onDoubleClick);
@@ -350,7 +363,16 @@ export function startPartitionDrawingMode() {
         tempGroup.add(cursorMarker);
     }
 
+    // Remove any stale listeners before adding to prevent stacking
     const canvas = dom['render-container'];
+    canvas.removeEventListener('mousemove', onMouseMove);
+    canvas.removeEventListener('click', onClick);
+    canvas.removeEventListener('dblclick', onDoubleClick);
+    canvas.removeEventListener('contextmenu', onContextMenu);
+    window.removeEventListener('keydown', onKeyDown, true);
+    window.removeEventListener('resize', onWindowResize);
+    controls.removeEventListener('change', updateAllLabels);
+
     canvas.addEventListener('mousemove', onMouseMove);
     canvas.addEventListener('click', onClick);
     canvas.addEventListener('dblclick', onDoubleClick);
@@ -840,6 +862,7 @@ function finishDrawing() {
         cancelBtn.addEventListener('click', onCancel);
     } else {
         console.error("Height modal not found!");
+        isDrawing = false;
         cleanupHelpers();
     }
 }
@@ -927,22 +950,31 @@ function cleanupHelpers(partial = false) {
         if (tooltip) tooltip.classList.add('hidden');
     }
 
-    // Clear temp geometry
-    while (tempGroup.children.length > 0) {
-        tempGroup.remove(tempGroup.children[0]);
-    }
+    // Helper to dispose a single child's GPU resources
+    const disposeChild = (child) => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+            const mats = Array.isArray(child.material) ? child.material : [child.material];
+            mats.forEach(m => { if (m.map) m.map.dispose(); m.dispose(); });
+        }
+    };
 
-    // Clear refs (but keep marker if partial?)
-    // Actually simpler to just rebuild marker in start/partial logic if needed
-    // But cursorMarker is useful.
     if (partial && cursorMarker) {
-        // Keep cursorMarker, remove others
-        // Iterate backwards
+        // Keep cursorMarker, dispose and remove everything else
         for (let i = tempGroup.children.length - 1; i >= 0; i--) {
             const c = tempGroup.children[i];
-            if (c !== cursorMarker) tempGroup.remove(c);
+            if (c !== cursorMarker) {
+                disposeChild(c);
+                tempGroup.remove(c);
+            }
         }
     } else {
+        // Full cleanup: dispose and remove all children
+        while (tempGroup.children.length > 0) {
+            const child = tempGroup.children[0];
+            disposeChild(child);
+            tempGroup.remove(child);
+        }
         activeLine = null;
         cursorMarker = null;
         startMarker = null;

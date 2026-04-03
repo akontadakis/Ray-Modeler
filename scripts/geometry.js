@@ -139,11 +139,23 @@ function applyClippingToMaterial(mat, clippingPlanes) {
     mat.clipIntersection = true;
 }
 
+function disposeMaterial(m) {
+    if (!m) return;
+    // Dispose textures attached to the material
+    if (m.map) m.map.dispose();
+    if (m.normalMap) m.normalMap.dispose();
+    if (m.roughnessMap) m.roughnessMap.dispose();
+    if (m.metalnessMap) m.metalnessMap.dispose();
+    if (m.aoMap) m.aoMap.dispose();
+    if (m.emissiveMap) m.emissiveMap.dispose();
+    m.dispose();
+}
+
 function disposeMeshLike(obj) {
     if (obj.geometry) obj.geometry.dispose?.();
     if (obj.material) {
-        if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose?.());
-        else obj.material.dispose?.();
+        if (Array.isArray(obj.material)) obj.material.forEach(disposeMaterial);
+        else disposeMaterial(obj.material);
     }
 }
 

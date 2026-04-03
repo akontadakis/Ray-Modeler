@@ -184,7 +184,7 @@ const debouncedScheduleUpdate = debounce(scheduleUpdate, 250); // 250ms delay
 const debouncedWindowResize = debounce(() => window.dispatchEvent(new Event('resize')), 100);
 
 let map, tileLayer;
-let maxZ = 100;
+let maxZ = 200;
 
 /**
 * Generates an 8760-hour occupancy schedule CSV content based on UI controls
@@ -420,9 +420,14 @@ export function setShadingState(wallDir, state) {
 export function scheduleUpdate(id = null) {
     if (updateScheduled) return;
     updateScheduled = true;
-    requestAnimationFrame(() => {
-        updateScene(id, selectedWallId);
-        updateScheduled = false;
+    requestAnimationFrame(async () => {
+        try {
+            await updateScene(id, selectedWallId);
+        } catch (err) {
+            console.error('[UI] Scene update failed:', err);
+        } finally {
+            updateScheduled = false;
+        }
     });
 }
 
@@ -435,6 +440,8 @@ let windowModes = { 'n': 'wwr', 's': 'wwr', 'e': 'wwr', 'w': 'wwr' };
 * for any floating window that is dynamically added to the DOM,
 * such as simulation recipe panels.
 */
+let dynamicPanelObserver = null;
+
 function observeAndInitDynamicPanels() {
     const container = document.getElementById('window-container');
     if (!container) {
@@ -442,7 +449,12 @@ function observeAndInitDynamicPanels() {
         return;
     }
 
-    const observer = new MutationObserver((mutationsList) => {
+    // Disconnect previous observer to prevent accumulation
+    if (dynamicPanelObserver) {
+        dynamicPanelObserver.disconnect();
+    }
+
+    dynamicPanelObserver = new MutationObserver((mutationsList) => {
         for (const mutation of mutationsList) {
             if (mutation.type === 'childList') {
                 mutation.addedNodes.forEach(node => {
@@ -455,7 +467,7 @@ function observeAndInitDynamicPanels() {
         }
     });
 
-    observer.observe(container, { childList: true });
+    dynamicPanelObserver.observe(container, { childList: true });
 }
 
 /**
@@ -854,7 +866,11 @@ function setupTaskAreaVisualizer() {
     taskAreaCanvas.addEventListener('mouseup', onTaskAreaMouseUp);
     taskAreaCanvas.addEventListener('mouseleave', onTaskAreaMouseUp);
 
-    new ResizeObserver(drawTaskAreaVisualizer).observe(dom['task-area-visualizer-container']);
+    // Store ResizeObserver so it can be cleaned up if needed
+    if (!taskAreaCanvas._resizeObserver) {
+        taskAreaCanvas._resizeObserver = new ResizeObserver(drawTaskAreaVisualizer);
+        taskAreaCanvas._resizeObserver.observe(dom['task-area-visualizer-container']);
+    }
 }
 
 // --- END: New functions for Task Area Visualizer ---
@@ -881,12 +897,8 @@ function setupHeliosPanel() {
     // NOTE: Former helios-mode-toggle behavior has been removed.
     // Both optimization tabs are always available; tab click handlers manage active content.
 
-    // AI Panel Tab Switching
-    // Logic moved entirely to ai-assistant.js to handle dynamic chat tabs and optimization tabs unification.
-    // This listener is neutralized to prevent conflicts (blank content issues).
-    dom['ai-chat-tabs']?.addEventListener('click', (e) => {
-        // no-op: ai-assistant.js handles all click events for these tabs
-    });
+    // AI Panel Tab Switching is handled entirely by ai-assistant.js.
+    // No listener needed here.
 }
 
 export async function setupEventListeners() {
@@ -3320,11 +3332,22 @@ function promptForProjectDirectory() {
     }
 }
 
+/**
+ * Escapes HTML special characters to prevent XSS when inserting into innerHTML.
+ */
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
 export function showAlert(message, title = "Notification") {
     const dom = getDom();
 
     dom['custom-alert-title'].textContent = title;
-    dom['custom-alert-message'].innerHTML = message;
+    // Allow only known safe HTML tags (br, b, strong, em, i) from internal callers
+    const safeMessage = typeof message === 'string' ? message : escapeHtml(String(message));
+    dom['custom-alert-message'].innerHTML = safeMessage;
     dom['custom-alert'].style.zIndex = getNewZIndex();
     dom['custom-alert'].classList.replace('hidden', 'flex');
 }
@@ -3994,10 +4017,16 @@ function populateGlareSourceList(glareResult) {
     glareResult.sources.forEach((source, index) => {
         const li = document.createElement('li');
         li.className = 'p-2 rounded cursor-pointer hover:bg-[--grid-color] transition-colors';
-        li.innerHTML = `<div class="flex justify-between items-center">
-                          <span>Source ${index + 1} (L: ${source.L.toFixed(0)} cd/m²)</span>
-                          <span class="text-xs text-[--text-secondary]">Ev: ${source.Ev.toFixed(0)}</span>
-                        </div>`;
+        const div = document.createElement('div');
+        div.className = 'flex justify-between items-center';
+        const spanL = document.createElement('span');
+        spanL.textContent = `Source ${index + 1} (L: ${source.L.toFixed(0)} cd/m²)`;
+        const spanEv = document.createElement('span');
+        spanEv.className = 'text-xs text-[--text-secondary]';
+        spanEv.textContent = `Ev: ${source.Ev.toFixed(0)}`;
+        div.appendChild(spanL);
+        div.appendChild(spanEv);
+        li.appendChild(div);
 
         li.addEventListener('click', () => {
             // Remove active class from all other items
@@ -5422,13 +5451,25 @@ function renderSavedViews() {
         const viewElement = document.createElement('div');
         viewElement.className = 'saved-view-item';
         viewElement.dataset.index = index;
-        viewElement.innerHTML = `
-            <img src="${view.thumbnail}" alt="${view.name}" class="saved-view-thumbnail">
-            <span class="saved-view-name">${view.name}</span>
-            <button class="delete-view-btn" aria-label="Delete ${view.name}">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-        `;
+
+        const img = document.createElement('img');
+        img.className = 'saved-view-thumbnail';
+        img.alt = view.name;
+        // Only allow data: URLs for thumbnails (generated internally from canvas)
+        img.src = (view.thumbnail && view.thumbnail.startsWith('data:')) ? view.thumbnail : '';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'saved-view-name';
+        nameSpan.textContent = view.name;
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-view-btn';
+        deleteBtn.ariaLabel = `Delete ${view.name}`;
+        deleteBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+
+        viewElement.appendChild(img);
+        viewElement.appendChild(nameSpan);
+        viewElement.appendChild(deleteBtn);
         listContainer.appendChild(viewElement);
     });
 }

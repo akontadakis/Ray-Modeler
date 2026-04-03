@@ -134,8 +134,11 @@ export function _parseBsdfXml(xmlContent) {
         const angleNode = node.querySelector("Angle");
         if (!angleNode) return;
 
-        const theta = parseFloat(angleNode.querySelector("Theta")?.textContent);
-        const phi = parseFloat(angleNode.querySelector("Phi")?.textContent);
+        const thetaText = angleNode.querySelector("Theta")?.textContent;
+        const phiText = angleNode.querySelector("Phi")?.textContent;
+        const theta = thetaText != null ? parseFloat(thetaText) : NaN;
+        const phi = phiText != null ? parseFloat(phiText) : NaN;
+        if (isNaN(theta) || isNaN(phi)) return; // Skip entries with invalid angles
 
         const dataNode = node.querySelector('WavelengthData[Wavelength="Visible"] WavelengthDataBlock[WavelengthDataIdentifier="Transmission Front"]');
         if (!dataNode) return;

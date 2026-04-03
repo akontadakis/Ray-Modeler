@@ -57,7 +57,7 @@
 }
 
 .diag-highlight {
-  outline: 1px solid var(--accent-color, #38bdf8);
+  outline: 1px solid var(--highlight-color, #38bdf8);
   background-color: rgba(56, 189, 248, 0.06);
   transition: background-color 0.25s ease-out, outline-color 0.25s ease-out;
 }
@@ -441,7 +441,7 @@ canvas {
   padding: 6px 12px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
   position: absolute;
-  z-index: 100;
+  z-index: 9000;
   left: calc(100% + 10px);
   /* Default to right */
   top: 50%;
@@ -2857,31 +2857,32 @@ body.left-sidebar-docked.ai-sidebar-open #render-container {
   margin-left: 60px;
   width: calc(100% - 60px - var(--ai-sidebar-width));
 }
+
 /* Tutor Mode Styles */
 .window-header.tutor-mode {
-    background-color: var(--accent-color);
-    color: white;
+  background-color: var(--accent-color);
+  color: white;
 }
 
 .tutor-badge {
-    background-color: rgba(59, 130, 246, 0.1);
-    border: 1px solid var(--accent-color);
-    border-radius: 4px;
-    padding: 8px;
-    margin-bottom: 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.85rem;
-    color: var(--accent-color);
-    font-weight: 500;
+  background-color: rgba(59, 130, 246, 0.1);
+  border: 1px solid var(--accent-color);
+  border-radius: 4px;
+  padding: 8px;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--accent-color);
+  font-weight: 500;
 }
 
 .tutor-badge button {
-    color: var(--text-secondary);
-    text-decoration: underline;
+  color: var(--text-secondary);
+  text-decoration: underline;
 }
 
 .tutor-badge button:hover {
-    color: var(--text-primary);
+  color: var(--text-primary);
 }

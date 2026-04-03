@@ -1,36 +1,80 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 /**
+ * Validates that an argument is a plain object with expected string fields.
+ */
+function validatePathArgs(args, requiredFields) {
+  if (!args || typeof args !== 'object') {
+    throw new Error('Invalid arguments: expected an object');
+  }
+  for (const field of requiredFields) {
+    if (typeof args[field] !== 'string' || !args[field]) {
+      throw new Error(`Invalid argument: '${field}' must be a non-empty string`);
+    }
+  }
+}
+
+/**
  * Electron preload → renderer bridge.
+ * All methods validate arguments before forwarding to the main process.
  */
 contextBridge.exposeInMainWorld('electronAPI', {
   // --- Methods that expect a return value (invoked) ---
   openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
-  saveProject: (args) => ipcRenderer.invoke('fs:saveProject', args),
-  runScriptHeadless: (args) => ipcRenderer.invoke('run-script-headless', args),
-  runSimulationsParallel: (args) => ipcRenderer.invoke('run-simulations-parallel', args),
-  readFile: (args) => ipcRenderer.invoke('fs:readFile', args),
-  checkFileExists: (args) => ipcRenderer.invoke('fs:checkFileExists', args),
-  writeFile: (args) => ipcRenderer.invoke('fs:writeFile', args),
-  runPythonScript: (args) => ipcRenderer.invoke('run-python-script', args),
+
+  saveProject: (args) => {
+    validatePathArgs(args, ['projectPath']);
+    if (!Array.isArray(args.files)) throw new Error('Invalid argument: files must be an array');
+    return ipcRenderer.invoke('fs:saveProject', args);
+  },
+
+  runScriptHeadless: (args) => {
+    validatePathArgs(args, ['projectPath']);
+    return ipcRenderer.invoke('run-script-headless', args);
+  },
+
+  runSimulationsParallel: (args) => {
+    if (!args || !Array.isArray(args.simulations)) throw new Error('Invalid argument: simulations must be an array');
+    return ipcRenderer.invoke('run-simulations-parallel', args);
+  },
+
+  readFile: (args) => {
+    validatePathArgs(args, ['projectPath', 'filePath']);
+    return ipcRenderer.invoke('fs:readFile', args);
+  },
+
+  checkFileExists: (args) => {
+    validatePathArgs(args, ['projectPath', 'filePath']);
+    return ipcRenderer.invoke('fs:checkFileExists', args);
+  },
+
+  writeFile: (args) => {
+    validatePathArgs(args, ['projectPath', 'filePath']);
+    return ipcRenderer.invoke('fs:writeFile', args);
+  },
+
+  runPythonScript: (args) => {
+    validatePathArgs(args, ['projectPath', 'scriptPath']);
+    return ipcRenderer.invoke('run-python-script', args);
+  },
 
   // --- Methods for one-way communication or event listeners ---
-  runScript: (args) => ipcRenderer.send('run-script', args),
+  runScript: (args) => {
+    validatePathArgs(args, ['projectPath', 'scriptName']);
+    ipcRenderer.send('run-script', args);
+  },
 
   onScriptOutput: (callback) => {
     const listener = (_event, value) => callback(value);
     ipcRenderer.on('script-output', listener);
-    return listener;
+    // Return unsubscribe function to prevent listener leaks
+    return () => ipcRenderer.removeListener('script-output', listener);
   },
+
   onScriptExit: (callback) => {
     const listener = (_event, value) => callback(value);
     ipcRenderer.on('script-exit', listener);
-    return listener;
+    // Return unsubscribe function to prevent listener leaks
+    return () => ipcRenderer.removeListener('script-exit', listener);
   },
-
-
-
-
-
-
 });
