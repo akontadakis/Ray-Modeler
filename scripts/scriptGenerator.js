@@ -3,6 +3,20 @@
 import { _parseAndBinSpectralData } from './radiance.js';
 
 /**
+ * Converts a "HH:MM" clock string to decimal hours (e.g. "12:30" -> 12.5),
+ * which is the format gensky/gendaylit expect. A bare number is passed through.
+ * @param {string} timeStr - The time as "HH:MM".
+ * @param {string} fallback - Value to use when timeStr is empty.
+ * @returns {number} Decimal hours.
+ */
+function _timeToDecimalHour(timeStr, fallback = '12:00') {
+    const parts = String(timeStr || fallback).split(':');
+    const h = parseFloat(parts[0]);
+    const m = parts.length > 1 ? parseFloat(parts[1]) : 0;
+    return (isNaN(h) ? 0 : h) + (isNaN(m) ? 0 : m) / 60;
+}
+
+/**
 * Generates Radiance definitions for artificial light sources using xform for placement.
 * @param {object|null} lightingData - The lighting state object from lightingManager.
 * @param {object} roomData - The room geometry data { W, L, H, rotationY }.
@@ -67,7 +81,7 @@ import { _parseAndBinSpectralData } from './radiance.js';
 
     switch (lightingData.type) {
         case 'light': matArgs = `3 ${scaledRgb(lightingData.rgb)}`; break;
-        case 'spotlight': matArgs = `7 ${scaledRgb(lightingData.rgb)} 0 0 -1 ${lightingData.cone_angle} 0`; break;
+        case 'spotlight': matArgs = `7 ${scaledRgb(lightingData.rgb)} ${lightingData.cone_angle} 0 0 -1`; break;
         case 'glow': matArgs = `4 ${scaledRgb(lightingData.rgb)} ${lightingData.max_radius}`; break;
         case 'illum': matArgs = `2 ${lightingData.alternate_material || 'void'} ${scaledRgb(lightingData.rgb)}`; break;
         case 'ies':
@@ -85,36 +99,48 @@ import { _parseAndBinSpectralData } from './radiance.js';
         }
 
     if (lightingData.type !== 'ies') {
-        lightRad += `void ${lightingData.type} ${matIdentifier}\n0\n0\n${matArgs}\n\n`;
-
-        // 2. Define the light geometry ONCE at the origin.
-        switch (lightingData.geometry.type) {
-            case 'sphere':
-                lightRad += `${matIdentifier} sphere ${geomIdentifier}\n0\n0\n4 0 0 0 ${lightingData.geometry.radius}\n\n`;
-                break;
-            case 'cylinder':
-                const cylP1 = `0 0 ${-lightingData.geometry.length / 2}`;
-                const cylP2 = `0 0 ${lightingData.geometry.length / 2}`;
-                lightRad += `${matIdentifier} cylinder ${geomIdentifier}\n0\n0\n7 ${cylP1} ${cylP2} ${lightingData.geometry.radius}\n\n`;
-                break;
-            case 'ring':
-                 lightRad += `${matIdentifier} ring ${geomIdentifier}\n0\n0\n8 0 0 0  0 0 1  ${lightingData.geometry.innerRadius} ${lightingData.geometry.outerRadius}\n\n`;
-                 break;
-            case 'polygon':
-            default:
-                const halfW = 0.125, halfH = 0.125;
-                lightRad += `${matIdentifier} polygon ${geomIdentifier}\n0\n0\n12\n  ${-halfW} ${-halfH} 0\n  ${halfW} ${-halfH} 0\n  ${halfW} ${halfH} 0\n  ${-halfW} ${halfH} 0\n\n`;
-                break;
+        if (lightingData.type === 'illum') {
+            // illum needs: 1 string arg (alternate material), 0 integer args, 3 reals (R G B)
+            lightRad += `void illum ${matIdentifier}\n1 ${lightingData.alternate_material || 'void'}\n0\n3 ${scaledRgb(lightingData.rgb)}\n\n`;
+        } else {
+            lightRad += `void ${lightingData.type} ${matIdentifier}\n0\n0\n${matArgs}\n\n`;
         }
+
+        // 2. Define the light geometry inline at each position. Emitting the primitive
+        //    directly at each luminaire location avoids needing an external prototype
+        //    .rad file (xform requires a real filename, which was never written).
+        positions.forEach((pos, i) => {
+            const gid = `${geomIdentifier}_${i}`;
+            switch (lightingData.geometry.type) {
+                case 'sphere':
+                    lightRad += `${matIdentifier} sphere ${gid}\n0\n0\n4 ${pos.x} ${pos.y} ${pos.z} ${lightingData.geometry.radius}\n\n`;
+                    break;
+                case 'cylinder': {
+                    const halfLen = lightingData.geometry.length / 2;
+                    lightRad += `${matIdentifier} cylinder ${gid}\n0\n0\n7 ${pos.x} ${pos.y} ${pos.z - halfLen} ${pos.x} ${pos.y} ${pos.z + halfLen} ${lightingData.geometry.radius}\n\n`;
+                    break;
+                }
+                case 'ring':
+                    lightRad += `${matIdentifier} ring ${gid}\n0\n0\n8 ${pos.x} ${pos.y} ${pos.z}  0 0 1  ${lightingData.geometry.innerRadius} ${lightingData.geometry.outerRadius}\n\n`;
+                    break;
+                case 'polygon':
+                default: {
+                    const halfW = 0.125, halfH = 0.125;
+                    lightRad += `${matIdentifier} polygon ${gid}\n0\n0\n12\n  ${pos.x - halfW} ${pos.y - halfH} ${pos.z}\n  ${pos.x + halfW} ${pos.y - halfH} ${pos.z}\n  ${pos.x + halfW} ${pos.y + halfH} ${pos.z}\n  ${pos.x - halfW} ${pos.y + halfH} ${pos.z}\n\n`;
+                    break;
+                }
+            }
+        });
     }
 
-    // 3. Use xform to instance, place, and rotate the geometry for each light in the grid/array.
-    positions.forEach((pos, i) => {
-        const instanceIdentifier = lightingData.type === 'ies' ? iesBasename : geomIdentifier;
-        // The room's rotation (-rz) is removed. It's handled by the viewpoint vectors.
-        // The IES identifier is now the corrected basename.
-        lightRad += `!xform -t ${pos.x} ${pos.y} ${pos.z} -rx ${rotX} -ry ${rotY} -rz ${rotZ} ${instanceIdentifier}\n`;
-    });
+    // 3. For IES luminaires, instance the ies2rad-generated prototype file at each
+    //    position with xform (rotations before translation so each unit is oriented
+    //    about its own origin before being moved into place).
+    if (lightingData.type === 'ies') {
+        positions.forEach((pos) => {
+            lightRad += `!xform -rx ${rotX} -ry ${rotY} -rz ${rotZ} -t ${pos.x} ${pos.y} ${pos.z} ${iesBasename}.rad\n`;
+        });
+    }
 
     return lightRad;
 }
@@ -262,7 +288,7 @@ function createLarkSpectralScript(projectData) {
     const projectName = pi['project-name'].replace(/\s+/g, '_') || 'scene';
 
     // --- Common Parameters ---
-    const month = p['lark-month'], day = p['lark-day'], hour = (p['lark-time'] || '12:00').replace(':', '.');
+    const month = p['lark-month'], day = p['lark-day'], hour = _timeToDecimalHour(p['lark-time'], '12:00');
     const lat = pi.latitude, lon = pi.longitude, mer = (Math.round(lon / 15) * 15) * -1;
     const dni = p['lark-dni'], dhi = p['lark-dhi'];
     const sunSpdFile = p['lark-sun-spd']?.name || 'sun.spd';
@@ -297,19 +323,19 @@ void plastic ceiling_mat
     `;
     
     const materialDefs9ch = {
-        'c1-3': generateMaterialSet('c1-3', binnedWallRefl9ch.slice(0, 3), binnedFloorRefl9ch.slice(0, 3), binnedCeilingRefl9ch.slice(0, 3)),
-        'c4-6': generateMaterialSet('c4-6', binnedWallRefl9ch.slice(3, 6), binnedFloorRefl9ch.slice(3, 6), binnedCeilingRefl9ch.slice(3, 6)),
-        'c7-9': generateMaterialSet('c7-9', binnedWallRefl9ch.slice(6, 9), binnedFloorRefl9ch.slice(6, 9), binnedCeilingRefl9ch.slice(6, 9)),
+        c1_3: generateMaterialSet('c1-3', binnedWallRefl9ch.slice(0, 3), binnedFloorRefl9ch.slice(0, 3), binnedCeilingRefl9ch.slice(0, 3)),
+        c4_6: generateMaterialSet('c4-6', binnedWallRefl9ch.slice(3, 6), binnedFloorRefl9ch.slice(3, 6), binnedCeilingRefl9ch.slice(3, 6)),
+        c7_9: generateMaterialSet('c7-9', binnedWallRefl9ch.slice(6, 9), binnedFloorRefl9ch.slice(6, 9), binnedCeilingRefl9ch.slice(6, 9)),
     };
 
     const pythonScriptContent = `
-    import numpy as np
-    import pandas as pd
-    import json
-    import argparse
-    import os
+import numpy as np
+import pandas as pd
+import json
+import argparse
+import os
 
-    def calculate_metrics(res_file, num_points):
+def calculate_metrics(res_file, num_points):
     """
     Calculates circadian metrics from a 9-channel Radiance result file.
     """
@@ -411,7 +437,7 @@ void plastic ceiling_mat
         
     print("Circadian analysis complete. Summary and per-point files saved.")
 
-    if __name__ == "__main__":
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Post-process Radiance 9-channel spectral results.")
     parser.add_argument("res_file", type=str, help="Path to the 9-channel .res file.")
     parser.add_argument("--points", type=int, required=True, help="Number of sensor points in the grid.")
@@ -434,7 +460,7 @@ void plastic ceiling_mat
 
     # --- COMMON PARAMETERS ---
     MONTH=${month}; DAY=${day}; HOUR=${hour};
-    LATITUDE=${lat}; LONGITUDE=${lon}; MERIDIAN=${mer};
+    LATITUDE=${lat}; LONGITUDE=${-lon}; MERIDIAN=${mer};
     DNI=${dni}; DHI=${dhi};
     GEOMETRY_FILE="../01_geometry/${projectName}.rad"
     MATERIALS_DIR="../02_materials"
@@ -462,13 +488,13 @@ void plastic ceiling_mat
     echo "Step 1: Generating spectrally binned material files..."
     cat > "${MATERIALS_DIR}/materials_c1-3.rad" << EOF
     ${materialDefs9ch.c1_3}
-    EOF
+EOF
         cat > "${MATERIALS_DIR}/materials_c4-6.rad" << EOF
     ${materialDefs9ch.c4_6}
-    EOF
+EOF
         cat > "${MATERIALS_DIR}/materials_c7-9.rad" << EOF
     ${materialDefs9ch.c7_9}
-    EOF
+EOF
 
     # --- 2. BIN SUN/SKY SPECTRA ---
     echo "Step 2: Binning sun and sky spectral data..."
@@ -503,7 +529,7 @@ void plastic ceiling_mat
         cat > $MOD_FILE <<EOF
     void colorfunc sky_rgb_${SUFFIX}\\n4 red green blue skybright.cal\\n0\\n3 $R_K $G_K $B_K
     void colorfunc sun_rgb_${SUFFIX}\\n4 red green blue source.cal\\n0\\n3 $R_S $G_S $B_S
-    EOF
+EOF
         gendaylit $MONTH $DAY $HOUR -a $LATITUDE -o $LONGITUDE -m $MERIDIAN -W $DNI $DHI \\
             | sed "s/^void brightfunc skyfunc/sky_rgb_${SUFFIX} brightfunc skyfunc/" \\
             | sed "s/^void light solar/sun_rgb_${SUFFIX} light solar/" > $SKY_FILE
@@ -527,7 +553,7 @@ void plastic ceiling_mat
     echo "Creating Python post-processor..."
     cat > "${OUTPUT_DIR}/${PYTHON_SCRIPT}" << EOF
     ${pythonScriptContent}
-    EOF
+EOF
 
     # Execute the Python script
     echo "Executing Python post-processor..."
@@ -564,7 +590,7 @@ function createPointIlluminanceScript(projectData) {
     
     const month = p['pit-month'] || 6;
     const day = p['pit-day'] || 21;
-    const time = (p['pit-time'] || '12:00').replace(':', '.');
+    const time = _timeToDecimalHour(p['pit-time'], '12:00');
 
     const ab = p['ab'] || 4;
     const ad = p['ad'] || 1024;
@@ -583,7 +609,7 @@ function createPointIlluminanceScript(projectData) {
     # --- Simulation Configuration ---
     PROJECT_NAME="${projectName}"
     LATITUDE=${lat}
-    LONGITUDE=${lon}
+    LONGITUDE=${-lon}
     MERIDIAN=${mer}
 
     # Date and Time for Analysis
@@ -643,7 +669,7 @@ function createPointIlluminanceScript(projectData) {
     REM --- Simulation Configuration ---
     set "PROJECT_NAME=${projectName}"
     set "LATITUDE=${lat}"
-    set "LONGITUDE=${lon}"
+    set "LONGITUDE=${-lon}"
     set "MERIDIAN=${mer}"
 
     REM Date and Time for Analysis
@@ -660,6 +686,7 @@ function createPointIlluminanceScript(projectData) {
 
     REM --- File & Directory Setup ---
     set "GEOM_FILE=..\\01_geometry\\%PROJECT_NAME%.rad"
+    set "MAT_FILE=..\\02_materials\\%PROJECT_NAME%_materials.rad"
     set "SKY_DIR=..\\04_skies"
     set "OCT_DIR=..\\06_octrees"
     set "RESULTS_DIR=..\\08_results"
@@ -688,7 +715,7 @@ function createPointIlluminanceScript(projectData) {
     type "%SKY_FILE%"
     echo.
     (
-    ${lightDefs.split('\n').map(line => `        echo ${line}`).join('\n')}
+    ${lightDefs.split('\n').map(line => line.trim() === '' ? '        echo.' : `        echo ${line}`).join('\n')}
         )
     ) > "%TEMP_RAD_FILE%"
 
@@ -728,7 +755,7 @@ function createRenderImageScript(projectData) {
     const mer = (Math.round(lon / 15) * 15) * -1;
     const month = p['pit-month'] || 6;
     const day = p['pit-day'] || 21;
-    const time = (p['pit-time'] || '12:00').replace(':', '.');
+    const time = _timeToDecimalHour(p['pit-time'], '12:00');
     const ab = p['ab'] || 4;
     const ad = p['ad'] || 1024;
     const as = p['as'] || 512;
@@ -752,7 +779,7 @@ function createRenderImageScript(projectData) {
     # --- Simulation Configuration ---
     PROJECT_NAME="${projectName}"
     LATITUDE=${lat}
-    LONGITUDE=${lon}
+    LONGITUDE=${-lon}
     MERIDIAN=${mer}
     MONTH=${month}
     DAY=${day}
@@ -814,7 +841,7 @@ function createRenderImageScript(projectData) {
     REM --- Simulation Configuration ---
     set "PROJECT_NAME=${projectName}"
     set "LATITUDE=${lat}"
-    set "LONGITUDE=${lon}"
+    set "LONGITUDE=${-lon}"
     set "MERIDIAN=${mer}"
     set "MONTH=${month}"
     set "DAY=${day}"
@@ -834,6 +861,7 @@ function createRenderImageScript(projectData) {
 
     REM --- File & Directory Setup ---
     set "GEOM_FILE=..\\01_geometry\\%PROJECT_NAME%.rad"
+    set "MAT_FILE=..\\02_materials\\%PROJECT_NAME%_materials.rad"
     set "VIEW_FILE=..\\03_views\\viewpoint.vf"
     set "SKY_DIR=..\\04_skies"
     set "OCT_DIR=..\\06_octrees"
@@ -861,7 +889,7 @@ function createRenderImageScript(projectData) {
         type "%SKY_FILE%"
         echo.
         (
-    ${lightDefs.split('\n').map(line => `        echo ${line}`).join('\n')}
+    ${lightDefs.split('\n').map(line => line.trim() === '' ? '        echo.' : `        echo ${line}`).join('\n')}
         )
     ) > "%TEMP_RAD_FILE%"
 
@@ -898,7 +926,7 @@ function createDgpAnalysisScript(projectData) {
     const mer = (Math.round(lon / 15) * 15) * -1;
     const month = p['pit-month'] || 6;
     const day = p['pit-day'] || 21;
-    const time = (p['pit-time'] || '14:30').replace(':', '.');
+    const time = _timeToDecimalHour(p['pit-time'], '14:30');
     // High-quality parameters are essential for glare, so we use higher defaults.
     const ab = p['ab'] || 6;
     const ad = p['ad'] || 2048;
@@ -918,7 +946,7 @@ function createDgpAnalysisScript(projectData) {
     # --- Simulation Configuration ---
     PROJECT_NAME="${projectName}"
     LATITUDE=${lat}
-    LONGITUDE=${lon}
+    LONGITUDE=${-lon}
     MERIDIAN=${mer}
     MONTH=${month}
     DAY=${day}
@@ -990,7 +1018,7 @@ function createDgpAnalysisScript(projectData) {
     REM --- Simulation Configuration ---
     set "PROJECT_NAME=${projectName}"
     set "LATITUDE=${lat}"
-    set "LONGITUDE=${lon}"
+    set "LONGITUDE=${-lon}"
     set "MERIDIAN=${mer}"
     set "MONTH=${month}"
     set "DAY=${day}"
@@ -1005,6 +1033,7 @@ function createDgpAnalysisScript(projectData) {
 
     REM --- File & Directory Setup ---
     set "GEOM_FILE=..\\01_geometry\\%PROJECT_NAME%.rad"
+    set "MAT_FILE=..\\02_materials\\%PROJECT_NAME%_materials.rad"
     set "VIEW_FILE=..\\03_views\\viewpoint_fisheye.vf"
     set "SKY_DIR=..\\04_skies"
     set "OCT_DIR=..\\06_octrees"
@@ -1033,7 +1062,7 @@ function createDgpAnalysisScript(projectData) {
         type "%SKY_FILE%"
         echo.
         (
-    ${lightDefs.split('\n').map(line => `        echo ${line}`).join('\n')}
+    ${lightDefs.split('\n').map(line => line.trim() === '' ? '        echo.' : `        echo ${line}`).join('\n')}
         )
     ) > "%TEMP_RAD_FILE%"
 
@@ -1138,7 +1167,7 @@ function createDaylightFactorScript(projectData) {
     # This converts the interior irradiance to illuminance and divides by the exterior reference.
     echo "4. Calculating DF..."
     DF_RESULTS="\${RESULTS_DIR}/\${PROJECT_NAME}_df_results.txt"
-    cat "\${INTERIOR_IRRADIANCE}" | rcalc -e "$1=100 * (179*($1*0.265+$2*0.670+$3*0.065)) / \${EXT_LUX}" > "\${DF_RESULTS}"
+    cat "\${INTERIOR_IRRADIANCE}" | rcalc -e '$1=100 * (179*($1*0.265+$2*0.670+$3*0.065)) / '"\${EXT_LUX}" > "\${DF_RESULTS}"
 
     echo "---"
     echo "DF analysis complete. Results saved to: \${DF_RESULTS}"
@@ -1161,6 +1190,7 @@ function createDaylightFactorScript(projectData) {
 
     REM --- File & Directory Setup ---
     set "GEOM_FILE=..\\01_geometry\\%PROJECT_NAME%.rad"
+    set "MAT_FILE=..\\02_materials\\%PROJECT_NAME%_materials.rad"
     set "SKY_DIR=..\\04_skies"
     set "OCT_DIR=..\\06_octrees"
     set "RESULTS_DIR=..\\08_results"
@@ -1187,7 +1217,7 @@ function createDaylightFactorScript(projectData) {
         type "%SKY_FILE%"
         echo.
         (
-    ${lightDefs.split('\n').map(line => `        echo ${line}`).join('\n')}
+    ${lightDefs.split('\n').map(line => line.trim() === '' ? '        echo.' : `        echo ${line}`).join('\n')}
         )
     ) > "%TEMP_RAD_FILE%"
 
@@ -1277,7 +1307,7 @@ function create3phMatrixGenerationScript(projectData) {
     echo "2. Generating Daylight Matrix (D)..."
     DAYLIGHT_MTX="\${MATRIX_DIR}/daylight.mtx"
     rcontrib -I+ -w -ab \${AB} -ad \${AD} -as \${AS} -ar \${AR} -aa \${AA} -lw \${LW} \\
-        -f reinhart.cal -b tbin -bn 145 -m sky_glow \\
+        -f reinhart.cal -b rbin -bn 145 -m sky_glow \\
         -e 'REPLY=material("glass_mat")' \\
         -V- -i "\${OCTREE}" > "\${DAYLIGHT_MTX}"
     if [ \$? -ne 0 ]; then echo "Error generating Daylight Matrix."; exit 1; fi
@@ -1288,7 +1318,7 @@ function create3phMatrixGenerationScript(projectData) {
     echo "3. Generating View Matrix (V)..."
     VIEW_MTX="\${MATRIX_DIR}/view.mtx"
     rcontrib -I+ -w -ab \${AB} -ad \${AD} -as \${AS} -ar \${AR} -aa \${AA} -lw \${LW} \\
-        -f klems_full.cal -b tbin -bn 145 -m glass_mat \\
+        -f klems_full.cal -b kbin -bn 145 -m glass_mat \\
         "\${OCTREE}" < "\${POINTS_FILE}" > "\${VIEW_MTX}"
     if [ \$? -ne 0 ]; then echo "Error generating View Matrix."; exit 1; fi
 
@@ -1317,6 +1347,7 @@ function create3phMatrixGenerationScript(projectData) {
 
     REM --- File & Directory Setup ---
     set "GEOM_FILE=..\\01_geometry\\%PROJECT_NAME%.rad"
+    set "MAT_FILE=..\\02_materials\\%PROJECT_NAME%_materials.rad"
     set "OCT_DIR=..\\06_octrees"
     set "RESULTS_DIR=..\\08_results"
     set "MATRIX_DIR=%RESULTS_DIR%\\matrices"
@@ -1337,7 +1368,7 @@ function create3phMatrixGenerationScript(projectData) {
         type "%MAT_FILE%"
         echo.
         (
-    ${lightDefs.split('\n').map(line => `        echo ${line}`).join('\n')}
+    ${lightDefs.split('\n').map(line => line.trim() === '' ? '        echo.' : `        echo ${line}`).join('\n')}
         )
     ) > "%TEMP_RAD_FILE%"
 
@@ -1353,14 +1384,14 @@ function create3phMatrixGenerationScript(projectData) {
     REM 2. Generate Daylight Matrix (D)
     echo 2. Generating Daylight Matrix (D)...
     set "DAYLIGHT_MTX=%MATRIX_DIR%\\daylight.mtx"
-    rcontrib -I+ -w -ab %AB% -ad %AD% -as %AS% -ar %AR% -aa %AA% -lw %LW% -f reinhart.cal -b tbin -bn 145 -m sky_glow -e "REPLY=material('glass_mat')" -V- -i "%OCTREE%" > "%DAYLIGHT_MTX%"
+    rcontrib -I+ -w -ab %AB% -ad %AD% -as %AS% -ar %AR% -aa %AA% -lw %LW% -f reinhart.cal -b rbin -bn 145 -m sky_glow -e "REPLY=material('glass_mat')" -V- -i "%OCTREE%" > "%DAYLIGHT_MTX%"
     if %errorlevel% neq 0 ( echo "Error generating Daylight Matrix." & exit /b 1 )
 
 
     REM 3. Generate View Matrix (V)
     echo 3. Generating View Matrix (V)...
     set "VIEW_MTX=%MATRIX_DIR%\\view.mtx"
-    rcontrib -I+ -w -ab %AB% -ad %AD% -as %AS% -ar %AR% -aa %AA% -lw %LW% -f klems_full.cal -b tbin -bn 145 -m glass_mat "%OCTREE%" < "%POINTS_FILE%" > "%VIEW_MTX%"
+    rcontrib -I+ -w -ab %AB% -ad %AD% -as %AS% -ar %AR% -aa %AA% -lw %LW% -f klems_full.cal -b kbin -bn 145 -m glass_mat "%OCTREE%" < "%POINTS_FILE%" > "%VIEW_MTX%"
     if %errorlevel% neq 0 ( echo "Error generating View Matrix." & exit /b 1 )
 
     echo ---
@@ -1516,14 +1547,14 @@ function create5phMatrixGenerationScript(projectData) {
     # 2. Generate Annual Sky Matrix (S)
     echo "2. Generating annual sky matrix from EPW..."
     SKY_MTX="\${MATRIX_DIR}/sky.mtx"
-    gendaymtx -m 1 "\${WEATHER_FILE}" > "\${SKY_MTX}"
+    epw2wea "\${WEATHER_FILE}" | gendaymtx -m 1 - > "\${SKY_MTX}"
     if [ \$? -ne 0 ]; then echo "Error generating Sky Matrix."; exit 1; fi
 
     # 3. Generate Daylight Matrix (D)
     echo "3. Generating Daylight Matrix (D)..."
     DAYLIGHT_MTX="\${MATRIX_DIR}/daylight.mtx"
     rcontrib -I+ -w -ab \$AB -ad \$AD -as \$AS -ar \$AR -aa \$AA -lw \$LW \\
-        -f reinhart.cal -b tbin -bn 145 -m sky_glow \\
+        -f reinhart.cal -b rbin -bn 145 -m sky_glow \\
         -e 'REPLY=material("glass_mat")' \\
         -V- -i "\${OCTREE}" > "\${DAYLIGHT_MTX}"
     if [ \$? -ne 0 ]; then echo "Error generating Daylight Matrix."; exit 1; fi
@@ -1532,14 +1563,14 @@ function create5phMatrixGenerationScript(projectData) {
     echo "4. Generating View Matrix (V)..."
     VIEW_MTX="\${MATRIX_DIR}/view.mtx"
     rcontrib -I+ -w -ab \$AB -ad \$AD -as \$AS -ar \$AR -aa \$AA -lw \$LW \\
-        -f klems_full.cal -b tbin -bn 145 -m glass_mat \\
+        -f klems_full.cal -b kbin -bn 145 -m glass_mat \\
         "\${OCTREE}" < "\${POINTS_FILE}" > "\${VIEW_MTX}"
     if [ \$? -ne 0 ]; then echo "Error generating View Matrix."; exit 1; fi
 
     # 5. Generate Direct Sun-Only Sky Matrix (S_direct)
     echo "5. Generating direct-only sun matrix..."
     SUN_SKY_MTX="\${MATRIX_DIR}/sun_sky.mtx"
-    gendaymtx -m 1 -d "\${WEATHER_FILE}" > "\${SUN_SKY_MTX}"
+    epw2wea "\${WEATHER_FILE}" | gendaymtx -m 1 -d - > "\${SUN_SKY_MTX}"
     if [ \$? -ne 0 ]; then echo "Error generating Sun Sky Matrix."; exit 1; fi
 
     # 6. Generate Daylight Coefficient Matrix for direct sun (C_ds)
@@ -1547,7 +1578,7 @@ function create5phMatrixGenerationScript(projectData) {
     CDS_MTX="\${MATRIX_DIR}/cds.mtx"
     # We use process substitution to feed the sun modifiers from gendaymtx into rcontrib's -M option.
     rcontrib -I+ -w -ab 1 -ad 1024 -lw 1e-5 \\
-        -V- -i "\${OCTREE}" -M <(gendaymtx -d -s "\${WEATHER_FILE}") < "\${POINTS_FILE}" > "\${CDS_MTX}"
+        -V- -i "\${OCTREE}" -M <(epw2wea "\${WEATHER_FILE}" | gendaymtx -d -s -) < "\${POINTS_FILE}" > "\${CDS_MTX}"
     if [ \$? -ne 0 ]; then echo "Error generating CDS Matrix."; exit 1; fi
 
     # --- PART 7: Combine Matrices for Final Result ---
@@ -1561,10 +1592,10 @@ function create5phMatrixGenerationScript(projectData) {
     dctimestep "\${VIEW_MTX}" "\${BSDF_FILE}" "\${DAYLIGHT_MTX}" "\${SUN_SKY_MTX}" > "\${ILL_3PH_DIRECT}"
     if [ \$? -ne 0 ]; then echo "Error generating direct 3-phase result."; exit 1; fi
 
-    # Use the Tensor Tree BSDF for the accurate direct calculation (Phase 5)
-    TENSOR_BSDF_FILE="../05_bsdf/${p['bsdf-tensor']?.name || 'tensor.xml'}"
+    # Accurate direct component: combine the direct daylight-coefficient matrix (C_ds)
+    # with the direct-only sun matrix (matches the .bat workflow).
     ILL_5PH_DIRECT="\${RESULTS_DIR}/direct_5ph.ill"
-    dctimestep "\${VIEW_MTX}" "\${TENSOR_BSDF_FILE}" "\${DAYLIGHT_MTX}" "\${SUN_SKY_MTX}" > "\${ILL_5PH_DIRECT}"
+    dctimestep "\${CDS_MTX}" "\${SUN_SKY_MTX}" > "\${ILL_5PH_DIRECT}"
     if [ \$? -ne 0 ]; then echo "Error generating direct 5-phase result."; exit 1; fi
 
     # Final calculation: Total - Inaccurate_Direct + Accurate_Direct
@@ -1598,6 +1629,7 @@ function create5phMatrixGenerationScript(projectData) {
 
     REM --- File & Directory Setup ---
     set "GEOM_FILE=..\\01_geometry\\%PROJECT_NAME%.rad"
+    set "MAT_FILE=..\\02_materials\\%PROJECT_NAME%_materials.rad"
     set "OCT_DIR=..\\06_octrees"
     set "RESULTS_DIR=..\\08_results"
     set "MATRIX_DIR=%RESULTS_DIR%\\matrices"
@@ -1619,7 +1651,7 @@ function create5phMatrixGenerationScript(projectData) {
         type "%MAT_FILE%"
         echo.
         (
-    ${lightDefs.split('\n').map(line => `        echo ${line}`).join('\n')}
+    ${lightDefs.split('\n').map(line => line.trim() === '' ? '        echo.' : `        echo ${line}`).join('\n')}
         )
     ) > "%TEMP_RAD_FILE%"
 
@@ -1630,25 +1662,25 @@ function create5phMatrixGenerationScript(projectData) {
     REM 2. Generate Annual Sky Matrix (S)
     echo 2. Generating annual sky matrix from EPW...
     set "SKY_MTX=%MATRIX_DIR%\\sky.mtx"
-    (gendaymtx -m 1 "%WEATHER_FILE%") > "%SKY_MTX%"
+    (epw2wea "%WEATHER_FILE%") | gendaymtx -m 1 - > "%SKY_MTX%"
     if %errorlevel% neq 0 ( echo "Error generating Sky Matrix." & exit /b 1 )
 
     REM 3. Generate Daylight Matrix (D)
     echo 3. Generating Daylight Matrix (D)...
     set "DAYLIGHT_MTX=%MATRIX_DIR%\\daylight.mtx"
-    rcontrib -I+ -w -ab %AB% -ad %AD% -as %AS% -ar %AR% -aa %AA% -lw %LW% -f reinhart.cal -b tbin -bn 145 -m sky_glow -e "REPLY=material('glass_mat')" -V- -i "%OCTREE%" > "%DAYLIGHT_MTX%"
+    rcontrib -I+ -w -ab %AB% -ad %AD% -as %AS% -ar %AR% -aa %AA% -lw %LW% -f reinhart.cal -b rbin -bn 145 -m sky_glow -e "REPLY=material('glass_mat')" -V- -i "%OCTREE%" > "%DAYLIGHT_MTX%"
     if %errorlevel% neq 0 ( echo "Error generating Daylight Matrix." & exit /b 1 )
 
     REM 4. Generate View Matrix (V)
     echo 4. Generating View Matrix (V)...
     set "VIEW_MTX=%MATRIX_DIR%\\view.mtx"
-    rcontrib -I+ -w -ab %AB% -ad %AD% -as %AS% -ar %AR% -aa %AA% -lw %LW% -f klems_full.cal -b tbin -bn 145 -m glass_mat "%OCTREE%" < "%POINTS_FILE%" > "%VIEW_MTX%"
+    rcontrib -I+ -w -ab %AB% -ad %AD% -as %AS% -ar %AR% -aa %AA% -lw %LW% -f klems_full.cal -b kbin -bn 145 -m glass_mat "%OCTREE%" < "%POINTS_FILE%" > "%VIEW_MTX%"
     if %errorlevel% neq 0 ( echo "Error generating View Matrix." & exit /b 1 )
 
     REM 5. Generate Direct Sun-Only Sky Matrix (S_direct)
     echo 5. Generating direct-only sun matrix...
     set "SUN_SKY_MTX=%MATRIX_DIR%\\sun_sky.mtx"
-    (gendaymtx -m 1 -d "%WEATHER_FILE%") > "%SUN_SKY_MTX%"
+    (epw2wea "%WEATHER_FILE%") | gendaymtx -m 1 -d - > "%SUN_SKY_MTX%"
     if %errorlevel% neq 0 ( echo "Error generating Sun Sky Matrix." & exit /b 1 )
 
     REM 6. Generate Daylight Coefficient Matrix for direct sun (C_ds)
@@ -1656,7 +1688,7 @@ function create5phMatrixGenerationScript(projectData) {
     set "CDS_MTX=%MATRIX_DIR%\\cds.mtx"
     set "SUN_MODS_FILE=%MATRIX_DIR%\\sun_modifiers.rad"
     REM We must first write the sun modifiers to a temporary file for Windows
-    gendaymtx -d -s "%WEATHER_FILE%" > "%SUN_MODS_FILE%"
+    epw2wea "%WEATHER_FILE%" | gendaymtx -d -s - > "%SUN_MODS_FILE%"
     rcontrib -I+ -w -ab 1 -ad 1024 -lw 1e-5 -V- -i "%OCTREE%" -M "%SUN_MODS_FILE%" < "%POINTS_FILE%" > "%CDS_MTX%"
     if %errorlevel% neq 0 ( echo "Error generating CDS Matrix." & exit /b 1 )
 
@@ -1693,113 +1725,113 @@ function create5phMatrixGenerationScript(projectData) {
 function createPostProcessingScript() {
     // This script is a direct copy from the source document.
     const content = `import numpy as np
-    import pandas as pd
-    import argparse
-    import os
+import pandas as pd
+import argparse
+import os
 
-    def calculate_metrics(illuminance_file: str, output_dir: str, num_points: int, schedule_file: str | None = None):
-        """
-        Calculates sDA, UDI, and ASE from a Radiance annual illuminance file.
-        Args:
-            illuminance_file (str): Path to the .ill file from dctimestep.
-            output_dir (str): Directory to save the results CSV.
-            num_points (int): The number of sensor points in the simulation grid.
-        """
-        print(f"Reading annual illuminance data from: {illuminance_file}")
-        try:
-            # Radiance .ill files are typically 3-channel (RGB) float32
-            data = np.fromfile(illuminance_file, dtype=np.float32)
-            # Convert RGB to single illuminance value
-            rgb_illuminance = data.reshape(8760, num_points, 3)
-            annual_illuminance = 179 * (rgb_illuminance[:,:,0]*0.265 + rgb_illuminance[:,:,1]*0.670 + rgb_illuminance[:,:,2]*0.065)
-        except Exception as e:
-            print(f"Error reading or reshaping file: {e}")
-            print("Please ensure the --points argument matches your simulation grid.")
-            return
-        
-        print(f"Data loaded successfully. Shape: {annual_illuminance.shape}")
-        
-        # Define occupancy schedule
-        time_index = pd.to_datetime(pd.date_range(start='2023-01-01', end='2024-01-01', freq='h', inclusive='left'))
+def calculate_metrics(illuminance_file: str, output_dir: str, num_points: int, schedule_file: str | None = None):
+    """
+    Calculates sDA, UDI, and ASE from a Radiance annual illuminance file.
+    Args:
+        illuminance_file (str): Path to the .ill file from dctimestep.
+        output_dir (str): Directory to save the results CSV.
+        num_points (int): The number of sensor points in the simulation grid.
+    """
+    print(f"Reading annual illuminance data from: {illuminance_file}")
+    try:
+        # Radiance .ill files are typically 3-channel (RGB) float32
+        data = np.fromfile(illuminance_file, dtype=np.float32)
+        # Convert RGB to single illuminance value
+        rgb_illuminance = data.reshape(8760, num_points, 3)
+        annual_illuminance = 179 * (rgb_illuminance[:,:,0]*0.265 + rgb_illuminance[:,:,1]*0.670 + rgb_illuminance[:,:,2]*0.065)
+    except Exception as e:
+        print(f"Error reading or reshaping file: {e}")
+        print("Please ensure the --points argument matches your simulation grid.")
+        return
+    
+    print(f"Data loaded successfully. Shape: {annual_illuminance.shape}")
+    
+    # Define occupancy schedule
+    time_index = pd.to_datetime(pd.date_range(start='2023-01-01', end='2024-01-01', freq='h', inclusive='left'))
 
-        # Default to weekdays, 8 AM to 5 PM if no schedule is provided
-        occupied_mask = (time_index.hour >= 8) & (time_index.hour <= 17) & (time_index.dayofweek < 5)
+    # Default to weekdays, 8 AM to 5 PM if no schedule is provided
+    occupied_mask = (time_index.hour >= 8) & (time_index.hour <= 17) & (time_index.dayofweek < 5)
 
-        if schedule_file and os.path.exists(schedule_file):
-            print(f"Using occupancy schedule from: {schedule_file}")
-            schedule = pd.read_csv(schedule_file, header=None).squeeze("columns")
-            if len(schedule) == 8760:
-                occupied_mask = schedule.to_numpy(dtype=bool)
-            else:
-                print(f"Warning: Schedule file does not contain 8760 entries. Using default schedule.")
+    if schedule_file and os.path.exists(schedule_file):
+        print(f"Using occupancy schedule from: {schedule_file}")
+        schedule = pd.read_csv(schedule_file, header=None).squeeze("columns")
+        if len(schedule) == 8760:
+            occupied_mask = schedule.to_numpy(dtype=bool)
         else:
-            print("No schedule file provided or found. Using default schedule (Mon-Fri, 8am-5pm).")
+            print(f"Warning: Schedule file does not contain 8760 entries. Using default schedule.")
+    else:
+        print("No schedule file provided or found. Using default schedule (Mon-Fri, 8am-5pm).")
 
-        occupied_illuminance = annual_illuminance[occupied_mask, :]
+    occupied_illuminance = annual_illuminance[occupied_mask, :]
 
-        print(f"Processing {occupied_illuminance.shape[0]} occupied hours...")
-        
-        # --- Metric Calculations ---
-        # 1. Spatial Daylight Autonomy (sDA 300/50%)
-        lux_threshold_da = 300
-        percent_time_threshold_da = 0.5
-        hours_above_threshold = np.sum(occupied_illuminance >= lux_threshold_da, axis=0)
-        fraction_of_time_above_threshold = hours_above_threshold / occupied_illuminance.shape[0]
-        points_meeting_da_criteria = fraction_of_time_above_threshold >= percent_time_threshold_da
-        sDA = np.sum(points_meeting_da_criteria) / num_points * 100
+    print(f"Processing {occupied_illuminance.shape[0]} occupied hours...")
+    
+    # --- Metric Calculations ---
+    # 1. Spatial Daylight Autonomy (sDA 300/50%)
+    lux_threshold_da = 300
+    percent_time_threshold_da = 0.5
+    hours_above_threshold = np.sum(occupied_illuminance >= lux_threshold_da, axis=0)
+    fraction_of_time_above_threshold = hours_above_threshold / occupied_illuminance.shape[0]
+    points_meeting_da_criteria = fraction_of_time_above_threshold >= percent_time_threshold_da
+    sDA = np.sum(points_meeting_da_criteria) / num_points * 100
 
-        # 2. Useful Daylight Illuminance (UDI)
-        udi_f = np.mean(occupied_illuminance < 100, axis=0) * 100
-        udi_s = np.mean((occupied_illuminance >= 100) & (occupied_illuminance < 500), axis=0) * 100
-        udi_a = np.mean((occupied_illuminance >= 500) & (occupied_illuminance < 2000), axis=0) * 100
-        udi_e = np.mean(occupied_illuminance >= 2000, axis=0) * 100
+    # 2. Useful Daylight Illuminance (UDI)
+    udi_f = np.mean(occupied_illuminance < 100, axis=0) * 100
+    udi_s = np.mean((occupied_illuminance >= 100) & (occupied_illuminance < 500), axis=0) * 100
+    udi_a = np.mean((occupied_illuminance >= 500) & (occupied_illuminance < 2000), axis=0) * 100
+    udi_e = np.mean(occupied_illuminance >= 2000, axis=0) * 100
 
-        # 3. Annual Sunlight Exposure (ASE 1000,250)
-        # NOTE: Requires input .ill file from a 5-Phase Method simulation.
-        lux_threshold_ase = 1000
-        hours_threshold_ase = 250
-        hours_above_threshold_ase = np.sum(occupied_illuminance >= lux_threshold_ase, axis=0)
-        points_meeting_ase_criteria = hours_above_threshold_ase >= hours_threshold_ase
-        ASE = np.sum(points_meeting_ase_criteria) / num_points * 100
-        
-        # --- Save Results ---
-        results_df = pd.DataFrame({
-            'PointID': range(num_points),
-            'UDI_Fell_Short_Percent (<100lx)': udi_f,
-            'UDI_Supplementary_Percent (100-500lx)': udi_s,
-            'UDI_Autonomous_Percent (500-2000lx)': udi_a,
-            'UDI_Exceeded_Percent (>2000lx)': udi_e,
-        })
-        
-        summary = {
-            'sDA_300_50%': [f"{sDA:.2f}%"],
-            'ASE_1000_250h': [f"{ASE:.2f}%"],
-        }
-        summary_df = pd.DataFrame(summary)
-        
-        output_path = os.path.join(output_dir, "annual_metrics_per_point.csv")
-        summary_path = os.path.join(output_dir, "annual_metrics_summary.csv")
-        
-        results_df.to_csv(output_path, index=False)
-        summary_df.to_csv(summary_path, index=False)
-        
-        print("\\n--- Annual Metrics Summary ---")
-        print(summary_df.to_string(index=False))
-        print("------------------------------")
-        print(f"Detailed per-point results saved to: {output_path}")
+    # 3. Annual Sunlight Exposure (ASE 1000,250)
+    # NOTE: Requires input .ill file from a 5-Phase Method simulation.
+    lux_threshold_ase = 1000
+    hours_threshold_ase = 250
+    hours_above_threshold_ase = np.sum(occupied_illuminance >= lux_threshold_ase, axis=0)
+    points_meeting_ase_criteria = hours_above_threshold_ase >= hours_threshold_ase
+    ASE = np.sum(points_meeting_ase_criteria) / num_points * 100
+    
+    # --- Save Results ---
+    results_df = pd.DataFrame({
+        'PointID': range(num_points),
+        'UDI_Fell_Short_Percent (<100lx)': udi_f,
+        'UDI_Supplementary_Percent (100-500lx)': udi_s,
+        'UDI_Autonomous_Percent (500-2000lx)': udi_a,
+        'UDI_Exceeded_Percent (>2000lx)': udi_e,
+    })
+    
+    summary = {
+        'sDA_300_50%': [f"{sDA:.2f}%"],
+        'ASE_1000_250h': [f"{ASE:.2f}%"],
+    }
+    summary_df = pd.DataFrame(summary)
+    
+    output_path = os.path.join(output_dir, "annual_metrics_per_point.csv")
+    summary_path = os.path.join(output_dir, "annual_metrics_summary.csv")
+    
+    results_df.to_csv(output_path, index=False)
+    summary_df.to_csv(summary_path, index=False)
+    
+    print("\\n--- Annual Metrics Summary ---")
+    print(summary_df.to_string(index=False))
+    print("------------------------------")
+    print(f"Detailed per-point results saved to: {output_path}")
 
-        if __name__ == "__main__":
-            parser = argparse.ArgumentParser(description="Post-process Radiance annual results.")
-            parser.add_argument("illuminance_file", type=str, help="Path to the .ill file.")
-            parser.add_argument("--points", type=int, required=True, help="Number of sensor points in the grid.")
-            parser.add_argument("--outdir", type=str, default="../08_results", help="Output directory for CSV results.")
-            parser.add_argument("--schedule", type=str, default=None, help="Optional path to an 8760-hour occupancy schedule CSV file.")
-            args = parser.parse_args()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Post-process Radiance annual results.")
+    parser.add_argument("illuminance_file", type=str, help="Path to the .ill file.")
+    parser.add_argument("--points", type=int, required=True, help="Number of sensor points in the grid.")
+    parser.add_argument("--outdir", type=str, default="../08_results", help="Output directory for CSV results.")
+    parser.add_argument("--schedule", type=str, default=None, help="Optional path to an 8760-hour occupancy schedule CSV file.")
+    args = parser.parse_args()
 
-            if not os.path.exists(args.illuminance_file):
-                print(f"Error: Input file not found at {args.illuminance_file}")
-            else:
-                calculate_metrics(args.illuminance_file, args.outdir, args.points, args.schedule)
+    if not os.path.exists(args.illuminance_file):
+        print(f"Error: Input file not found at {args.illuminance_file}")
+    else:
+        calculate_metrics(args.illuminance_file, args.outdir, args.points, args.schedule)
     `;
     return { fileName: 'post_process_annual.py', content };
 }
@@ -1822,7 +1854,7 @@ function createImagelessGlareScript(projectData) {
     const lw = sp['lw'] || 0.001;
     const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room, projectData.simulationFiles);
 
-    const scheduleFlag = scheduleFile ? `-sff ../10_schedules/${scheduleFile}` : '';
+    const scheduleFlag = scheduleFile ? `-sf ../10_schedules/${scheduleFile}` : '';
 
     const shContent = `#!/bin/bash
     # RUN_Imageless_Glare.sh
@@ -1883,19 +1915,19 @@ function createImagelessGlareScript(projectData) {
     # 5. Calculate Annual DGP time-series
     echo "5. Calculating annual DGP values..."
     DGP_RESULTS="\${RESULTS_DIR}/\${PROJECT_NAME}.dgp"
-    dcglare -V "\${DC_TOTAL_MTX}" -C "\${DC_DIRECT_MTX}" "\${SKY_MTX}" ${scheduleFlag} > "\${DGP_RESULTS}"
+    dcglare ${scheduleFlag} "\${DC_DIRECT_MTX}" "\${DC_TOTAL_MTX}" "\${SKY_MTX}" > "\${DGP_RESULTS}"
     if [ \$? -ne 0 ]; then echo "Error during dcglare for DGP."; exit 1; fi
 
     # 6. Calculate Glare Autonomy (GA)
     echo "6. Calculating Glare Autonomy (GA) for a threshold of \${DGP_THRESHOLD}..."
     GA_RESULTS="\${RESULTS_DIR}/\${PROJECT_NAME}.ga"
-    dcglare -V "\${DC_TOTAL_MTX}" -C "\${DC_DIRECT_MTX}" -l \${DGP_THRESHOLD} "\${SKY_MTX}" ${scheduleFlag} > "\${GA_RESULTS}"
+    dcglare -l \${DGP_THRESHOLD} ${scheduleFlag} "\${DC_DIRECT_MTX}" "\${DC_TOTAL_MTX}" "\${SKY_MTX}" > "\${GA_RESULTS}"
     if [ \$? -ne 0 ]; then echo "Error during dcglare for GA."; exit 1; fi
 
     # 7. Calculate Spatial Glare Autonomy (sGA)
     echo "7. Calculating spatial Glare Autonomy (sGA) for a target of \${SGA_TARGET}..."
     SGA_RESULTS="\${RESULTS_DIR}/\${PROJECT_NAME}_sGA.txt"
-    rcalc -e 'sGA = 100 * total(gt($1, ${SGA_TARGET})) / total(1)' "\${GA_RESULTS}" > "\${SGA_RESULTS}"
+    awk -v t=\${SGA_TARGET} 'BEGIN{n=0;c=0} {n++; if ($1+0 >= t) c++} END{ if (n>0) printf "%.2f\\n", 100*c/n; else print "0" }' "\${GA_RESULTS}" > "\${SGA_RESULTS}"
 
     SGA_VALUE=\$(cat "\${SGA_RESULTS}")
     echo "---"
@@ -1907,7 +1939,7 @@ function createImagelessGlareScript(projectData) {
     echo "---"
 `;
 
-    const batScheduleFlag = scheduleFile ? `-sff ..\\10_schedules\\${scheduleFile}` : '';
+    const batScheduleFlag = scheduleFile ? `-sf ..\\10_schedules\\${scheduleFile}` : '';
     const batContent = `@echo off
     REM RUN_Imageless_Glare.bat
     REM Script for imageless annual glare analysis using the Accelerad method.
@@ -1931,6 +1963,7 @@ function createImagelessGlareScript(projectData) {
 
     REM --- File & Directory Setup ---
     set "GEOM_FILE=..\\01_geometry\\%PROJECT_NAME%.rad"
+    set "MAT_FILE=..\\02_materials\\%PROJECT_NAME%_materials.rad"
     set "OCT_DIR=..\\06_octrees"
     set "RESULTS_DIR=..\\08_results"
     set "MATRIX_DIR=%RESULTS_DIR%\\matrices"
@@ -1951,7 +1984,7 @@ function createImagelessGlareScript(projectData) {
         type "%MAT_FILE%"
         echo.
         (
-    ${lightDefs.split('\n').map(line => `        echo ${line}`).join('\n')}
+    ${lightDefs.split('\n').map(line => line.trim() === '' ? '        echo.' : `        echo ${line}`).join('\n')}
         )
     ) > "%TEMP_RAD_FILE%"
 
@@ -1980,19 +2013,24 @@ function createImagelessGlareScript(projectData) {
     REM 5. Calculate Annual DGP time-series
     echo 5. Calculating annual DGP values...
     set "DGP_RESULTS=%RESULTS_DIR%\\%PROJECT_NAME%.dgp"
-    dcglare -V "%DC_TOTAL_MTX%" -C "%DC_DIRECT_MTX%" "%SKY_MTX%" ${batScheduleFlag} > "%DGP_RESULTS%"
+    dcglare ${batScheduleFlag} "%DC_DIRECT_MTX%" "%DC_TOTAL_MTX%" "%SKY_MTX%" > "%DGP_RESULTS%"
     if %errorlevel% neq 0 ( echo "Error during dcglare for DGP." & exit /b 1 )
 
     REM 6. Calculate Glare Autonomy (GA)
     echo 6. Calculating Glare Autonomy (GA) for a threshold of %DGP_THRESHOLD%...
     set "GA_RESULTS=%RESULTS_DIR%\\%PROJECT_NAME%.ga"
-    dcglare -V "%DC_TOTAL_MTX%" -C "%DC_DIRECT_MTX%" -l %DGP_THRESHOLD% "%SKY_MTX%" ${batScheduleFlag} > "%GA_RESULTS%"
+    dcglare -l %DGP_THRESHOLD% ${batScheduleFlag} "%DC_DIRECT_MTX%" "%DC_TOTAL_MTX%" "%SKY_MTX%" > "%GA_RESULTS%"
     if %errorlevel% neq 0 ( echo "Error during dcglare for GA." & exit /b 1 )
 
     REM 7. Calculate Spatial Glare Autonomy (sGA)
     echo 7. Calculating spatial Glare Autonomy (sGA) for a target of %SGA_TARGET%...
     set "SGA_RESULTS=%RESULTS_DIR%\\%PROJECT_NAME%_sGA.txt"
-    (type "%GA_RESULTS%") | rcalc -e "$1 = 100 * total(gt($1, %SGA_TARGET%)) / total(1)" > "%SGA_RESULTS%"
+    REM Two-step spatial aggregation: count passing points, count total points, then take the ratio.
+    (rcalc -e "$1=if($1-%SGA_TARGET%,1,0)" "%GA_RESULTS%") | total > "%RESULTS_DIR%\\_sga_pass.txt"
+    set /p SGA_PASS=<"%RESULTS_DIR%\\_sga_pass.txt"
+    (rcalc -e "$1=1" "%GA_RESULTS%") | total > "%RESULTS_DIR%\\_sga_count.txt"
+    set /p SGA_NPTS=<"%RESULTS_DIR%\\_sga_count.txt"
+    rcalc -n -e "$1=100*%SGA_PASS%/%SGA_NPTS%" > "%SGA_RESULTS%"
 
     for /f "delims=" %%a in ('type "%SGA_RESULTS%"') do @set "SGA_VALUE=%%a"
 
@@ -2020,7 +2058,7 @@ function createSdaAseScript(projectData) {
     const bsdfClosedFile = p['bsdf-closed-file']?.name || 'bsdf_closed.xml';
 
     const blindsThreshold = p['blinds-threshold-lux'] || 1000;
-    const blindsTrigger = p['blinds-trigger-percent'] / 100.0 || 0.02;
+    const blindsTrigger = (p['blinds-trigger-percent'] != null ? p['blinds-trigger-percent'] / 100 : 0.02);
 
     // LM-83-23 recommendations for sDA
     const ab = p['ab'] || 6;
@@ -2031,98 +2069,98 @@ const aa = p['aa'] || 0.15;
     const lw = p['lw'] || 0.005;
 
     const pythonScriptContent = `import numpy as np
-    import argparse
-    import os
-    import struct
+import argparse
+import os
+import struct
 
-    def read_ill_file(file_path, num_points):
-        """Reads a binary .ill file and converts to photopic illuminance."""
-        try:
-            data = np.fromfile(file_path, dtype=np.float32)
-            if data.size == 0:
-                print(f"Warning: Ill file is empty: {file_path}")
-                return np.zeros((8760, num_points))
+def read_ill_file(file_path, num_points):
+    """Reads a binary .ill file and converts to photopic illuminance."""
+    try:
+        data = np.fromfile(file_path, dtype=np.float32)
+        if data.size == 0:
+            print(f"Warning: Ill file is empty: {file_path}")
+            return np.zeros((8760, num_points))
 
-            rgb_illuminance = data.reshape(8760, num_points, 3)
-            # Standard photopic conversion from radiance (W/m^2/sr) to illuminance (lux)
-            illuminance = 179 * (rgb_illuminance[:,:,0]*0.265 + rgb_illuminance[:,:,1]*0.670 + rgb_illuminance[:,:,2]*0.065)
-            return illuminance
-        except Exception as e:
-            print(f"Error reading or reshaping file '{file_path}': {e}")
-            return None
+        rgb_illuminance = data.reshape(8760, num_points, 3)
+        # Standard photopic conversion from radiance (W/m^2/sr) to illuminance (lux)
+        illuminance = 179 * (rgb_illuminance[:,:,0]*0.265 + rgb_illuminance[:,:,1]*0.670 + rgb_illuminance[:,:,2]*0.065)
+        return illuminance
+    except Exception as e:
+        print(f"Error reading or reshaping file '{file_path}': {e}")
+        return None
 
-    def generate_schedule(direct_ill_file, num_points, threshold, trigger_percent):
-        """Generates a blind schedule based on direct illuminance."""
-        print(f"Generating blind schedule from {direct_ill_file}...")
-        direct_ill = read_ill_file(direct_ill_file, num_points)
-        if direct_ill is None: return
+def generate_schedule(direct_ill_file, num_points, threshold, trigger_percent):
+    """Generates a blind schedule based on direct illuminance."""
+    print(f"Generating blind schedule from {direct_ill_file}...")
+    direct_ill = read_ill_file(direct_ill_file, num_points)
+    if direct_ill is None: return
 
-        schedule = []
-        points_threshold = num_points * trigger_percent
-        for hour in range(8760):
-            points_over_threshold = np.sum(direct_ill[hour, :] > threshold)
-            if points_over_threshold > points_threshold:
-                schedule.append(1)  # Blinds closed
-            else:
-                schedule.append(0)  # Blinds open
-
-        with open("blinds.schedule", "w") as f:
-            f.write("\\n".join(map(str, schedule)))
-        print("Generated blinds.schedule")
-
-    def combine_results(schedule_file, open_ill_file, closed_ill_file, num_points, output_file):
-        """Combines two .ill files based on a schedule."""
-        print("Combining results for final sDA calculation...")
-        with open(schedule_file, "r") as f:
-            schedule = [int(line.strip()) for line in f]
-
-        # Open files in binary read mode
-        with open(open_ill_file, "rb") as f_open, open(closed_ill_file, "rb") as f_closed, open(output_file, "wb") as f_out:
-            # Each point-hour is 3 floats * 4 bytes/float = 12 bytes
-            record_size = 12 
-            
-            for hour in range(8760):
-                for point in range(num_points):
-                    # Calculate the byte offset for the current record
-                    offset = (hour * num_points + point) * record_size
-                    
-                    if schedule[hour] == 1: # Blinds closed
-                        f_closed.seek(offset)
-                        record = f_closed.read(record_size)
-                    else: # Blinds open
-                        f_open.seek(offset)
-                        record = f_open.read(record_size)
-                    
-                    f_out.write(record)
-
-        print(f"Final combined results saved to {output_file}")
-
-    if __name__ == "__main__":
-        parser = argparse.ArgumentParser(description="Post-process sDA/ASE simulation results.")
-        parser.add_argument("--generate-schedule", action="store_true", help="Generate blind schedule.")
-        parser.add_argument("--combine-results", action="store_true", help="Combine open/closed results.")
-        parser.add_argument("--direct-ill", help="Path to direct-only illuminance file.")
-        parser.add_argument("--open-ill", help="Path to blinds-open illuminance file.")
-        parser.add_argument("--closed-ill", help="Path to blinds-closed illuminance file.")
-        parser.add_argument("--output-file", help="Path for the final combined .ill file.")
-        parser.add_argument("--num-points", type=int, required=True, help="Number of sensor points.")
-        parser.add_argument("--threshold", type=float, default=1000.0, help="Lux threshold for blind trigger.")
-        parser.add_argument("--trigger", type=float, default=0.02, help="Area percentage for blind trigger.")
-
-        args = parser.parse_args()
-
-        if args.generate_schedule:
-            if not args.direct_ill:
-                print("Error: --direct-ill is required for generating schedule.")
-            else:
-                generate_schedule(args.direct_ill, args.num_points, args.threshold, args.trigger)
-        elif args.combine_results:
-            if not args.open_ill or not args.closed_ill or not args.output_file:
-                print("Error: --open-ill, --closed-ill, and --output-file are required for combining results.")
-            else:
-                combine_results("blinds.schedule", args.open_ill, args.closed_ill, args.num_points, args.output_file)
+    schedule = []
+    points_threshold = num_points * trigger_percent
+    for hour in range(8760):
+        points_over_threshold = np.sum(direct_ill[hour, :] > threshold)
+        if points_over_threshold > points_threshold:
+            schedule.append(1)  # Blinds closed
         else:
-            print("No action specified. Use --generate-schedule or --combine-results.")
+            schedule.append(0)  # Blinds open
+
+    with open("blinds.schedule", "w") as f:
+        f.write("\\n".join(map(str, schedule)))
+    print("Generated blinds.schedule")
+
+def combine_results(schedule_file, open_ill_file, closed_ill_file, num_points, output_file):
+    """Combines two .ill files based on a schedule."""
+    print("Combining results for final sDA calculation...")
+    with open(schedule_file, "r") as f:
+        schedule = [int(line.strip()) for line in f]
+
+    # Open files in binary read mode
+    with open(open_ill_file, "rb") as f_open, open(closed_ill_file, "rb") as f_closed, open(output_file, "wb") as f_out:
+        # Each point-hour is 3 floats * 4 bytes/float = 12 bytes
+        record_size = 12 
+        
+        for hour in range(8760):
+            for point in range(num_points):
+                # Calculate the byte offset for the current record
+                offset = (hour * num_points + point) * record_size
+                
+                if schedule[hour] == 1: # Blinds closed
+                    f_closed.seek(offset)
+                    record = f_closed.read(record_size)
+                else: # Blinds open
+                    f_open.seek(offset)
+                    record = f_open.read(record_size)
+                
+                f_out.write(record)
+
+    print(f"Final combined results saved to {output_file}")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Post-process sDA/ASE simulation results.")
+    parser.add_argument("--generate-schedule", action="store_true", help="Generate blind schedule.")
+    parser.add_argument("--combine-results", action="store_true", help="Combine open/closed results.")
+    parser.add_argument("--direct-ill", help="Path to direct-only illuminance file.")
+    parser.add_argument("--open-ill", help="Path to blinds-open illuminance file.")
+    parser.add_argument("--closed-ill", help="Path to blinds-closed illuminance file.")
+    parser.add_argument("--output-file", help="Path for the final combined .ill file.")
+    parser.add_argument("--num-points", type=int, required=True, help="Number of sensor points.")
+    parser.add_argument("--threshold", type=float, default=1000.0, help="Lux threshold for blind trigger.")
+    parser.add_argument("--trigger", type=float, default=0.02, help="Area percentage for blind trigger.")
+
+    args = parser.parse_args()
+
+    if args.generate_schedule:
+        if not args.direct_ill:
+            print("Error: --direct-ill is required for generating schedule.")
+        else:
+            generate_schedule(args.direct_ill, args.num_points, args.threshold, args.trigger)
+    elif args.combine_results:
+        if not args.open_ill or not args.closed_ill or not args.output_file:
+            print("Error: --open-ill, --closed-ill, and --output-file are required for combining results.")
+        else:
+            combine_results("blinds.schedule", args.open_ill, args.closed_ill, args.num_points, args.output_file)
+    else:
+        print("No action specified. Use --generate-schedule or --combine-results.")
 `;
 
     const shContent = `#!/bin/bash
@@ -2136,7 +2174,7 @@ const aa = p['aa'] || 0.15;
     # from the "Annual Daylight (3-Phase)" recipe.
 
     # --- Configuration ---
-    PROJECT_NAME="\${projectName}"
+    PROJECT_NAME="${projectName}"
     WEATHER_FILE="../04_skies/${epwFileName}"
     BSDF_OPEN="../05_bsdf/${bsdfOpenFile}"
     BSDF_CLOSED="../05_bsdf/${bsdfClosedFile}"
@@ -2251,134 +2289,136 @@ function createEn17037ComplianceScript(projectData) {
     const ar = p['ar'] || 1024;
     const aa = p['aa'] || 0.1;
     const lw = p['lw'] || 1e-5;
+    // Standard meridian (west-positive) for gendaylit, matching the other generators.
+    const mer = Math.round(pi.longitude / 15) * 15 * -1;
 
     // --- Python Helper Script for Daylight Provision ---
     const pythonDaylightScript = `
-    import numpy as np
-    import pandas as pd
-    import argparse
-    import os
+import numpy as np
+import pandas as pd
+import argparse
+import os
 
-    def check_daylight_provision(illuminance_file, epw_file, num_points, ET, F_plane_ET, ETM, F_plane_ETM):
-        print("\\n--- Checking EN 17037 Daylight Provision ---")
-        print(f"Targets: >{ET}lx on >{F_plane_ET}% of area AND >{ETM}lx on >{F_plane_ETM}% of area, for >50% of daylight hours.")
+def check_daylight_provision(illuminance_file, epw_file, num_points, ET, F_plane_ET, ETM, F_plane_ETM):
+    print("\\n--- Checking EN 17037 Daylight Provision ---")
+    print(f"Targets: >{ET}lx on >{F_plane_ET}% of area AND >{ETM}lx on >{F_plane_ETM}% of area, for >50% of daylight hours.")
 
-        try:
-            # Read EPW to find daylight hours
-            epw_data = pd.read_csv(epw_file, header=None, skiprows=8)
-            diffuse_horizontal_irradiance = epw_data[13]
-            daylight_hours_indices = diffuse_horizontal_irradiance.nlargest(4380).index
+    try:
+        # Read EPW to find daylight hours
+        epw_data = pd.read_csv(epw_file, header=None, skiprows=8)
+        diffuse_horizontal_irradiance = epw_data[13]
+        daylight_hours_indices = diffuse_horizontal_irradiance.nlargest(4380).index
 
-            # Read Radiance .ill file
-            data = np.fromfile(illuminance_file, dtype=np.float32)
-            rgb_illuminance = data.reshape(8760, num_points, 3)
-            annual_illuminance = 179 * (rgb_illuminance[:,:,0]*0.265 + rgb_illuminance[:,:,1]*0.670 + rgb_illuminance[:,:,2]*0.065)
+        # Read Radiance .ill file
+        data = np.fromfile(illuminance_file, dtype=np.float32)
+        rgb_illuminance = data.reshape(8760, num_points, 3)
+        annual_illuminance = 179 * (rgb_illuminance[:,:,0]*0.265 + rgb_illuminance[:,:,1]*0.670 + rgb_illuminance[:,:,2]*0.065)
 
-            # Filter for daylight hours
-            daylight_illuminance = annual_illuminance[daylight_hours_indices, :]
+        # Filter for daylight hours
+        daylight_illuminance = annual_illuminance[daylight_hours_indices, :]
 
-            # Check criteria for each daylight hour
-            passing_hours_ET = 0
-            passing_hours_ETM = 0
+        # Check criteria for each daylight hour
+        passing_hours_ET = 0
+        passing_hours_ETM = 0
 
-            for hour_idx in range(4380):
-                hour_data = daylight_illuminance[hour_idx, :]
+        for hour_idx in range(4380):
+            hour_data = daylight_illuminance[hour_idx, :]
 
-                percent_area_ET = (np.sum(hour_data >= ET) / num_points) * 100
-                percent_area_ETM = (np.sum(hour_data >= ETM) / num_points) * 100
+            percent_area_ET = (np.sum(hour_data >= ET) / num_points) * 100
+            percent_area_ETM = (np.sum(hour_data >= ETM) / num_points) * 100
 
-                if percent_area_ET >= F_plane_ET:
-                    passing_hours_ET += 1
-                if percent_area_ETM >= F_plane_ETM:
-                    passing_hours_ETM += 1
+            if percent_area_ET >= F_plane_ET:
+                passing_hours_ET += 1
+            if percent_area_ETM >= F_plane_ETM:
+                passing_hours_ETM += 1
 
-            # Final compliance check
-            percent_time_ET = (passing_hours_ET / 4380) * 100
-            percent_time_ETM = (passing_hours_ETM / 4380) * 100
+        # Final compliance check
+        percent_time_ET = (passing_hours_ET / 4380) * 100
+        percent_time_ETM = (passing_hours_ETM / 4380) * 100
 
-            compliant_ET = percent_time_ET >= 50.0
-            compliant_ETM = percent_time_ETM >= 50.0
+        compliant_ET = percent_time_ET >= 50.0
+        compliant_ETM = percent_time_ETM >= 50.0
 
-            print(f"Result (ET): {percent_time_ET:.1f}% of daylight hours met the {ET}lx target. (Pass: {compliant_ET})")
-            print(f"Result (ETM): {percent_time_ETM:.1f}% of daylight hours met the {ETM}lx target. (Pass: {compliant_ETM})")
+        print(f"Result (ET): {percent_time_ET:.1f}% of daylight hours met the {ET}lx target. (Pass: {compliant_ET})")
+        print(f"Result (ETM): {percent_time_ETM:.1f}% of daylight hours met the {ETM}lx target. (Pass: {compliant_ETM})")
 
-            if compliant_ET and compliant_ETM:
-                print(">>> STATUS: PASS")
-            else:
-                print(">>> STATUS: FAIL")
+        if compliant_ET and compliant_ETM:
+            print(">>> STATUS: PASS")
+        else:
+            print(">>> STATUS: FAIL")
 
-        except Exception as e:
-            print(f"An error occurred during daylight provision analysis: {e}")
-            print(">>> STATUS: ERROR")
+    except Exception as e:
+        print(f"An error occurred during daylight provision analysis: {e}")
+        print(">>> STATUS: ERROR")
 
-    if __name__ == "__main__":
-        parser = argparse.ArgumentParser()
-        parser.add_argument("illuminance_file")
-        parser.add_argument("epw_file")
-        parser.add_argument("--points", type=int, required=True)
-        parser.add_argument("--ET", type=float, required=True)
-        parser.add_argument("--F_plane_ET", type=float, required=True)
-        parser.add_argument("--ETM", type=float, required=True)
-        parser.add_argument("--F_plane_ETM", type=float, required=True)
-        args = parser.parse_args()
-        check_daylight_provision(args.illuminance_file, args.epw_file, args.points, args.ET, args.F_plane_ET, args.ETM, args.F_plane_ETM)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("illuminance_file")
+    parser.add_argument("epw_file")
+    parser.add_argument("--points", type=int, required=True)
+    parser.add_argument("--ET", type=float, required=True)
+    parser.add_argument("--F_plane_ET", type=float, required=True)
+    parser.add_argument("--ETM", type=float, required=True)
+    parser.add_argument("--F_plane_ETM", type=float, required=True)
+    args = parser.parse_args()
+    check_daylight_provision(args.illuminance_file, args.epw_file, args.points, args.ET, args.F_plane_ET, args.ETM, args.F_plane_ETM)
 `;
 
     // --- Python Helper Script for Glare ---
     const pythonGlareScript = `
-    import numpy as np
-    import pandas as pd
-    import argparse
-    import os
+import numpy as np
+import pandas as pd
+import argparse
+import os
 
-    def check_glare_protection(dgp_file, schedule_file, dgp_threshold):
-        print("\\n--- Checking EN 17037 Glare Protection ---")
-        print(f"Target: DGP <= {dgp_threshold} for at least 95% of occupied hours.")
+def check_glare_protection(dgp_file, schedule_file, dgp_threshold):
+    print("\\n--- Checking EN 17037 Glare Protection ---")
+    print(f"Target: DGP <= {dgp_threshold} for at least 95% of occupied hours.")
 
-        try:
-            dgp_data = pd.read_csv(dgp_file, header=None, delim_whitespace=True)
-            num_points = dgp_data.shape[1]
+    try:
+        dgp_data = pd.read_csv(dgp_file, header=None, delim_whitespace=True)
+        num_points = dgp_data.shape[1]
 
-            # Default to weekdays, 8 AM to 6 PM if no schedule is provided
-            time_index = pd.to_datetime(pd.date_range(start='2023-01-01', end='2024-01-01', freq='h', inclusive='left'))
-            occupied_mask = (time_index.hour >= 8) & (time_index.hour < 18) & (time_index.dayofweek < 5)
+        # Default to weekdays, 8 AM to 6 PM if no schedule is provided
+        time_index = pd.to_datetime(pd.date_range(start='2023-01-01', end='2024-01-01', freq='h', inclusive='left'))
+        occupied_mask = (time_index.hour >= 8) & (time_index.hour < 18) & (time_index.dayofweek < 5)
 
-            if schedule_file and os.path.exists(schedule_file):
-                print(f"Using occupancy schedule from: {schedule_file}")
-                schedule = pd.read_csv(schedule_file, header=None).squeeze("columns")
-                if len(schedule) == 8760:
-                    occupied_mask = schedule.to_numpy(dtype=bool)
-                else:
-                    print(f"Warning: Schedule file does not contain 8760 entries. Using default schedule.")
-
-            occupied_dgp = dgp_data[occupied_mask]
-            total_occupied_hours = occupied_dgp.shape[0]
-
-            # Check for each point
-            hours_with_glare = (occupied_dgp > dgp_threshold).sum(axis=0)
-            percent_hours_with_glare = (hours_with_glare / total_occupied_hours) * 100
-
-            # The standard implies checking each point. We report the worst-case.
-            max_glare_percent = percent_hours_with_glare.max()
-
-            print(f"Worst-case sensor experienced glare for {max_glare_percent:.1f}% of occupied hours.")
-
-            if max_glare_percent <= 5.0:
-                print(">>> STATUS: PASS")
+        if schedule_file and os.path.exists(schedule_file):
+            print(f"Using occupancy schedule from: {schedule_file}")
+            schedule = pd.read_csv(schedule_file, header=None).squeeze("columns")
+            if len(schedule) == 8760:
+                occupied_mask = schedule.to_numpy(dtype=bool)
             else:
-                print(">>> STATUS: FAIL")
+                print(f"Warning: Schedule file does not contain 8760 entries. Using default schedule.")
 
-        except Exception as e:
-            print(f"An error occurred during glare analysis: {e}")
-            print(">>> STATUS: ERROR")
+        occupied_dgp = dgp_data[occupied_mask]
+        total_occupied_hours = occupied_dgp.shape[0]
 
-    if __name__ == "__main__":
-        parser = argparse.ArgumentParser()
-        parser.add_argument("dgp_file")
-        parser.add_argument("--schedule", type=str, default=None)
-        parser.add_argument("--threshold", type=float, required=True)
-        args = parser.parse_args()
-        check_glare_protection(args.dgp_file, args.schedule, args.threshold)
+        # Check for each point
+        hours_with_glare = (occupied_dgp > dgp_threshold).sum(axis=0)
+        percent_hours_with_glare = (hours_with_glare / total_occupied_hours) * 100
+
+        # The standard implies checking each point. We report the worst-case.
+        max_glare_percent = percent_hours_with_glare.max()
+
+        print(f"Worst-case sensor experienced glare for {max_glare_percent:.1f}% of occupied hours.")
+
+        if max_glare_percent <= 5.0:
+            print(">>> STATUS: PASS")
+        else:
+            print(">>> STATUS: FAIL")
+
+    except Exception as e:
+        print(f"An error occurred during glare analysis: {e}")
+        print(">>> STATUS: ERROR")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("dgp_file")
+    parser.add_argument("--schedule", type=str, default=None)
+    parser.add_argument("--threshold", type=float, required=True)
+    args = parser.parse_args()
+    check_glare_protection(args.dgp_file, args.schedule, args.threshold)
 `;
 
     // --- Master Shell Script ---
@@ -2449,7 +2489,7 @@ function createEn17037ComplianceScript(projectData) {
             hour=\$(echo "scale=2; \${minute_of_day} / 60" | bc)
 
             # Get sun position for this time step
-            sun_info=$(gendaylit ${monthStr} ${dayStr} \${hour} -a ${pi.latitude} -o ${pi.longitude} -m ${mer} -O 1)
+            sun_info=$(gendaylit ${monthStr} ${dayStr} \${hour} -a ${pi.latitude} -o ${-pi.longitude} -m ${mer} -O 1)
             sun_altitude=$(echo "\$sun_info" | awk '{print $3}')
             sun_altitude_deg=$(echo "scale=2; \$sun_altitude * 180 / 3.14159" | bc)
 
@@ -2519,7 +2559,7 @@ function createEn17037ComplianceScript(projectData) {
     0
     0
     5 0 0 0 0 0
-    EOF
+EOF
 
         # Use replmarks to swap all materials except glazing to 'black'.
         replmarks -m glass_mat=window_light \\
@@ -2549,7 +2589,7 @@ function createEn17037ComplianceScript(projectData) {
         # 4. Generate a visualization image
         echo "4. Generating fisheye visualization..."
         VIZ_IMAGE="\${IMG_DIR}/${projectName}_view_factor_viz.hdr"
-        rpict -vth -vh 180 -vv 180 -ab 0 -vf ../03_views/viewpoint_fisheye.vf "\${OCTREE_VF}" > "\${VIZ_IMAGE}"
+        rpict -vta -vh 180 -vv 180 -ab 0 -vf ../03_views/viewpoint_fisheye.vf "\${OCTREE_VF}" > "\${VIZ_IMAGE}"
         
         echo ">>> STATUS: COMPLETE. View Factor is \${VIEW_FACTOR_PERCENTAGE}%. Visualization saved to \${VIZ_IMAGE}"
     fi
@@ -2652,24 +2692,20 @@ function createEnIlluminanceScript(projectData) {
         echo "--- EN 12464-1 Illuminance & Uniformity Report ---"
         echo ""
         echo "--- TASK AREA RESULTS ---"
-        total -m < "\${RESULTS_DIR}/task_results_lux.txt" | {
-            read E_avg
-            E_min=$(datamax -l "\${RESULTS_DIR}/task_results_lux.txt")
-            U0=$(echo "scale=4; if(\$E_avg > 0) \$E_min / \$E_avg else 0" | bc)
-            echo "Average Illuminance (Em): \${E_avg} lux"
-            echo "Minimum Illuminance (Emin): \${E_min} lux"
-            echo "Uniformity (U0 = Emin/Em): \${U0}"
-        }
+        E_avg=$(total -m < "\${RESULTS_DIR}/task_results_lux.txt")
+        E_min=$(total -l < "\${RESULTS_DIR}/task_results_lux.txt")
+        U0=$(awk -v a="\$E_avg" -v m="\$E_min" 'BEGIN{ if (a+0 > 0) printf "%.4f", m/a; else print "0" }')
+        echo "Average Illuminance (Em): \${E_avg} lux"
+        echo "Minimum Illuminance (Emin): \${E_min} lux"
+        echo "Uniformity (U0 = Emin/Em): \${U0}"
         echo ""
         echo "--- SURROUNDING AREA RESULTS ---"
-        total -m < "\${RESULTS_DIR}/surround_results_lux.txt" | {
-            read E_avg
-            E_min=$(datamax -l "\${RESULTS_DIR}/surround_results_lux.txt")
-            U0=$(echo "scale=4; if(\$E_avg > 0) \$E_min / \$E_avg else 0" | bc)
-            echo "Average Illuminance (Em): \${E_avg} lux"
-            echo "Minimum Illuminance (Emin): \${E_min} lux"
-            echo "Uniformity (U0 = Emin/Em): \${U0}"
-        }
+        E_avg=$(total -m < "\${RESULTS_DIR}/surround_results_lux.txt")
+        E_min=$(total -l < "\${RESULTS_DIR}/surround_results_lux.txt")
+        U0=$(awk -v a="\$E_avg" -v m="\$E_min" 'BEGIN{ if (a+0 > 0) printf "%.4f", m/a; else print "0" }')
+        echo "Average Illuminance (Em): \${E_avg} lux"
+        echo "Minimum Illuminance (Emin): \${E_min} lux"
+        echo "Uniformity (U0 = Emin/Em): \${U0}"
         echo "----------------------------------------------------"
     } > "\${SUMMARY_FILE}"
 
@@ -2742,14 +2778,14 @@ function createEnUgrScript(projectData) {
     # 2. Render 180-degree fisheye HDR image
     echo "2. Rendering fisheye image for observer..."
     HDR_IMAGE="\${IMG_DIR}/\${PROJECT_NAME}_ugr_view.hdr"
-    rpict -vth -vh 180 -vv 180 -vf "\${VIEW_FILE}" -x 2048 -y 2048 \\
+    rpict -vta -vh 180 -vv 180 -vf "\${VIEW_FILE}" -x 2048 -y 2048 \\
         -ab \${AB} -ad \${AD} -as \${AS} -ar \${AR} -aa \${AA} -lw \${LW} \\
         "\${OCTREE}" > "\${HDR_IMAGE}"
 
     # 3. Calculate UGR with evalglare
     echo "3. Calculating UGR with evalglare..."
     GLARE_REPORT="\${RESULTS_DIR}/EN12464_UGR_Report.txt"
-    evalglare -vth "\${HDR_IMAGE}" > "\${GLARE_REPORT}"
+    evalglare -vta "\${HDR_IMAGE}" > "\${GLARE_REPORT}"
 
     # 4. Generate Summary Report
     echo "4. Generating summary report..."
@@ -2795,7 +2831,7 @@ function createLightingEnergyScript(projectData) {
     const bsdfClosedFile = p['bsdf-closed-file']?.name || 'bsdf_closed.xml';
 
     const blindsThreshold = p['blinds-threshold-lux'] || 1000;
-    const blindsTrigger = p['blinds-trigger-percent'] / 100.0 || 0.02;
+    const blindsTrigger = (p['blinds-trigger-percent'] != null ? p['blinds-trigger-percent'] / 100 : 0.02);
 
     // Get lighting control and power info
     const { daylighting: dc, luminaire_wattage } = lighting;
@@ -2808,141 +2844,141 @@ function createLightingEnergyScript(projectData) {
 
 
     const pythonScriptContent = `import numpy as np
-    import argparse
-    import os
-    import pandas as pd
+import argparse
+import os
+import pandas as pd
 
-    def read_ill_file(file_path, num_points):
-        """Reads a binary .ill file and converts to photopic illuminance."""
-        try:
-            data = np.fromfile(file_path, dtype=np.float32)
-            if data.size == 0:
-                print(f"Warning: Ill file is empty: {file_path}")
-                return np.zeros((8760, num_points))
-            rgb = data.reshape(8760, num_points, 3)
-            return 179 * (rgb[:,:,0]*0.265 + rgb[:,:,1]*0.670 + rgb[:,:,2]*0.065)
-        except Exception as e:
-            print(f"Error reading or reshaping file '{file_path}': {e}")
-            return None
+def read_ill_file(file_path, num_points):
+    """Reads a binary .ill file and converts to photopic illuminance."""
+    try:
+        data = np.fromfile(file_path, dtype=np.float32)
+        if data.size == 0:
+            print(f"Warning: Ill file is empty: {file_path}")
+            return np.zeros((8760, num_points))
+        rgb = data.reshape(8760, num_points, 3)
+        return 179 * (rgb[:,:,0]*0.265 + rgb[:,:,1]*0.670 + rgb[:,:,2]*0.065)
+    except Exception as e:
+        print(f"Error reading or reshaping file '{file_path}': {e}")
+        return None
 
-    def generate_schedule(direct_ill_file, num_points, threshold, trigger_percent):
-        """Generates a blind schedule based on direct illuminance."""
-        print(f"Generating blind schedule from {direct_ill_file}...")
-        direct_ill = read_ill_file(direct_ill_file, num_points)
-        if direct_ill is None: return
+def generate_schedule(direct_ill_file, num_points, threshold, trigger_percent):
+    """Generates a blind schedule based on direct illuminance."""
+    print(f"Generating blind schedule from {direct_ill_file}...")
+    direct_ill = read_ill_file(direct_ill_file, num_points)
+    if direct_ill is None: return
 
-        schedule = []
-        points_threshold = int(num_points * trigger_percent)
+    schedule = []
+    points_threshold = int(num_points * trigger_percent)
+    for hour in range(8760):
+        points_over_threshold = np.sum(direct_ill[hour, :] > threshold)
+        schedule.append(1 if points_over_threshold > points_threshold else 0)
+
+    with open("blinds.schedule", "w") as f:
+        f.write("\\n".join(map(str, schedule)))
+    print("Generated blinds.schedule")
+
+def combine_results(schedule_file, open_ill_file, closed_ill_file, num_points, output_file):
+    """Combines two .ill files based on a schedule."""
+    print("Combining results for final illuminance calculation...")
+    with open(schedule_file, "r") as f:
+        schedule = [int(line.strip()) for line in f]
+
+    with open(open_ill_file, "rb") as f_open, open(closed_ill_file, "rb") as f_closed, open(output_file, "wb") as f_out:
+        record_size = 12 
         for hour in range(8760):
-            points_over_threshold = np.sum(direct_ill[hour, :] > threshold)
-            schedule.append(1 if points_over_threshold > points_threshold else 0)
+            for point in range(num_points):
+                offset = (hour * num_points + point) * record_size
+                f_source = f_closed if schedule[hour] == 1 else f_open
+                f_source.seek(offset)
+                record = f_source.read(record_size)
+                f_out.write(record)
+    print(f"Final combined results saved to {output_file}")
 
-        with open("blinds.schedule", "w") as f:
-            f.write("\\n".join(map(str, schedule)))
-        print("Generated blinds.schedule")
+def calculate_energy(final_ill_file, num_points, args):
+    """Calculates lighting energy based on illuminance and control settings."""
+    print("\\nCalculating lighting energy consumption...")
+    final_ill = read_ill_file(final_ill_file, num_points)
+    if final_ill is None: return
 
-    def combine_results(schedule_file, open_ill_file, closed_ill_file, num_points, output_file):
-        """Combines two .ill files based on a schedule."""
-        print("Combining results for final illuminance calculation...")
-        with open(schedule_file, "r") as f:
-            schedule = [int(line.strip()) for line in f]
+    hourly_avg_ill = np.mean(final_ill, axis=1)
+    total_power_fraction_sum = 0
+    occupied_hour_count = 0
 
-        with open(open_ill_file, "rb") as f_open, open(closed_ill_file, "rb") as f_closed, open(output_file, "wb") as f_out:
-            record_size = 12 
-            for hour in range(8760):
-                for point in range(num_points):
-                    offset = (hour * num_points + point) * record_size
-                    f_source = f_closed if schedule[hour] == 1 else f_open
-                    f_source.seek(offset)
-                    record = f_source.read(record_size)
-                    f_out.write(record)
-        print(f"Final combined results saved to {output_file}")
+    time_index = pd.to_datetime(pd.date_range(start='2023-01-01', end='2024-01-01', freq='h', inclusive='left'))
+    occupied_mask = (time_index.hour >= 8) & (time_index.hour < 18) & (time_index.dayofweek < 5)
 
-    def calculate_energy(final_ill_file, num_points, args):
-        """Calculates lighting energy based on illuminance and control settings."""
-        print("\\nCalculating lighting energy consumption...")
-        final_ill = read_ill_file(final_ill_file, num_points)
-        if final_ill is None: return
+    for h in range(8760):
+        if occupied_mask[h]:
+            occupied_hour_count += 1
+            daylight = hourly_avg_ill[h]
+            
+            fL = max(0, (args.setpoint - daylight) / args.setpoint)
+            fP = 0
+            if args.control_type == 'Continuous':
+                if fL < args.min_light_frac:
+                    fP = args.min_power_frac
+                else:
+                    fP = args.min_power_frac + (fL - args.min_light_frac) * (1 - args.min_power_frac) / (1 - args.min_light_frac)
+            elif args.control_type == 'ContinuousOff':
+                if fL < args.min_light_frac:
+                    fP = 0
+                else:
+                    fP = args.min_power_frac + (fL - args.min_light_frac) * (1 - args.min_power_frac) / (1 - args.min_light_frac)
+            elif args.control_type == 'Stepped':
+                if fL <= 0: fP = 0
+                elif fL >= 1: fP = 1
+                else: fP = np.ceil(args.n_steps * fL) / args.n_steps
+            
+            total_power_fraction_sum += fP
 
-        hourly_avg_ill = np.mean(final_ill, axis=1)
-        total_power_fraction_sum = 0
-        occupied_hour_count = 0
+    avg_power_fraction = total_power_fraction_sum / occupied_hour_count if occupied_hour_count > 0 else 0
+    total_installed_power_kw = args.total_power / 1000.0
+    annual_energy_kwh = avg_power_fraction * total_installed_power_kw * occupied_hour_count
+    savings = (1 - avg_power_fraction) * 100
+    lpd = args.total_power / args.room_area
 
-        time_index = pd.to_datetime(pd.date_range(start='2023-01-01', end='2024-01-01', freq='h', inclusive='left'))
-        occupied_mask = (time_index.hour >= 8) & (time_index.hour < 18) & (time_index.dayofweek < 5)
+    summary_df = pd.DataFrame({
+        'Lighting Power Density (W/m^2)': [f"{lpd:.2f}"],
+        'Annual Lighting Energy (kWh/yr)': [f"{annual_energy_kwh:.0f}"],
+        'Daylighting Savings (%)': [f"{savings:.1f}"]
+    })
+    summary_path = os.path.join(args.outdir, "energy_summary.csv")
+    summary_df.to_csv(summary_path, index=False)
 
-        for h in range(8760):
-            if occupied_mask[h]:
-                occupied_hour_count += 1
-                daylight = hourly_avg_ill[h]
-                
-                fL = max(0, (args.setpoint - daylight) / args.setpoint)
-                fP = 0
-                if args.control_type == 'Continuous':
-                    if fL < args.min_light_frac:
-                        fP = args.min_power_frac
-                    else:
-                        fP = args.min_power_frac + (fL - args.min_light_frac) * (1 - args.min_power_frac) / (1 - args.min_light_frac)
-                elif args.control_type == 'ContinuousOff':
-                    if fL < args.min_light_frac:
-                        fP = 0
-                    else:
-                        fP = args.min_power_frac + (fL - args.min_light_frac) * (1 - args.min_power_frac) / (1 - args.min_light_frac)
-                elif args.control_type == 'Stepped':
-                    if fL <= 0: fP = 0
-                    elif fL >= 1: fP = 1
-                    else: fP = np.ceil(args.n_steps * fL) / args.n_steps
-                
-                total_power_fraction_sum += fP
+    print("\\n--- Lighting Energy Summary ---")
+    print(f"  Lighting Power Density (LPD): {lpd:.2f} W/m²")
+    print(f"  Annual Energy Consumption:    {annual_energy_kwh:.0f} kWh")
+    print(f"  Energy Savings vs. No DL-Ctrl:  {savings:.1f}%")
+    print(f"\\nSummary saved to: {summary_path}")
 
-        avg_power_fraction = total_power_fraction_sum / occupied_hour_count if occupied_hour_count > 0 else 0
-        total_installed_power_kw = args.total_power / 1000.0
-        annual_energy_kwh = avg_power_fraction * total_installed_power_kw * occupied_hour_count
-        savings = (1 - avg_power_fraction) * 100
-        lpd = args.total_power / args.room_area
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("action", choices=['generate_schedule', 'combine_results', 'calculate_energy'])
+    parser.add_argument("--num-points", type=int, required=True)
+    parser.add_argument("--outdir", type=str, default="../08_results")
 
-        summary_df = pd.DataFrame({
-            'Lighting Power Density (W/m^2)': [f"{lpd:.2f}"],
-            'Annual Lighting Energy (kWh/yr)': [f"{annual_energy_kwh:.0f}"],
-            'Daylighting Savings (%)': [f"{savings:.1f}"]
-        })
-        summary_path = os.path.join(args.outdir, "energy_summary.csv")
-        summary_df.to_csv(summary_path, index=False)
+    parser.add_argument("--direct-ill", help="Path to direct-only illuminance file.")
+    parser.add_argument("--open-ill", help="Path to blinds-open illuminance file.")
+    parser.add_argument("--closed-ill", help="Path to blinds-closed illuminance file.")
+    parser.add_argument("--final-ill", help="Path to final combined illuminance file.")
+    parser.add_argument("--threshold", type=float, default=1000.0)
+    parser.add_argument("--trigger", type=float, default=0.02)
 
-        print("\\n--- Lighting Energy Summary ---")
-        print(f"  Lighting Power Density (LPD): {lpd:.2f} W/m²")
-        print(f"  Annual Energy Consumption:    {annual_energy_kwh:.0f} kWh")
-        print(f"  Energy Savings vs. No DL-Ctrl:  {savings:.1f}%")
-        print(f"\\nSummary saved to: {summary_path}")
+    parser.add_argument("--total-power", type=float, help="Total installed lighting power (Watts)")
+    parser.add_argument("--room-area", type=float, help="Room floor area (m^2)")
+    parser.add_argument("--control-type", choices=['Continuous', 'ContinuousOff', 'Stepped'])
+    parser.add_argument("--setpoint", type=float, default=500.0)
+    parser.add_argument("--min-power-frac", type=float, default=0.1)
+    parser.add_argument("--min-light-frac", type=float, default=0.1)
+    parser.add_argument("--n-steps", type=int, default=3)
+    args = parser.parse_args()
 
-    if __name__ == "__main__":
-        parser = argparse.ArgumentParser()
-        parser.add_argument("action", choices=['generate_schedule', 'combine_results', 'calculate_energy'])
-        parser.add_argument("--num-points", type=int, required=True)
-        parser.add_argument("--outdir", type=str, default="../08_results")
-
-        parser.add_argument("--direct-ill", help="Path to direct-only illuminance file.")
-        parser.add_argument("--open-ill", help="Path to blinds-open illuminance file.")
-        parser.add_argument("--closed-ill", help="Path to blinds-closed illuminance file.")
-        parser.add_argument("--final-ill", help="Path to final combined illuminance file.")
-        parser.add_argument("--threshold", type=float, default=1000.0)
-        parser.add_argument("--trigger", type=float, default=0.02)
-
-        parser.add_argument("--total-power", type=float, help="Total installed lighting power (Watts)")
-        parser.add_argument("--room-area", type=float, help="Room floor area (m^2)")
-        parser.add_argument("--control-type", choices=['Continuous', 'ContinuousOff', 'Stepped'])
-        parser.add_argument("--setpoint", type=float, default=500.0)
-        parser.add_argument("--min-power-frac", type=float, default=0.1)
-        parser.add_argument("--min-light-frac", type=float, default=0.1)
-        parser.add_argument("--n-steps", type=int, default=3)
-        args = parser.parse_args()
-
-        if args.action == 'generate_schedule':
-            generate_schedule(args.direct_ill, args.num_points, args.threshold, args.trigger)
-        elif args.action == 'combine_results':
-            combine_results("blinds.schedule", args.open_ill, args.closed_ill, args.num_points, args.final_ill)
-        elif args.action == 'calculate_energy':
-            calculate_energy(args.final_ill, args.num_points, args)
+    if args.action == 'generate_schedule':
+        generate_schedule(args.direct_ill, args.num_points, args.threshold, args.trigger)
+    elif args.action == 'combine_results':
+        combine_results("blinds.schedule", args.open_ill, args.closed_ill, args.num_points, args.final_ill)
+    elif args.action == 'calculate_energy':
+        calculate_energy(args.final_ill, args.num_points, args)
 `;
 
     const shContent = `#!/bin/bash
@@ -3054,7 +3090,6 @@ function createFacadeIrradiationScript(projectData) {
     const lw = p['lw'] || 0.005;
 
     const shContent = `#!/bin/bash
->>>>>>>>
     # RUN_Facade_Irradiation.sh
     # Calculates annual solar irradiation on a facade, including shading effects.
 
@@ -3079,7 +3114,7 @@ function createFacadeIrradiationScript(projectData) {
     # 1. Generate Sky Matrix from EPW
     echo "1. Generating annual sky matrix..."
     SKY_MTX="\${MATRIX_DIR}/sky.smx"
-    gendaymtx -m 1 "\${WEATHER_FILE}" > "\${SKY_MTX}"
+    epw2wea "\${WEATHER_FILE}" | gendaymtx -m 1 - > "\${SKY_MTX}"
 
     # 2. Create Scene Octree (includes room, shading, context)
     echo "2. Creating scene octree..."
@@ -3090,7 +3125,7 @@ function createFacadeIrradiationScript(projectData) {
     echo "3. Calculating daylight coefficients (rcontrib)..."
     FACADE_DCMTX="\${MATRIX_DIR}/facade_dc.mtx"
     rcontrib -I+ -w -ab \${AB} -ad \${AD} -as \${AS} -ar \${AR} -aa \${AA} -lw \${LW} \\
-        -f reinhart.cal -b tbin -bn 145 -m sky_glow \\
+        -f reinhart.cal -b rbin -bn 145 -m sky_glow \\
         "\${OCTREE}" < "\${POINTS_FILE}" > "\${FACADE_DCMTX}"
 
     # 4. Calculate hourly irradiance for the year
@@ -3101,7 +3136,7 @@ function createFacadeIrradiationScript(projectData) {
     # 5. Sum hourly results to get annual total in kWh/m^2
     echo "5. Summing annual results..."
     ANNUAL_IRRAD="\${RESULTS_DIR}/facade_annual_kWh.txt"
-    total -if3 "\${HOURLY_IRRAD}" | rcalc -e 'total_solar=$1+$2+$3; $1=total_solar * 8760 / 1000' > "\${ANNUAL_IRRAD}"
+    total -if3 "\${HOURLY_IRRAD}" | rcalc -e 'total_solar=$1+$2+$3; $1=total_solar / 1000' > "\${ANNUAL_IRRAD}"
 
     echo "---"
     echo "Analysis Complete."
@@ -3115,13 +3150,14 @@ function createFacadeIrradiationScript(projectData) {
         sh: { fileName: `RUN_${projectName}_Facade_Irradiation.sh`, content: shContent },
         bat: { fileName: `RUN_${projectName}_Facade_Irradiation.bat`, content: batContent }
     };
+}
 
-    /**
-     * Creates scripts for an annual solar radiation analysis on interior surfaces.
-     * @param {object} projectData - The complete project data object.
-     * @returns {object} An object containing the shell and bat script files.
-     */
-    function createAnnualRadiationScript(projectData) {
+/**
+ * Creates scripts for an annual solar radiation analysis on interior surfaces.
+ * @param {object} projectData - The complete project data object.
+ * @returns {object} An object containing the shell and bat script files.
+ */
+function createAnnualRadiationScript(projectData) {
         const { projectInfo: pi, mergedSimParams: p } = projectData;
         const projectName = pi['project-name'].replace(/\s+/g, '_') || 'scene';
         const epwFileName = p['weather-file']?.name || 'weather.epw';
@@ -3181,14 +3217,14 @@ function createFacadeIrradiationScript(projectData) {
     # 2. Generate Annual Sky Matrix (S)
     echo "2. Generating annual sky matrix from EPW..."
     SKY_MTX="\${MATRIX_DIR}/sky.smx"
-    gendaymtx -m 1 "\${WEATHER_FILE}" > "\${SKY_MTX}"
+    epw2wea "\${WEATHER_FILE}" | gendaymtx -m 1 - > "\${SKY_MTX}"
     if [ \$? -ne 0 ]; then echo "Error generating Sky Matrix."; exit 1; fi
 
     # 3. Generate Daylight Coefficients for Irradiance (DC)
     echo "3. Generating Daylight Coefficients (-I+)..."
     DC_MTX="\${MATRIX_DIR}/dc_irradiance.mtx"
     rcontrib -I+ -w -ab \${AB} -ad \${AD} -as \${AS} -ar \${AR} -aa \${AA} -lw \${LW} \\
-        -f reinhart.cal -b tbin -bn 145 -m sky_glow \\
+        -f reinhart.cal -b rbin -bn 145 -m sky_glow \\
         "\${OCTREE}" < "\${POINTS_FILE}" > "\${DC_MTX}"
     if [ \$? -ne 0 ]; then echo "Error generating Daylight Coefficient Matrix."; exit 1; fi
 
@@ -3230,4 +3266,3 @@ function createFacadeIrradiationScript(projectData) {
             bat: { fileName: `RUN_${projectName}_Annual_Radiation.bat`, content: batContent }
         };
     }
-}

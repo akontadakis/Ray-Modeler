@@ -247,7 +247,7 @@ class ReportGenerator {
                 <h2>Key Metrics Summary</h2>
                 <div class="metric-grid">
                     ${stats ? this._buildMetricCard('Average Illuminance', stats.avg.toFixed(1), 'lux') : ''}
-                    ${stats ? this._buildMetricCard('Uniformity (Uo)', (stats.min / stats.avg).toFixed(2)) : ''}
+                    ${stats ? this._buildMetricCard('Uniformity (Uo)', (Number.isFinite(stats.uniformity) ? stats.uniformity : (stats.avg > 0 ? stats.min / stats.avg : 0)).toFixed(2)) : ''}
                     ${annualMetrics ? this._buildMetricCard('sDA <sub>300/50%</sub>', annualMetrics.sDA.toFixed(1), '%') : ''}
                     ${annualMetrics ? this._buildMetricCard('ASE <sub>1000,250h</sub>', annualMetrics.ASE.toFixed(1), '%') : ''}
                     ${glareResult ? this._buildMetricCard('DGP', glareResult.dgp.toFixed(3)) : ''}

@@ -123,26 +123,49 @@ function _parseEvalglareContent(content) {
 
     // Find the start of the source list (this format is common to modern evalglare output for both metrics)
     const lines = content.split('\n');
-    let sourceStartIndex = lines.findIndex(line => line.trim().startsWith("Nr.") && line.includes("Ev"));
-    
-    if (sourceStartIndex !== -1) {
-        sourceStartIndex += 2; // Skip the header and separator line '---...'
+    // Detailed evalglare prints the vertical-illuminance column as "E_vert"
+    // (older/summary output uses "Ev"); accept either.
+    const headerLineIndex = lines.findIndex(line =>
+        line.trim().startsWith("Nr") && (line.includes("E_vert") || line.includes("Ev")));
 
-        for (let i = sourceStartIndex; i < lines.length; i++) {
+    if (headerLineIndex !== -1) {
+        // Locate columns by name for robustness across evalglare versions.
+        // Standard detailed order: Nr x y L_s Omega_s Posindx L_b L_t E_vert
+        const headerCols = lines[headerLineIndex].trim().split(/\s+/);
+        const colIndex = (names, fallback) => {
+            for (const n of names) {
+                const idx = headerCols.indexOf(n);
+                if (idx !== -1) return idx;
+            }
+            return fallback;
+        };
+        const idxNr = colIndex(['Nr', 'Nr.', 'No', 'No.'], 0);
+        const idxX = colIndex(['x', 'x-pos'], 1);
+        const idxY = colIndex(['y', 'y-pos'], 2);
+        const idxL = colIndex(['L_s'], 3);
+        const idxOmega = colIndex(['Omega_s', 'Omega'], 4);
+        const idxP = colIndex(['Posindx', 'Posidx', 'Pos_idx'], 5);
+        const idxLb = colIndex(['L_b'], 6);
+        const idxEv = colIndex(['E_vert', 'Ev'], 8);
+        const minCols = Math.max(idxNr, idxX, idxY, idxL, idxOmega, idxP, idxLb, idxEv);
+
+        const dataStartIndex = headerLineIndex + 2; // Skip the header and separator line '---...'
+
+        for (let i = dataStartIndex; i < lines.length; i++) {
             const line = lines[i].trim();
             if (line === '') break; // Stop at the end of the list
 
             const parts = line.split(/\s+/);
-            if (parts.length < 8) continue;
+            if (parts.length <= minCols) continue;
 
             glareResult.sources.push({
-                nr: parseInt(parts[0]),
-                pos: { x: parseFloat(parts[1]), y: parseFloat(parts[2]) },
-                L: parseFloat(parts[3]),      // Source Luminance
-                omega: parseFloat(parts[4]),  // Solid Angle
-                p: parseFloat(parts[5]),      // Guth Position Index
-                Ev: parseFloat(parts[6]),     // Vertical Illuminance
-                L_B: parseFloat(parts[7]),    // Background Luminance
+                nr: parseInt(parts[idxNr]),
+                pos: { x: parseFloat(parts[idxX]), y: parseFloat(parts[idxY]) },
+                L: parseFloat(parts[idxL]),       // Source Luminance (L_s)
+                omega: parseFloat(parts[idxOmega]),// Solid Angle (Omega_s)
+                p: parseFloat(parts[idxP]),        // Guth Position Index
+                Ev: parseFloat(parts[idxEv]),      // Vertical Illuminance (E_vert)
+                L_B: parseFloat(parts[idxLb]),     // Background Luminance (L_b)
             });
         }
     }
@@ -154,10 +177,38 @@ function _parseEvalglareContent(content) {
  * Parses the raw binary content of an annual .ill results file.
  */
 function _parseIllFileContent(arrayBuffer) {
-    const floatData = new Float32Array(arrayBuffer);
-    const totalFloats = floatData.length;
     const HOURS_IN_YEAR = 8760;
     const CHANNELS = 3; // R, G, B
+
+    // Radiance binary matrices (dctimestep/rmtxop) prepend an ASCII header,
+    // e.g. "#?RADIANCE ... FORMAT=float\n\n", before the raw float payload.
+    // Detect it, skip past the terminating blank line, and read floats from
+    // there. Already-headerless files are read from offset 0 as before.
+    let payloadBuffer = arrayBuffer;
+    const bytes = new Uint8Array(arrayBuffer);
+    const sniffLen = Math.min(bytes.length, 10000);
+    let headerText = '';
+    for (let i = 0; i < sniffLen; i++) {
+        headerText += String.fromCharCode(bytes[i]);
+    }
+    if (headerText.startsWith('#?RADIANCE') || headerText.includes('FORMAT=')) {
+        // The header terminates at the first blank line.
+        let sep = headerText.indexOf('\n\n');
+        let sepLen = 2;
+        const crlfSep = headerText.indexOf('\r\n\r\n');
+        if (crlfSep !== -1 && (sep === -1 || crlfSep < sep)) {
+            sep = crlfSep;
+            sepLen = 4;
+        }
+        if (sep !== -1) {
+            const offset = sep + sepLen;
+            // slice() yields a new, 4-byte-aligned ArrayBuffer, required by Float32Array.
+            payloadBuffer = arrayBuffer.slice(offset);
+        }
+    }
+
+    const floatData = new Float32Array(payloadBuffer);
+    const totalFloats = floatData.length;
 
     if (totalFloats === 0 || totalFloats % (HOURS_IN_YEAR * CHANNELS) !== 0) {
         throw new Error(`Invalid .ill file format. File size is not compatible with 8760 hourly RGB values.`);

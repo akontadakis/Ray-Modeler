@@ -495,6 +495,23 @@ export function clearSensorHighlights() {
 }
 
 /**
+* Updates the annual time-scrubber's text label to reflect the given hour of the year.
+* @param {number} hour - The hour of the year (0-8759).
+*/
+function updateTimeScrubberDisplay(hour) {
+    const display = getDom()['time-scrubber-display'];
+    if (!display || !Number.isFinite(hour)) return;
+
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const dayOfYear = Math.floor(hour / 24);
+    const hourOfDay = hour % 24;
+    // Use a non-leap reference year (2023) so the day-of-year maps to a 365-day calendar.
+    const date = new Date(2023, 0, 1 + dayOfYear);
+    const label = `${monthNames[date.getMonth()]} ${date.getDate()}, ${String(hourOfDay).padStart(2, '0')}:00`;
+    display.textContent = label;
+}
+
+/**
 * Highlights sensor points that correspond to the min or max value.
 * @param {'min' | 'max'} type - The type of value to highlight.
 */
@@ -1157,13 +1174,20 @@ export async function setupEventListeners() {
 
     // --- Annual Glare Listeners ---
     dom['glare-rose-btn']?.addEventListener('click', async () => {
-        if (dom['glare-rose-threshold-val']) {
-            dom['glare-rose-threshold-val'].textContent = parseFloat(e.target.value).toFixed(2);
+        // Reflect the current threshold slider value in its label before opening.
+        const thresholdInput = dom['glare-rose-threshold'];
+        if (thresholdInput && dom['glare-rose-threshold-val']) {
+            dom['glare-rose-threshold-val'].textContent = parseFloat(thresholdInput.value).toFixed(2);
         }
-        // Live update the chart if the panel is visible
-        if (dom['glare-rose-panel'] && !dom['glare-rose-panel'].classList.contains('hidden')) {
-            const { updateGlareRoseDiagram } = await import('./annualDashboard.js');
-            updateGlareRoseDiagram();
+        // Open (and render) the glare rose diagram.
+        const { openGlareRoseDiagram } = await import('./annualDashboard.js');
+        openGlareRoseDiagram();
+    });
+
+    dom['clear-glare-highlight-btn']?.addEventListener('click', () => {
+        glareHighlighter.clear();
+        if (dom['glare-source-list']) {
+            dom['glare-source-list'].querySelectorAll('li').forEach(item => item.classList.remove('active-glare-source'));
         }
     });
 
@@ -1547,43 +1571,45 @@ export async function setupEventListeners() {
     dom['time-scrubber']?.addEventListener('input', (e) => {
         const hour = parseInt(e.target.value, 10);
         updateTimeScrubberDisplay(hour);
+    });
 
-        // --- Daylighting Sensor Gizmo Listener ---
-        sensorTransformControls.addEventListener('dragging-changed', (event) => {
-            // Only update the UI when the user has finished dragging the gizmo.
-            if (event.value === false) {
-                if (!sensorTransformControls.object) return;
+    // --- Daylighting Sensor Gizmo Listener ---
+    // Registered exactly once so the gizmo position is written back to the
+    // daylight-sensor sliders when the user finishes dragging.
+    sensorTransformControls.addEventListener('dragging-changed', (event) => {
+        // Only update the UI when the user has finished dragging the gizmo.
+        if (event.value === false) {
+            if (!sensorTransformControls.object) return;
 
-                const controlledObject = sensorTransformControls.object;
-                const isSensor1 = controlledObject.name === 'daylightingSensor1';
-                const isSensor2 = controlledObject.name === 'daylightingSensor2';
+            const controlledObject = sensorTransformControls.object;
+            const isSensor1 = controlledObject.name === 'daylightingSensor1';
+            const isSensor2 = controlledObject.name === 'daylightingSensor2';
 
-                if (!isSensor1 && !isSensor2) return;
+            if (!isSensor1 && !isSensor2) return;
 
-                const W = parseFloat(dom.width.value);
-                const L = parseFloat(dom.length.value);
-                const sensorIndex = isSensor1 ? 1 : 2;
-                const finalPosition = controlledObject.position;
+            const W = parseFloat(dom.width.value);
+            const L = parseFloat(dom.length.value);
+            const sensorIndex = isSensor1 ? 1 : 2;
+            const finalPosition = controlledObject.position;
 
-                // Convert from the scene's corner-based coordinate system to the slider's center-based system.
-                const sliderX = finalPosition.x - W / 2;
-                const sliderZ = finalPosition.z - L / 2;
+            // Convert from the scene's corner-based coordinate system to the slider's center-based system.
+            const sliderX = finalPosition.x - W / 2;
+            const sliderZ = finalPosition.z - L / 2;
 
-                // Update the slider values with the final position.
-                if (dom[`daylight-sensor${sensorIndex}-x`]) dom[`daylight-sensor${sensorIndex}-x`].value = sliderX.toFixed(2);
-                if (dom[`daylight-sensor${sensorIndex}-y`]) dom[`daylight-sensor${sensorIndex}-y`].value = finalPosition.y.toFixed(2);
-                if (dom[`daylight-sensor${sensorIndex}-z`]) dom[`daylight-sensor${sensorIndex}-z`].value = sliderZ.toFixed(2);
+            // Update the slider values with the final position.
+            if (dom[`daylight-sensor${sensorIndex}-x`]) dom[`daylight-sensor${sensorIndex}-x`].value = sliderX.toFixed(2);
+            if (dom[`daylight-sensor${sensorIndex}-y`]) dom[`daylight-sensor${sensorIndex}-y`].value = finalPosition.y.toFixed(2);
+            if (dom[`daylight-sensor${sensorIndex}-z`]) dom[`daylight-sensor${sensorIndex}-z`].value = sliderZ.toFixed(2);
 
-                // Manually update the text labels next to the sliders.
-                updateAllLabels();
+            // Manually update the text labels next to the sliders.
+            updateAllLabels();
 
-                // Programmatically trigger an 'input' event on one of the sliders.
-                // This is crucial to notify the rest of the application (e.g., updateScene) of the change.
-                if (dom[`daylight-sensor${sensorIndex}-x`]) {
-                    dom[`daylight-sensor${sensorIndex}-x`].dispatchEvent(new Event('input', { bubbles: true }));
-                }
+            // Programmatically trigger an 'input' event on one of the sliders.
+            // This is crucial to notify the rest of the application (e.g., updateScene) of the change.
+            if (dom[`daylight-sensor${sensorIndex}-x`]) {
+                dom[`daylight-sensor${sensorIndex}-x`].dispatchEvent(new Event('input', { bubbles: true }));
             }
-        });
+        }
     });
 
     // Make toolbars draggable
@@ -1619,34 +1645,10 @@ export async function setupEventListeners() {
     }, { once: true }); // The event should only fire once.
 
     // --- Electron-Specific Listeners ---
-    // Listen for the 'run-simulation-button' which is dynamically created
-    document.body.addEventListener('click', async (event) => {
-        const button = event.target.closest('[data-action="run"]');
-        if (button && project.dirHandle) {
-            const panel = button.closest('.floating-window');
-            const scriptName = panel.dataset.scriptName;
-            if (!scriptName) {
-                showAlert('Could not find the script name for this simulation.', 'Error');
-                return;
-            }
-
-            // Show the console
-            const consolePanel = dom['simulation-console-panel'];
-            if (consolePanel) {
-                consolePanel.classList.remove('hidden');
-                consolePanel.style.zIndex = getNewZIndex();
-                dom['simulation-output'].textContent = `Running ${scriptName} in ${project.dirHandle.name}... \n\n`;
-                dom['simulation-status'].textContent = 'Status: Running...';
-                dom['simulation-status'].classList.add('text-yellow-500');
-                dom['simulation-status'].classList.remove('text-green-500', 'text-red-500');
-            }
-
-            // Use the Electron API to run the script
-            window.electronAPI.runScript({ projectPath: project.dirHandle.name, scriptName });
-        } else if (button && !project.dirHandle) {
-            showAlert('Please select a project directory before running a simulation.', 'Error');
-        }
-    });
+    // NOTE: The Run button ([data-action="run"]) is handled in simulation.js.
+    // A previous body-level delegated handler here gated on project.dirHandle
+    // (always null in Electron, which uses project.dirPath) and only ever
+    // produced a false "select a project directory" alert, so it was removed.
 
     // Listen for output from the running script
     if (window.electronAPI?.onScriptOutput) {
@@ -1830,7 +1832,7 @@ export function togglePanelVisibility(panelId, btnId) {
         // --- SHOW PANEL ---
         panel.classList.remove('hidden');
         panel.classList.remove('collapsed'); // Ensure panel is expanded when shown
-        btn.classList.add('active');
+        if (btn) btn.classList.add('active');
 
         // Bring the panel to the front
         panel.style.zIndex = getNewZIndex();
@@ -1862,7 +1864,7 @@ export function togglePanelVisibility(panelId, btnId) {
     } else {
         // --- HIDE PANEL ---
         panel.classList.add('hidden');
-        btn.classList.remove('active');
+        if (btn) btn.classList.remove('active');
     }
 }
 
@@ -2183,15 +2185,6 @@ export function makeDraggable(element, handle) {
         element.classList.add('is-dragging'); // Add dragging class
         controls.enabled = false;
 
-        // On the first drag, we switch the element to a pure transform-based positioning
-        if (!element.dataset.transformPositioned) {
-            element.style.left = '0px';
-            element.style.top = '0px';
-            element.style.transform = `translate3d(${rect.left}px, ${rect.top}px, 0)`;
-            element.dataset.transformPositioned = 'true';
-        }
-
-        controls.enabled = false;
         document.onmouseup = () => {
             document.onmouseup = null;
             document.onmousemove = null;
@@ -2694,11 +2687,12 @@ async function handleInputChange(e) {
         updateValueLabel(valEl, val, unit, id);
     }
 
-    // If the user changes the main dimensions, switch back to parametric mode
+    // If the user changes the main dimensions, switch back to parametric mode.
+    // The actual scene rebuild is handled by the debouncedScheduleUpdate(id) call
+    // at the end of this function, so we don't rebuild immediately here (that would
+    // rebuild the scene twice per keystroke).
     if (id === 'width' || id === 'length' || id === 'height') {
         setIsCustomGeometry(false);
-        // Trigger parametric room regeneration
-        updateScene();
     }
 
     // Add specific handler for viewpoint sliders to update the gizmo in real-time
@@ -4084,13 +4078,6 @@ function updateSpectralMetricsDashboard(key) {
     dashboard.classList.remove('hidden');
 }
 
-dom['clear-glare-highlight-btn']?.addEventListener('click', () => {
-    glareHighlighter.clear();
-    if (dom['glare-source-list']) {
-        dom['glare-source-list'].querySelectorAll('li').forEach(item => item.classList.remove('active-glare-source'));
-    }
-});
-
 /** Handles right-click events on the 3D scene to show a context menu on sensor points.
 * @param {MouseEvent} event The contextmenu event.
 */
@@ -4932,6 +4919,15 @@ export function getViewpointFileContent(forceFisheye = false) {
     const viewType = forceFisheye ? 'h' : dom['view-type'].value;
     const fov = parseFloat(dom['view-fov'].value);
     const vfov = (viewType === 'h' || viewType === 'a') ? 180 : fov;
+    // For perspective ('v') and cylindrical ('c') views, derive the horizontal FOV
+    // from the render aspect ratio (X/Y resolution). Fisheye/parallel views keep hfov = vfov.
+    let hfov = vfov;
+    if (viewType === 'v' || viewType === 'c') {
+        const xRes = parseFloat(dom['rpict-x']?.value);
+        const yRes = parseFloat(dom['rpict-y']?.value);
+        const aspect = (Number.isFinite(xRes) && Number.isFinite(yRes) && yRes > 0) ? xRes / yRes : 1;
+        hfov = 2 * Math.atan(Math.tan(vfov * Math.PI / 360) * aspect) * 180 / Math.PI;
+    }
     const viewTypeMap = { 'v': '-vtv', 'h': '-vth', 'c': '-vtc', 'l': '-vtl', 'a': '-vta' };
     const radViewType = viewTypeMap[viewType] || '-vtv';
 
@@ -4951,7 +4947,7 @@ export function getViewpointFileContent(forceFisheye = false) {
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(viewpointCamera.quaternion);
     const rad_vu = `${up.x.toFixed(4)} ${up.z.toFixed(4)} ${up.y.toFixed(4)}`;
 
-    return `${radViewType} -vp ${rad_vp} -vd ${rad_vd} -vu ${rad_vu} -vh ${vfov} -vv ${vfov}`;
+    return `${radViewType} -vp ${rad_vp} -vd ${rad_vd} -vu ${rad_vu} -vh ${hfov} -vv ${vfov}`;
 }
 
 /**

@@ -4,6 +4,7 @@ const os = require('os');
 const { execFile, spawn } = require('child_process');
 const fs = require('fs');
 const fsp = require('fs/promises');
+const { pathToFileURL } = require('url');
 
 let mainWindow;
 const activeChildProcesses = new Set();
@@ -36,6 +37,10 @@ function runShellScript(scriptPath, scriptDir, callback) {
   }
   activeChildProcesses.add(child);
   child.on('exit', () => activeChildProcesses.delete(child));
+  // Guard against unhandled 'error' events (e.g. spawn failures) crashing the
+  // main process. The execFile callback already receives the error, so this
+  // listener only needs to keep the process registry clean.
+  child.on('error', () => activeChildProcesses.delete(child));
   return child;
 }
 
@@ -107,12 +112,25 @@ app.whenReady().then(() => {
 
       activeChildProcesses.add(child);
 
-      child.stdout.on('data', (data) => {
-        event.sender.send('script-output', data.toString());
-      });
+      if (child.stdout) {
+        child.stdout.on('data', (data) => {
+          event.sender.send('script-output', data.toString());
+        });
+      }
 
-      child.stderr.on('data', (data) => {
-        event.sender.send('script-output', `ERROR: ${data.toString()}`);
+      if (child.stderr) {
+        child.stderr.on('data', (data) => {
+          event.sender.send('script-output', `ERROR: ${data.toString()}`);
+        });
+      }
+
+      // Without this listener a spawn failure (bad shebang, missing
+      // interpreter, permissions) emits an unhandled 'error' event that would
+      // crash the entire main process.
+      child.on('error', (err) => {
+        activeChildProcesses.delete(child);
+        event.sender.send('script-output', `ERROR: ${err.message}`);
+        event.sender.send('script-exit', -1);
       });
 
       child.on('exit', (code) => {
@@ -286,7 +304,145 @@ app.whenReady().then(() => {
       });
       activeChildProcesses.add(child);
       child.on('exit', () => activeChildProcesses.delete(child));
+      child.on('error', () => activeChildProcesses.delete(child));
     });
+  });
+
+  // Handle a live-preview render request from the renderer.
+  // The renderer (scripts/project.js -> runLivePreviewRender) sends the raw
+  // Radiance scene content (geometry/materials/viewpoint), the EPW weather
+  // content, and a date/time. We stage those into a temporary working
+  // directory, build a Radiance sky for the requested moment, oconv the scene
+  // into an octree and rpict it into an HDR, then return a file:// URL that the
+  // renderer can load with RGBELoader.
+  ipcMain.handle('run-live-render', async (event, payload) => {
+    try {
+      const {
+        epwContent,
+        geometryContent,
+        materialsContent,
+        viewpointContent,
+        month,
+        day,
+        time,
+      } = payload || {};
+
+      if (
+        typeof epwContent !== 'string' ||
+        typeof geometryContent !== 'string' ||
+        typeof materialsContent !== 'string' ||
+        typeof viewpointContent !== 'string'
+      ) {
+        return { success: false, error: 'Invalid live render payload: missing scene content.' };
+      }
+      const m = Number(month);
+      const d = Number(day);
+      const t = Number(time);
+      if (!Number.isFinite(m) || !Number.isFinite(d) || !Number.isFinite(t)) {
+        return { success: false, error: 'Invalid live render payload: month/day/time must be numbers.' };
+      }
+
+      // Stage everything in a temporary, per-render working directory. The
+      // payload carries no project path, so we sandbox under the OS temp dir
+      // and still route every filename through validatePath as a guard.
+      const baseDir = path.join(os.tmpdir(), 'ray-modeler-live-preview');
+      await fsp.mkdir(baseDir, { recursive: true });
+      const workDir = validatePath(baseDir, `render-${Date.now()}`);
+      await fsp.mkdir(workDir, { recursive: true });
+
+      const epwPath = validatePath(workDir, 'weather.epw');
+      const geoPath = validatePath(workDir, 'geometry.rad');
+      const matPath = validatePath(workDir, 'materials.rad');
+      const viewPath = validatePath(workDir, 'view.vf');
+      const skyGlowPath = validatePath(workDir, 'sky_glow.rad');
+      const genskyPath = validatePath(workDir, 'gensky.rad');
+      const octPath = validatePath(workDir, 'scene.oct');
+      const hdrPath = validatePath(workDir, 'preview.hdr');
+
+      // Sky/ground hemispheres that pick up the gensky brightness function.
+      const skyGlow = [
+        'skyfunc glow sky_glow',
+        '0', '0', '4 1 1 1 0',
+        'sky_glow source sky',
+        '0', '0', '4 0 0 1 180',
+        'skyfunc glow ground_glow',
+        '0', '0', '4 1 1 1 0',
+        'ground_glow source ground',
+        '0', '0', '4 0 0 -1 180',
+        '',
+      ].join('\n');
+
+      // Derive gensky location flags from the EPW LOCATION header when present.
+      // EPW line: LOCATION,city,state,country,source,wmo,lat,long,tz,elevation
+      // Radiance uses west-positive longitude/meridian, EPW east-positive.
+      let locFlags = '';
+      const firstLine = (epwContent.split(/\r?\n/)[0] || '').split(',');
+      const lat = parseFloat(firstLine[6]);
+      const lon = parseFloat(firstLine[7]);
+      const tz = parseFloat(firstLine[8]);
+      if (Number.isFinite(lat) && Number.isFinite(lon) && Number.isFinite(tz)) {
+        locFlags = ` -a ${lat} -o ${-lon} -m ${-15 * tz}`;
+      }
+
+      const genskyCmd = `gensky ${m} ${d} ${t} +s${locFlags}`;
+
+      await fsp.writeFile(epwPath, epwContent);
+      await fsp.writeFile(geoPath, geometryContent);
+      await fsp.writeFile(matPath, materialsContent);
+      await fsp.writeFile(viewPath, viewpointContent);
+      await fsp.writeFile(skyGlowPath, skyGlow);
+
+      const isWindows = process.platform === 'win32';
+      const scriptName = isWindows ? 'render.bat' : 'render.sh';
+      const scriptPath = validatePath(workDir, scriptName);
+
+      const cmds = [
+        `${genskyCmd} > "${genskyPath}"`,
+        `oconv "${matPath}" "${geoPath}" "${genskyPath}" "${skyGlowPath}" > "${octPath}"`,
+        `rpict -vf "${viewPath}" -x 512 -y 512 "${octPath}" > "${hdrPath}"`,
+      ];
+
+      const scriptBody = isWindows
+        ? ['@echo off', ...cmds].join('\r\n') + '\r\n'
+        : ['#!/bin/bash', 'set -e', ...cmds].join('\n') + '\n';
+
+      await fsp.writeFile(scriptPath, scriptBody);
+
+      const result = await new Promise((resolve) => {
+        runShellScript(scriptPath, workDir, (error, stdout, stderr) => {
+          if (error) {
+            resolve({ success: false, stdout, stderr, error: error.message, code: error.code });
+          } else {
+            resolve({ success: true, stdout, stderr, code: 0 });
+          }
+        });
+      });
+
+      if (!result.success) {
+        return result;
+      }
+
+      // Make sure rpict actually produced a non-empty HDR before reporting success.
+      try {
+        const stat = await fsp.stat(hdrPath);
+        if (!stat.size) {
+          return { success: false, error: 'Render produced an empty image.', stderr: result.stderr };
+        }
+      } catch (statErr) {
+        return { success: false, error: 'Render did not produce an output image.', stderr: result.stderr };
+      }
+
+      return {
+        success: true,
+        hdrPath: pathToFileURL(hdrPath).href,
+        outputPath: hdrPath,
+        stdout: result.stdout,
+        stderr: result.stderr,
+      };
+    } catch (err) {
+      console.error('run-live-render failed:', err);
+      return { success: false, error: err.message, code: -1 };
+    }
   });
 
   createWindow();

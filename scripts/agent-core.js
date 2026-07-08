@@ -119,22 +119,33 @@ You are in a ReAct loop.
             // Call LLM
             const response = await llmExecutor(currentMessages, fullSystemPrompt);
 
-            // Handle Text (Thought or Final Answer)
-            if (response.text) {
-                // If we have tool calls, the text is likely "reasoning".
-                // If no tool calls, it's the final answer.
-                if (!response.toolCalls || response.toolCalls.length === 0) {
-                    this.chatHistory.push({ role: 'assistant', content: response.text });
-                    return response.text;
-                }
+            const hasToolCalls = response.toolCalls && response.toolCalls.length > 0;
 
-                // It's reasoning/thought
+            // Final Answer: text present with no tool calls -> we're done.
+            if (response.text && !hasToolCalls) {
+                this.chatHistory.push({ role: 'assistant', content: response.text });
+                return response.text;
+            }
+
+            // Stream any reasoning text to the UI.
+            if (response.text) {
                 onThought(response.text);
-                currentMessages.push({ role: 'assistant', content: response.text, tool_calls: response.toolCalls });
+            }
+
+            // Add the assistant tool-call turn to history whenever there are tool calls
+            // (content may be null/empty for tool-only turns, e.g. OpenAI returns content:null).
+            // This MUST happen BEFORE the role:'tool' results are pushed, otherwise the
+            // provider rejects tool results that aren't preceded by their tool-call turn.
+            if (hasToolCalls || response.text) {
+                currentMessages.push({
+                    role: 'assistant',
+                    content: response.text || '',
+                    tool_calls: hasToolCalls ? response.toolCalls : undefined
+                });
             }
 
             // Handle Tool Calls
-            if (response.toolCalls && response.toolCalls.length > 0) {
+            if (hasToolCalls) {
                 for (const toolCall of response.toolCalls) {
                     const { name, args, id } = toolCall;
 

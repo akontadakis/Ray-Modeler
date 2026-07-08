@@ -54,13 +54,20 @@ class Project {
             recipes: []
         };
 
-        // 1. Gather Global Parameters from the dedicated panel
-        const globalPanel = document.querySelector('.floating-window[data-template-id="template-global-sim-params"]');
+        // 1. Gather Global Parameters directly from the main simulation panel.
+        // The global quality sliders (#ab,#ad,#as,#ar,#aa,#lw), advanced Radiance
+        // params, and the quality preset live directly inside
+        // #panel-simulation-modules (not a floating window / dedicated panel).
+        const globalPanel = document.getElementById('panel-simulation-modules');
         if (globalPanel) {
             const panelData = {};
-            // Assuming global panel inputs have simple IDs without suffixes
+            // The active recipe's inputs live inside #recipe-parameters-container and
+            // are gathered separately below; exclude them from the global set.
+            const recipeContainer = globalPanel.querySelector('#recipe-parameters-container');
             globalPanel.querySelectorAll('input, select').forEach(input => {
+                if (recipeContainer && recipeContainer.contains(input)) return;
                 const key = input.id;
+                if (!key) return;
                 panelData[key] = (input.type === 'checkbox' || input.type === 'radio') ? input.checked : input.value;
             });
             simParams.global = panelData;
@@ -107,11 +114,16 @@ class Project {
         const activePanel = sidebarContainer ? sidebarContainer.firstElementChild : null;
 
         if (activeTemplateId && activePanel) {
-            const panelIdSuffix = activePanel.id.split('-').pop();
+            // Only derive a suffix when the panel actually has a hyphenated id.
+            // The sidebar's firstElementChild is an id-less <div class="param-section">,
+            // so stripping a "-" suffix would corrupt input ids (e.g. pit-month -> pitmonth).
+            const panelIdSuffix = (activePanel.id && activePanel.id.includes('-'))
+                ? activePanel.id.split('-').pop()
+                : '';
             const activeValues = {};
 
             activePanel.querySelectorAll('input, select').forEach(input => {
-                const key = input.id.replace(`-${panelIdSuffix}`, '');
+                const key = panelIdSuffix ? input.id.replace(`-${panelIdSuffix}`, '') : input.id;
                 if (!key) return;
 
                 if (input.type === 'file') {
@@ -499,13 +511,23 @@ class Project {
         const simParams = projectData.simulationParameters || { global: {}, recipes: [] };
         const globalParams = simParams.global || {};
         const recipeOverrides = {};
-        const recipeContainer = panelElement.querySelector('#recipe-parameters-container');
+        // panelElement may be the outer #panel-simulation-modules (sidebar flow),
+        // the #recipe-parameters-container itself (optimization/AI flow), or a legacy
+        // floating window. Resolve the container in all cases.
+        const recipeContainer = (panelElement.id === 'recipe-parameters-container')
+            ? panelElement
+            : panelElement.querySelector('#recipe-parameters-container');
         const activeRecipePanel = recipeContainer ? recipeContainer.firstElementChild : null;
 
         if (activeRecipePanel) {
-            const panelIdSuffix = activeRecipePanel.id.split('-').pop();
+            // The sidebar's active panel is an id-less <div class="param-section">.
+            // Only strip a suffix when the panel has a real hyphenated id; otherwise
+            // keep input ids intact (stripping "-" would corrupt keys like pit-month).
+            const panelIdSuffix = (activeRecipePanel.id && activeRecipePanel.id.includes('-'))
+                ? activeRecipePanel.id.split('-').pop()
+                : '';
             activeRecipePanel.querySelectorAll('input, select').forEach(input => {
-                const key = input.id.replace(`-${panelIdSuffix}`, '');
+                const key = panelIdSuffix ? input.id.replace(`-${panelIdSuffix}`, '') : input.id;
                 if (!key) return;
 
                 if (input.type === 'file') {
@@ -532,7 +554,14 @@ class Project {
         // Sync the active recipe overrides into simulationParameters so that
         // configMappers + RecipeRegistry see the same values the user edits
         // in the sidebar. This enforces "one package = one active recipe".
-        const recipeType = panelElement.dataset.templateId;
+        // Resolve the active recipe type across every flow:
+        //  - legacy floating panels set data-template-id on panelElement itself
+        //  - the sidebar sets data-activeRecipeTemplate on #recipe-parameters-container
+        //  - AI/optimization pass the container directly as panelElement
+        const recipeType = panelElement.dataset.templateId
+            || panelElement.dataset.activeRecipeTemplate
+            || recipeContainer?.dataset?.activeRecipeTemplate
+            || panelElement.querySelector('[data-template-id]')?.dataset?.templateId;
         if (recipeType) {
             const syncedSimParams = {
                 global: globalParams,
@@ -1254,16 +1283,18 @@ class Project {
                     }
                 }
 
-                // Load topography heightmap as a Blob
-                if (settings.topography?.heightmapFile?.name) {
-                    const blob = await readFileAsBlob(['12_topography', settings.topography.heightmapFile.name]);
-                    if (blob) {
-                        // Store the blob directly, ui.js will create a URL from it
-                        this.addSimulationFile('topo-heightmap-file', settings.topography.heightmapFile.name, blob);
-                    }
-                }
-
                 await Promise.all(filePromises);
+            }
+
+            // Load topography heightmap as a Blob. This must run independently of the
+            // simulationFiles block so a project with topography but no simulationFiles
+            // still restores its heightmap.
+            if (settings.topography?.heightmapFile?.name) {
+                const blob = await readFileAsBlob(['12_topography', settings.topography.heightmapFile.name]);
+                if (blob) {
+                    // Store the blob directly, ui.js will create a URL from it
+                    this.addSimulationFile('topo-heightmap-file', settings.topography.heightmapFile.name, blob);
+                }
             }
 
             await this.applySettings(settings, showAlert);
@@ -1306,22 +1337,26 @@ class Project {
         };
 
         // --- Project Info & EPW ---
-        Object.keys(settings.projectInfo).forEach(key => setValue(key, settings.projectInfo[key]));
-        if (this.epwFileContent) {
-            dom['epw-file-name'].textContent = settings.projectInfo.epwFileName || 'climate.epw';
+        if (settings.projectInfo) {
+            Object.keys(settings.projectInfo).forEach(key => setValue(key, settings.projectInfo[key]));
+        }
+        if (this.epwFileContent && dom['epw-file-name']) {
+            dom['epw-file-name'].textContent = settings.projectInfo?.epwFileName || 'climate.epw';
         }
 
         // --- Geometry & Apertures ---
-        if (settings.geometry.mode === 'imported') {
+        if (settings.geometry?.mode === 'imported') {
             showAlertCallback("This project uses an imported model. Please re-import the original .obj and .mtl files to continue.", "Model Import Required");
             ui.switchGeometryMode('imported');
         } else {
             ui.switchGeometryMode('parametric');
         }
-        Object.keys(settings.geometry.room).forEach(key => setValue(key, settings.geometry.room[key]));
+        if (settings.geometry?.room) {
+            Object.keys(settings.geometry.room).forEach(key => setValue(key, settings.geometry.room[key]));
+        }
         ['n', 's', 'e', 'w'].forEach(dir => {
             const key = dir.toUpperCase();
-            const apertureData = settings.geometry.apertures[key];
+            const apertureData = settings.geometry?.apertures?.[key];
             setChecked(`aperture-${dir}-toggle`, !!apertureData);
             if (apertureData) {
                 ui.setWindowMode(dir, apertureData.mode, false);
@@ -1339,7 +1374,7 @@ class Project {
                 setValue(`win-depth-pos-${dir}`, apertureData.winDepthPos);
                 setValue(`win-depth-pos-${dir}-manual`, apertureData.winDepthPos);
             }
-            const shadingData = settings.geometry.shading[key];
+            const shadingData = settings.geometry?.shading?.[key];
             setChecked(`shading-${dir}-toggle`, !!shadingData);
             if (shadingData) {
                 setValue(`shading-type-${dir}`, shadingData.type);
@@ -1365,15 +1400,15 @@ class Project {
         });
 
         // --- Frames & Materials ---
-        setChecked('frame-toggle', settings.geometry.frames.enabled);
-        setValue('frame-thick', settings.geometry.frames.thickness);
-        setValue('frame-depth', settings.geometry.frames.depth);
+        setChecked('frame-toggle', settings.geometry?.frames?.enabled);
+        setValue('frame-thick', settings.geometry?.frames?.thickness);
+        setValue('frame-depth', settings.geometry?.frames?.depth);
         ['wall', 'floor', 'ceiling', 'frame', 'shading', 'glazing', 'furniture'].forEach(type => {
-            if (settings.materials[type]) {
+            if (settings.materials?.[type]) {
                 const mat = settings.materials[type];
                 if (mat.type) setValue(`${type}-mat-type`, mat.type);
-                if (mat.reflectance) setValue(`${type}-refl`, mat.reflectance);
-                if (mat.specularity) setValue(`${type}-spec`, mat.specularity);
+                if (mat.reflectance != null) setValue(`${type}-refl`, mat.reflectance);
+                if (mat.specularity != null) setValue(`${type}-spec`, mat.specularity);
                 if ((type === 'wall' || type === 'floor' || type === 'ceiling') && mat.mode === 'srd') {
                     dom[`${type}-mode-srd`]?.click();
                     if (mat.srdFile?.name && dom[`${type}-srd-file`]) {
@@ -1384,11 +1419,11 @@ class Project {
                         }
                     }
                 }
-                if (mat.roughness) setValue(`${type}-rough`, mat.roughness);
-                if (mat.transmittance) setValue(`${type}-trans`, mat.transmittance);
+                if (mat.roughness != null) setValue(`${type}-rough`, mat.roughness);
+                if (mat.transmittance != null) setValue(`${type}-trans`, mat.transmittance);
             }
         });
-        setChecked('bsdf-toggle', settings.materials.glazing.bsdfEnabled);
+        setChecked('bsdf-toggle', settings.materials?.glazing?.bsdfEnabled);
 
         // --- Furniture ---
         if (settings.geometry.furniture && Array.isArray(settings.geometry.furniture)) {

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { roomObject, wallSelectionGroup, updateScene, setIsCustomGeometry } from './geometry.js';
 import { getDom } from './dom.js';
-import { registerCustomWall, clearCustomWalls, getCustomWallData } from './customApertureManager.js';
+import { registerCustomWall, clearCustomWalls, getCustomWallData, unregisterCustomWall } from './customApertureManager.js';
 
 import { renderer } from './scene.js';
 
@@ -287,21 +287,48 @@ function splitWallAtPoint(wallGroup, t, splitPoint) {
     const { p1, p2, isCCW, thickness, canonicalId } = wallGroup.userData;
     const height = currentRoomHeight;
 
+    // Capture the original wall's aperture/frame/shading config before registering the new
+    // segments (registerCustomWall resets apertures to count=0). This prevents the original
+    // wall's windows/doors from being silently lost on split.
+    const originalData = getCustomWallData(canonicalId);
+    const originalApertures = originalData ? JSON.parse(JSON.stringify(originalData.apertures)) : null;
+    const originalFrame = originalData ? JSON.parse(JSON.stringify(originalData.frame)) : null;
+    const originalShading = originalData ? JSON.parse(JSON.stringify(originalData.shading)) : null;
+
     // Calculate the original wall's properties
     const originalAngle = Math.atan2(p2.z - p1.z, p2.x - p1.x);
 
-    // Create two new wall segments
+    // Create two new wall segments (register both first; geometry is built afterwards so
+    // the retained segment can punch its aperture holes with the copied config).
     // Segment 1: from p1 to splitPoint
     const len1 = p1.distanceTo(splitPoint);
     const wallId1 = `${canonicalId}_a`;
     registerCustomWall(wallId1, { length: len1, height: height });
-    const wall1 = createCustomWallGeometry(wallId1, p1, splitPoint, height, thickness, originalAngle, isCCW, len1, 0);
 
     // Segment 2: from splitPoint to p2
     const len2 = splitPoint.distanceTo(p2);
     const wallId2 = `${canonicalId}_b`;
     registerCustomWall(wallId2, { length: len2, height: height });
+
+    // FLAGGED: apertures are NOT geometrically re-apportioned across the split point.
+    // As a safe minimum, copy the original wall's aperture/frame/shading config onto the
+    // longer (retained) segment so windows/doors survive the split. Apertures that would
+    // have fallen on the shorter segment are dropped.
+    if (originalData) {
+        const retainedId = len1 >= len2 ? wallId1 : wallId2;
+        const retained = getCustomWallData(retainedId);
+        if (retained) {
+            if (originalApertures) retained.apertures = originalApertures;
+            if (originalFrame) retained.frame = originalFrame;
+            if (originalShading) retained.shading = originalShading;
+        }
+    }
+
+    const wall1 = createCustomWallGeometry(wallId1, p1, splitPoint, height, thickness, originalAngle, isCCW, len1, 0);
     const wall2 = createCustomWallGeometry(wallId2, splitPoint, p2, height, thickness, originalAngle, isCCW, len2, 0);
+
+    // Remove the orphaned original wall data entry so it doesn't linger in the map.
+    unregisterCustomWall(canonicalId);
 
     // Remove original wall
     container.remove(wallGroup);
@@ -481,8 +508,11 @@ function _buildWallContent(wallGroup, wallData, len, height, wallThickness, isCC
     wallShape.closePath();
 
     // Add Holes (Windows)
+    // Only punch window holes for window-type apertures. Door apertures are handled
+    // separately below via doorCount; without this gate, switching a wall to "door"
+    // would leave empty rectangular window holes.
     const apertures = wallData.apertures;
-    if (apertures && apertures.count > 0) {
+    if (apertures && apertures.count > 0 && apertures.type !== 'door') {
         const ww = apertures.width;
         const wh = apertures.height;
         const sh = apertures.sillHeight;

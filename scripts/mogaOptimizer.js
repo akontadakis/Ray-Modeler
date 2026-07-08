@@ -86,7 +86,9 @@ export class MultiObjectiveOptimizer {
         });
 
         let i = 0;
-        while (fronts[i].length > 0) {
+        // Guard against `fronts[i]` being undefined on the terminal empty front
+        // (the conditional assignment below never creates an empty trailing front).
+        while (fronts[i] && fronts[i].length > 0) {
             const nextFront = [];
             for (const p of fronts[i]) {
                 for (const q of p.dominatedSet) {
@@ -187,13 +189,17 @@ export class MultiObjectiveOptimizer {
                     const rawValue = mutated[param.name] + mutation;
                     mutated[param.name] = _snapToStep(rawValue, param.min, param.max, param.step);
                 } else if (param.type === 'discrete') {
-                    const currentOption = mutated[param.name];
-                    let newOption = currentOption;
-                    while (newOption === currentOption) {
-                        const randIndex = Math.floor(Math.random() * param.options.length);
-                        newOption = param.options[randIndex];
+                    // Only mutate if there is more than one option, otherwise the
+                    // "pick a different option" loop would never terminate.
+                    if (param.options.length > 1) {
+                        const currentOption = mutated[param.name];
+                        let newOption = currentOption;
+                        while (newOption === currentOption) {
+                            const randIndex = Math.floor(Math.random() * param.options.length);
+                            newOption = param.options[randIndex];
+                        }
+                        mutated[param.name] = newOption;
                     }
-                    mutated[param.name] = newOption;
                 }
             }
         });
@@ -230,12 +236,12 @@ export class MultiObjectiveOptimizer {
                 this.population.push({ params });
             }
 
-            // Evaluate initial population
-            const evalPromises = this.population.map(async (ind) => {
+            // Evaluate initial population SEQUENTIALLY. Each evaluation mutates and
+            // reads the single shared UI/scene, so concurrent evaluation would
+            // cross-contaminate results.
+            for (const ind of this.population) {
                 ind.metrics = await fitnessFunction(ind.params);
-                return ind;
-            });
-            this.population = await Promise.all(evalPromises);
+            }
         }
 
         // 2. Start generational loop
@@ -252,12 +258,11 @@ export class MultiObjectiveOptimizer {
                 childPopulation.push({ params: childParams });
             }
 
-            // 4. Evaluate child population
-            const evalChildPromises = childPopulation.map(async (ind) => {
+            // 4. Evaluate child population SEQUENTIALLY (shared UI/scene, see above).
+            for (const ind of childPopulation) {
                 ind.metrics = await fitnessFunction(ind.params);
-                return ind;
-            });
-            const evaluatedChildren = await Promise.all(evalChildPromises);
+            }
+            const evaluatedChildren = childPopulation;
 
             // 5. Combine parent and child (R_t)
             const combinedPopulation = [...this.population, ...evaluatedChildren];

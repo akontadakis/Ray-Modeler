@@ -45,6 +45,15 @@ export function clearCustomWalls() {
     customWalls.clear();
 }
 
+/**
+ * Removes a single custom wall's stored data (e.g. an orphaned wall after a split).
+ * @param {string} id - The wall id to remove.
+ * @returns {boolean} True if an entry was removed.
+ */
+export function unregisterCustomWall(id) {
+    return customWalls.delete(id);
+}
+
 export function getCustomWallData(id) {
     return customWalls.get(id);
 }

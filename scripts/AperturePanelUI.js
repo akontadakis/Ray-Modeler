@@ -369,24 +369,6 @@ export class AperturePanelUI {
         return div;
     }
 
-    createFrameControls(suffix = '') {
-        const s = suffix ? `-${suffix}` : '';
-        const div = document.createElement('div');
-        div.className = 'pt-4 border-t border-[--grid-color]';
-        div.innerHTML = `
-            <label for="frame-toggle${s}" class="flex items-center cursor-pointer">
-                <input type="checkbox" id="frame-toggle${s}" checked>
-                <span class="ml-3 text-sm font-normal text-[--text-primary]">Add Frame To All Windows</span>
-            </label>
-            <div id="frame-controls${s}" class="mt-4 space-y-2"></div>`;
-
-        const controls = div.querySelector(`#frame-controls${s}`);
-        controls.appendChild(this.createRangeControl(`frame-thick${s}`, 'Frame Thick. (m)', 0, 1, 0.01, 0.01, 'm'));
-        controls.appendChild(this.createRangeControl(`frame-depth${s}`, 'Frame Depth (m)', 0, 1, 0.05, 0.01, 'm'));
-
-        return div;
-    }
-
     createRangeControl(id, label, min, max, value, step, unit = '', percentMode = false) {
         const wrapper = document.createElement('div');
         const displayVal = percentMode ? `${Math.round(value * 100)}%` : `${value}${unit}`;

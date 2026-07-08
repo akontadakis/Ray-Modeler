@@ -325,9 +325,14 @@ export function updateViewpointFromUI(params) {
         localDir.set(0, 0, -1); // Default to looking along negative Z in local space
     }
 
-    // Convert UI's corner-based coordinates to the scene's center-based world coordinates
+    // Convert UI's corner-based coordinates to the scene's center-based world coordinates.
+    // The geometry groups are transformed by the room's rotation (rotation.y) and
+    // elevation (position.y), so apply the same room rotation and elevation offset to the
+    // camera POSITION so it matches the placed gizmo (the direction is rotated below).
     const worldPos = new THREE.Vector3(pos.x - W / 2, pos.y, pos.z - L / 2);
-    
+    worldPos.applyQuaternion(roomObject.quaternion);
+    worldPos.add(roomObject.position);
+
     // Rotate the local direction vector by the room's current rotation to get the world direction
     const localDirNormalized = localDir.clone().normalize();
 
@@ -611,8 +616,6 @@ export function captureSceneSnapshot(width = 128) {
 
     // Return a JPEG for smaller file size
     return thumbnailCanvas.toDataURL('image/jpeg', 0.8);
-    // Return the data URL from the main renderer's canvas
-    return renderer.domElement.toDataURL('image/png');
 }
 
 /**

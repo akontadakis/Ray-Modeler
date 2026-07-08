@@ -110,6 +110,19 @@ const shared = {
     vegetationCanopyMat: new THREE.MeshBasicMaterial({ color: 0x4caf50, transparent: true, opacity: 0.8, side: THREE.DoubleSide }),
 };
 
+// Mark shared singleton geometries/materials so disposeMeshLike never disposes them.
+// These are reused across many rebuilds; disposing them would break later frames.
+[
+    shared.sensorGeom, shared.sensorMat, shared.wireMat, shared.furnitureMat,
+    shared.shadeMat, shared.taskAreaMat, shared.surroundingAreaMat,
+    shared.contextMat, shared.vegetationCanopyMat, highlightMaterial
+].forEach(res => {
+    if (res) {
+        res.userData = res.userData || {};
+        res.userData.shared = true;
+    }
+});
+
 // --- HELPER FUNCTIONS ---
 
 /**
@@ -141,6 +154,7 @@ function applyClippingToMaterial(mat, clippingPlanes) {
 
 function disposeMaterial(m) {
     if (!m) return;
+    if (m.userData?.shared) return; // Never dispose shared singleton materials
     // Dispose textures attached to the material
     if (m.map) m.map.dispose();
     if (m.normalMap) m.normalMap.dispose();
@@ -152,7 +166,7 @@ function disposeMaterial(m) {
 }
 
 function disposeMeshLike(obj) {
-    if (obj.geometry) obj.geometry.dispose?.();
+    if (obj.geometry && !obj.geometry.userData?.shared) obj.geometry.dispose?.();
     if (obj.material) {
         if (Array.isArray(obj.material)) obj.material.forEach(disposeMaterial);
         else disposeMaterial(obj.material);
@@ -260,7 +274,7 @@ export async function updateScene(changedId = null, selectedWallId = null) {
         // ... (logic for custom geometry)
     }
 
-    createShadingDevices();
+    await createShadingDevices();
     createSensorGrid();
     createGroundPlane();
     createNorthArrow();
@@ -388,10 +402,6 @@ function createGroundPlane() {
             mesh.userData.isGround = true; // Flag for Radiance export
             groundObject.add(mesh);
             URL.revokeObjectURL(imageUrl); // Clean up
-        };
-        img.onerror = () => {
-            console.error("Failed to load heightmap image.");
-            URL.revokeObjectURL(imageUrl);
         };
         img.src = imageUrl;
     } else {
@@ -1075,7 +1085,7 @@ function getWallOutwardNormal(orientation) {
  * Creates all shading devices based on UI settings.
  * Uses explicit outward normals for consistent external/internal placement across orientations.
  */
-export function createShadingDevices() {
+export async function createShadingDevices() {
     clearGroup(shadingObject);
     const allWindows = getAllWindowParams();
     const allShading = getAllShadingParams();
@@ -1132,7 +1142,7 @@ export function createShadingDevices() {
             } else if (shadeParams.type === 'roller' && shadeParams.roller) {
                 deviceGroup = createRoller(ww, wh, shadeParams.roller, shadeColor, outward);
             } else if (shadeParams.type === 'imported_obj' && shadeParams.imported_obj) {
-                deviceGroup = createImportedShading(shadeParams.imported_obj, shadeColor, orientation, i);
+                deviceGroup = await createImportedShading(shadeParams.imported_obj, shadeColor, orientation, i);
             }
 
             if (!deviceGroup) continue;
@@ -1578,9 +1588,9 @@ export function updateDaylightingSensorVisuals() {
         sensorGroup.add(new THREE.Mesh(geometry, material.clone()));
 
         const dir = {
-            x: parseFloat(dom[`daylight-sensor${i}-dir-x`].value),
-            y: parseFloat(dom[`daylight-sensor${i}-dir-y`].value),
-            z: parseFloat(dom[`daylight-sensor${i}-dir-z`].value)
+            x: parseFloat(dom[`daylight-sensor${i}-dir-x`]?.value),
+            y: parseFloat(dom[`daylight-sensor${i}-dir-y`]?.value),
+            z: parseFloat(dom[`daylight-sensor${i}-dir-z`]?.value)
         };
         const directionVec = new THREE.Vector3(dir.x, dir.y, dir.z).normalize();
         sensorGroup.add(new THREE.ArrowHelper(directionVec, new THREE.Vector3(0, 0.02, 0), 0.4, 0xffff00));
@@ -1994,7 +2004,10 @@ export function getContextObjectProperties(id) {
             volume = (4 / 3) * Math.PI * object.userData.radius * object.userData.radius * object.userData.radius;
             break;
         case 'pyramid':
-            volume = (1 / 3) * Math.PI * object.userData.radius * object.userData.radius * object.userData.height;
+            // ConeGeometry(radius, height, 4) is a square-base pyramid whose base is a
+            // square with circumradius = radius (side = radius*sqrt(2), area = 2*radius^2).
+            // Volume = (1/3) * baseArea * height = (2/3) * radius^2 * height.
+            volume = (2 / 3) * object.userData.radius * object.userData.radius * object.userData.height;
             break;
     }
 
@@ -2195,7 +2208,7 @@ export function createContextFromOsm(osmData, centerLat, centerLon) {
                 const node = nodes.get(nodeId);
                 if (node) {
                     // Convert lat/lon to meters from the center point
-                    const metersPerLat = 111132.954 - 559.822 * Math.cos(2 * centerLat) + 1.175 * Math.cos(4 * centerLat);
+                    const metersPerLat = 111132.954 - 559.822 * Math.cos(2 * centerLat * Math.PI / 180) + 1.175 * Math.cos(4 * centerLat * Math.PI / 180);
                     const metersPerLon = 111319.488 * Math.cos(centerLat * Math.PI / 180);
                     const x = (node.lon - centerLon) * metersPerLon;
                     const z = -(node.lat - centerLat) * metersPerLat; // Z is negative latitude

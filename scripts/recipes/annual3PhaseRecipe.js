@@ -86,7 +86,11 @@ function validate(projectData, config) {
     config.simulationFiles['weather-file'] &&
     config.simulationFiles['weather-file'].name;
   const hasWeatherFromConfig = !!config.recipe['weather-file'];
-  if (!hasWeatherFromFiles && !hasWeatherFromConfig) {
+  // The main project EPW is stored on projectData.epwFileContent / projectInfo.epwFileName
+  // and is never keyed 'weather-file'. Accept it as a valid weather source.
+  const hasWeatherFromProject =
+    !!projectData.epwFileContent || !!projectData.projectInfo?.epwFileName;
+  if (!hasWeatherFromFiles && !hasWeatherFromConfig && !hasWeatherFromProject) {
     addError(
       res,
       'Annual 3-Phase recipe requires a weather EPW file (weather-file). Please select an EPW file in the Simulation Files panel.'

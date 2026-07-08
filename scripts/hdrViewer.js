@@ -267,10 +267,14 @@ function updateLuminanceProbe(e) {
         const uv = intersects[0].uv;
         if (!uv) return;
 
-        // Read pixel data from the original texture
-        const x = Math.floor(uv.x * currentTexture.image.width);
-        const y = Math.floor(uv.y * currentTexture.image.height);
-        const index = (y * currentTexture.image.width + x) * 4;
+        // Read pixel data from the original texture.
+        // HDR image rows are stored top-down, while UV y originates at the bottom,
+        // so flip the row index to sample the pixel that is actually displayed.
+        const width = currentTexture.image.width;
+        const height = currentTexture.image.height;
+        const x = Math.min(width - 1, Math.floor(uv.x * width));
+        const y = Math.min(height - 1, Math.floor((1 - uv.y) * height));
+        const index = (y * width + x) * 4;
         const pixelData = currentTexture.image.data;
 
         const r = pixelData[index];

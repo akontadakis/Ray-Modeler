@@ -167,6 +167,11 @@ const RECIPE_METRICS = {
     ]
 };
 
+// Recipes whose result files _parseSimulationResult can currently parse. Other
+// recipes in RECIPE_METRICS (imageless-glare, spectral-lark, en17037) have no
+// parser and are therefore hidden from the optimization recipe dropdowns.
+const OPTIMIZER_SUPPORTED_RECIPES = ['sda-ase', 'illuminance', 'dgp'];
+
 // Master list of all optimizable parameters for each shading type
 const SHADING_PARAMETERS = {
     'overhang': [
@@ -346,6 +351,10 @@ export function initOptimizationUI(optPanel) {
         }
 
         Object.keys(RECIPE_METRICS).forEach(recipeId => {
+            // Only expose recipes whose result files _parseSimulationResult can parse.
+            // imageless-glare, spectral-lark and en17037 have no parser yet and would
+            // yield empty metrics (undefined in Pareto comparison), so hide them.
+            if (!OPTIMIZER_SUPPORTED_RECIPES.includes(recipeId)) return;
             const option = document.createElement('option');
             option.value = recipeId;
             option.textContent = recipeId.replace(/-/g, ' ').replace('sda ase', 'sDA/ASE');
@@ -697,6 +706,8 @@ export async function startOptimization(mode = 'full') {
         return;
     }
 
+    const dom = getDom(); // Safe here: runtime is well after setupDOM.
+
     // Clear previous results list
     const summaryList = optimizationPanel.querySelector('#optimization-summary-list');
     const placeholder = optimizationPanel.querySelector('#opt-summary-placeholder');
@@ -707,6 +718,7 @@ export async function startOptimization(mode = 'full') {
     dom['apply-best-design-btn']?.classList.add('hidden');
 
     try {
+        isOptimizing = true; // Set the concurrency guard; reset in `finally`.
         setControlsLocked(true);
         if (!resume) {
             clearLog();
@@ -900,6 +912,30 @@ function gatherSettings(mode = 'full') {
         });
     }
 
+    // --- Also read dynamically-added parameters (from the MASTER_PARAMETER_CONFIG builder) ---
+    // These live in a separate list (#dynamic-opt-params-list) populated by the
+    // "Add Parameter" modal, and are keyed by MASTER_PARAMETER_CONFIG ids.
+    const dynamicList = optimizationPanel.querySelector('#dynamic-opt-params-list');
+    if (dynamicList) {
+        dynamicList.querySelectorAll('.dynamic-opt-param-item').forEach(item => {
+            const paramId = item.dataset.paramId;
+            const paramConfig = MASTER_PARAMETER_CONFIG[paramId];
+            if (!paramConfig) {
+                console.warn(`Could not find MASTER config for dynamic param ${paramId}`);
+                return;
+            }
+            // All MASTER_PARAMETER_CONFIG params are continuous.
+            selectedParams.push({
+                name: paramId,
+                type: 'continuous',
+                min: parseFloat(item.querySelector('.dynamic-opt-param-min').value),
+                max: parseFloat(item.querySelector('.dynamic-opt-param-max').value),
+                step: parseFloat(item.querySelector('.dynamic-opt-param-step').value),
+                isMaster: true // Flag so applyDesignToScene uses MASTER_PARAMETER_CONFIG mapping.
+            });
+        });
+    }
+
     if (selectedParams.length === 0) {
         throw new Error('No parameters selected. Please check at least one parameter to optimize.');
     }
@@ -980,7 +1016,20 @@ async function applyDesignToScene(params, settings) {
 
     // Set each parameter value in the UI
     for (const [paramName, value] of Object.entries(params)) {
+        // Dynamically-added parameters use MASTER_PARAMETER_CONFIG ids (WWR, material
+        // reflectance, lighting grid, etc.). These carry their own uiElementId + setter,
+        // so apply them directly and skip the shading-specific mapping below.
+        const masterConfig = MASTER_PARAMETER_CONFIG[paramName];
+        if (masterConfig) {
+            masterConfig.setter(masterConfig.uiElementId, value);
+            continue;
+        }
+
         const paramConfig = SHADING_PARAMETERS[shadingType].find(p => p.id === paramName);
+        if (!paramConfig) {
+            console.warn(`applyDesignToScene: no config found for parameter "${paramName}"; skipping.`);
+            continue;
+        }
 
         if (paramConfig.type === 'continuous') {
             // e.g., 'overhang-depth-s'
@@ -1030,7 +1079,7 @@ async function runSimulation(settings) {
         // 'en-illuminance' is excluded as it's not for shading optimization
     };
 
-    const templateId = recipeTemplateMap[recipe];
+    const templateId = recipeTemplateMap[settings.recipe];
 
     if (!templateId) throw new Error(`Unknown recipe: ${settings.recipe}`);
 
@@ -1225,7 +1274,15 @@ async function loadCheckpoint() {
             const state = JSON.parse(content);
             
             optimizer.loadState(state);
-            log(`✓ Resumed from generation ${state.currentGeneration + 1}`);
+            // MOGA checkpoints store `currentGeneration`; SSGA checkpoints store
+            // `evaluationsCompleted`. Handle both so we never log NaN.
+            if (typeof state.currentGeneration === 'number') {
+                log(`✓ Resumed from generation ${state.currentGeneration + 1}`);
+            } else if (typeof state.evaluationsCompleted === 'number') {
+                log(`✓ Resumed from ${state.evaluationsCompleted} evaluations completed`);
+            } else {
+                log(`✓ Resumed from checkpoint`);
+            }
         } else {
             throw new Error('Checkpoint file not found or unreadable.');
         }
@@ -1315,7 +1372,9 @@ async function _parseSimulationResult(settings, uniqueId) {
             continue;
         }
 
-        const metricKey = metricId.split('_')[1].toLowerCase(); // e.g., sda, ase, avg
+        // Strip the leading minimize_/maximize_ prefix and keep the remainder so that
+        // multi-underscore ids (e.g. "minimize_Annual_DGP_Avg") parse correctly.
+        const metricKey = metricId.replace(/^(minimize|maximize)_/, '').toLowerCase(); // e.g., sda, ase, avg
         const filePath = `08_results/${baseName}${goalMetric.file}`;
 
         try {
@@ -1355,7 +1414,9 @@ async function _parseSimulationResult(settings, uniqueId) {
 function _calculateSingleFitness(metrics, settings) {
     const { goalId, goalType, targetValue, constraint } = settings;
 
-    const metricKey = goalId.split('_')[1].toLowerCase(); // e.g., sda
+    // Strip the leading minimize_/maximize_ prefix (keep the remainder) so multi-underscore
+    // ids parse correctly and match the keys produced by _parseSimulationResult.
+    const metricKey = goalId.replace(/^(minimize|maximize)_/, '').toLowerCase(); // e.g., sda
     const value = metrics[metricKey];
     let unit = '';
     if (metricKey === 'sda' || metricKey === 'ase') unit = '%';
@@ -1395,6 +1456,7 @@ function _calculateSingleFitness(metrics, settings) {
  */
 function populateParetoFront(paretoFront, type, objectives = []) {
     if (!optimizationPanel) return;
+    const dom = getDom(); // Safe here: runtime is well after setupDOM.
     const summaryList = optimizationPanel.querySelector('#optimization-summary-list');
     const placeholder = optimizationPanel.querySelector('#opt-summary-placeholder');
     if (!summaryList || !placeholder) return;
