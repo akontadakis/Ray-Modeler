@@ -44,9 +44,12 @@ function validate(projectData, config) {
     (projectData.views && projectData.views.some(v => v.type === 'fisheye'));
 
   if (!hasFisheyeVf) {
-    addError(
+    // The fisheye viewpoint file (viewpoint_fisheye.vf) is generated at package time,
+    // so projectData has no reference to it here. Warn instead of hard-failing (mirrors
+    // dgpRecipe) so the package can still generate.
+    addWarning(
       result,
-      'EN 12464-1 UGR: No fisheye viewpoint found. Create a fisheye view (viewpoint_fisheye.vf) before running this recipe.'
+      'EN 12464-1 UGR: No fisheye viewpoint detected. A fisheye view (viewpoint_fisheye.vf) will be generated for accurate UGR glare evaluation.'
     );
   }
 

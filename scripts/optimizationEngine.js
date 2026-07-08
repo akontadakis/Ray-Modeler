@@ -99,14 +99,17 @@ export class GeneticOptimizer {
                     const rawValue = mutated[param.name] + mutation;
                     mutated[param.name] = _snapToStep(rawValue, param.min, param.max, param.step);
                 } else if (param.type === 'discrete') {
-                    // Pick a *different* random option
-                    const currentOption = mutated[param.name];
-                    let newOption = currentOption;
-                    while (newOption === currentOption) {
-                        const randIndex = Math.floor(Math.random() * param.options.length);
-                        newOption = param.options[randIndex];
+                    // Pick a *different* random option. Guard against a single-option
+                    // parameter, where this loop would never terminate.
+                    if (param.options.length > 1) {
+                        const currentOption = mutated[param.name];
+                        let newOption = currentOption;
+                        while (newOption === currentOption) {
+                            const randIndex = Math.floor(Math.random() * param.options.length);
+                            newOption = param.options[randIndex];
+                        }
+                        mutated[param.name] = newOption;
                     }
-                    mutated[param.name] = newOption;
                 }
             }
         });
@@ -135,9 +138,13 @@ export class GeneticOptimizer {
     // 1. Initialize and evaluate initial population if this is a new run
     if (this.evaluationsCompleted === 0) {
         this.initializePopulation();
-        // Evaluate all individuals in the initial population
-        const initialPromises = this.population.map(design => fitnessFunction(design.params));
-        populationWithFitness = await Promise.all(initialPromises);
+        // Evaluate all individuals in the initial population SEQUENTIALLY. Each
+        // evaluation mutates and reads the single shared UI/scene, so concurrent
+        // evaluation would cross-contaminate results.
+        populationWithFitness = [];
+        for (const design of this.population) {
+            populationWithFitness.push(await fitnessFunction(design.params));
+        }
         this.evaluationsCompleted = this.populationSize;
     } else {
         // Resuming: population is already loaded with fitness values
@@ -163,11 +170,11 @@ export class GeneticOptimizer {
         const childAParams = this.mutate(this.crossover(parentA, parentB));
         const childBParams = this.mutate(this.crossover(parentB, parentA));
 
-        // Evaluate 2 new children
-        const newChildren = await Promise.all([
-            fitnessFunction(childAParams),
-            fitnessFunction(childBParams)
-        ]);
+        // Evaluate 2 new children SEQUENTIALLY (shared UI/scene, see above).
+        const newChildren = [
+            await fitnessFunction(childAParams),
+            await fitnessFunction(childBParams)
+        ];
         this.evaluationsCompleted += 2;
 
         // Insert new children and cull the worst

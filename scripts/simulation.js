@@ -9,6 +9,11 @@ import { getRuntimeEnvironment, getRecipeExecutionSupport } from './recipes/runt
 // --- MODULE-LEVEL VARIABLES ---
 let panelCounter = 0;
 let globalParametersCache = {}; // Cache for global parameters that persists across accordion state changes
+// Track the active script-output/exit IPC subscriptions so we can unsubscribe the
+// previous listeners before re-registering (initializePanelLogic runs on every recipe
+// switch). Without this, listeners duplicate and leak.
+let scriptOutputUnsub = null;
+let scriptExitUnsub = null;
 
 const availableModules = [
     // Global panel (not shown in recipes dropdown)
@@ -688,14 +693,19 @@ export function initializePanelLogic(panel) {
             outputConsole = consoleWrapper.querySelector('.simulation-output-console');
         }
 
-        window.electronAPI.onScriptOutput((data) => {
+        // Remove any previously registered listeners before re-adding, so switching
+        // recipes (which re-runs initializePanelLogic) does not stack duplicates.
+        if (scriptOutputUnsub) scriptOutputUnsub();
+        if (scriptExitUnsub) scriptExitUnsub();
+
+        scriptOutputUnsub = window.electronAPI.onScriptOutput((data) => {
             if (outputConsole) {
                 outputConsole.textContent += data;
                 outputConsole.scrollTop = outputConsole.scrollHeight; // Auto-scroll
             }
         });
 
-        window.electronAPI.onScriptExit((code) => {
+        scriptExitUnsub = window.electronAPI.onScriptExit((code) => {
             if (outputConsole) {
                 outputConsole.textContent += `\n--- PROCESS EXITED WITH CODE: ${code} ---`;
                 outputConsole.scrollTop = outputConsole.scrollHeight;

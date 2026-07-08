@@ -170,20 +170,20 @@ export class GeometryOptimizer {
 
         rawGroup.children.forEach(mesh => {
             const type = mesh.userData.surfaceType || 'GENERIC';
-            // We also need to distinguish distinct materials within a surface type if possible?
-            // In the current app, 'INTERIOR_WALL' uses 'wall_mat' globally (mostly).
-            // But if we have specific modifications, we should be careful.
-            // For now, grouping by surfaceType is the safest 'high level' optim for this app.
+            // Group by surfaceType AND material so distinct materials within the same
+            // surface type (e.g. two walls with different reflectance) are preserved as
+            // separate merged meshes instead of all inheriting the first mesh's material.
+            const materialKey = mesh.material?.uuid || 'NO_MATERIAL';
+            const binKey = `${type}::${materialKey}`;
 
-            // NOTE: We must differentiate transparency/glass!
-            // 'GLAZING' is a distinct surfaceType.
-
-            if (!bins.has(type)) bins.set(type, []);
-            bins.get(type).push(mesh);
+            if (!bins.has(binKey)) bins.set(binKey, []);
+            bins.get(binKey).push(mesh);
         });
 
-        bins.forEach((meshes, type) => {
+        bins.forEach((meshes, binKey) => {
             if (meshes.length === 0) return;
+            // Recover the surfaceType from the representative mesh (binKey also encodes material).
+            const type = meshes[0].userData.surfaceType || 'GENERIC';
 
             // Extract geometries
             const geometries = [];

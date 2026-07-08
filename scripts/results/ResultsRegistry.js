@@ -30,6 +30,11 @@ export const ResultsRegistry = (() => {
   /** @type {ResultDescriptor[]} */
   const descriptors = [];
 
+  // Matches direct-only annual illuminance filenames produced by the app.
+  // Covers: *_direct.ill, *_ASE_direct_only.ill, *direct_3ph.ill / direct_5ph.ill,
+  // and *_direct_3ph.ill / *_direct_5ph.ill variants.
+  const DIRECT_ILL_RE = /(_ASE_direct_only|direct_\dph|_direct(_\dph)?)\.ill$/i;
+
   function register(descriptor) {
     descriptors.push(descriptor);
   }
@@ -83,7 +88,7 @@ export const ResultsRegistry = (() => {
     filePatterns: [/\.ill$/i],
     match: (fileName, result) => {
       if (!/\.ill$/i.test(fileName)) return false;
-      if (/_direct\.ill$/i.test(fileName)) return false;
+      if (DIRECT_ILL_RE.test(fileName)) return false;
       return !!result.annualData;
     },
     schema: {
@@ -123,12 +128,12 @@ export const ResultsRegistry = (() => {
     ],
   });
 
-  // Annual Direct Illuminance (_direct.ill)
+  // Annual Direct Illuminance (_direct.ill, _ASE_direct_only.ill, direct_3ph/5ph.ill)
   register({
     id: "annual-direct-illuminance",
     label: "Annual Direct Illuminance",
-    filePatterns: [/_direct\.ill$/i],
-    match: (fileName, result) => /_direct\.ill$/i.test(fileName) && !!result.annualData,
+    filePatterns: [DIRECT_ILL_RE],
+    match: (fileName, result) => DIRECT_ILL_RE.test(fileName) && !!result.annualData,
     schema: {
       fields: {
         annualData: "matrix[point][8760]",

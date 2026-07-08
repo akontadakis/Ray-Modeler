@@ -287,6 +287,47 @@ export function transformThreeVectorToRadianceArray(threeVector, cosA, sinA) {
 
 /**
  * Generates the content for a Radiance .vf (view file).
+/**
+ * Computes the horizontal field of view from a vertical FOV and image aspect ratio.
+ * @param {number} vfov - Vertical field of view in degrees.
+ * @param {number} aspect - Image aspect ratio (width / height).
+ * @returns {number} Horizontal field of view in degrees.
+ */
+function computeHfovFromAspect(vfov, aspect) {
+    if (!Number.isFinite(aspect) || aspect <= 0) return vfov;
+    return 2 * Math.atan(Math.tan(vfov * Math.PI / 360) * aspect) * 180 / Math.PI;
+}
+
+/**
+ * Reads the configured render aspect ratio (X resolution / Y resolution) from the UI.
+ * Falls back to 1 (square) when the resolution inputs are unavailable.
+ * @returns {number} The render aspect ratio (width / height).
+ */
+function getRenderAspect() {
+    const dom = getDom();
+    const x = parseFloat(dom['rpict-x']?.value);
+    const y = parseFloat(dom['rpict-y']?.value);
+    if (Number.isFinite(x) && Number.isFinite(y) && y > 0) return x / y;
+    return 1;
+}
+
+/**
+ * Determines the horizontal FOV for a given Radiance view type.
+ * Perspective ('v') and cylindrical ('c') views derive their horizontal FOV from
+ * the render aspect ratio; all other view types (including the fixed 180° fisheye
+ * types) keep the horizontal FOV equal to the vertical FOV.
+ * @param {string} viewType - The single-letter view type.
+ * @param {number} vfov - The vertical field of view in degrees.
+ * @returns {number} The horizontal field of view in degrees.
+ */
+function resolveHfov(viewType, vfov) {
+    if (viewType === 'v' || viewType === 'c') {
+        return computeHfovFromAspect(vfov, getRenderAspect());
+    }
+    return vfov;
+}
+
+/**
  * @param {object} viewpointData - The viewpoint data object from the project.
  * @param {object} roomData - The room geometry data object.
  * @returns {string} The content for the .vf file.
@@ -312,7 +353,7 @@ export function generateViewpointFileContent(viewpointData, roomData) {
     const radViewType = viewTypeMap[viewType] || '-vtv';
 
     const vfov = (viewType === 'h' || viewType === 'a') ? 180 : fov;
-    const hfov = vfov;
+    const hfov = resolveHfov(viewType, vfov);
 
     return `${radViewType} -vp ${rad_vp} -vd ${rad_vd} -vu 0 0 1 -vh ${hfov} -vv ${vfov}`;
 }
@@ -1230,6 +1271,7 @@ export function generateViewpointFileContentFromState(cameraState) {
 
     const { viewType, fov, position, quaternion } = cameraState;
     const vfov = (viewType === 'h' || viewType === 'a') ? 180 : fov;
+    const hfov = resolveHfov(viewType, vfov);
     const viewTypeMap = { 'v': '-vtv', 'h': '-vth', 'c': '-vtc', 'l': '-vtl', 'a': '-vta' };
     const radViewType = viewTypeMap[viewType] || '-vtv';
 
@@ -1243,7 +1285,7 @@ export function generateViewpointFileContentFromState(cameraState) {
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(quaternion);
     const rad_vu = `${up.x.toFixed(4)} ${up.z.toFixed(4)} ${up.y.toFixed(4)}`;
 
-    return `${radViewType} -vp ${rad_vp} -vd ${rad_vd} -vu ${rad_vu} -vh ${vfov} -vv ${vfov}`;
+    return `${radViewType} -vp ${rad_vp} -vd ${rad_vd} -vu ${rad_vu} -vh ${hfov} -vv ${vfov}`;
 }
 
 /**

@@ -44,8 +44,11 @@ class IESParser {
         if (dataLine1.length < 10) throw new Error("IES file format error: Invalid data definition line 1.");
         if (dataLine2.length < 3) throw new Error("IES file format error: Invalid ballast/watts definition line 2.");
 
-        const [numLamps, lumensPerLamp, , numVAngles, numHAngles] = dataLine1;
+        const [numLamps, lumensPerLamp, candelaMultiplier, numVAngles, numHAngles] = dataLine1;
         const wattage = dataLine2[2];
+        // Absolute photometry files use lumensPerLamp === -1; luminous flux is defined
+        // directly by the candela data rather than a rated lamp lumen value.
+        const isAbsolute = lumensPerLamp === -1;
 
         if (numVAngles <= 0 || numHAngles <= 0) throw new Error("IES file format error: Invalid number of angles.");
 
@@ -69,6 +72,8 @@ class IESParser {
         return {
             lumensPerLamp,
             numLamps,
+            candelaMultiplier,
+            isAbsolute,
             wattage,
             maxCandela,
             verticalAngles,
@@ -128,6 +133,8 @@ class LightingManager {
         this.updateScheduled = false;
         /** @private @type {?{name: string, content: string}} */
         this.iesFileData = null;
+        /** @private @type {?{name: string}} */
+        this.scheduleFileData = null;
         /** @private @type {object} */
         this.ies3d = { scene: null, camera: null, renderer: null, controls: null, webMesh: null, animationFrameId: null, resizeObserver: null };
         /** @private @type {boolean} */
@@ -561,9 +568,14 @@ class LightingManager {
         const { project } = await import('./project.js'); // Lazy load
         if (file) {
             const content = await file.text();
-            project.addSimulationFile('daylighting-schedule', file.name, content);
+            // Key must match the load side in project.js (daylighting-availability-schedule).
+            project.addSimulationFile('daylighting-availability-schedule', file.name, content);
+            this.scheduleFileData = { name: file.name };
+            this._setFileDisplayName('daylighting-availability-schedule', file.name);
         } else {
-            project.addSimulationFile('daylighting-schedule', null, null);
+            project.addSimulationFile('daylighting-availability-schedule', null, null);
+            this.scheduleFileData = null;
+            this._setFileDisplayName('daylighting-availability-schedule', null);
         }
     }
 
@@ -1031,7 +1043,9 @@ class LightingManager {
         const isEnabled = this.dom['daylighting-enabled-toggle']?.checked;
         def.daylighting = {
             enabled: isEnabled,
-            visualizeZones: this.dom['daylighting-visualize-zones-toggle']?.checked
+            visualizeZones: this.dom['daylighting-visualize-zones-toggle']?.checked,
+            // Persist the availability schedule reference so it survives save/load.
+            scheduleFile: this.scheduleFileData || null
         };
         if (!isEnabled) return;
 
@@ -1155,6 +1169,7 @@ class LightingManager {
         this._setUIValue('daylighting-min-power-frac', state.daylighting.minPowerFraction);
         this._setUIValue('daylighting-min-light-frac', state.daylighting.minLightFraction);
         this._setUIValue('daylighting-steps', state.daylighting.nSteps);
+        this.scheduleFileData = state.daylighting.scheduleFile || null;
         this._setFileDisplayName('daylighting-availability-schedule', state.daylighting.scheduleFile?.name);
 
         if (state.daylighting.sensors) {
@@ -1249,11 +1264,14 @@ class LightingManager {
      * @private
      */
     _updateIesInfoDisplay(parsedData) {
-        const { numLamps, lumensPerLamp, wattage } = parsedData;
-        const totalLumens = numLamps * lumensPerLamp;
-        const efficacy = (wattage > 0) ? (totalLumens / wattage).toFixed(1) : 'N/A';
+        const { numLamps, lumensPerLamp, wattage, isAbsolute } = parsedData;
+        // Absolute-photometry IES files signal luminous flux via candela values, not a
+        // rated lamp lumen figure (lumensPerLamp === -1). Avoid showing negative totals.
+        const isAbs = isAbsolute || lumensPerLamp === -1;
+        const totalLumens = isAbs ? null : numLamps * lumensPerLamp;
+        const efficacy = (!isAbs && wattage > 0) ? (totalLumens / wattage).toFixed(1) : 'N/A';
 
-        if (this.dom['ies-lumens-val']) this.dom['ies-lumens-val'].textContent = totalLumens.toFixed(0);
+        if (this.dom['ies-lumens-val']) this.dom['ies-lumens-val'].textContent = isAbs ? 'Absolute' : totalLumens.toFixed(0);
         if (this.dom['ies-wattage-val']) this.dom['ies-wattage-val'].textContent = wattage.toFixed(1);
         if (this.dom['ies-efficacy-val']) this.dom['ies-efficacy-val'].textContent = efficacy;
     }

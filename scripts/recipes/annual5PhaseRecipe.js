@@ -50,7 +50,13 @@ function validate(projectData, config) {
   const epw = simFiles['weather-file'] || config.recipe['weather-file'];
   const klems = simFiles['bsdf-klems'] || config.recipe['bsdf-klems'];
 
-  if (!epw || !epw.name) {
+  // The main project EPW lives on projectData.epwFileContent / projectInfo.epwFileName
+  // and is never keyed 'weather-file'. Accept it as a valid weather source.
+  const hasWeather = (epw && epw.name)
+    || !!projectData.epwFileContent
+    || !!projectData.projectInfo?.epwFileName;
+
+  if (!hasWeather) {
     addError(result, 'Annual 5-Phase: Weather file is required. Please select an EPW file.');
   }
   if (!klems || !klems.name) {

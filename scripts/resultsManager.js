@@ -288,15 +288,31 @@ class ResultsManager {
         if (!data || data.length === 0) {
             return { min: 0, max: 0, avg: 0, count: 0, uniformity: 0 };
         }
-        const sum = data.reduce((a, b) => a + b, 0);
-        const min = Math.min(...data);
-        const avg = sum / data.length;
+        // Single pass avoids stack overflow from Math.min/max(...spread) on large
+        // grids, and filters out non-finite values (NaN/Infinity) that would
+        // otherwise poison min/max/avg.
+        let min = Infinity;
+        let max = -Infinity;
+        let sum = 0;
+        let count = 0;
+        for (let i = 0; i < data.length; i++) {
+            const v = data[i];
+            if (!Number.isFinite(v)) continue;
+            if (v < min) min = v;
+            if (v > max) max = v;
+            sum += v;
+            count++;
+        }
+        if (count === 0) {
+            return { min: 0, max: 0, avg: 0, count: 0, uniformity: 0 };
+        }
+        const avg = sum / count;
         return {
             min: min,
-            max: Math.max(...data),
+            max: max,
             avg: avg,
             uniformity: avg > 0 ? min / avg : 0,
-            count: data.length,
+            count: count,
         };
     }
 
@@ -379,9 +395,15 @@ class ResultsManager {
         const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
         const monthlyTotals = { dni: Array(12).fill(0), dhi: Array(12).fill(0) };
         let hourIndex = 0;
+        // Guard against leap-year (8784h) / partial EPW files misaligning the index.
+        const numHours = Math.min(
+            this.climateData.dni ? this.climateData.dni.length : 0,
+            this.climateData.dhi ? this.climateData.dhi.length : 0
+        );
 
         for (let m = 0; m < 12; m++) {
             for (let d = 0; d < daysInMonth[m] * 24; d++) {
+                if (hourIndex >= numHours) break;
                 monthlyTotals.dni[m] += this.climateData.dni[hourIndex];
                 monthlyTotals.dhi[m] += this.climateData.dhi[hourIndex];
                 hourIndex++;
@@ -408,11 +430,14 @@ class ResultsManager {
         const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
         const monthly = Array(12).fill(0).map(() => ({ min: Infinity, max: -Infinity, sum: 0, count: 0 }));
         let hourIndex = 0;
+        // Guard against leap-year (8784h) / partial EPW files misaligning the index.
+        const numHours = this.climateData.temp ? this.climateData.temp.length : 0;
 
         for (let m = 0; m < 12; m++) {
             for (let d = 0; d < daysInMonth[m] * 24; d++) {
+                if (hourIndex >= numHours) break;
                 const temp = this.climateData.temp[hourIndex];
-                if (temp > -99) { // EPW uses -99 for missing data
+                if (Number.isFinite(temp) && temp < 99) { // EPW uses 99.9 for missing dry-bulb
                     monthly[m].min = Math.min(monthly[m].min, temp);
                     monthly[m].max = Math.max(monthly[m].max, temp);
                     monthly[m].sum += temp;
@@ -588,6 +613,11 @@ class ResultsManager {
 
         const { mask: occupiedMask, total: totalOccupiedHoursInYear } =
             this._buildOccupiedMask(occupiedHours);
+
+        if (totalOccupiedHoursInYear === 0) {
+            console.warn(`Annual metrics for '${key}': no occupied hours in schedule; returning zeros.`);
+            return { sDA: 0, ASE: 0, UDI: { insufficient: 0, autonomous: 0, exceeded: 0 } };
+        }
 
         for (let p = 0; p < numPoints; p++) {
             let hoursMeetingSda = 0;
@@ -1227,6 +1257,23 @@ class ResultsManager {
         if (!data || data.length === 0 || !stats) return { labels: [], datasets: [] };
 
         const { min, max } = stats;
+
+        // Degenerate case: all values equal (max === min) => binWidth would be 0,
+        // producing NaN bin indices and an empty histogram. Collapse to a single bin.
+        if (max === min) {
+            const count = data.filter(v => Number.isFinite(v)).length;
+            return {
+                labels: [`${Math.round(min)}`],
+                datasets: [{
+                    label: 'Illuminance (lux)',
+                    data: [count],
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }]
+            };
+        }
+
         const binWidth = (max - min) / numBins;
         const bins = new Array(numBins).fill(0);
         const labels = [];

@@ -995,6 +995,8 @@ function createNewConversation(conversationName = null) {
         mode: MASTER_MODE.name,
         title: tabTitle,
         history: [],
+        // Per-conversation agent working history so contexts don't bleed between tabs.
+        agentHistory: [],
         isActive: false // Will be set to true by switchConversation
     };
 
@@ -1021,6 +1023,12 @@ function switchConversation(conversationId) {
     for (const id in conversations) {
         conversations[id].isActive = (id === conversationId);
     }
+
+    // Point the shared agent at this conversation's own working history so
+    // contexts from other tabs don't bleed in. (agent is a singleton.)
+    const conv = conversations[conversationId];
+    if (!conv.agentHistory) conv.agentHistory = [];
+    agent.chatHistory = conv.agentHistory;
 
     renderTabs();
     renderActiveConversation();
@@ -1480,6 +1488,33 @@ function addMessage(sender, text) {
 }
 
 /**
+ * Escapes HTML entities so untrusted text cannot inject markup.
+ * @param {string} str
+ * @returns {string}
+ */
+function _escapeHtml(str) {
+    return String(str == null ? '' : str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+/**
+ * Safely renders model/tool output: escapes HTML first, then applies the
+ * limited markdown transform (fenced code blocks -> <pre><code>). Because the
+ * source text is fully escaped up front, no injected <script>, event handler,
+ * or javascript: URI can execute.
+ * @param {string} text
+ * @returns {string} Sanitized HTML string.
+ */
+function _renderSafeMarkdown(text) {
+    const escaped = _escapeHtml(text);
+    return escaped.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+}
+
+/**
  * Creates and appends a message element to the DOM. (Helper for rendering)
  * @param {string} sender - 'user' or 'ai'.
  * @param {string} text - The message content.
@@ -1493,9 +1528,9 @@ function addMessageToDOM(sender, text, container) {
     const messageBubble = document.createElement('div');
     messageBubble.className = 'message-bubble';
 
-    // Convert markdown code blocks to pre tags
-    text = text.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
-    messageBubble.innerHTML = text;
+    // Escape HTML entities BEFORE applying markdown so any injected markup
+    // (<script>, on*= handlers, javascript: URIs) is rendered inert as text.
+    messageBubble.innerHTML = _renderSafeMarkdown(text);
 
     messageWrapper.appendChild(messageBubble);
     container.appendChild(messageWrapper);
@@ -1732,9 +1767,13 @@ async function handleSendMessage(event) {
             // Add other relevant context here
         };
 
-        // Create a placeholder for the AI response to stream thoughts
+        // Create a placeholder for the AI response to stream thoughts.
+        // Keep a reference to the history entry so the final answer can be written
+        // back into conv.history (survives tab switches / re-render).
         const responseWrapper = addMessage('ai', '');
         const bubble = responseWrapper.querySelector('.message-bubble');
+        const activeConv = conversations[activeConversationId];
+        const historyPlaceholder = activeConv ? activeConv.history[activeConv.history.length - 1] : null;
         let thoughtContainer = null;
 
         // Call Agent Process
@@ -1788,10 +1827,15 @@ async function handleSendMessage(event) {
             }
         );
 
-        // Append Final Response
+        // Persist the final answer into conversation history so it survives tab
+        // switches and re-renders (renderActiveConversation reads parts[0].text).
+        if (historyPlaceholder && historyPlaceholder.parts && historyPlaceholder.parts[0]) {
+            historyPlaceholder.parts[0].text = finalResponse;
+        }
+
+        // Append Final Response (escaped before markdown to prevent XSS).
         const finalContent = document.createElement('div');
-        // Convert markdown
-        finalContent.innerHTML = finalResponse.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+        finalContent.innerHTML = _renderSafeMarkdown(finalResponse);
         bubble.appendChild(finalContent);
 
     } catch (error) {
@@ -2758,7 +2802,6 @@ const toolHandlers = {
     'setGlobalRadianceParameter': (args) => _handleSimulationTool('setGlobalRadianceParameter', args),
     'configureDaylightingSystem': (args) => _handleSimulationTool('configureDaylightingSystem', args),
     'runOccupancyAnalysis': (args) => _handleSimulationTool('runOccupancyAnalysis', args),
-    'runOccupancyAnalysis': (args) => _handleSimulationTool('runOccupancyAnalysis', args),
 
     // UI tools
     'toggleUIPanel': (args) => _handleUITool('toggleUIPanel', args),
@@ -3211,7 +3254,10 @@ async function _callModelAPI(payload, provider, apiKey, model) {
             headers['Authorization'] = `Bearer ${apiKey}`;
             break;
         case 'gemini':
-            apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            // Send the API key via header instead of the URL query string so it is
+            // not leaked in logs, browser history, or the Referer header.
+            apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+            headers['x-goog-api-key'] = apiKey;
             break;
         case 'anthropic':
             apiUrl = 'https://api.anthropic.com/v1/messages';
@@ -3235,8 +3281,22 @@ async function _callModelAPI(payload, provider, apiKey, model) {
     });
 
     if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || errorData.message || `API Error: ${response.status}`);
+        // Non-OK bodies are not guaranteed to be JSON (429/502/HTML/plain text).
+        // Read as text first, then try to parse JSON so a non-JSON body doesn't
+        // throw and mask the real HTTP status.
+        let errorText = '';
+        let errorData = null;
+        try {
+            errorText = await response.text();
+            errorData = JSON.parse(errorText);
+        } catch (_) {
+            // Body was empty or not valid JSON; fall back to the raw text.
+        }
+        const message = errorData?.error?.message
+            || errorData?.message
+            || (errorText && errorText.trim())
+            || `API Error: ${response.status}`;
+        throw new Error(message);
     }
 
     return response.json();
@@ -3496,35 +3556,18 @@ async function callGenerativeAI(apiKey, provider, model, systemPrompt) {
     try {
         data = await _callModelAPI(payload, provider, apiKey, model);
     } catch (error) {
-        // Handle OpenRouter specific errors for models that don't support tools
-        // We catch "No endpoints found..." and generic "Provider returned error" which often happens with 400s on unsupported models
-        const isToolError = error.message && (
-            error.message.includes("No endpoints found that support tool use") ||
-            error.message.includes("Provider returned error") ||
-            error.message.includes("400")
-        );
-
-        if (isToolError && payload.tools) {
-            console.warn("Model likely does not support tools. Retrying without tools...");
+        // Only retry without tools when the error SPECIFICALLY indicates the model
+        // does not support tool/function-calling. Generic 400s or "Provider returned
+        // error" are genuine failures and must surface as-is (no success banner).
+        if (_isToolUnsupportedError(error) && payload.tools) {
+            console.warn("Model does not support tools. Retrying without tools...");
 
             // Remove tool-related properties from payload
             delete payload.tools;
             delete payload.tool_choice;
 
-            // Retry the request
+            // Retry the request; a failure here propagates the real error.
             data = await _callModelAPI(payload, provider, apiKey, model);
-
-            // Notify the user visually that the response failed
-            setTimeout(() => {
-                const warningMsg = document.createElement('div');
-                warningMsg.className = 'text-xs text-green-800 bg-green-100 border border-green-200 rounded p-2 text-center mt-2 mb-1 mx-4';
-                warningMsg.innerHTML = `<strong>✅ Action Completed</strong><br/>Your request was processed successfully. Check the 3D viewport for changes.<br/><em>Note: Model '${model}' cannot provide conversational responses.</em>`;
-                const chatContainer = dom['ai-chat-messages'];
-                if (chatContainer) {
-                    chatContainer.appendChild(warningMsg);
-                    chatContainer.scrollTop = chatContainer.scrollHeight;
-                }
-            }, 100);
         } else {
             throw error;
         }
@@ -3711,7 +3754,7 @@ function loadSettings() {
  * @returns {Array} The tool array in OpenAI's format.
  */
 function convertGeminiToolsToOpenAI(geminiTools) {
-    if (!geminiTools || !geminiTools.length || !geminiTools[0].functionDeclarations) {
+    if (!geminiTools || !geminiTools.length) {
         return [];
     }
 
@@ -3732,7 +3775,11 @@ function convertGeminiToolsToOpenAI(geminiTools) {
         return newParams;
     };
 
-    return geminiTools[0].functionDeclarations.map(func => ({
+    // availableTools contains MULTIPLE tool groups, each with its own
+    // functionDeclarations. Flatten across all groups so every tool is exposed.
+    const allDeclarations = geminiTools.flatMap(group => group.functionDeclarations || []);
+
+    return allDeclarations.map(func => ({
         type: 'function',
         function: {
             name: func.name,
@@ -3740,6 +3787,45 @@ function convertGeminiToolsToOpenAI(geminiTools) {
             parameters: convertParameters(func.parameters)
         }
     }));
+}
+
+/**
+ * Converts a Gemini-formatted tool array to the Anthropic Messages API format.
+ * Flattens across all tool groups and lowercases JSON-schema types.
+ * @param {Array} geminiTools - The tool array in Gemini's format.
+ * @returns {Array} The tool array in Anthropic's format ({name, description, input_schema}).
+ */
+function convertGeminiToolsToAnthropic(geminiTools) {
+    if (!geminiTools || !geminiTools.length) {
+        return [];
+    }
+
+    const lowercaseTypes = (obj) => {
+        if (!obj || typeof obj !== 'object') return;
+        if (obj.type) obj.type = String(obj.type).toLowerCase();
+        if (obj.properties) {
+            for (const key in obj.properties) {
+                lowercaseTypes(obj.properties[key]);
+            }
+        }
+        if (obj.items) lowercaseTypes(obj.items);
+    };
+
+    const allDeclarations = geminiTools.flatMap(group => group.functionDeclarations || []);
+
+    return allDeclarations.map(func => {
+        const schema = func.parameters
+            ? JSON.parse(JSON.stringify(func.parameters))
+            : { type: 'object', properties: {} };
+        lowercaseTypes(schema);
+        if (!schema.type) schema.type = 'object';
+        if (!schema.properties) schema.properties = {};
+        return {
+            name: func.name,
+            description: func.description,
+            input_schema: schema
+        };
+    });
 }
 
 /**
@@ -3842,16 +3928,18 @@ async function _runGenerativeDesignIteration(variable, targetElement, currentVal
     const aseFile = await _getFileFromElectron(`08_results/${projectName}_ASE_direct_only.ill`);
     const sdaFile = await _getFileFromElectron(`08_results/${projectName}_sDA_final.ill`);
 
+    // Load BOTH files into the same dataset so the direct (ASE) and total (sDA)
+    // slots coexist, then compute metrics once. The descriptor routes each file
+    // to its correct slot (annualDirectData vs annualData); loading both before
+    // calculating avoids one overwriting the other.
     await resultsManager.loadAndProcessFile(aseFile, 'a');
-    const aseMetrics = resultsManager.calculateAnnualMetrics('a', {});
-
     await resultsManager.loadAndProcessFile(sdaFile, 'a');
-    const sdaMetrics = resultsManager.calculateAnnualMetrics('a', {});
+    const annualMetrics = resultsManager.calculateAnnualMetrics('a', {});
 
     return {
         variableValue: currentValue,
-        sDA: sdaMetrics.sDA,
-        ASE: aseMetrics.ASE
+        sDA: annualMetrics.sDA,
+        ASE: annualMetrics.ASE
     };
 }
 
@@ -4008,17 +4096,17 @@ async function _performGenerativeDesign(args) {
             const aseFile = await _getFileFromElectron(`08_results/${projectName}_ASE_direct_only.ill`);
             const sdaFile = await _getFileFromElectron(`08_results/${projectName}_sDA_final.ill`);
 
-            // Load into the results manager to calculate metrics.
+            // Load BOTH files into the same dataset so the direct (ASE) and total
+            // (sDA) slots coexist, then compute metrics once (the second load must
+            // not overwrite the first).
             await resultsManager.loadAndProcessFile(aseFile, 'a');
-            const aseMetrics = resultsManager.calculateAnnualMetrics('a', {});
-
             await resultsManager.loadAndProcessFile(sdaFile, 'a');
-            const sdaMetrics = resultsManager.calculateAnnualMetrics('a', {});
+            const annualMetrics = resultsManager.calculateAnnualMetrics('a', {});
 
             const iterationResult = {
                 variableValue: currentValue,
-                sDA: sdaMetrics.sDA,
-                ASE: aseMetrics.ASE
+                sDA: annualMetrics.sDA,
+                ASE: annualMetrics.ASE
             };
             results.push(iterationResult);
 
@@ -4362,9 +4450,14 @@ async function _parseSimulationResult(optimizationGoal, targetConstraint) {
             unit = '%';
 
         } else if (optimizationGoal === 'minimize_ASE') {
-            // Load ASE result file
+            // ASE requires BOTH the direct-only (ASE) file and the total (sDA) file:
+            // the metrics calc reads direct illuminance for ASE but needs the total
+            // dataset populated to run. Load both into the same dataset so their
+            // direct/total slots coexist (neither overwrites the other).
             const aseFile = await _getFileFromElectron(`08_results/${projectName}_ASE_direct_only.ill`);
+            const sdaFile = await _getFileFromElectron(`08_results/${projectName}_sDA_final.ill`);
             await resultsManager.loadAndProcessFile(aseFile, 'a');
+            await resultsManager.loadAndProcessFile(sdaFile, 'a');
             const metrics = resultsManager.calculateAnnualMetrics('a', {});
             metricValue = metrics.ASE;
             unit = '%';
@@ -4464,12 +4557,32 @@ async function _generateRawResponse(apiKey, provider, model, systemPrompt, agent
     // Map Agent messages to Provider messages
     let messages = [];
 
-    if (provider === 'openrouter' || provider === 'openai') {
+    // OpenAI, OpenRouter and Ollama all speak the OpenAI-compatible chat API
+    // (Ollama via its /v1/chat/completions endpoint, configured in _callModelAPI).
+    if (provider === 'openrouter' || provider === 'openai' || provider === 'ollama') {
+        // Map the normalized agent history ({id,name,args} tool calls, role:'tool'
+        // results) into the exact OpenAI wire shape.
         messages = agentMessages.map(m => {
-            const msg = { role: m.role, content: m.content };
-            if (m.tool_calls) msg.tool_calls = m.tool_calls;
-            if (m.tool_call_id) msg.tool_call_id = m.tool_call_id;
-            if (m.name) msg.name = m.name;
+            if (m.role === 'tool') {
+                return {
+                    role: 'tool',
+                    tool_call_id: m.tool_call_id,
+                    content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
+                };
+            }
+            const msg = { role: m.role, content: m.content ?? '' };
+            if (m.tool_calls && m.tool_calls.length > 0) {
+                // Assistant tool-call turn: content may legitimately be null.
+                msg.content = m.content ?? null;
+                msg.tool_calls = m.tool_calls.map(tc => ({
+                    id: tc.id,
+                    type: 'function',
+                    function: {
+                        name: tc.name,
+                        arguments: typeof tc.args === 'string' ? tc.args : JSON.stringify(tc.args || {})
+                    }
+                }));
+            }
             return msg;
         });
         messages.unshift({ role: 'system', content: systemPrompt });
@@ -4481,47 +4594,15 @@ async function _generateRawResponse(apiKey, provider, model, systemPrompt, agent
         try {
             data = await _callModelAPI(payload, provider, apiKey, model);
         } catch (error) {
-            // Handle OpenRouter specific errors for models that don't support tools
-            const isToolError = error.message && (
-                error.message.includes("No endpoints found that support tool use") ||
-                error.message.includes("Provider returned error") ||
-                error.message.includes("400")
-            );
-
-            if (isToolError && payload.tools) {
-                console.warn("Model likely does not support tools. Retrying without tools...");
-
-                // Remove tool-related properties from payload
+            // Only retry without tools when the error SPECIFICALLY indicates the
+            // model/endpoint does not support tool/function-calling. Generic 400s or
+            // "Provider returned error" are real failures and must surface as-is.
+            if (_isToolUnsupportedError(error) && payload.tools) {
+                console.warn("Model does not support tools. Retrying without tools...");
                 delete payload.tools;
                 delete payload.tool_choice;
-
-                // Retry the request
-                try {
-                    data = await _callModelAPI(payload, provider, apiKey, model);
-
-                    // Notify the user visually that tools are disabled
-                    setTimeout(() => {
-                        const warningMsg = document.createElement('div');
-                        warningMsg.className = 'text-xs text-green-800 bg-green-100 border border-green-200 rounded p-2 text-center mt-2 mb-1 mx-4';
-                        warningMsg.innerHTML = `<strong>✅ Action Completed</strong><br/>Your request was processed successfully. Check the 3D viewport for changes.<br/><em>Note: Model '${model}' cannot provide conversational responses.</em>`;
-                        const chatContainer = dom['ai-chat-messages'];
-                        if (chatContainer) {
-                            chatContainer.appendChild(warningMsg);
-                            chatContainer.scrollTop = chatContainer.scrollHeight;
-                        }
-                    }, 100);
-                } catch (retryError) {
-                    // Even the retry failed - this model may not work at all
-                    const errorMsg = document.createElement('div');
-                    errorMsg.className = 'text-xs text-red-800 bg-red-100 border border-red-200 rounded p-2 text-center mt-2 mb-1 mx-4';
-                    errorMsg.innerHTML = `<strong>❌ Model Not Available</strong><br/>The model '${model}' is not responding correctly.<br/>Please try selecting a different model from the settings.`;
-                    const chatContainer = dom['ai-chat-messages'];
-                    if (chatContainer) {
-                        chatContainer.appendChild(errorMsg);
-                        chatContainer.scrollTop = chatContainer.scrollHeight;
-                    }
-                    throw new Error(`Model '${model}' is not available or not working correctly. Please select a different model.`);
-                }
+                // Let a failure here propagate the real error to the caller.
+                data = await _callModelAPI(payload, provider, apiKey, model);
             } else {
                 throw error;
             }
@@ -4535,19 +4616,35 @@ async function _generateRawResponse(apiKey, provider, model, systemPrompt, agent
             toolCalls: choice.tool_calls ? choice.tool_calls.map(tc => ({
                 id: tc.id,
                 name: tc.function.name,
-                args: JSON.parse(tc.function.arguments)
+                args: tc.function.arguments ? JSON.parse(tc.function.arguments) : {}
             })) : []
         };
     } else if (provider === 'gemini') {
-        // Basic Gemini mapping (simplified)
+        // Gemini multi-turn tool loop: a functionResponse must be preceded by the
+        // model's functionCall turn, so assistant tool-call turns are emitted as
+        // role:'model' with functionCall parts, and tool results as role:'function'
+        // with functionResponse parts.
         const geminiContents = agentMessages.map(m => {
-            let role = m.role === 'user' ? 'user' : 'model';
-            let parts = [{ text: m.content || '' }];
             if (m.role === 'tool') {
-                role = 'function';
-                parts = [{ functionResponse: { name: m.name, response: { content: m.content } } }];
+                return {
+                    role: 'function',
+                    parts: [{
+                        functionResponse: {
+                            name: m.name,
+                            response: { content: m.content }
+                        }
+                    }]
+                };
             }
-            return { role, parts };
+            if (m.role === 'assistant' && m.tool_calls && m.tool_calls.length > 0) {
+                const parts = m.tool_calls.map(tc => ({
+                    functionCall: { name: tc.name, args: tc.args || {} }
+                }));
+                if (m.content) parts.unshift({ text: m.content });
+                return { role: 'model', parts };
+            }
+            const role = m.role === 'user' ? 'user' : 'model';
+            return { role, parts: [{ text: m.content || '' }] };
         });
 
         const payload = {
@@ -4558,26 +4655,117 @@ async function _generateRawResponse(apiKey, provider, model, systemPrompt, agent
 
         const data = await _callModelAPI(payload, provider, apiKey, model);
         const candidate = data.candidates?.[0]?.content;
-        const part = candidate?.parts?.[0];
+        const parts = candidate?.parts || [];
 
-        if (part?.functionCall) {
+        // A single model turn can contain multiple functionCall parts.
+        const functionCalls = parts.filter(p => p && p.functionCall);
+        if (functionCalls.length > 0) {
+            const textPart = parts.find(p => p && typeof p.text === 'string');
             return {
-                text: null,
-                toolCalls: [{
-                    id: 'gemini_call_' + Date.now(),
-                    name: part.functionCall.name,
-                    args: part.functionCall.args
-                }]
+                text: textPart ? textPart.text : null,
+                toolCalls: functionCalls.map((p, i) => ({
+                    id: 'gemini_call_' + Date.now() + '_' + i,
+                    name: p.functionCall.name,
+                    args: p.functionCall.args || {}
+                }))
             };
         }
 
         return {
-            text: part?.text || '',
+            text: parts.map(p => p?.text || '').join('') || '',
             toolCalls: []
+        };
+    } else if (provider === 'anthropic') {
+        // Anthropic Messages API: system as a top-level param, tool calls as
+        // tool_use content blocks on assistant turns, and tool results as
+        // tool_result content blocks on a following user turn (coalesced).
+        const anthropicMessages = [];
+        for (const m of agentMessages) {
+            if (m.role === 'tool') {
+                const block = {
+                    type: 'tool_result',
+                    tool_use_id: m.tool_call_id,
+                    content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
+                };
+                const last = anthropicMessages[anthropicMessages.length - 1];
+                if (last && last.role === 'user' && Array.isArray(last.content)) {
+                    last.content.push(block);
+                } else {
+                    anthropicMessages.push({ role: 'user', content: [block] });
+                }
+            } else if (m.role === 'assistant' && m.tool_calls && m.tool_calls.length > 0) {
+                const content = [];
+                if (m.content) content.push({ type: 'text', text: m.content });
+                for (const tc of m.tool_calls) {
+                    let input = tc.args || {};
+                    if (typeof input === 'string') {
+                        try { input = JSON.parse(input); } catch (_) { input = {}; }
+                    }
+                    content.push({ type: 'tool_use', id: tc.id, name: tc.name, input });
+                }
+                anthropicMessages.push({ role: 'assistant', content });
+            } else {
+                anthropicMessages.push({
+                    role: m.role === 'user' ? 'user' : 'assistant',
+                    content: m.content || ''
+                });
+            }
+        }
+
+        const anthropicTools = convertGeminiToolsToAnthropic(availableTools);
+        const payload = {
+            model,
+            max_tokens: 4096,
+            system: systemPrompt,
+            messages: anthropicMessages,
+            tools: anthropicTools
+        };
+
+        let data;
+        try {
+            data = await _callModelAPI(payload, provider, apiKey, model);
+        } catch (error) {
+            if (_isToolUnsupportedError(error) && payload.tools) {
+                console.warn("Model does not support tools. Retrying without tools...");
+                delete payload.tools;
+                data = await _callModelAPI(payload, provider, apiKey, model);
+            } else {
+                throw error;
+            }
+        }
+
+        const blocks = Array.isArray(data.content) ? data.content : [];
+        const text = blocks.filter(b => b.type === 'text').map(b => b.text).join('');
+        const toolUses = blocks.filter(b => b.type === 'tool_use');
+
+        return {
+            text: text || (toolUses.length > 0 ? null : ''),
+            toolCalls: toolUses.map(b => ({ id: b.id, name: b.name, args: b.input || {} }))
         };
     }
 
     throw new Error(`Provider ${provider} not fully supported in Agent mode yet.`);
+}
+
+/**
+ * Determines whether an API error specifically indicates that the model or
+ * endpoint does not support tool/function-calling (as opposed to a generic
+ * failure). Used to gate the tools-stripped retry so real errors surface.
+ * @param {Error} error
+ * @returns {boolean}
+ */
+function _isToolUnsupportedError(error) {
+    if (!error || !error.message) return false;
+    const msg = error.message;
+    return (
+        /no endpoints found that support tool use/i.test(msg) ||
+        /does not support tools/i.test(msg) ||
+        /does not support function/i.test(msg) ||
+        /tool use is not supported/i.test(msg) ||
+        /tools are not supported/i.test(msg) ||
+        /function calling is not (supported|enabled)/i.test(msg) ||
+        /doesn'?t support tool/i.test(msg)
+    );
 }
 
 // Initialize YOLO Toggle Listener

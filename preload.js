@@ -58,6 +58,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return ipcRenderer.invoke('run-python-script', args);
   },
 
+  runLiveRender: (args) => {
+    if (!args || typeof args !== 'object') {
+      throw new Error('Invalid arguments: expected an object');
+    }
+    for (const field of ['epwContent', 'geometryContent', 'materialsContent', 'viewpointContent']) {
+      if (typeof args[field] !== 'string') {
+        throw new Error(`Invalid argument: '${field}' must be a string`);
+      }
+    }
+    for (const field of ['month', 'day', 'time']) {
+      if (typeof args[field] !== 'number' || !Number.isFinite(args[field])) {
+        throw new Error(`Invalid argument: '${field}' must be a finite number`);
+      }
+    }
+    return ipcRenderer.invoke('run-live-render', args);
+  },
+
   // --- Methods for one-way communication or event listeners ---
   runScript: (args) => {
     validatePathArgs(args, ['projectPath', 'scriptName']);

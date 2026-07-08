@@ -54,7 +54,13 @@ function validate(projectData, config) {
   const bsdfOpen = simFiles['bsdf-open-file'] || config.recipe['bsdf-open-file'];
   const bsdfClosed = simFiles['bsdf-closed-file'] || config.recipe['bsdf-closed-file'];
 
-  if (!epw || !epw.name) {
+  // The main project EPW lives on projectData.epwFileContent / projectInfo.epwFileName
+  // and is never keyed 'weather-file'. Accept it as a valid weather source.
+  const hasWeather = (epw && epw.name)
+    || !!projectData.epwFileContent
+    || !!projectData.projectInfo?.epwFileName;
+
+  if (!hasWeather) {
     addError(result, 'sDA/ASE: Weather file is required. Please select an EPW file.');
   }
   if (!bsdfOpen || !bsdfOpen.name) {

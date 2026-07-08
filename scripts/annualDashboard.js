@@ -231,13 +231,19 @@ function createSunPathChart() {
     const textColor = style.getPropertyValue('--text-secondary').trim() || '#e5e7eb';
     const gridColor = style.getPropertyValue('--grid-color').trim() || 'rgba(75,85,99,0.4)';
 
-    // Utility to convert {r, t} into Chart.js radialLinear-friendly points.
-    const mapPath = (pts) => pts.map(p => ({
-        // For radialLinear: r is radius, and angle (theta) is derived from index.
-        // We keep r directly; azimuth is shown via tooltip.
-        r: p.r,
-        t: p.t
-    }));
+    // Project polar sun-path points {r: zenith angle 0-90, t: compass azimuth deg}
+    // onto a cartesian plane for a Chart.js scatter (which reads parsed.x/parsed.y).
+    // North is up (+y), East is right (+x). Original r/t are retained for the tooltip.
+    const mapPath = (pts) => pts.map(p => {
+        const r = typeof p.r === 'number' ? p.r : 0;       // zenith angle (0=overhead, 90=horizon)
+        const azRad = (typeof p.t === 'number' ? p.t : 0) * Math.PI / 180;
+        return {
+            x: r * Math.sin(azRad),
+            y: r * Math.cos(azRad),
+            r,
+            t: p.t
+        };
+    });
 
     sunPathChart = new Chart(ctx, {
         type: 'scatter',
@@ -292,29 +298,23 @@ function createSunPathChart() {
                     }
                 }
             },
+            aspectRatio: 1,
             scales: {
-                r: {
+                x: {
                     type: 'linear',
-                    min: 0,
-                    max: 90,
-                    angleLines: { color: gridColor },
+                    min: -95,
+                    max: 95,
                     grid: { color: gridColor },
-                    ticks: {
-                        stepSize: 30,
-                        backdropColor: 'transparent',
-                        color: textColor,
-                        callback: (value) => `${90 - value}°` // Show altitude on radial ticks
-                    },
-                    pointLabels: {
-                        display: true,
-                        color: textColor,
-                        centerPointLabels: true,
-                        font: { size: 9 }
-                    }
+                    ticks: { display: false }
+                },
+                y: {
+                    type: 'linear',
+                    min: -95,
+                    max: 95,
+                    grid: { color: gridColor },
+                    ticks: { display: false }
                 }
-            },
-            // Render as polar by using radialLinear scale on 'r' axis
-            indexAxis: 'r'
+            }
         }
     });
 }
