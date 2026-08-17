@@ -803,10 +803,12 @@ export function updateAnnualMetricsDashboard(metrics, lightingMetrics) {
 
     document.getElementById('annual-metrics-dashboard').classList.remove('hidden');
     document.getElementById('sda-value').textContent = `${metrics.sDA.toFixed(1)}%`;
-    document.getElementById('ase-value').textContent = `${metrics.ASE.toFixed(1)}%`;
+    // ASE is null when no direct-only dataset was loaded; showing 0% would read as a pass.
+    document.getElementById('ase-value').textContent =
+        metrics.ASE === null ? 'n/a' : `${metrics.ASE.toFixed(1)}%`;
 
     sdaGauge = createGauge('sda-gauge', metrics.sDA, '#3b82f6');
-    aseGauge = createGauge('ase-gauge', metrics.ASE, '#f59e0b');
+    aseGauge = createGauge('ase-gauge', metrics.ASE === null ? 0 : metrics.ASE, '#f59e0b');
     udiChart = createUdiChart('udi-chart', metrics.UDI);
 
     if (lightingMetrics) {

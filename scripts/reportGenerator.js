@@ -249,7 +249,7 @@ class ReportGenerator {
                     ${stats ? this._buildMetricCard('Average Illuminance', stats.avg.toFixed(1), 'lux') : ''}
                     ${stats ? this._buildMetricCard('Uniformity (Uo)', (Number.isFinite(stats.uniformity) ? stats.uniformity : (stats.avg > 0 ? stats.min / stats.avg : 0)).toFixed(2)) : ''}
                     ${annualMetrics ? this._buildMetricCard('sDA <sub>300/50%</sub>', annualMetrics.sDA.toFixed(1), '%') : ''}
-                    ${annualMetrics ? this._buildMetricCard('ASE <sub>1000,250h</sub>', annualMetrics.ASE.toFixed(1), '%') : ''}
+                    ${annualMetrics ? this._buildMetricCard('ASE <sub>1000,250h</sub>', annualMetrics.ASE === null ? 'n/a' : annualMetrics.ASE.toFixed(1), annualMetrics.ASE === null ? '' : '%') : ''}
                     ${glareResult ? this._buildMetricCard('DGP', glareResult.dgp.toFixed(3)) : ''}
                     ${circadianMetrics ? this._buildMetricCard('Avg. Circadian Stimulus', circadianMetrics.avg_cs.toFixed(3)) : ''}
                     ${circadianMetrics ? this._buildMetricCard('Avg. EML', circadianMetrics.avg_eml.toFixed(0), 'lux') : ''}

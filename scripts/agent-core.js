@@ -201,14 +201,40 @@ You are in a ReAct loop.
      * @returns {boolean} True if confirmation is needed.
      */
     requiresConfirmation(toolName) {
-        const dangerTools = ['deleteGeometry', 'resetProject', 'overwriteFiles']; // Example
-        const isDangerous = dangerTools.includes(toolName);
+        // setViewpointPosition is deliberately absent from this list: it writes the
+        // view-position fields that the DGP and rendering recipes read, so it is a
+        // simulation input rather than a camera move. changeView, by contrast, only
+        // moves the editor camera.
+        // Read-only tools answer a question without touching project state, so
+        // confirming them adds friction and teaches the user to click through the
+        // prompt. Everything not listed here changes the scene, the recipe, the
+        // results, or a file on disk, and is confirmed in normal mode.
+        const readOnlyTools = new Set([
+            'getEn17037Summary', 'getEnIlluminanceSummary', 'getEnUgrSummary',
+            'getCircadianMetricsSummary', 'getImagelessGlareSummary',
+            'getLightingEnergySummary', 'compareMetrics', 'getGeometryMode',
+            'listCustomWalls', 'getWallDetails', 'queryResultsData',
+            'getDatasetStatistics', 'searchKnowledgeBase',
+            'analyzeOptimizationResults', 'suggestOptimizationRanges',
+            'showAnalysisDashboard', 'displayResultsForTime',
+            'highlightResultPoint', 'filterAndHighlightPoints', 'filterDataTable',
+            'toggleDataTable', 'toggleUIPanel', 'toggleHdrViewer',
+            'configureHdrViewer', 'toggleComparisonMode', 'setTheme',
+            'changeView', 'startWalkthrough',
+            'endWalkthrough', 'toggleSunRayVisibility', 'openSimulationRecipe',
+            'openOptimizationPanel'
+        ]);
+
+        // Destructive tools discard work that cannot be recovered from the UI, so
+        // they are confirmed even in autonomous mode. Every name here is checked
+        // against the live registry by the test in requiresConfirmation's spec.
+        const destructiveTools = new Set([
+            'loadProject', 'clearResults', 'startOptimization', 'runSimulation'
+        ]);
 
         if (this.yoloMode) {
-            return isDangerous; // In YOLO, only dangerous tools need confirm
+            return destructiveTools.has(toolName);
         }
-        return true; // In normal mode, most "action" tools might need confirm, or maybe just dangerous ones?
-        // User said: "Disable YOLO -> Verify it asks 'I am about to add 5 windows. Proceed?'"
-        // So in normal mode, ALL state-changing tools should likely ask.
+        return !readOnlyTools.has(toolName);
     }
 }

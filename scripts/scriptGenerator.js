@@ -486,13 +486,13 @@ if __name__ == "__main__":
 
     # --- 1. PRE-PROCESSING AND MATERIAL FILE GENERATION ---
     echo "Step 1: Generating spectrally binned material files..."
-    cat > "${MATERIALS_DIR}/materials_c1-3.rad" << EOF
+    cat > "\${MATERIALS_DIR}/materials_c1-3.rad" << EOF
     ${materialDefs9ch.c1_3}
 EOF
-        cat > "${MATERIALS_DIR}/materials_c4-6.rad" << EOF
+        cat > "\${MATERIALS_DIR}/materials_c4-6.rad" << EOF
     ${materialDefs9ch.c4_6}
 EOF
-        cat > "${MATERIALS_DIR}/materials_c7-9.rad" << EOF
+        cat > "\${MATERIALS_DIR}/materials_c7-9.rad" << EOF
     ${materialDefs9ch.c7_9}
 EOF
 
@@ -508,16 +508,40 @@ EOF
 
     # --- 3. SPECTRAL SKY GENERATION (TWO-PASS METHOD) ---
     echo "Step 3: Generating spectral sky files..."
-    BASELINE_SKY="${OUTPUT_DIR}/sky_baseline.rad"
+
+    # The per-band colorfunc modifiers below scale a pattern by three constants.
+    # Radiance has no built-in red/green/blue functions, so they are defined here
+    # and the file is written into the script's own directory. '.' is prepended to
+    # RAYPATH only when RAYPATH is already set, so an install relying on Radiance's
+    # compiled-in default path is left untouched.
+    SPECTRAL_CAL_NAME="spectral_rgb.cal"
+    cat > "\${SPECTRAL_CAL_NAME}" <<'CALEOF'
+{ Per-band channel scaling for the 9-channel spectral method.
+  A1, A2, A3 are the three band values carried by the colorfunc. }
+red = A1;
+green = A2;
+blue = A3;
+CALEOF
+    if [ -n "\${RAYPATH}" ]; then export RAYPATH=".:\${RAYPATH}"; fi
+    BASELINE_SKY="\${OUTPUT_DIR}/sky_baseline.rad"
     gendaylit $MONTH $DAY $HOUR -a $LATITUDE -o $LONGITUDE -m $MERIDIAN -W $DNI $DHI > $BASELINE_SKY
-    SUN_RAD_RGB=$(grep "sun source" -A 3 $BASELINE_SKY | tail -n 1)
-    R_RAD=$(echo $SUN_RAD_RGB | awk '{print $1}'); G_RAD=$(echo $SUN_RAD_RGB | awk '{print $2}'); B_RAD=$(echo $SUN_RAD_RGB | awk '{print $3}')
-    L_BASE=$(echo "179 * (0.2651*$R_RAD + 0.670*$G_RAD + 0.065*$B_RAD)" | bc -l)
-    L_SPEC_UNSCALED=$(echo "179*($B1_SUN*0.0003+$B2_SUN*0.0232+$B3_SUN*0.1465+$B4_SUN*0.3644+$B5_SUN*0.7386+$B6_SUN*0.9859+$B7_SUN*0.8654+$B8_SUN*0.3804+$B9_SUN*0.0535)" | bc -l)
-    C_SCALE=$(echo "scale=10; $L_BASE / ($L_SPEC_UNSCALED + 1e-9)" | bc -l)
-    S1_SCALED=$(echo "$B1_SUN * $C_SCALE" | bc -l); S2_SCALED=$(echo "$B2_SUN * $C_SCALE" | bc -l); S3_SCALED=$(echo "$B3_SUN * $C_SCALE" | bc -l)
-    S4_SCALED=$(echo "$B4_SUN * $C_SCALE" | bc -l); S5_SCALED=$(echo "$B5_SUN * $C_SCALE" | bc -l); S6_SCALED=$(echo "$B6_SUN * $C_SCALE" | bc -l)
-    S7_SCALED=$(echo "$B7_SUN * $C_SCALE" | bc -l); S8_SCALED=$(echo "$B8_SUN * $C_SCALE" | bc -l); S9_SCALED=$(echo "$B9_SUN * $C_SCALE" | bc -l)
+    # gendaylit emits the sun as "void light solar" followed by two count lines and
+    # then "3 R G B"; the radiance values are fields 2-4 of that fourth line. The
+    # separate "solar source sun" primitive carries the direction, not the colour.
+    SUN_RAD_RGB=$(grep -A 3 "^void light solar" $BASELINE_SKY | tail -n 1)
+    R_RAD=$(echo $SUN_RAD_RGB | awk '{print $2}'); G_RAD=$(echo $SUN_RAD_RGB | awk '{print $3}'); B_RAD=$(echo $SUN_RAD_RGB | awk '{print $4}')
+    if [ -z "$R_RAD" ]; then echo "ERROR: could not read the sun radiance from $BASELINE_SKY; aborting." >&2; return 1; fi
+    # awk, not bc: gendaylit writes the sun radiance in scientific notation
+    # (e.g. 6.807e+06), which bc cannot parse. bc would fail silently here and
+    # leave every scaled band empty, producing an unusable modifier file.
+    L_BASE=$(awk -v r="$R_RAD" -v g="$G_RAD" -v b="$B_RAD" 'BEGIN{printf "%.10g", 179*(0.265*r + 0.670*g + 0.065*b)}')
+    L_SPEC_UNSCALED=$(awk -v b1="$B1_SUN" -v b2="$B2_SUN" -v b3="$B3_SUN" -v b4="$B4_SUN" -v b5="$B5_SUN" -v b6="$B6_SUN" -v b7="$B7_SUN" -v b8="$B8_SUN" -v b9="$B9_SUN" \
+        'BEGIN{printf "%.10g", 179*(b1*0.0003+b2*0.0232+b3*0.1465+b4*0.3644+b5*0.7386+b6*0.9859+b7*0.8654+b8*0.3804+b9*0.0535)}')
+    C_SCALE=$(awk -v a="$L_BASE" -v b="$L_SPEC_UNSCALED" 'BEGIN{printf "%.10g", a/(b + 1e-9)}')
+    scale_band() { awk -v v="$1" -v c="$C_SCALE" 'BEGIN{printf "%.10g", v*c}'; }
+    S1_SCALED=$(scale_band "$B1_SUN"); S2_SCALED=$(scale_band "$B2_SUN"); S3_SCALED=$(scale_band "$B3_SUN")
+    S4_SCALED=$(scale_band "$B4_SUN"); S5_SCALED=$(scale_band "$B5_SUN"); S6_SCALED=$(scale_band "$B6_SUN")
+    S7_SCALED=$(scale_band "$B7_SUN"); S8_SCALED=$(scale_band "$B8_SUN"); S9_SCALED=$(scale_band "$B9_SUN")
 
     for i in {1..3}; do
         case $i in
@@ -525,42 +549,49 @@ EOF
             2) R_S=$S4_SCALED; G_S=$S5_SCALED; B_S=$S6_SCALED; R_K=$B4_SKY; G_K=$B5_SKY; B_K=$B6_SKY; SUFFIX="c4-6";;
             3) R_S=$S7_SCALED; G_S=$S8_SCALED; B_S=$S9_SCALED; R_K=$B7_SKY; G_K=$B8_SKY; B_K=$B9_SKY; SUFFIX="c7-9";;
         esac
-        MOD_FILE="${OUTPUT_DIR}/mods_${SUFFIX}.rad"; SKY_FILE="${OUTPUT_DIR}/sky_${SUFFIX}.rad"
+        MOD_FILE="\${OUTPUT_DIR}/mods_\${SUFFIX}.rad"; SKY_FILE="\${OUTPUT_DIR}/sky_\${SUFFIX}.rad"
         cat > $MOD_FILE <<EOF
-    void colorfunc sky_rgb_${SUFFIX}\\n4 red green blue skybright.cal\\n0\\n3 $R_K $G_K $B_K
-    void colorfunc sun_rgb_${SUFFIX}\\n4 red green blue source.cal\\n0\\n3 $R_S $G_S $B_S
+void colorfunc sky_rgb_\${SUFFIX}
+4 red green blue \${SPECTRAL_CAL_NAME}
+0
+3 $R_K $G_K $B_K
+
+void colorfunc sun_rgb_\${SUFFIX}
+4 red green blue \${SPECTRAL_CAL_NAME}
+0
+3 $R_S $G_S $B_S
 EOF
         gendaylit $MONTH $DAY $HOUR -a $LATITUDE -o $LONGITUDE -m $MERIDIAN -W $DNI $DHI \\
-            | sed "s/^void brightfunc skyfunc/sky_rgb_${SUFFIX} brightfunc skyfunc/" \\
-            | sed "s/^void light solar/sun_rgb_${SUFFIX} light solar/" > $SKY_FILE
-        cat $MOD_FILE $SKY_FILE > "${OUTPUT_DIR}/sky_final_${SUFFIX}.rad"
+            | sed "s/^void brightfunc skyfunc/sky_rgb_\${SUFFIX} brightfunc skyfunc/" \\
+            | sed "s/^void light solar/sun_rgb_\${SUFFIX} light solar/" > $SKY_FILE
+        cat $MOD_FILE $SKY_FILE > "\${OUTPUT_DIR}/sky_final_\${SUFFIX}.rad"
     done
 
     # --- 4. SCENE COMPILATION & 5. SIMULATION ---
     echo "Steps 4 & 5: Compiling octrees and running simulations..."
     for SUFFIX in "c1-3" "c4-6" "c7-9"; do
-        OCTREE="${OUTPUT_DIR}/scene_${SUFFIX}.oct"
-        oconv -f "${OUTPUT_DIR}/sky_final_${SUFFIX}.rad" "${MATERIALS_DIR}/materials_${SUFFIX}.rad" $GEOMETRY_FILE > $OCTREE
+        OCTREE="\${OUTPUT_DIR}/scene_\${SUFFIX}.oct"
+        oconv -f "\${OUTPUT_DIR}/sky_final_\${SUFFIX}.rad" "\${MATERIALS_DIR}/materials_\${SUFFIX}.rad" $GEOMETRY_FILE > $OCTREE
         # We only need the sensor point results for the post-processing script
-        rtrace -I -h $RAD_PARAMS $OCTREE < $POINTS_FILE > "${OUTPUT_DIR}/results_${SUFFIX}.res"
+        rtrace -I -h $RAD_PARAMS $OCTREE < $POINTS_FILE > "\${OUTPUT_DIR}/results_\${SUFFIX}.res"
     done
 
     # --- 6. POST-PROCESSING ---
     echo "Step 6: Combining results and calculating final circadian metrics..."
-    paste "${OUTPUT_DIR}/results_c1-3.res" "${OUTPUT_DIR}/results_c4-6.res" "${OUTPUT_DIR}/results_c7-9.res" > "${OUTPUT_DIR}/results_9channel.res"
+    paste "\${OUTPUT_DIR}/results_c1-3.res" "\${OUTPUT_DIR}/results_c4-6.res" "\${OUTPUT_DIR}/results_c7-9.res" > "\${OUTPUT_DIR}/results_9channel.res"
     
     # Save the Python script to the results directory
     echo "Creating Python post-processor..."
-    cat > "${OUTPUT_DIR}/${PYTHON_SCRIPT}" << EOF
+    cat > "\${OUTPUT_DIR}/\${PYTHON_SCRIPT}" << EOF
     ${pythonScriptContent}
 EOF
 
     # Execute the Python script
     echo "Executing Python post-processor..."
-    python3 "${OUTPUT_DIR}/${PYTHON_SCRIPT}" "${OUTPUT_DIR}/results_9channel.res" --points "\${NUM_POINTS}"
+    python3 "\${OUTPUT_DIR}/\${PYTHON_SCRIPT}" "\${OUTPUT_DIR}/results_9channel.res" --points "\${NUM_POINTS}"
 
     echo "### 9-CHANNEL SIMULATION COMPLETE ###"
-    echo "Circadian metrics saved in ${OUTPUT_DIR}/circadian_summary.json"
+    echo "Circadian metrics saved in \${OUTPUT_DIR}/circadian_summary.json"
     }
 
     # ==============================================================================
@@ -1117,8 +1148,13 @@ function createDaylightFactorScript(projectData) {
     const skyType = p['df-sky-type'] || '-c';
     const groundRefl = p['df-ground-refl'] || 0.2;
     
-    // For a standard 10,000 lux exterior illuminance, B should be 55.866 W/m^2 for a CIE overcast sky
+    // gensky -B takes horizontal diffuse irradiance in W/m^2; 55.866 W/m^2 gives the
+    // conventional 10,000 lux exterior reference. The DF denominator is derived from
+    // whatever irradiance is actually used rather than pinned to 10,000, because a
+    // user-supplied value would otherwise leave the two inconsistent and scale every
+    // reported DF by the ratio between them.
     const horizIrrad = p['df-irrad'] || 55.866;
+    const extLux = (horizIrrad * 179).toFixed(1);
     const lightDefs = generateLightSourceDefinitions(projectData.lighting, projectData.geometry.room, projectData.simulationFiles);
 
     const shContent = `#!/bin/bash
@@ -1129,7 +1165,7 @@ function createDaylightFactorScript(projectData) {
     # --- Simulation Configuration ---
     PROJECT_NAME="${projectName}"
     AB=${ab}; AD=${ad}; AS=${as}; AR=${ar}; AA=${aa}
-    EXT_LUX=10000 # Reference exterior horizontal illuminance for DF calculation
+    EXT_LUX=${extLux} # Exterior horizontal illuminance implied by the sky above (179 lm/W x ${horizIrrad} W/m2)
 
     # --- File & Directory Setup ---
     GEOM_FILE="../01_geometry/\${PROJECT_NAME}.rad"
@@ -1186,7 +1222,7 @@ function createDaylightFactorScript(projectData) {
     set "AS=${as}"
     set "AR=${ar}"
     set "AA=${aa}"
-    set "EXT_LUX=10000"
+    set "EXT_LUX=${extLux}"
 
     REM --- File & Directory Setup ---
     set "GEOM_FILE=..\\01_geometry\\%PROJECT_NAME%.rad"
@@ -1440,13 +1476,17 @@ function create3phAnnualSimScript(projectData) {
     DAYLIGHT_MTX="\${MATRIX_DIR}/daylight.mtx"
     VIEW_MTX="\${MATRIX_DIR}/view.mtx"
     ANNUAL_RESULTS="\${RESULTS_DIR}/\${PROJECT_NAME}.ill"
+    POINTS_FILE="../08_results/grid.pts"
+    NUM_POINTS=$(wc -l < "\${POINTS_FILE}" | tr -d ' ')
     dctimestep "\${VIEW_MTX}" "\${BSDF_FILE}" "\${DAYLIGHT_MTX}" "\${SKY_MTX}" > "\${ANNUAL_RESULTS}"
     if [ \$? -ne 0 ]; then echo "Error during dctimestep."; exit 1; fi
 
     echo "---"
     echo "Annual simulation complete."
     echo "Annual illuminance results saved to: \${ANNUAL_RESULTS}"
-    echo "Run post_process_annual.py on this file to get sDA/UDI metrics."
+    echo "Run: python3 post_process_annual.py \"\${ANNUAL_RESULTS}\" --points \${NUM_POINTS}"
+    echo "Note: this 3-phase result carries no separate direct-sun component, so ASE is not reported."
+    echo "      Use the 5-phase or the dedicated sDA/ASE recipe for an LM-83 ASE figure."
     echo "---"
     `;
 
@@ -1529,6 +1569,7 @@ function create5phMatrixGenerationScript(projectData) {
     RESULTS_DIR="../08_results"
     MATRIX_DIR="\${RESULTS_DIR}/matrices"
     POINTS_FILE="../08_results/grid.pts"
+    NUM_POINTS=$(wc -l < "\${POINTS_FILE}" | tr -d ' ')
     mkdir -p \$OCT_DIR \$RESULTS_DIR \$MATRIX_DIR
 
     echo "--- Starting 5-Phase Simulation Workflow ---"
@@ -1606,6 +1647,16 @@ function create5phMatrixGenerationScript(projectData) {
     echo "---"
     echo "5-Phase simulation complete. Final results saved to: \${FINAL_RESULTS}" 
     echo "---"
+
+    # ASE is defined by LM-83 on direct sunlight alone, so the direct-only matrix
+    # result is passed alongside the total. Without it the post-processor reports
+    # sDA and UDI and explicitly declines to report ASE.
+    if command -v python3 >/dev/null 2>&1 && [ -f post_process_annual.py ]; then
+        echo "Post-processing annual metrics..."
+        python3 post_process_annual.py "\${FINAL_RESULTS}" --points "\${NUM_POINTS}" --direct-ill "\${ILL_5PH_DIRECT}"
+    else
+        echo "Run: python3 post_process_annual.py \"\${FINAL_RESULTS}\" --points \${NUM_POINTS} --direct-ill \"\${ILL_5PH_DIRECT}\""
+    fi
 `;
 
     const batContent = `@echo off
@@ -1729,15 +1780,26 @@ import pandas as pd
 import argparse
 import os
 
-def calculate_metrics(illuminance_file: str, output_dir: str, num_points: int, schedule_file: str | None = None):
+def _read_ill(path: str, num_points: int):
+    """Read a Radiance annual .ill file and reduce RGB to photopic illuminance."""
+    data = np.fromfile(path, dtype=np.float32)
+    rgb = data.reshape(8760, num_points, 3)
+    return 179 * (rgb[:, :, 0] * 0.265 + rgb[:, :, 1] * 0.670 + rgb[:, :, 2] * 0.065)
+
+
+def calculate_metrics(illuminance_file: str, output_dir: str, num_points: int, schedule_file: str | None = None, direct_file: str | None = None):
     """
-    Calculates sDA, UDI, and ASE from a Radiance annual illuminance file.
+    Calculates sDA and UDI from a Radiance annual illuminance file, and ASE from a
+    direct-only file when one is supplied.
     Args:
-        illuminance_file (str): Path to the .ill file from dctimestep.
+        illuminance_file (str): Path to the total .ill file from dctimestep.
         output_dir (str): Directory to save the results CSV.
         num_points (int): The number of sensor points in the simulation grid.
+        schedule_file (str): Optional 8760-row occupancy schedule.
+        direct_file (str): Optional direct-only .ill, required for LM-83 ASE.
     """
     print(f"Reading annual illuminance data from: {illuminance_file}")
+    direct_illuminance = None
     try:
         # Radiance .ill files are typically 3-channel (RGB) float32
         data = np.fromfile(illuminance_file, dtype=np.float32)
@@ -1749,7 +1811,20 @@ def calculate_metrics(illuminance_file: str, output_dir: str, num_points: int, s
         print("Please ensure the --points argument matches your simulation grid.")
         return
     
+    if num_points <= 0:
+        print("Error: --points must be a positive integer.")
+        return
     print(f"Data loaded successfully. Shape: {annual_illuminance.shape}")
+
+    if direct_file:
+        if os.path.exists(direct_file):
+            try:
+                direct_illuminance = _read_ill(direct_file, num_points)
+                print(f"Direct-only illuminance loaded for ASE from: {direct_file}")
+            except Exception as e:
+                print(f"Warning: could not read direct-only file ({e}). ASE will not be reported.")
+        else:
+            print(f"Warning: direct-only file not found: {direct_file}. ASE will not be reported.")
     
     # Define occupancy schedule
     time_index = pd.to_datetime(pd.date_range(start='2023-01-01', end='2024-01-01', freq='h', inclusive='left'))
@@ -1776,7 +1851,11 @@ def calculate_metrics(illuminance_file: str, output_dir: str, num_points: int, s
     lux_threshold_da = 300
     percent_time_threshold_da = 0.5
     hours_above_threshold = np.sum(occupied_illuminance >= lux_threshold_da, axis=0)
-    fraction_of_time_above_threshold = hours_above_threshold / occupied_illuminance.shape[0]
+    occupied_hours_count = occupied_illuminance.shape[0]
+    if occupied_hours_count == 0:
+        print("Error: the occupancy schedule contains no occupied hours; metrics cannot be computed.")
+        return
+    fraction_of_time_above_threshold = hours_above_threshold / occupied_hours_count
     points_meeting_da_criteria = fraction_of_time_above_threshold >= percent_time_threshold_da
     sDA = np.sum(points_meeting_da_criteria) / num_points * 100
 
@@ -1787,12 +1866,22 @@ def calculate_metrics(illuminance_file: str, output_dir: str, num_points: int, s
     udi_e = np.mean(occupied_illuminance >= 2000, axis=0) * 100
 
     # 3. Annual Sunlight Exposure (ASE 1000,250)
-    # NOTE: Requires input .ill file from a 5-Phase Method simulation.
+    # LM-83 defines ASE on DIRECT SUNLIGHT ONLY, with shading retracted. Computing
+    # it from the total illuminance used for sDA counts interreflected light too,
+    # which can only raise the hour count, so ASE comes out biased high. ASE is
+    # therefore reported only when a direct-only .ill is supplied.
     lux_threshold_ase = 1000
     hours_threshold_ase = 250
-    hours_above_threshold_ase = np.sum(occupied_illuminance >= lux_threshold_ase, axis=0)
-    points_meeting_ase_criteria = hours_above_threshold_ase >= hours_threshold_ase
-    ASE = np.sum(points_meeting_ase_criteria) / num_points * 100
+    ASE = None
+    if direct_illuminance is not None:
+        occupied_direct = direct_illuminance[occupied_mask, :]
+        hours_above_threshold_ase = np.sum(occupied_direct >= lux_threshold_ase, axis=0)
+        points_meeting_ase_criteria = hours_above_threshold_ase >= hours_threshold_ase
+        ASE = np.sum(points_meeting_ase_criteria) / num_points * 100
+    else:
+        print("ASE not reported: no direct-only illuminance file was supplied "
+              "(--direct-ill). LM-83 requires direct sunlight only; deriving it "
+              "from the total illuminance would overestimate ASE.")
     
     # --- Save Results ---
     results_df = pd.DataFrame({
@@ -1805,7 +1894,7 @@ def calculate_metrics(illuminance_file: str, output_dir: str, num_points: int, s
     
     summary = {
         'sDA_300_50%': [f"{sDA:.2f}%"],
-        'ASE_1000_250h': [f"{ASE:.2f}%"],
+        'ASE_1000_250h': [f"{ASE:.2f}%" if ASE is not None else "not reported (no direct-only input)"],
     }
     summary_df = pd.DataFrame(summary)
     
@@ -1826,12 +1915,14 @@ if __name__ == "__main__":
     parser.add_argument("--points", type=int, required=True, help="Number of sensor points in the grid.")
     parser.add_argument("--outdir", type=str, default="../08_results", help="Output directory for CSV results.")
     parser.add_argument("--schedule", type=str, default=None, help="Optional path to an 8760-hour occupancy schedule CSV file.")
+    parser.add_argument("--direct-ill", type=str, default=None, dest="direct_ill",
+                        help="Direct-only .ill file. Required to report ASE: LM-83 defines it on direct sunlight alone.")
     args = parser.parse_args()
 
     if not os.path.exists(args.illuminance_file):
         print(f"Error: Input file not found at {args.illuminance_file}")
     else:
-        calculate_metrics(args.illuminance_file, args.outdir, args.points, args.schedule)
+        calculate_metrics(args.illuminance_file, args.outdir, args.points, args.schedule, args.direct_ill)
     `;
     return { fileName: 'post_process_annual.py', content };
 }
@@ -2393,6 +2484,9 @@ def check_glare_protection(dgp_file, schedule_file, dgp_threshold):
 
         occupied_dgp = dgp_data[occupied_mask]
         total_occupied_hours = occupied_dgp.shape[0]
+        if total_occupied_hours == 0:
+            print("Error: no occupied hours in the schedule; glare percentages cannot be computed.")
+            return
 
         # Check for each point
         hours_with_glare = (occupied_dgp > dgp_threshold).sum(axis=0)

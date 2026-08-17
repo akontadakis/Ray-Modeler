@@ -1659,7 +1659,7 @@ You are acting as an interactive tutor. Guide the user step-by-step through the 
 
 ## Available Tools
 
-You have access to ${availableTools[0].functionDeclarations.length} different tools that allow you to:
+You have access to ${availableTools.reduce((n, g) => n + g.functionDeclarations.length, 0)} different tools that allow you to:
 - Manipulate the 3D scene (place assets, set dimensions, configure materials)
 - Control the user interface (open panels, change views, toggle settings)
 - Run simulations and manage results
@@ -1927,9 +1927,16 @@ async function _handleSceneTool(name, args) {
             if (args.property === 'transmittance' && args.surface !== 'glazing') throw new Error("The 'transmittance' property can only be set for the 'glazing' surface.");
             if (args.property !== 'transmittance' && args.surface === 'glazing') throw new Error("The 'glazing' surface only accepts the 'transmittance' property.");
             const elementId = `${args.surface}-${propMap[args.property]}`;
-            const clampedValue = Math.max(0, Math.min(1, args.value));
-            if (_updateUI(elementId, clampedValue)) {
-                return { success: true, message: `Set ${args.surface} ${args.property} to ${clampedValue.toFixed(2)}.` };
+            // Reject rather than clamp. Clamping silently substituted a value the
+            // user never asked for and still reported success, so a physically
+            // impossible reflectance reached the simulation as 1.0 unannounced.
+            const value = Number(args.value);
+            if (!Number.isFinite(value)) throw new Error(`Invalid ${args.property}: '${args.value}' is not a number.`);
+            if (value < 0 || value > 1) {
+                throw new Error(`Invalid ${args.property} for ${args.surface}: ${value}. Must be between 0.0 and 1.0.`);
+            }
+            if (_updateUI(elementId, value)) {
+                return { success: true, message: `Set ${args.surface} ${args.property} to ${value.toFixed(2)}.` };
             }
             throw new Error(`Could not find the UI control for ${args.surface} ${args.property} (ID: ${elementId}).`);
         }
@@ -2911,6 +2918,7 @@ const toolHandlers = {
                 const recipe = Object.keys(RECIPE_METRICS).find(r => RECIPE_METRICS[r].some(m => m.id === objective1));
 
                 if (recipe) {
+                    assertSupported(recipe, objective1);
                     setUiValue('opt-simulation-recipe', recipe);
                     dom['opt-simulation-recipe']?.dispatchEvent(new Event('change', { bubbles: true }));
                     await new Promise(resolve => setTimeout(resolve, 50));
@@ -2933,6 +2941,7 @@ const toolHandlers = {
                 const recipe = Object.keys(RECIPE_METRICS).find(r => RECIPE_METRICS[r].some(m => m.id === objStr));
 
                 if (recipe) {
+                    assertSupported(recipe, objStr);
                     setUiValue(`opt-recipe-${num}`, recipe);
                     dom[`opt-recipe-${num}`]?.dispatchEvent(new Event('change', { bubbles: true }));
                     await new Promise(resolve => setTimeout(resolve, 50));
@@ -4111,7 +4120,7 @@ async function _performGenerativeDesign(args) {
             results.push(iterationResult);
 
             // Append this step's results to the progress message.
-            progressMessage += `<p>✅ Step ${i + 1}: Depth ${currentValue.toFixed(2)}m → sDA: ${iterationResult.sDA.toFixed(1)}%, ASE: ${iterationResult.ASE.toFixed(1)}%</p>`;
+            progressMessage += `<p>✅ Step ${i + 1}: Depth ${currentValue.toFixed(2)}m → sDA: ${iterationResult.sDA.toFixed(1)}%, ASE: ${iterationResult.ASE === null ? 'n/a' : iterationResult.ASE.toFixed(1) + '%'}</p>`;
             statusMessageElement.querySelector('.message-bubble').innerHTML = progressMessage;
 
         } catch (error) {
@@ -4165,7 +4174,7 @@ async function _performGenerativeDesign(args) {
     let summary = `✅ **Generative Design Complete!**\n\nFound ${validOptions.length} valid options that met your constraint (${constraints}).\n\n**🏆 Best Result:**\n`;
     summary += `* **${variable}:** ${bestOption.variableValue.toFixed(2)}m\n`;
     summary += `* **sDA:** ${bestOption.sDA.toFixed(1)}%\n`;
-    summary += `* **ASE:** ${bestOption.ASE.toFixed(1)}%\n\n`;
+    summary += `* **ASE:** ${bestOption.ASE === null ? 'not available (no direct-only illuminance loaded)' : bestOption.ASE.toFixed(1) + '%'}\n\n`;
     summary += `This option provides the best performance for your goal ("${goal}").`;
 
     // Clean up the progress message by replacing it with the final summary.
@@ -4459,6 +4468,9 @@ async function _parseSimulationResult(optimizationGoal, targetConstraint) {
             await resultsManager.loadAndProcessFile(aseFile, 'a');
             await resultsManager.loadAndProcessFile(sdaFile, 'a');
             const metrics = resultsManager.calculateAnnualMetrics('a', {});
+            if (metrics.ASE === null) {
+                throw new Error("ASE cannot be computed: no direct-only illuminance dataset is loaded. LM-83 defines ASE on direct sunlight alone.");
+            }
             metricValue = metrics.ASE;
             unit = '%';
 

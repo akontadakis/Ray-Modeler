@@ -139,7 +139,7 @@ let selectedDesignParams = null; // Store params of the clicked-on result
 
 
 // --- Configuration maps ---
-const RECIPE_METRICS = {
+export const RECIPE_METRICS = {
     'sda-ase': [
         { id: 'maximize_sDA', name: 'Maximize sDA', file: '_sDA_final.ill' },
         { id: 'minimize_ASE', name: 'Minimize ASE', file: '_ASE_direct_only.ill' }
@@ -170,7 +170,7 @@ const RECIPE_METRICS = {
 // Recipes whose result files _parseSimulationResult can currently parse. Other
 // recipes in RECIPE_METRICS (imageless-glare, spectral-lark, en17037) have no
 // parser and are therefore hidden from the optimization recipe dropdowns.
-const OPTIMIZER_SUPPORTED_RECIPES = ['sda-ase', 'illuminance', 'dgp'];
+export const OPTIMIZER_SUPPORTED_RECIPES = ['sda-ase', 'illuminance', 'dgp'];
 
 // Master list of all optimizable parameters for each shading type
 const SHADING_PARAMETERS = {
@@ -1160,6 +1160,9 @@ async function calculateFitness(settings) {
         if (settings.goalId.includes('sDA')) {
             value = annualMetrics.sDA;
         } else {
+            if (annualMetrics.ASE === null) {
+                throw new Error("Cannot optimise against ASE: no direct-only illuminance dataset is available. LM-83 defines ASE on direct sunlight alone.");
+            }
             value = annualMetrics.ASE;
         }
         unit = '%';
@@ -1380,6 +1383,9 @@ async function _parseSimulationResult(settings, uniqueId) {
         try {
             if (recipe === 'sda-ase') {
                 const m = await getSdaMetrics(filePath);
+                if (metricKey !== 'sda' && m.ASE === null) {
+                    throw new Error("ASE unavailable for this run: no direct-only illuminance was produced.");
+                }
                 metrics[metricKey] = (metricKey === 'sda') ? m.sDA : m.ASE;
             } else if (recipe === 'illuminance') {
                 const stats = await getIllumStats(filePath);

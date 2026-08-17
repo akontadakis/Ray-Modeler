@@ -301,6 +301,33 @@ function updateLuminanceProbe(e) {
  * @param {THREE.DataTexture} texture - The HDR texture to display.
  * @param {object|null} [glareResult=null] - Optional parsed glare result from evalglare.
  */
+/**
+ * Sets the HDR viewer exposure by driving the existing exposure control, so the
+ * slider, its readout and the shader uniform stay in sync. Imported by the
+ * configureHdrViewer agent tool, which previously destructured a name this
+ * module never exported and threw "setHdrExposure is not a function".
+ * @param {number} value - Exposure in stops.
+ */
+export function setHdrExposure(value) {
+    const el = domElements['hdr-exposure'];
+    if (!el) throw new Error('HDR viewer is not open, so exposure cannot be set.');
+    el.value = value;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+/**
+ * Turns the false-colour overlay on or off through its existing toggle.
+ * @param {boolean} enabled
+ */
+export function toggleHdrFalseColor(enabled) {
+    const el = domElements['hdr-false-color-toggle'];
+    if (!el) throw new Error('HDR viewer is not open, so false colour cannot be toggled.');
+    if (el.checked !== !!enabled) {
+        el.checked = !!enabled;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+}
+
 export function openHdrViewer(texture, glareResult = null) {
     if (!texture) {
         console.error("HDR Viewer: No texture provided.");

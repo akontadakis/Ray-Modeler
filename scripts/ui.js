@@ -391,6 +391,34 @@ export function getNewZIndex() {
  * @param {string} wallDir - The wall direction ('n', 's', 'e', 'w').
  * @param {object} state - An object with { enabled: boolean, type: string }.
  */
+/**
+ * Records a generative shading pattern and its parameters on the project, in the
+ * shape getAllShadingParams() reads back. The generative design flow imported this
+ * from here while it was never exported, so the call threw before any parameters
+ * were stored.
+ * @param {string} dir - Wall direction key, lower case.
+ * @param {string} patternType - e.g. 'voronoi'.
+ * @param {object} parameters - Pattern parameters.
+ */
+export function storeGenerativeParams(dir, patternType, parameters) {
+    if (!project.generativeShadingParams) project.generativeShadingParams = {};
+    const existing = project.generativeShadingParams[dir] || {};
+    project.generativeShadingParams[dir] = {
+        ...existing,
+        patternType,
+        parameters: parameters || {}
+    };
+}
+
+/**
+ * Mirrors generative parameters onto their UI controls. The current interface has
+ * no generative sliders, so there is nothing to mirror and the stored parameters
+ * set by storeGenerativeParams remain the single source of truth. Kept as an
+ * explicit no-op because the generative design flow calls it; if sliders are added
+ * later, wire them here.
+ */
+export function setGenerativeSliderValues(dir, designParams) { /* no generative controls in the current UI */ }
+
 export function setShadingState(wallDir, state) {
     const dom = getDom();
 

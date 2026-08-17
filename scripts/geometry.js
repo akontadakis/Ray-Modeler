@@ -2,6 +2,9 @@
 
 import * as THREE from 'three';
 import { renderer, horizontalClipPlane, verticalClipPlane, sensorTransformControls, importedModelObject } from './scene.js';
+// geometryOptimizer.js imports importedModelObject from this module; it is owned
+// by scene.js, so re-export it rather than leaving that import resolving to undefined.
+export { importedModelObject };
 import { getAllWindowParams, getAllShadingParams, validateInputs, getWindowParamsForWall, getSensorGridParams, scheduleUpdate } from './ui.js';
 import { getDom } from './dom.js';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';

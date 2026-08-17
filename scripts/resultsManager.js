@@ -664,7 +664,11 @@ class ResultsManager {
         }
 
         const sDA = (sdaPoints / numPoints) * 100;
-        const ASE = (asePoints / numPoints) * 100;
+        // ASE is only meaningful when a direct-only dataset was loaded. Returning 0
+        // here would read as a pass (LM-83 allows ASE <= 10%) on a space that was
+        // never assessed, so an unavailable ASE is reported as null, not as zero.
+        const aseAvailable = !!(dataset.annualDirectData && dataset.annualDirectData.length > 0);
+        const ASE = aseAvailable ? (asePoints / numPoints) * 100 : null;
 
         const avgUdi = allUdiPercentages.reduce((acc, curr) => {
             acc.insufficient += curr.insufficient;
@@ -677,7 +681,7 @@ class ResultsManager {
         avgUdi.autonomous /= numPoints;
         avgUdi.exceeded /= numPoints;
 
-        return { sDA, ASE, UDI: avgUdi };
+        return { sDA, ASE, aseAvailable, UDI: avgUdi };
     }
 
     /**
