@@ -6,54 +6,60 @@ import { project } from './project.js';
 import * as THREE from 'three';
 import { shadingObject } from './geometry.js';
 
-// Klems Full Basis outgoing angles (center points) for plotting
+// Klems Full Basis outgoing angles (patch centres), 145 bins.
+// Polar bands and azimuth counts taken from Radiance's klems_full.cal:
+//   kpola = 5 15 25 35 45 55 65 75 90, knaz = 1 8 16 20 24 24 24 16 12 (Nkbins = 145).
+// theta is the band centre, phi the bin centre (bin j is centred on j * 360 / knaz).
 const KLEMS_ANGLES = [
-    { theta: 5, phi: 0, patch: 1 }, { theta: 15, phi: 0, patch: 8 }, { theta: 15, phi: 45, patch: 8 },
-    { theta: 15, phi: 90, patch: 8 }, { theta: 15, phi: 135, patch: 8 }, { theta: 15, phi: 180, patch: 8 },
-    { theta: 15, phi: 225, patch: 8 }, { theta: 15, phi: 270, patch: 8 }, { theta: 15, phi: 315, patch: 8 },
-    { theta: 25, phi: 0, patch: 16 }, { theta: 25, phi: 22.5, patch: 16 }, { theta: 25, phi: 45, patch: 16 },
-    { theta: 25, phi: 67.5, patch: 16 }, { theta: 25, phi: 90, patch: 16 }, { theta: 25, phi: 112.5, patch: 16 },
-    { theta: 25, phi: 135, patch: 16 }, { theta: 25, phi: 157.5, patch: 16 }, { theta: 25, phi: 180, patch: 16 },
-    { theta: 25, phi: 202.5, patch: 16 }, { theta: 25, phi: 225, patch: 16 }, { theta: 25, phi: 247.5, patch: 16 },
-    { theta: 25, phi: 270, patch: 16 }, { theta: 25, phi: 292.5, patch: 16 }, { theta: 25, phi: 315, patch: 16 },
-    { theta: 25, phi: 337.5, patch: 16 }, { theta: 35, phi: 0, patch: 24 }, { theta: 35, phi: 15, patch: 24 },
-    { theta: 35, phi: 30, patch: 24 }, { theta: 35, phi: 45, patch: 24 }, { theta: 35, phi: 60, patch: 24 },
-    { theta: 35, phi: 75, patch: 24 }, { theta: 35, phi: 90, patch: 24 }, { theta: 35, phi: 105, patch: 24 },
-    { theta: 35, phi: 120, patch: 24 }, { theta: 35, phi: 135, patch: 24 }, { theta: 35, phi: 150, patch: 24 },
-    { theta: 35, phi: 165, patch: 24 }, { theta: 35, phi: 180, patch: 24 }, { theta: 35, phi: 195, patch: 24 },
-    { theta: 35, phi: 210, patch: 24 }, { theta: 35, phi: 225, patch: 24 }, { theta: 35, phi: 240, patch: 24 },
-    { theta: 35, phi: 255, patch: 24 }, { theta: 35, phi: 270, patch: 24 }, { theta: 35, phi: 285, patch: 24 },
-    { theta: 35, phi: 300, patch: 24 }, { theta: 35, phi: 315, patch: 24 }, { theta: 35, phi: 330, patch: 24 },
-    { theta: 35, phi: 345, patch: 24 }, { theta: 45, phi: 0, patch: 24 }, { theta: 45, phi: 15, patch: 24 },
-    { theta: 45, phi: 30, patch: 24 }, { theta: 45, phi: 45, patch: 24 }, { theta: 45, phi: 60, patch: 24 },
-    { theta: 45, phi: 75, patch: 24 }, { theta: 45, phi: 90, patch: 24 }, { theta: 45, phi: 105, patch: 24 },
-    { theta: 45, phi: 120, patch: 24 }, { theta: 45, phi: 135, patch: 24 }, { theta: 45, phi: 150, patch: 24 },
-    { theta: 45, phi: 165, patch: 24 }, { theta: 45, phi: 180, patch: 24 }, { theta: 45, phi: 195, patch: 24 },
-    { theta: 45, phi: 210, patch: 24 }, { theta: 45, phi: 225, patch: 24 }, { theta: 45, phi: 240, patch: 24 },
-    { theta: 45, phi: 255, patch: 24 }, { theta: 45, phi: 270, patch: 24 }, { theta: 45, phi: 285, patch: 24 },
-    { theta: 45, phi: 300, patch: 24 }, { theta: 45, phi: 315, patch: 24 }, { theta: 45, phi: 330, patch: 24 },
-    { theta: 45, phi: 345, patch: 24 }, { theta: 55, phi: 0, patch: 24 }, { theta: 55, phi: 15, patch: 24 },
-    { theta: 55, phi: 30, patch: 24 }, { theta: 55, phi: 45, patch: 24 }, { theta: 55, phi: 60, patch: 24 },
-    { theta: 55, phi: 75, patch: 24 }, { theta: 55, phi: 90, patch: 24 }, { theta: 55, phi: 105, patch: 24 },
-    { theta: 55, phi: 120, patch: 24 }, { theta: 55, phi: 135, patch: 24 }, { theta: 55, phi: 150, patch: 24 },
-    { theta: 55, phi: 165, patch: 24 }, { theta: 55, phi: 180, patch: 24 }, { theta: 55, phi: 195, patch: 24 },
-    { theta: 55, phi: 210, patch: 24 }, { theta: 55, phi: 225, patch: 24 }, { theta: 55, phi: 240, patch: 24 },
-    { theta: 55, phi: 255, patch: 24 }, { theta: 55, phi: 270, patch: 24 }, { theta: 55, phi: 285, patch: 24 },
-    { theta: 55, phi: 300, patch: 24 }, { theta: 55, phi: 315, patch: 24 }, { theta: 55, phi: 330, patch: 24 },
-    { theta: 55, phi: 345, patch: 24 }, { theta: 65, phi: 0, patch: 20 }, { theta: 65, phi: 18, patch: 20 },
-    { theta: 65, phi: 36, patch: 20 }, { theta: 65, phi: 54, patch: 20 }, { theta: 65, phi: 72, patch: 20 },
-    { theta: 65, phi: 90, patch: 20 }, { theta: 65, phi: 108, patch: 20 }, { theta: 65, phi: 126, patch: 20 },
-    { theta: 65, phi: 144, patch: 20 }, { theta: 65, phi: 162, patch: 20 }, { theta: 65, phi: 180, patch: 20 },
-    { theta: 65, phi: 198, patch: 20 }, { theta: 65, phi: 216, patch: 20 }, { theta: 65, phi: 234, patch: 20 },
-    { theta: 65, phi: 252, patch: 20 }, { theta: 65, phi: 270, patch: 20 }, { theta: 65, phi: 288, patch: 20 },
-    { theta: 65, phi: 306, patch: 20 }, { theta: 65, phi: 324, patch: 20 }, { theta: 65, phi: 342, patch: 20 },
-    { theta: 75, phi: 0, patch: 12 }, { theta: 75, phi: 30, patch: 12 }, { theta: 75, phi: 60, patch: 12 },
-    { theta: 75, phi: 90, patch: 12 }, { theta: 75, phi: 120, patch: 12 }, { theta: 75, phi: 150, patch: 12 },
-    { theta: 75, phi: 180, patch: 12 }, { theta: 75, phi: 210, patch: 12 }, { theta: 75, phi: 240, patch: 12 },
-    { theta: 75, phi: 270, patch: 12 }, { theta: 75, phi: 300, patch: 12 }, { theta: 75, phi: 330, patch: 12 },
-    { theta: 85, phi: 0, patch: 6 }, { theta: 85, phi: 60, patch: 6 }, { theta: 85, phi: 120, patch: 6 },
-    { theta: 85, phi: 180, patch: 6 }, { theta: 85, phi: 240, patch: 6 }, { theta: 85, phi: 300, patch: 6 },
-    { theta: 90, phi: 0, patch: 1 }
+    { theta: 0, phi: 0, patch: 1 }, { theta: 10, phi: 0, patch: 8 }, { theta: 10, phi: 45, patch: 8 },
+    { theta: 10, phi: 90, patch: 8 }, { theta: 10, phi: 135, patch: 8 }, { theta: 10, phi: 180, patch: 8 },
+    { theta: 10, phi: 225, patch: 8 }, { theta: 10, phi: 270, patch: 8 }, { theta: 10, phi: 315, patch: 8 },
+    { theta: 20, phi: 0, patch: 16 }, { theta: 20, phi: 22.5, patch: 16 }, { theta: 20, phi: 45, patch: 16 },
+    { theta: 20, phi: 67.5, patch: 16 }, { theta: 20, phi: 90, patch: 16 }, { theta: 20, phi: 112.5, patch: 16 },
+    { theta: 20, phi: 135, patch: 16 }, { theta: 20, phi: 157.5, patch: 16 }, { theta: 20, phi: 180, patch: 16 },
+    { theta: 20, phi: 202.5, patch: 16 }, { theta: 20, phi: 225, patch: 16 }, { theta: 20, phi: 247.5, patch: 16 },
+    { theta: 20, phi: 270, patch: 16 }, { theta: 20, phi: 292.5, patch: 16 }, { theta: 20, phi: 315, patch: 16 },
+    { theta: 20, phi: 337.5, patch: 16 }, { theta: 30, phi: 0, patch: 20 }, { theta: 30, phi: 18, patch: 20 },
+    { theta: 30, phi: 36, patch: 20 }, { theta: 30, phi: 54, patch: 20 }, { theta: 30, phi: 72, patch: 20 },
+    { theta: 30, phi: 90, patch: 20 }, { theta: 30, phi: 108, patch: 20 }, { theta: 30, phi: 126, patch: 20 },
+    { theta: 30, phi: 144, patch: 20 }, { theta: 30, phi: 162, patch: 20 }, { theta: 30, phi: 180, patch: 20 },
+    { theta: 30, phi: 198, patch: 20 }, { theta: 30, phi: 216, patch: 20 }, { theta: 30, phi: 234, patch: 20 },
+    { theta: 30, phi: 252, patch: 20 }, { theta: 30, phi: 270, patch: 20 }, { theta: 30, phi: 288, patch: 20 },
+    { theta: 30, phi: 306, patch: 20 }, { theta: 30, phi: 324, patch: 20 }, { theta: 30, phi: 342, patch: 20 },
+    { theta: 40, phi: 0, patch: 24 }, { theta: 40, phi: 15, patch: 24 }, { theta: 40, phi: 30, patch: 24 },
+    { theta: 40, phi: 45, patch: 24 }, { theta: 40, phi: 60, patch: 24 }, { theta: 40, phi: 75, patch: 24 },
+    { theta: 40, phi: 90, patch: 24 }, { theta: 40, phi: 105, patch: 24 }, { theta: 40, phi: 120, patch: 24 },
+    { theta: 40, phi: 135, patch: 24 }, { theta: 40, phi: 150, patch: 24 }, { theta: 40, phi: 165, patch: 24 },
+    { theta: 40, phi: 180, patch: 24 }, { theta: 40, phi: 195, patch: 24 }, { theta: 40, phi: 210, patch: 24 },
+    { theta: 40, phi: 225, patch: 24 }, { theta: 40, phi: 240, patch: 24 }, { theta: 40, phi: 255, patch: 24 },
+    { theta: 40, phi: 270, patch: 24 }, { theta: 40, phi: 285, patch: 24 }, { theta: 40, phi: 300, patch: 24 },
+    { theta: 40, phi: 315, patch: 24 }, { theta: 40, phi: 330, patch: 24 }, { theta: 40, phi: 345, patch: 24 },
+    { theta: 50, phi: 0, patch: 24 }, { theta: 50, phi: 15, patch: 24 }, { theta: 50, phi: 30, patch: 24 },
+    { theta: 50, phi: 45, patch: 24 }, { theta: 50, phi: 60, patch: 24 }, { theta: 50, phi: 75, patch: 24 },
+    { theta: 50, phi: 90, patch: 24 }, { theta: 50, phi: 105, patch: 24 }, { theta: 50, phi: 120, patch: 24 },
+    { theta: 50, phi: 135, patch: 24 }, { theta: 50, phi: 150, patch: 24 }, { theta: 50, phi: 165, patch: 24 },
+    { theta: 50, phi: 180, patch: 24 }, { theta: 50, phi: 195, patch: 24 }, { theta: 50, phi: 210, patch: 24 },
+    { theta: 50, phi: 225, patch: 24 }, { theta: 50, phi: 240, patch: 24 }, { theta: 50, phi: 255, patch: 24 },
+    { theta: 50, phi: 270, patch: 24 }, { theta: 50, phi: 285, patch: 24 }, { theta: 50, phi: 300, patch: 24 },
+    { theta: 50, phi: 315, patch: 24 }, { theta: 50, phi: 330, patch: 24 }, { theta: 50, phi: 345, patch: 24 },
+    { theta: 60, phi: 0, patch: 24 }, { theta: 60, phi: 15, patch: 24 }, { theta: 60, phi: 30, patch: 24 },
+    { theta: 60, phi: 45, patch: 24 }, { theta: 60, phi: 60, patch: 24 }, { theta: 60, phi: 75, patch: 24 },
+    { theta: 60, phi: 90, patch: 24 }, { theta: 60, phi: 105, patch: 24 }, { theta: 60, phi: 120, patch: 24 },
+    { theta: 60, phi: 135, patch: 24 }, { theta: 60, phi: 150, patch: 24 }, { theta: 60, phi: 165, patch: 24 },
+    { theta: 60, phi: 180, patch: 24 }, { theta: 60, phi: 195, patch: 24 }, { theta: 60, phi: 210, patch: 24 },
+    { theta: 60, phi: 225, patch: 24 }, { theta: 60, phi: 240, patch: 24 }, { theta: 60, phi: 255, patch: 24 },
+    { theta: 60, phi: 270, patch: 24 }, { theta: 60, phi: 285, patch: 24 }, { theta: 60, phi: 300, patch: 24 },
+    { theta: 60, phi: 315, patch: 24 }, { theta: 60, phi: 330, patch: 24 }, { theta: 60, phi: 345, patch: 24 },
+    { theta: 70, phi: 0, patch: 16 }, { theta: 70, phi: 22.5, patch: 16 }, { theta: 70, phi: 45, patch: 16 },
+    { theta: 70, phi: 67.5, patch: 16 }, { theta: 70, phi: 90, patch: 16 }, { theta: 70, phi: 112.5, patch: 16 },
+    { theta: 70, phi: 135, patch: 16 }, { theta: 70, phi: 157.5, patch: 16 }, { theta: 70, phi: 180, patch: 16 },
+    { theta: 70, phi: 202.5, patch: 16 }, { theta: 70, phi: 225, patch: 16 }, { theta: 70, phi: 247.5, patch: 16 },
+    { theta: 70, phi: 270, patch: 16 }, { theta: 70, phi: 292.5, patch: 16 }, { theta: 70, phi: 315, patch: 16 },
+    { theta: 70, phi: 337.5, patch: 16 }, { theta: 82.5, phi: 0, patch: 12 }, { theta: 82.5, phi: 30, patch: 12 },
+    { theta: 82.5, phi: 60, patch: 12 }, { theta: 82.5, phi: 90, patch: 12 }, { theta: 82.5, phi: 120, patch: 12 },
+    { theta: 82.5, phi: 150, patch: 12 }, { theta: 82.5, phi: 180, patch: 12 }, { theta: 82.5, phi: 210, patch: 12 },
+    { theta: 82.5, phi: 240, patch: 12 }, { theta: 82.5, phi: 270, patch: 12 }, { theta: 82.5, phi: 300, patch: 12 },
+    { theta: 82.5, phi: 330, patch: 12 }
 ];
 
 const SPECTRAL_BINS = {
@@ -146,7 +152,9 @@ export function _parseBsdfXml(xmlContent) {
         const dataString = dataNode.textContent;
         const values = dataString.trim().split(/\s+/).map(parseFloat);
 
-        if (values.length >= KLEMS_ANGLES.length) {
+        if (values.length !== KLEMS_ANGLES.length) {
+            console.warn(`[Radiance] Klems block has ${values.length} values, expected ${KLEMS_ANGLES.length} (full Klems basis). Skipping this incident angle.`);
+        } else {
             const transmittanceData = values.map((value, i) => ({
                 ...KLEMS_ANGLES[i],
                 value
@@ -177,15 +185,20 @@ export function _parseBsdfXml(xmlContent) {
  */
 
 function transmittanceToTransmissivity(Tn) {
-    // Correct implementation based on Stokes' equations for a single pane of glass (n=1.52)
-    // This formula is a simplified approximation and assumes Rn (reflectance) is ~0.08
+    // Radiance's `glass` primitive takes TRANSMISSIVITY, not transmittance. This is the
+    // standard conversion from the Radiance reference manual for n = 1.52.
+    //
+    // The previous implementation used a hand-derived "Stokes" expression that was wrong by
+    // roughly 11x: Tn 0.7 came out as 0.0659 instead of 0.7628, so every window was modelled
+    // as nearly opaque and daylight factors came back around 0.03% instead of a few percent.
+    // Reference check: clear single glazing Tn 0.88 must give tn ~ 0.96; this gives 0.958,
+    // the old one gave 0.083.
     if (Tn <= 0) return 0;
-    const Rn = 0.08;
-    const term1 = Math.sqrt((1 - Rn) ** 4 + 4 * (Rn ** 2) * (Tn ** 2));
-    const term2 = (1 - Rn) ** 2;
-    const tn = (term1 - term2) / (2 * Rn * Tn);
-    // Clamp the result to a physically plausible range [0, 1]
-    return Math.max(0, Math.min(1, tn));
+    const tn = (Math.sqrt(0.8402528435 + 0.0072522239 * Tn * Tn) - 0.9166530661)
+             / (0.0036261119 * Tn);
+    // Transmissivity legitimately exceeds transmittance and can pass 1.0 for very clear
+    // glazing, so only guard against negatives here.
+    return Math.max(0, tn);
 }
 
 function generateRadBox(topVerts, thickness, material, name, transformFunc) {
@@ -221,8 +234,37 @@ function generateRadBox(topVerts, thickness, material, name, transformFunc) {
 }
 
 /**
+ * Generates an array of centered point coordinates along a single axis.
+ * This is the single canonical implementation; the viewer (geometry.js) imports it so the
+ * preview grid and the exported grid can never diverge.
+ * @param {number} totalLength The total length of the surface.
+ * @param {number} spacing The distance between points.
+ * @returns {number[]} An array of coordinate values (empty when no point fits).
+ */
+export function generateCenteredPoints(totalLength, spacing) {
+    if (spacing <= 0 || totalLength <= 0) return [];
+
+    const numPoints = Math.floor(totalLength / spacing);
+    if (numPoints === 0) return [];
+
+    // If there's only one point, it should be in the center.
+    if (numPoints === 1) {
+        return [totalLength / 2];
+    }
+
+    const totalGridLength = (numPoints - 1) * spacing;
+    const start = (totalLength - totalGridLength) / 2;
+
+    return Array.from({ length: numPoints }, (_, i) => start + i * spacing);
+}
+
+/**
  * Transforms a point from local room coordinates to Radiance world coordinates.
  * This includes centering the room at the origin and rotating it.
+ * The room's depth axis is negated so that the app's North (depth = 0) maps to
+ * Radiance +Y (North). Composed with the local [width, depth, height] relabelling of the
+ * Three.js frame, this is the shared map (x, y, z)_three -> (x, -z, y)_radiance, whose
+ * determinant is +1, so handedness is preserved (no mirrored scene).
  * @param {Array<number>} localPoint - [x, y, z] in local room coords (width, depth, height).
  * @param {number} W - Room width.
  * @param {number} L - Room length.
@@ -233,7 +275,7 @@ function generateRadBox(topVerts, thickness, material, name, transformFunc) {
 function transformAndFormatPoint(localPoint, W, L, cosA, sinA) {
     const p = { x: localPoint[0], y: localPoint[1], z: localPoint[2] };
     const centered_x = p.x - W / 2;
-    const centered_y = p.y - L / 2; // Y is depth
+    const centered_y = L / 2 - p.y; // Depth -> Radiance +Y is North (depth 0 = North wall)
     const rx = centered_x * cosA - centered_y * sinA;
     const ry = centered_x * sinA + centered_y * cosA;
     return `${rx.toFixed(4)} ${ry.toFixed(4)} ${p.z.toFixed(4)}`; // Z is height
@@ -241,6 +283,8 @@ function transformAndFormatPoint(localPoint, W, L, cosA, sinA) {
 
 /**
  * Transforms a point from Three.js scene coordinates (Y-up) to a Radiance world coordinate array (Z-up).
+ * Map: (x, y, z)_three -> (x, -z, y)_radiance. Determinant +1, so handedness and polygon
+ * winding are preserved. The app's North is Three.js -Z (depth = 0), which lands on Radiance +Y.
  * @param {Array<number>} threePoint - An array representing the point in Three.js coordinates [X_width, Y_height, Z_depth].
  * @param {number} W - Room width.
  * @param {number} L - Room length.
@@ -251,9 +295,10 @@ function transformAndFormatPoint(localPoint, W, L, cosA, sinA) {
 export function transformThreePointToRadianceArray(threePoint, W, L, cosA, sinA) {
     const [threeX_width, threeY_height, threeZ_depth] = threePoint;
 
-    // Center the point on Radiance's XY (ground) plane for rotation
+    // Center the point on Radiance's XY (ground) plane for rotation.
+    // Depth is negated: Three.js -Z (North) -> Radiance +Y (North).
     const centered_x = threeX_width - W / 2;
-    const centered_y = threeZ_depth - L / 2; // Use Three.js Z (depth) for Radiance Y
+    const centered_y = L / 2 - threeZ_depth; // Use negated Three.js Z (depth) for Radiance Y
 
     // Rotate around the Z-axis (up axis in Radiance)
     const rx = centered_x * cosA - centered_y * sinA;
@@ -265,6 +310,8 @@ export function transformThreePointToRadianceArray(threePoint, W, L, cosA, sinA)
 
 /**
  * Transforms a vector from Three.js scene coordinates (Y-up) to a Radiance world vector array (Z-up).
+ * Uses the same map as transformThreePointToRadianceArray: (x, y, z)_three -> (x, -z, y)_radiance,
+ * so vectors and points stay consistent (determinant +1).
  * @param {Array<number>} threeVector - An array representing the vector in Three.js coordinates [x, y, z].
  * @param {number} cosA - Cosine of the room orientation angle.
  * @param {number} sinA - Sine of the room orientation angle.
@@ -273,9 +320,9 @@ export function transformThreePointToRadianceArray(threePoint, W, L, cosA, sinA)
 export function transformThreeVectorToRadianceArray(threeVector, cosA, sinA) {
     const [threeX, threeY, threeZ] = threeVector;
 
-    // Map Three.js vector components [x, y_height, z_depth] to Radiance's [x, y_depth, z_height]
+    // Map Three.js vector components [x, y_height, z_depth] to Radiance's [x, -z_depth, y_height]
     const rad_x = threeX;
-    const rad_y_depth = threeZ;
+    const rad_y_depth = -threeZ;
     const rad_z_height = threeY;
 
     // Rotate the vector components on the XY (ground) plane
@@ -283,6 +330,20 @@ export function transformThreeVectorToRadianceArray(threeVector, cosA, sinA) {
     const rotatedY = rad_x * sinA + rad_y_depth * cosA;
 
     return [rotatedX, rotatedY, rad_z_height];
+}
+
+/**
+ * Builds a formatter for points that are ALREADY in Three.js WORLD coordinates, i.e. the
+ * viewer has already applied the room centering and the orientation rotation. Only the axis
+ * map (x, y, z)_three -> (x, -z, y)_radiance is applied here (determinant +1), never a second
+ * centering or rotation.
+ * @param {number} [elevationOffset=0] - Room elevation to remove. The Radiance model always
+ *   places the room floor at z = 0, while the viewer raises the elevated groups (room, shading,
+ *   furniture, vegetation) by this amount.
+ * @returns {function(Array<number>): string} A formatter returning "x y z" for Radiance.
+ */
+function makeWorldPointFormatter(elevationOffset = 0) {
+    return (p) => `${p[0].toFixed(4)} ${(-p[2]).toFixed(4)} ${(p[1] - elevationOffset).toFixed(4)}`;
 }
 
 /**
@@ -328,6 +389,20 @@ function resolveHfov(viewType, vfov) {
 }
 
 /**
+ * Picks a Radiance up-vector for a view direction. Radiance rejects a view whose up vector
+ * is parallel to its view direction, which is exactly what the usual (0 0 1) is for a
+ * straight-down or straight-up view; those fall back to +Y (north).
+ * @param {Array<number>} radDir - The view direction in Radiance coordinates.
+ * @returns {Array<number>} The up vector in Radiance coordinates.
+ */
+function resolveRadianceUpVector(radDir) {
+    const [dx, dy, dz] = radDir;
+    const len = Math.hypot(dx, dy, dz);
+    if (len > 0 && Math.abs(dz / len) > 0.999) return [0, 1, 0];
+    return [0, 0, 1];
+}
+
+/**
  * @param {object} viewpointData - The viewpoint data object from the project.
  * @param {object} roomData - The room geometry data object.
  * @returns {string} The content for the .vf file.
@@ -355,7 +430,9 @@ export function generateViewpointFileContent(viewpointData, roomData) {
     const vfov = (viewType === 'h' || viewType === 'a') ? 180 : fov;
     const hfov = resolveHfov(viewType, vfov);
 
-    return `${radViewType} -vp ${rad_vp} -vd ${rad_vd} -vu 0 0 1 -vh ${hfov} -vv ${vfov}`;
+    const rad_vu = resolveRadianceUpVector(rad_vd_array).join(' ');
+
+    return `${radViewType} -vp ${rad_vp} -vd ${rad_vd} -vu ${rad_vu} -vh ${hfov} -vv ${vfov}`;
 }
 
 /**
@@ -428,7 +505,7 @@ export async function generateRadFileContent(options = {}) {
 
     // --- Headers and Setup ---
     let geoHeader = `# Radiance scene geometry generated on ${new Date().toISOString()}\n`;
-    geoHeader += `# Room Orientation: ${dom['room-orientation'].value} degrees from North (Radiance -Y)\n`;
+    geoHeader += `# Room Orientation: ${dom['room-orientation'].value} degrees from North (Radiance +Y)\n`;
     geoHeader += `# Coordinate System: Right-Handed, Z-up\n`;
 
     let matHeader = `# Radiance material definitions generated on ${new Date().toISOString()}\n\n`;
@@ -525,7 +602,7 @@ export async function generateRadFileContent(options = {}) {
         };
 
         // Transform from Three.js Y-up to Radiance Z-up
-        const threeToRadTransform = (p) => `${p[0].toFixed(4)} ${p[2].toFixed(4)} ${p[1].toFixed(4)}`;
+        const threeToRadTransform = makeWorldPointFormatter();
 
         options.geometry.optimizedGeometry.traverse(child => {
             if (child.isMesh) {
@@ -574,7 +651,7 @@ export async function generateRadFileContent(options = {}) {
             'VEGETATION_TRUNK': 'furniture_mat',
         };
         // Transform from Three.js Y-up to Radiance Z-up
-        const threeToRadTransform = (p) => `${p[0].toFixed(4)} ${p[2].toFixed(4)} ${p[1].toFixed(4)}`;
+        const threeToRadTransform = makeWorldPointFormatter();
 
         currentImportedModel.traverse(child => {
             if (child.isMesh) {
@@ -611,6 +688,12 @@ export async function generateRadFileContent(options = {}) {
     const cosA = Math.cos(alphaRad);
     const sinA = Math.sin(alphaRad);
     const transformAndFormat = (p) => transformAndFormatPoint(p, W, L, cosA, sinA);
+    // Objects taken straight out of the scene are already in Three.js world coordinates
+    // (centered and rotated by the viewer), so they must NOT go through transformAndFormat,
+    // which expects LOCAL [width, depth, height] coordinates. The viewer also raises those
+    // groups by the room elevation, which the Radiance model does not use.
+    const elevation = parseFloat(dom.elevation?.value) || 0;
+    const worldTransform = makeWorldPointFormatter(elevation);
     const surfaceThickness = parseFloat(dom['surface-thickness']?.value) || 0.2;
 
     // --- Floor ---
@@ -618,7 +701,11 @@ export async function generateRadFileContent(options = {}) {
     radGeometry += generateRadBox(floorTopVerts, surfaceThickness, 'floor_mat', 'floor', transformAndFormat);
 
     // --- Ceiling ---
-    const ceilTopVerts = [[0, 0, H], [W, 0, H], [W, L, H], [0, L, H]];
+    // generateRadBox extrudes DOWNWARDS from the given face, so the top face is placed at
+    // H + thickness to make the slab occupy [H, H + thickness]. This keeps the interior
+    // ceiling plane exactly at H (matching the walls and the viewer, which also puts the
+    // ceiling slab above H) and leaves the ceiling sensors at H + offset clear of the slab.
+    const ceilTopVerts = [[0, 0, H + surfaceThickness], [W, 0, H + surfaceThickness], [W, L, H + surfaceThickness], [0, L, H + surfaceThickness]];
     radGeometry += generateRadBox(ceilTopVerts, surfaceThickness, 'ceiling_mat', 'ceiling', transformAndFormat);
 
     function quadVerts(orientation, u0, u1, v0, v1) {
@@ -764,7 +851,7 @@ export async function generateRadFileContent(options = {}) {
         // Traverse the group to find the actual mesh
         objGroup.traverse(child => {
             if (child.isMesh) {
-                shadingGeometry += _generateRadFromMesh(child, 'shading_mat', `imported_obj_${index}`, transformAndFormat);
+                shadingGeometry += _generateRadFromMesh(child, 'shading_mat', `imported_obj_${index}`, worldTransform);
             }
         });
     });
@@ -773,21 +860,26 @@ export async function generateRadFileContent(options = {}) {
     let furnitureGeometry = '\n# --- FURNITURE & PARTITIONS ---\n';
     if (furnitureObject.children.length > 0) {
         const furnitureContainer = furnitureObject.children[0];
-        furnitureContainer.children.forEach((mesh, index) => {
-            furnitureGeometry += _generateRadFromMesh(mesh, 'furniture_mat', `${mesh.userData.assetType}_${index}`, transformAndFormat);
+        furnitureContainer.children.forEach((item, index) => {
+            // Each child is either a single mesh or a group of meshes (imported assets)
+            item.traverse(mesh => {
+                if (!mesh.isMesh) return;
+                furnitureGeometry += _generateRadFromMesh(mesh, 'furniture_mat', `${item.userData.assetType}_${index}`, worldTransform);
+            });
         });
     }
 
     // --- Generate Vegetation Geometry ---
     let vegetationGeometry = '\n# --- VEGETATION & TREES ---\n';
     if (vegetationObject.children.length > 0) {
-        const directTransform = (p) => `${p[0].toFixed(4)} ${p[2].toFixed(4)} ${p[1].toFixed(4)}`;
-        vegetationObject.children.forEach((treeGroup, index) => {
+        const vegetationContainer = vegetationObject.children[0];
+        vegetationContainer.children.forEach((treeGroup, index) => {
             // Each child is a group containing trunk and canopy meshes
-            treeGroup.children.forEach(mesh => {
+            treeGroup.traverse(mesh => {
+                if (!mesh.isMesh) return;
                 const surfaceType = mesh.userData.surfaceType;
                 const radMaterialName = surfaceType === 'VEGETATION_CANOPY' ? 'vegetation_canopy_mat' : 'furniture_mat';
-                vegetationGeometry += _generateRadFromMesh(mesh, radMaterialName, `${treeGroup.userData.assetType}_${index}`, directTransform);
+                vegetationGeometry += _generateRadFromMesh(mesh, radMaterialName, `${treeGroup.userData.assetType}_${index}`, worldTransform);
             });
         });
     }
@@ -953,7 +1045,7 @@ export async function generateRadFileContent(options = {}) {
                                     mesh,
                                     'shading_mat', // Use the standard shading material
                                     `generative_${patternType}_${winId}`,
-                                    transformAndFormat
+                                    worldTransform
                                 );
                             }
                         });
@@ -967,7 +1059,7 @@ export async function generateRadFileContent(options = {}) {
     if (contextObject.visible && contextObject.children.length > 0) {
         contextObject.children.forEach((mesh, index) => {
             // Context geometry is already in world coordinates, so we use a direct transform
-            const directTransform = (p) => `${p[0].toFixed(4)} ${p[2].toFixed(4)} ${p[1].toFixed(4)}`;
+            const directTransform = makeWorldPointFormatter();
             contextGeometry += _generateRadFromMesh(mesh, 'context_mat', `context_building_${index}`, directTransform);
         });
     }
@@ -977,7 +1069,7 @@ export async function generateRadFileContent(options = {}) {
     if (groundObject.visible && groundObject.children.length > 0) {
         groundObject.children.forEach((mesh) => {
             if (mesh.isMesh && mesh.userData.isGround) { // Check for a flag to only export the ground mesh
-                const directTransform = (p) => `${p[0].toFixed(4)} ${p[2].toFixed(4)} ${p[1].toFixed(4)}`;
+                const directTransform = makeWorldPointFormatter();
                 contextGeometry += _generateRadFromMesh(mesh, 'ground_mat', `ground_plane`, directTransform);
             }
         });
@@ -1125,7 +1217,8 @@ export async function generateRayFileContent() {
     const dom = getDom();
     const gridParams = getSensorGridParams();
     if (!gridParams?.view?.enabled) {
-        return "# View grid is not enabled. No rays generated.";
+        // Empty, not a comment: rtrace discards a whole file whose first line is '#'.
+        return "";
     }
 
     const { spacing, offset, numDirs, startVec } = gridParams.view;
@@ -1148,62 +1241,26 @@ export async function generateRayFileContent() {
         const validPoints = generatePolygonGridPoints(polygonPoints, spacing, offset, 0); // View grid usually offset from floor
 
         const alphaRad = THREE.MathUtils.degToRad(parseFloat(dom['room-orientation'].value));
-        const cosA = Math.cos(alphaRad);
-        const sinA = Math.sin(alphaRad);
 
-        // Room dimensions for transform (Coordinate System Origin)
-        // In Custom Mode, W and L might be arbitrary or bounding box.
-        // transformThreePointToRadianceArray centers based on W/L.
-        // We must be consistent with how geometry is exported.
-        // In radiance.js -> generateRadFileContent -> it uses W, L from DOM even for custom geometry?
-        // No, generateRadFileContent for 'optimizedGeometry' or 'imported' uses direct transform or centers?
-        // Let's check generateRadFileContent behavior for Optimized/Custom.
-        // It seems for Optimized, it calls THREE transform?
-        // Optimized geometry traversal:
-        // `threeToRadTransform` = p => p[0], p[2], p[1] (Y-up to Z-up reordering only).
-        // It DOES NOT apply room rotation or centering if it's "Optimized Geometry"?
-        // Wait, the "Optimized Geometry" block (lines 483-484) defines:
-        // `const threeToRadTransform = (p) => `${p[0].toFixed(4)} ${p[2].toFixed(4)} ${p[1].toFixed(4)}`;`
-        // It implies Optimized Geometry is ALREADY transformed or we trust its World Coords?
-        // Actually, `transformThreePointToRadianceArray` rotates and centers.
-        // Ideally, custom geometry is already centered in the scene?
-        // If `customGeometryManager` creates points, it centers them or uses raw coords?
-        // `createCustomRoom` uses raw points.
-
-        // If Ray Generation uses `transformThreePointToRadianceArray` (which rotates/centers),
-        // we assume the Custom Geometry is ALSO going to be rotated/centered by Radiance via `!xform`?
-        // OR, does `generateRadFileContent` manually rot/trans every vertex?
-        // For 'parametric', it uses `transformAndFormatPoint`.
-        // For 'optimized', it uses `threeToRadTransform` (NO centering/rotation??).
-
-        // CRITICAL: `generateRadFileContent` for optimized geometry (which custom becomes)
-        // DOES NOT apply `transformAndFormatPoint`. It applies direct XYZ swap.
-        // This means Custom Geometry is exported "As Is" in World Space.
-
-        // Therefore, Ray Tracing points must ALSO be in World Space (Three.js space),
-        // and then simply swapped Y-Z for Radiance.
-        // We should NOT use `transformThreePointToRadianceArray` if the geometry isn't using it.
-
-        // Let's stick to this assumption: Custom Geometry = Direct Export.
-        // So Rays should be Direct Export too.
+        // Custom room geometry is built from the raw drawn polygon coordinates and placed
+        // inside roomObject, which updateScene() rotates by the room orientation. The custom
+        // geometry export writes the baked WORLD coordinates of that group, so the ray origins
+        // and directions must be rotated the same way before being mapped into Radiance.
+        const toRadiance = makeWorldPointFormatter();
 
         for (const pt of validPoints) {
-            // pt is {x, y, z} in Three.js coords.
-            // But generatePolygonGridPoints returned y=yLevel.
-            // View grid: Offset is usually 'height from floor'.
-            // So y = offset.
-
-            // Radiance Point (Z-up): x -> x, y -> z, z -> y
-            const originString = `${pt.x.toFixed(4)} ${pt.z.toFixed(4)} ${pt.y.toFixed(4)}`;
+            // pt is {x, y, z} in Three.js room-local coords (y = view height above the floor).
+            const worldPt = new THREE.Vector3(pt.x, pt.y, pt.z).applyAxisAngle(upVector, alphaRad);
+            const originString = toRadiance(worldPt.toArray());
 
             for (let k = 0; k < numDirs; k++) {
                 const angle = (k / numDirs) * 2 * Math.PI;
-                // Direction in Three.js (Y-up)
-                // StartVec is relative to Y-up?
-                const localDir = startVector.clone().applyAxisAngle(upVector, angle);
+                // Direction in Three.js (Y-up), rotated with the room
+                const localDir = startVector.clone()
+                    .applyAxisAngle(upVector, angle)
+                    .applyAxisAngle(upVector, alphaRad);
 
-                // Radiance Vector: x->x, y->z, z->y
-                const dirString = `${localDir.x.toFixed(4)} ${localDir.z.toFixed(4)} ${localDir.y.toFixed(4)}`;
+                const dirString = toRadiance(localDir.toArray());
 
                 rays.push(`${originString} ${dirString}`);
             }
@@ -1217,15 +1274,6 @@ export async function generateRayFileContent() {
         const cosA = Math.cos(alphaRad);
         const sinA = Math.sin(alphaRad);
 
-        const generateCenteredPoints = (totalLength, spacing) => {
-            if (spacing <= 0 || totalLength <= 0) return [];
-            const numPoints = Math.floor(totalLength / spacing);
-            if (numPoints === 0) return [totalLength / 2];
-            const totalGridLength = (numPoints - 1) * spacing;
-            const start = (totalLength - totalGridLength) / 2;
-            return Array.from({ length: numPoints }, (_, i) => start + i * spacing);
-        };
-
         const pointsX = generateCenteredPoints(W, spacing);
         const pointsZ = generateCenteredPoints(L, spacing);
 
@@ -1233,19 +1281,16 @@ export async function generateRayFileContent() {
             for (const z of pointsZ) {
                 const localOrigin = new THREE.Vector3(x, offset, z);
 
-                const p = { x: localOrigin.x - W / 2, y: localOrigin.z - L / 2, z: localOrigin.y };
-                const originRx = p.x * cosA - p.y * sinA;
-                const originRy = p.x * sinA + p.y * cosA;
-                const originString = `${originRx.toFixed(4)} ${originRy.toFixed(4)} ${p.z.toFixed(4)}`;
+                // Use the shared transforms so rays follow the same convention as the geometry
+                const originArr = transformThreePointToRadianceArray(localOrigin.toArray(), W, L, cosA, sinA);
+                const originString = originArr.map(c => c.toFixed(4)).join(' ');
 
                 for (let k = 0; k < numDirs; k++) {
                     const angle = (k / numDirs) * 2 * Math.PI;
                     const localDir = startVector.clone().applyAxisAngle(upVector, angle);
 
-                    const v = { x: localDir.x, y: localDir.z, z: localDir.y };
-                    const dirRx = v.x * cosA - v.y * sinA;
-                    const dirRy = v.x * sinA + v.y * cosA;
-                    const dirString = `${dirRx.toFixed(4)} ${dirRy.toFixed(4)} ${v.z.toFixed(4)}`;
+                    const dirArr = transformThreeVectorToRadianceArray(localDir.toArray(), cosA, sinA);
+                    const dirString = dirArr.map(c => c.toFixed(4)).join(' ');
 
                     rays.push(`${originString} ${dirString}`);
                 }
@@ -1254,10 +1299,15 @@ export async function generateRayFileContent() {
     }
 
     if (rays.length === 0) {
-        return "# No view grid points generated.";
+        // Empty, not a comment: rtrace discards a whole file whose first line is '#'.
+        return "";
     }
 
-    return "# Radiance Rays (X Y Z Vx Vy Vz)\n" + rays.join('\n');
+    // NO header comment -- see the note in project.js's sensor-point writer. A leading '#'
+    // makes rtrace/rcontrib read zero rays and exit 0, which silently produced empty
+    // results for every recipe that consumes this file.
+    // Column order is X Y Z Vx Vy Vz.
+    return rays.join('\n') + '\n';
 }
 
 /**
@@ -1275,15 +1325,22 @@ export function generateViewpointFileContentFromState(cameraState) {
     const viewTypeMap = { 'v': '-vtv', 'h': '-vth', 'c': '-vtc', 'l': '-vtl', 'a': '-vta' };
     const radViewType = viewTypeMap[viewType] || '-vtv';
 
-    // Camera state is already in world coordinates. Convert from Y-up to Z-up for Radiance.
-    const pos = position;
-    const rad_vp = `${pos.x.toFixed(4)} ${pos.z.toFixed(4)} ${pos.y.toFixed(4)}`;
+    // The camera state is already in Three.js WORLD coordinates: the viewer centres the room
+    // on the origin and rotates the room groups, not the camera. So no extra centering or
+    // rotation may be applied here - only the shared axis map (x, y, z) -> (x, -z, y), plus
+    // removal of the room elevation, which the Radiance model does not use (floor at z = 0).
+    const dom = getDom();
+    const elevation = parseFloat(dom.elevation?.value) || 0;
+    const toRadiancePoint = makeWorldPointFormatter(elevation);
+    const toRadianceVector = makeWorldPointFormatter();
+
+    const rad_vp = toRadiancePoint([position.x, position.y, position.z]);
 
     const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(quaternion);
-    const rad_vd = `${dir.x.toFixed(4)} ${dir.z.toFixed(4)} ${dir.y.toFixed(4)}`;
+    const rad_vd = toRadianceVector(dir.toArray());
 
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(quaternion);
-    const rad_vu = `${up.x.toFixed(4)} ${up.z.toFixed(4)} ${up.y.toFixed(4)}`;
+    const rad_vu = toRadianceVector(up.toArray());
 
     return `${radViewType} -vp ${rad_vp} -vd ${rad_vd} -vu ${rad_vu} -vh ${hfov} -vv ${vfov}`;
 }

@@ -17,7 +17,9 @@
 
 /**
  * @typedef {Object} ParamSpec
- * @property {'string' | 'number' | 'boolean' | 'enum'} type
+ * @property {'string' | 'number' | 'boolean' | 'enum' | 'file'} type
+ *           'file' values are `{ name, content }` descriptors taken from
+ *           project.simulationFiles / a file input, never plain scalars.
  * @property {'global' | 'recipe' | 'projectInfo' | 'simulationFiles'=} source
  * @property {boolean=} required
  * @property {any=} default
@@ -166,6 +168,15 @@ export function mergeParamsWithSchema(globalParams, recipeOverrides, schema) {
           break;
         case 'enum':
           // Do not auto-fix; validate() should flag invalid values.
+          break;
+        case 'file':
+          // File values are { name, content } descriptors. Stringifying one
+          // produced "[object Object]" and destroyed every real override.
+          if (typeof value === 'string') {
+            value = value ? { name: value, content: null } : undefined;
+          } else if (typeof value !== 'object') {
+            value = undefined;
+          }
           break;
         case 'string':
         default:

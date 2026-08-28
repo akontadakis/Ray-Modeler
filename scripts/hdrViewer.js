@@ -10,6 +10,10 @@ let scene, camera, renderer, material, planeMesh, controls;
 let glareOverlayContainer;
 let domElements = {};
 let currentTexture = null;
+// Glare source markers, kept in module state so they can be re-projected whenever the
+// camera moves. Each entry is { el, x, y } where x/y are plane-space coordinates.
+let glareMarkers = [];
+let animationFrameId = null;
 
 /**
  * Throttles a function so it's called at most once per limit milliseconds.
@@ -118,6 +122,7 @@ function mapEvToColor(ev) {
 function drawGlareSourcesOverlay(sources, imageWidth, imageHeight) {
     if (!glareOverlayContainer) return;
     glareOverlayContainer.innerHTML = ''; // Clear previous overlays
+    glareMarkers = [];
 
     // If dimensions are missing, we cannot accurately place overlays.
     if (!imageWidth || !imageHeight) {
@@ -125,14 +130,19 @@ function drawGlareSourcesOverlay(sources, imageWidth, imageHeight) {
         return;
     }
 
+    // The image is letterboxed inside the container by the orthographic camera fit and
+    // can be panned and zoomed with OrbitControls, so a percentage of the CONTAINER is
+    // the wrong frame: markers landed in the wrong place whenever the aspect ratios
+    // differed and never moved when the view changed. Convert each source to
+    // plane-space coordinates once, then project them through the camera every frame.
+    const aspect = planeMesh ? planeMesh.scale.x : (imageWidth / imageHeight);
+
     sources.forEach(source => {
         const overlay = document.createElement('div');
         // Use a fixed size for the marker for better visibility, as source.size is not a pixel dimension.
-        const markerSize = '12px'; 
+        const markerSize = '12px';
 
         overlay.style.position = 'absolute';
-        overlay.style.left = `${(source.pos.x / imageWidth) * 100}%`;
-        overlay.style.top = `${(source.pos.y / imageHeight) * 100}%`;
         overlay.style.width = markerSize;
         overlay.style.height = markerSize;
         overlay.style.transform = 'translate(-50%, -50%)';
@@ -141,8 +151,38 @@ function drawGlareSourcesOverlay(sources, imageWidth, imageHeight) {
         overlay.style.border = '1px solid rgba(255, 255, 255, 0.7)';
         overlay.style.boxSizing = 'border-box';
 
+        // evalglare reports pixel positions from the top-left of the image. The plane
+        // spans x in [-aspect, +aspect] and y in [+1 (top), -1 (bottom)].
+        const u = source.pos.x / imageWidth;
+        const v = source.pos.y / imageHeight;
+
         glareOverlayContainer.appendChild(overlay);
+        glareMarkers.push({ el: overlay, x: (u * 2 - 1) * aspect, y: 1 - v * 2 });
     });
+
+    updateGlareOverlayPositions();
+}
+
+/**
+ * Projects every glare marker's plane-space position through the current camera and
+ * places it over the canvas. Called on every rendered frame so markers track pan/zoom.
+ */
+function updateGlareOverlayPositions() {
+    if (!glareMarkers.length || !camera || !renderer) return;
+
+    const width = renderer.domElement.clientWidth;
+    const height = renderer.domElement.clientHeight;
+    if (!width || !height) return;
+
+    const v = new THREE.Vector3();
+    for (const marker of glareMarkers) {
+        v.set(marker.x, marker.y, 0).project(camera);
+        const inView = v.x >= -1 && v.x <= 1 && v.y >= -1 && v.y <= 1;
+        marker.el.style.display = inView ? '' : 'none';
+        if (!inView) continue;
+        marker.el.style.left = `${(v.x * 0.5 + 0.5) * width}px`;
+        marker.el.style.top = `${(-v.y * 0.5 + 0.5) * height}px`;
+    }
 }
 
 /**
@@ -237,8 +277,15 @@ export function initHdrViewer() {
     });
     resizeObserver.observe(domElements['hdr-canvas-container']);
 
-    // Start the viewer's render loop
-    animate();
+    // Resume the render loop whenever the panel is un-hidden by any code path, not just
+    // by openHdrViewer().
+    if (domElements['hdr-viewer-panel']) {
+        new MutationObserver(() => startRenderLoop())
+            .observe(domElements['hdr-viewer-panel'], { attributes: true, attributeFilter: ['class'] });
+    }
+
+    // Start the viewer's render loop (a no-op while the panel is still hidden).
+    startRenderLoop();
 }
 
 /**
@@ -276,10 +323,20 @@ function updateLuminanceProbe(e) {
         const y = Math.min(height - 1, Math.floor((1 - uv.y) * height));
         const index = (y * width + x) * 4;
         const pixelData = currentTexture.image.data;
+        if (!pixelData || index + 2 >= pixelData.length) return;
 
-        const r = pixelData[index];
-        const g = pixelData[index + 1];
-        const b = pixelData[index + 2];
+        // three's HDRLoader defaults to HalfFloatType, which allocates a Uint16Array of
+        // half-float BIT PATTERNS: a true radiance of 1.0 is stored as 0x3C00 = 15360
+        // and would be reported as ~2.7e6 cd/m2 if read as a linear float. Decode when
+        // the backing array is 16-bit, and pass Float32/Float64 data straight through so
+        // the probe is correct whichever type the loader was configured with.
+        const decode = (pixelData instanceof Uint16Array || pixelData instanceof Int16Array)
+            ? (v) => THREE.DataUtils.fromHalfFloat(v)
+            : (v) => v;
+
+        const r = decode(pixelData[index]);
+        const g = decode(pixelData[index + 1]);
+        const b = decode(pixelData[index + 2]);
 
         const exposedColor = new THREE.Vector3(r, g, b).multiplyScalar(Math.pow(2.0, material.uniforms.exposure.value));
         const luminance = exposedColor.dot(new THREE.Vector3(0.265, 0.670, 0.065)) * 179.0;
@@ -337,10 +394,15 @@ export function openHdrViewer(texture, glareResult = null) {
         console.error("HDR Viewer: Viewer has not been initialized. Call initHdrViewer() before openHdrViewer().");
         return;
     }
+    // Release the GPU/CPU memory of the previously displayed image before replacing it.
+    if (currentTexture && currentTexture !== texture) {
+        disposeTextureIfUnowned(currentTexture);
+    }
     currentTexture = texture;
     if (glareOverlayContainer) {
         glareOverlayContainer.innerHTML = ''; // Clear previous overlays
     }
+    glareMarkers = [];
 
     // Update shader with new texture
     material.uniforms.hdrTexture.value = texture;
@@ -356,21 +418,70 @@ export function openHdrViewer(texture, glareResult = null) {
 
    // If glare results are provided, draw the overlays
    if (glareResult && glareResult.sources && glareResult.sources.length > 0) {
-        // Pass the parsed width and height to the overlay function.
-        drawGlareSourcesOverlay(glareResult.sources, glareResult.imageWidth, glareResult.imageHeight);
+        // The loaded texture is the authoritative source of the image dimensions the
+        // evalglare pixel positions refer to. The report's own width/height are only a
+        // fallback (and are approximate when they came from rpict's -x/-y maxima).
+        const imageWidth = texture.image?.width || glareResult.imageWidth;
+        const imageHeight = texture.image?.height || glareResult.imageHeight;
+        drawGlareSourcesOverlay(glareResult.sources, imageWidth, imageHeight);
     }
 
     // Show the panel
     domElements['hdr-viewer-panel'].classList.remove('hidden');
     domElements['hdr-viewer-panel'].style.zIndex = getNewZIndex();
     ensureWindowInView(domElements['hdr-viewer-panel']);
+
+    startRenderLoop();
+}
+
+/**
+ * Disposes a texture the viewer has finished with, unless something else still holds
+ * it. `resultsManager.hdrResult.texture` is re-opened every time the "View HDR" button
+ * is pressed, so disposing it would leave that button showing a dead texture.
+ * The import is dynamic to avoid a static import cycle (resultsManager -> ui -> hdrViewer).
+ * @param {THREE.Texture} texture
+ */
+async function disposeTextureIfUnowned(texture) {
+    try {
+        const { resultsManager } = await import('./resultsManager.js');
+        if (resultsManager?.hdrResult?.texture === texture) return;
+    } catch (e) {
+        // Fall through: if ownership cannot be checked, still release the memory.
+    }
+    texture.dispose();
+}
+
+/**
+ * True when the HDR viewer panel is on screen.
+ * @returns {boolean}
+ */
+function isViewerVisible() {
+    const panel = domElements['hdr-viewer-panel'];
+    return !!panel && !panel.classList.contains('hidden');
+}
+
+/**
+ * Starts the render loop if it is not already running and the panel is visible.
+ */
+function startRenderLoop() {
+    if (animationFrameId === null && isViewerVisible()) {
+        animationFrameId = requestAnimationFrame(animate);
+    }
 }
 
 /**
  * The dedicated render loop for the HDR viewer.
+ * It renders only while the panel is visible; when the panel is hidden the loop stops
+ * entirely (a MutationObserver installed in initHdrViewer restarts it on re-show)
+ * instead of burning a render every frame behind a hidden panel.
  */
 function animate() {
-    requestAnimationFrame(animate);
+    if (!isViewerVisible()) {
+        animationFrameId = null;
+        return;
+    }
+    animationFrameId = requestAnimationFrame(animate);
     controls.update();
     renderer.render(scene, camera);
+    updateGlareOverlayPositions();
 }

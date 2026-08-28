@@ -1,10 +1,11 @@
 {
   "name": "ray-modeler",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "description": "A web-based graphical user interface (GUI) for the Radiance Lighting Simulation Suite.",
   "main": "electron.js",
   "scripts": {
     "start": "electron .",
+    "build:css": "tailwindcss -c tailwind.config.js -i tailwind.src.css -o vendor/tailwind.css --minify",
     "build": "electron-builder",
     "build:win": "electron-builder --win",
     "build:mac": "electron-builder --mac",
@@ -19,7 +20,8 @@
   "license": "MIT",
   "devDependencies": {
     "electron": "^38.0.0",
-    "electron-builder": "^24.9.1"
+    "electron-builder": "^26.15.3",
+    "tailwindcss": "3.4.19"
   },
   "build": {
     "appId": "io.github.akontadakis.raymodeler",
@@ -63,6 +65,12 @@
     }
   },
   "dependencies": {
-    "three": "^0.181.2"
+    "chart.js": "4.5.1",
+    "chartjs-plugin-datalabels": "2.2.0",
+    "flatpickr": "4.6.13",
+    "jszip": "3.10.1",
+    "leaflet": "1.9.4",
+    "mermaid": "11.17.2",
+    "three": "0.160.0"
   }
 }

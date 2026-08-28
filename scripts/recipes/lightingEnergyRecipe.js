@@ -13,13 +13,16 @@ const inputSchema = {
     lw: { type: 'number' }
   },
   recipeParams: {
-    'weather-file': { type: 'string' },
-    'bsdf-open-file': { type: 'string', optional: true },
-    'bsdf-closed-file': { type: 'string', optional: true },
-    'installed-power': { type: 'number', optional: true },
-    'room-area': { type: 'number', optional: true },
-    'control-strategy': { type: 'string', optional: true }
-    // Additional tuning parameters used by the legacy script can be surfaced here as needed.
+    'weather-file': { type: 'file' },
+    'bsdf-open-file': { type: 'file', optional: true },
+    'bsdf-closed-file': { type: 'file', optional: true }
+    // 'installed-power', 'room-area' and 'control-strategy' were declared here but
+    // no such controls exist in #template-recipe-lighting-energy. They are NOT
+    // user inputs: createLightingEnergyScript() derives all three from real
+    // sources — installed power from projectData.lighting.luminaire_wattage x the
+    // luminaire count, room area from geometry.room W x L, and the control
+    // strategy from projectData.lighting.daylighting.controlType. Declaring them
+    // only made validate() report on values nobody could set, so they are removed.
   },
   requiredFiles: ['weather-file'],
   requiredResources: {

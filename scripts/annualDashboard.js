@@ -22,6 +22,22 @@ let energyGauge = null;
 let energySavingsGauge = null;
 let temporalMapPanel = null, temporalMapCanvas = null, temporalMapTooltip = null;
 
+/**
+ * Resolves a CSS custom property to a concrete colour string.
+ * Chart.js draws onto a canvas, which cannot resolve `var(--x)` itself.
+ * @param {string} name - The custom property name, e.g. '--grid-color'.
+ * @param {string} fallback - Value to use when the property is unset.
+ * @returns {string}
+ */
+function cssVar(name, fallback) {
+    try {
+        const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        return value || fallback;
+    } catch (e) {
+        return fallback;
+    }
+}
+
 
 /**
  * Opens the climate analysis dashboard and generates the charts.
@@ -487,11 +503,18 @@ export function updateCombinedAnalysisChart() {
 
 /**
  * Creates and renders the combined daylight vs. glare scatter plot.
- * @param {object[]} chartData - An array of {x, y, pointId} objects.
+ * @param {object[]} chartData - An array of {x, y, pointId, udiBounds} objects.
  */
 function createCombinedAnalysisChart(chartData) {
     const canvas = document.getElementById('combined-analysis-canvas');
     if (!canvas) return;
+
+    // The x-axis counts hours inside the real UDI band the data was binned with.
+    // The old label read "UDI 500-2000lx", which is not a UDI band under any usual
+    // definition and did not match the 100-2000 lx bins used elsewhere.
+    const bounds = chartData[0]?.udiBounds || { min: 100, max: 2000 };
+    const udiLo = Number.isFinite(bounds.min) ? bounds.min : 100;
+    const udiHi = Number.isFinite(bounds.max) ? bounds.max : 2000;
 
     const ctx = canvas.getContext('2d');
     if (combinedAnalysisChart) {
@@ -544,7 +567,7 @@ function createCombinedAnalysisChart(chartData) {
             scales: {
                 x: {
                     type: 'linear', position: 'bottom',
-                    title: { display: true, text: '% Occupied Hours with Useful Daylight (UDI 500-2000lx)', color: textColor },
+                    title: { display: true, text: `% Occupied Hours with Useful Daylight (UDI ${udiLo}-${udiHi} lx)`, color: textColor },
                     min: 0, max: 100, ticks: { color: textColor }, grid: { color: gridColor }
                 },
                 y: {
@@ -579,11 +602,17 @@ function createCombinedAnalysisChart(chartData) {
  * @returns {Chart} A new Chart.js instance.
  */
 function createGauge(canvasId, value, color) {
-    const ctx = document.getElementById(canvasId).getContext('2d');
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return null;
+    const ctx = canvas.getContext('2d');
+    // A canvas cannot resolve CSS custom properties, so 'var(--grid-color)' silently
+    // fell back to the Chart.js default colour. Resolve it here.
+    const remainderColor = cssVar('--grid-color', 'rgba(128, 128, 128, 0.25)');
+    const safeValue = Number.isFinite(value) ? Math.min(Math.max(value, 0), 100) : 0;
     const data = {
         datasets: [{
-            data: [value, 100 - value],
-            backgroundColor: [color, 'var(--grid-color)'],
+            data: [safeValue, 100 - safeValue],
+            backgroundColor: [color, remainderColor],
             borderWidth: 0,
             circumference: 270,
             rotation: 225,
@@ -611,26 +640,35 @@ function createGauge(canvasId, value, color) {
  * @param {object} udiData - An object with { insufficient, autonomous, exceeded }.
  * @returns {Chart} A new Chart.js instance.
  */
-function createUdiChart(canvasId, udiData) {
+function createUdiChart(canvasId, udiData, udiBounds = { min: 100, max: 2000 }) {
     // Register the plugin for use
     Chart.register(ChartDataLabels);
 
-    const ctx = document.getElementById(canvasId).getContext('2d');
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return null;
+    const ctx = canvas.getContext('2d');
+
+    // Bin labels must come from the bounds the metrics were actually computed with.
+    // Hardcoding <100 / 100-2000 / >2000 gave a legend that contradicted the data
+    // whenever custom UDI_min/UDI_max were supplied to calculateAnnualMetrics.
+    const lo = Number.isFinite(udiBounds?.min) ? udiBounds.min : 100;
+    const hi = Number.isFinite(udiBounds?.max) ? udiBounds.max : 2000;
+
     const data = {
         labels: [''], // Use an empty label for a cleaner look
         datasets: [
             {
-                label: 'Insufficient (<100 lx)',
+                label: `Insufficient (<${lo} lx)`,
                 data: [udiData.insufficient],
                 backgroundColor: '#ef4444', // Red
             },
             {
-                label: 'Autonomous (100-2000 lx)',
+                label: `Autonomous (${lo}-${hi} lx)`,
                 data: [udiData.autonomous],
                 backgroundColor: '#22c55e', // Green
             },
             {
-                label: 'Exceeded (>2000 lx)',
+                label: `Exceeded (>${hi} lx)`,
                 data: [udiData.exceeded],
                 backgroundColor: '#f97316', // Orange
             }
@@ -651,7 +689,7 @@ function createUdiChart(canvasId, udiData) {
                     ticks: {
                         callback: (value) => value + "%"
                     },
-                    grid: { color: 'var(--grid-color-faint)' }
+                    grid: { color: cssVar('--grid-color-faint', 'rgba(128, 128, 128, 0.15)') }
                 },
                 y: {
                     stacked: true,
@@ -750,29 +788,36 @@ export function updateLightingEnergyDashboard(metrics) {
 
     dashboard.classList.remove('hidden');
 
-    const lpdEl = document.getElementById('lpd-val');
-    const energyEl = document.getElementById('energy-val');
-    const savingsEl = document.getElementById('energy-savings-val');
-
-    if (lpdEl) lpdEl.textContent = metrics.lpd.toFixed(2);
-    if (energyEl) energyEl.textContent = metrics.annualEnergy.toFixed(0);
-    if (savingsEl) savingsEl.textContent = metrics.savings.toFixed(1);
+    // Any of these fields can legitimately be absent (no luminaire wattage or room
+    // footprint to derive an LPD from). An unguarded .toFixed() on undefined threw
+    // inside the awaited load handler and aborted the rest of the results update.
+    setText('lpd-val', fmt(metrics.lpd, 2));
+    setText('energy-val', fmt(metrics.annualEnergy, 0));
+    setText('energy-savings-val', fmt(metrics.savings, 1));
 
     // Create gauges (assuming max values for visualization purposes)
     // LPD: Target might be ~10 W/m^2. Scale accordingly.
-    lpdGauge = createGauge('lpd-gauge', (metrics.lpd / 10) * 100, '#f59e0b');
+    lpdGauge = Number.isFinite(metrics.lpd)
+        ? createGauge('lpd-gauge', (metrics.lpd / 10) * 100, '#f59e0b')
+        : createEmptyGauge('lpd-gauge');
     // Energy Savings: value is already a percentage
-    energySavingsGauge = createGauge('energy-savings-gauge', metrics.savings, '#4ade80');
+    energySavingsGauge = Number.isFinite(metrics.savings)
+        ? createGauge('energy-savings-gauge', metrics.savings, '#4ade80')
+        : createEmptyGauge('energy-savings-gauge');
     // Energy: We need a baseline/max to create a meaningful gauge.
     // For this example, let's assume a max of 50 kWh/m^2.
-    energyGauge = createGauge('energy-gauge', (metrics.annualEnergy / 50) * 100, '#f87171');
+    energyGauge = Number.isFinite(metrics.annualEnergy)
+        ? createGauge('energy-gauge', (metrics.annualEnergy / 50) * 100, '#f87171')
+        : createEmptyGauge('energy-gauge');
 }
 
 /**
  * Clears and hides the annual metrics dashboard.
  */
 export function clearAnnualDashboard() {
-    document.getElementById('annual-metrics-dashboard').classList.add('hidden');
+    // This runs as the FIRST statement of the dashboard update, so an unguarded
+    // getElementById(...).classList here throws before any metric is rendered.
+    document.getElementById('annual-metrics-dashboard')?.classList.add('hidden');
 
     if (sdaGauge) sdaGauge.destroy();
     if (aseGauge) aseGauge.destroy();
@@ -785,10 +830,20 @@ export function clearAnnualDashboard() {
     savingsGauge = null;
     powerGauge = null;
 
-    document.getElementById('sda-value').textContent = '--%';
-    document.getElementById('ase-value').textContent = '--%';
-    document.getElementById('savings-value').textContent = '--%';
-    document.getElementById('power-value').textContent = '--';
+    setText('sda-value', '--%');
+    setText('ase-value', '--%');
+    setText('savings-value', '--%');
+    setText('power-value', '--');
+}
+
+/**
+ * Sets the text of an element by id, doing nothing if the element is absent.
+ * @param {string} id
+ * @param {string} text
+ */
+function setText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
 }
 
 /**
@@ -801,26 +856,72 @@ export function updateAnnualMetricsDashboard(metrics, lightingMetrics) {
 
     if (!metrics) return;
 
-    document.getElementById('annual-metrics-dashboard').classList.remove('hidden');
-    document.getElementById('sda-value').textContent = `${metrics.sDA.toFixed(1)}%`;
+    document.getElementById('annual-metrics-dashboard')?.classList.remove('hidden');
+    setText('sda-value', fmt(metrics.sDA, 1, '%'));
     // ASE is null when no direct-only dataset was loaded; showing 0% would read as a pass.
-    document.getElementById('ase-value').textContent =
-        metrics.ASE === null ? 'n/a' : `${metrics.ASE.toFixed(1)}%`;
+    const aseAvailable = Number.isFinite(metrics.ASE);
+    setText('ase-value', aseAvailable ? `${metrics.ASE.toFixed(1)}%` : 'n/a');
 
     sdaGauge = createGauge('sda-gauge', metrics.sDA, '#3b82f6');
-    aseGauge = createGauge('ase-gauge', metrics.ASE === null ? 0 : metrics.ASE, '#f59e0b');
-    udiChart = createUdiChart('udi-chart', metrics.UDI);
+    // A 0% ASE arc next to an "n/a" readout looks like a passing value at a glance.
+    // Render an explicit unknown state instead: a full ring in the neutral remainder
+    // colour, with no coloured arc.
+    aseGauge = aseAvailable
+        ? createGauge('ase-gauge', metrics.ASE, '#f59e0b')
+        : createEmptyGauge('ase-gauge');
+    udiChart = createUdiChart('udi-chart', metrics.UDI, metrics.udiBounds);
 
     if (lightingMetrics) {
-        document.getElementById('lighting-metrics-dashboard').classList.remove('hidden');
-        document.getElementById('savings-value').textContent = `${lightingMetrics.savings.toFixed(1)}%`;
-        document.getElementById('power-value').textContent = `${lightingMetrics.avgPower.toFixed(2)}`;
+        document.getElementById('lighting-metrics-dashboard')?.classList.remove('hidden');
+        setText('savings-value', fmt(lightingMetrics.savings, 1, '%'));
+        setText('power-value', fmt(lightingMetrics.avgPower, 2));
 
         // Green for savings
         savingsGauge = createGauge('savings-gauge', lightingMetrics.savings, '#4ade80');
         // Red for power used (the value is a fraction, so multiply by 100 for the gauge)
-        powerGauge = createGauge('power-gauge', lightingMetrics.avgPower * 100, '#f87171');
+        powerGauge = createGauge('power-gauge', (lightingMetrics.avgPower || 0) * 100, '#f87171');
     }
+}
+
+/**
+ * Formats a numeric metric, returning a dash when the value is missing so a
+ * `.toFixed()` on undefined cannot abort the whole dashboard update.
+ * @param {number} value
+ * @param {number} digits
+ * @param {string} [suffix='']
+ * @returns {string}
+ */
+function fmt(value, digits, suffix = '') {
+    return Number.isFinite(value) ? `${value.toFixed(digits)}${suffix}` : '--';
+}
+
+/**
+ * Draws a gauge in an explicit empty/unknown state: a single neutral ring with no
+ * coloured arc, so it cannot be misread as a measured value of zero.
+ * @param {string} canvasId
+ * @returns {Chart|null}
+ */
+function createEmptyGauge(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return null;
+    return new Chart(canvas.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+            datasets: [{
+                data: [100],
+                backgroundColor: [cssVar('--grid-color', 'rgba(128, 128, 128, 0.25)')],
+                borderWidth: 0,
+                circumference: 270,
+                rotation: 225,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            cutout: '80%'
+        }
+    });
 }
 
 /**
@@ -926,13 +1027,15 @@ function drawTemporalMap(data) {
     ctx.textBaseline = 'bottom';
     ctx.fillText(Math.round(resultsManager.colorScale.min), legendX + legendWidth + 5, legendY + legendHeight);
 
-    setupTemporalMapTooltip(canvas, data, margin, cellWidth, cellHeight);
+    setupTemporalMapTooltip(canvas, data, margin);
 }
 
 /**
  * Sets up the mousemove/mouseleave events for the temporal map tooltip.
+ * Cell sizes are recomputed on every read rather than captured at draw time, so a
+ * resize without a redraw cannot make the tooltip report the wrong day/hour.
  */
-function setupTemporalMapTooltip(canvas, data, margin, cellWidth, cellHeight) {
+function setupTemporalMapTooltip(canvas, data, margin) {
     if (!temporalMapTooltip) {
         temporalMapTooltip = document.createElement('div');
         temporalMapTooltip.id = 'temporal-map-tooltip';
@@ -940,24 +1043,34 @@ function setupTemporalMapTooltip(canvas, data, margin, cellWidth, cellHeight) {
         canvas.parentElement.appendChild(temporalMapTooltip);
     }
 
+    const quantity = resultsManager.getQuantityForDataset();
+    const unitSuffix = quantity.unit ? ` ${quantity.unit}` : '';
+
     canvas.onmousemove = (e) => {
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
+        // Recompute from the CURRENT size, not the size captured when it was drawn.
+        const cellWidth = (rect.width - margin.left - margin.right) / 365;
+        const cellHeight = (rect.height - margin.top - margin.bottom) / 24;
+        if (!(cellWidth > 0) || !(cellHeight > 0)) return;
+
         if (x > margin.left && x < rect.width - margin.right && y > margin.top && y < rect.height - margin.bottom) {
-            const day = Math.floor((x - margin.left) / cellWidth);
-            const hour = Math.floor((y - margin.top) / cellHeight);
+            const day = Math.min(364, Math.floor((x - margin.left) / cellWidth));
+            const hour = Math.min(23, Math.floor((y - margin.top) / cellHeight));
 
             const index = day * 24 + hour;
             const value = data[index];
-            const date = new Date(2023, 0, day + 1);
+            // Built in UTC and formatted in UTC: a local-midnight Date resolves to the
+            // previous day in zones whose DST transition happens at 00:00.
+            const date = new Date(Date.UTC(2023, 0, day + 1));
 
             temporalMapTooltip.style.left = `${x + 15}px`;
             temporalMapTooltip.style.top = `${y + 15}px`;
             temporalMapTooltip.innerHTML = `
-                <strong>${date.toLocaleDateString('en-us', { month: 'short', day: 'numeric' })}, ${hour}:00&ndash;${hour + 1}:00</strong><br>
-                Value: ${value.toFixed(1)} lux
+                <strong>${date.toLocaleDateString('en-us', { month: 'short', day: 'numeric', timeZone: 'UTC' })}, ${hour}:00&ndash;${hour + 1}:00</strong><br>
+                Value: ${Number.isFinite(value) ? value.toFixed(1) : '--'}${unitSuffix}
             `;
             temporalMapTooltip.classList.remove('hidden');
         } else {

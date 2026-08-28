@@ -12,6 +12,9 @@ import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { resultsManager } from './resultsManager.js';
 import { project } from './project.js';
+// Single canonical sensor-grid point generator, shared with the Radiance exporter so the
+// preview grid and the exported grid can never diverge.
+import { generateCenteredPoints } from './radiance.js';
 
 /**
  * Surface type classification system for ray interaction behavior.
@@ -115,15 +118,16 @@ const shared = {
 
 // Mark shared singleton geometries/materials so disposeMeshLike never disposes them.
 // These are reused across many rebuilds; disposing them would break later frames.
+// A WeakSet is used rather than a userData flag: THREE.Material.copy() deep-copies
+// userData, so every clone of a shared material would inherit the flag and never be
+// disposed, leaking a material on each updateScene().
+const sharedResources = new WeakSet();
 [
     shared.sensorGeom, shared.sensorMat, shared.wireMat, shared.furnitureMat,
     shared.shadeMat, shared.taskAreaMat, shared.surroundingAreaMat,
     shared.contextMat, shared.vegetationCanopyMat, highlightMaterial
 ].forEach(res => {
-    if (res) {
-        res.userData = res.userData || {};
-        res.userData.shared = true;
-    }
+    if (res) sharedResources.add(res);
 });
 
 // --- HELPER FUNCTIONS ---
@@ -157,7 +161,7 @@ function applyClippingToMaterial(mat, clippingPlanes) {
 
 function disposeMaterial(m) {
     if (!m) return;
-    if (m.userData?.shared) return; // Never dispose shared singleton materials
+    if (sharedResources.has(m)) return; // Never dispose shared singleton materials
     // Dispose textures attached to the material
     if (m.map) m.map.dispose();
     if (m.normalMap) m.normalMap.dispose();
@@ -168,15 +172,15 @@ function disposeMaterial(m) {
     m.dispose();
 }
 
-function disposeMeshLike(obj) {
-    if (obj.geometry && !obj.geometry.userData?.shared) obj.geometry.dispose?.();
+export function disposeMeshLike(obj) {
+    if (obj.geometry && !sharedResources.has(obj.geometry)) obj.geometry.dispose?.();
     if (obj.material) {
         if (Array.isArray(obj.material)) obj.material.forEach(disposeMaterial);
         else disposeMaterial(obj.material);
     }
 }
 
-function clearGroup(group) {
+export function clearGroup(group) {
     if (group === sensorGridObject) {
         sensorMeshes.length = 0; // Clear the references when clearing the group
     }
@@ -239,7 +243,9 @@ export async function updateScene(changedId = null, selectedWallId = null) {
     validateInputs(changedId);
     const { W, L, H, rotationY, elevation } = readParams();
 
-    // Apply room rotation and elevation to all relevant geometry groups
+    // Apply room rotation and elevation to all relevant geometry groups.
+    // This is the authoritative frame: custom geometry is rotated here too, and the Radiance
+    // exporters follow the viewer by exporting the resulting WORLD coordinates.
     const groupsToTransform = [roomObject, shadingObject, sensorGridObject, wallSelectionGroup, furnitureObject, daylightingSensorsGroup, resizeHandlesObject, vegetationObject];
     groupsToTransform.forEach(group => {
         group.rotation.y = rotationY;
@@ -312,6 +318,12 @@ export async function updateScene(changedId = null, selectedWallId = null) {
             }
         }
     }
+
+    // The luminaire group is added straight to the scene, so it is not part of
+    // groupsToTransform and does not follow room resize, rotation or elevation on its own.
+    // Lazy import: lighting.js already imports from geometry.js, so a static import back
+    // would create a cycle.
+    import('./lighting.js').then(({ updateLightingVisuals }) => updateLightingVisuals());
 }
 
 // --- GEOMETRY CREATION FUNCTIONS ---
@@ -597,7 +609,7 @@ function _createWalls({ W, L, H, wallThickness }) {
         n: { s: [W, H], p: [W / 2, H / 2, 0], r: [0, Math.PI, 0] },
         s: { s: [W, H], p: [W / 2, H / 2, L], r: [0, 0, 0] },
         w: { s: [L, H], p: [0, H / 2, L / 2], r: [0, -Math.PI / 2, 0] },
-        e: { s: [L, H], p: [W, H / 2, L / 2], r: [0, -Math.PI / 2, 0] },
+        e: { s: [L, H], p: [W, H / 2, L / 2], r: [0, Math.PI / 2, 0] },
     };
 
     for (const [key, props] of Object.entries(walls)) {
@@ -659,9 +671,8 @@ function _createWallSegment(key, props, winParams, { H, wallThickness }) {
     wallMeshGroup.userData = { canonicalId: key };
 
     const isEW = key === 'e' || key === 'w';
-    // Fix: Only the East wall needs the negative Z translation/inversion logic. 
-    // West wall aligns correctly with standard positive extrusion in this coordinate system.
-    const isEast = key === 'e';
+    // With the East wall rotated +PI/2 (matching createShadingDevices), its local +Z axis
+    // points outwards just like N/S/W, so no per-wall depth inversion is needed any more.
 
     let wallW = props.s[0];
     const wallH = props.s[1];
@@ -696,8 +707,7 @@ function _createWallSegment(key, props, winParams, { H, wallThickness }) {
             holePath.closePath();
             wallShape.holes.push(holePath);
 
-            // Fix: Use isEast to determine depth inversion
-            const effectiveWinDepthPos = (isEast) ? -winDepthPos : winDepthPos;
+            const effectiveWinDepthPos = winDepthPos;
             const glassWidth = Math.max(0, ww - 2 * ft);
             const glassHeight = Math.max(0, wh - 2 * ft);
 
@@ -736,16 +746,12 @@ function _createWallSegment(key, props, winParams, { H, wallThickness }) {
 
         const extrudeSettings = { steps: 1, depth: wallThickness, bevelEnabled: false };
         const wallGeometry = new THREE.ExtrudeGeometry(wallShape, extrudeSettings);
-        // Fix: Only translate geometry for East wall
-        if (isEast) wallGeometry.translate(0, 0, -wallThickness);
 
         const wallMeshWithHoles = createSchematicObject(wallGeometry, wallMeshGroup, wallMaterial, SURFACE_TYPES.INTERIOR_WALL);
         wallMeshWithHoles.userData.isSelectableWall = true;
     } else {
         const wallGeometry = new THREE.BoxGeometry(wallW, wallH, wallThickness);
-        // Fix: Determine Z translation based on isEast
-        const z_translation = isEast ? -wallThickness / 2 : wallThickness / 2;
-        wallGeometry.translate(0, 0, z_translation);
+        wallGeometry.translate(0, 0, wallThickness / 2);
         const wallMesh = createSchematicObject(wallGeometry, wallMeshGroup, wallMaterial, SURFACE_TYPES.INTERIOR_WALL);
         wallMesh.userData.isSelectableWall = true;
     }
@@ -811,28 +817,6 @@ export async function createSensorGrid() {
     sensorGridObject.add(gridContainer);
 }
 
-/**
- * Generates an array of centered point coordinates along a single axis.
- * @param {number} totalLength The total length of the surface.
- * @param {number} spacing The distance between points.
- * @returns {number[]} An array of coordinate values.
- */
-function generateCenteredPoints(totalLength, spacing) {
-    if (spacing <= 0 || totalLength <= 0) return [];
-
-    const numPoints = Math.floor(totalLength / spacing);
-    if (numPoints === 0) return [];
-
-    // If there's only one point, it should be in the center.
-    if (numPoints === 1) {
-        return [totalLength / 2];
-    }
-
-    const totalGridLength = (numPoints - 1) * spacing;
-    const start = (totalLength - totalGridLength) / 2;
-
-    return Array.from({ length: numPoints }, (_, i) => start + i * spacing);
-}
 
 /**
  * Generates an array of Vector3 positions for a grid on a specific surface.
@@ -867,6 +851,12 @@ async function _generateGridPositions(surface, W, L, H, customGeomPoints = null)
         const spacing = params.spacing;
         const offset = params.offset;
 
+        // The left-hand edge normal (-dz, dx) only points INTO the polygon when the outline
+        // is wound counter-clockwise. A clockwise-drawn room needs it negated, otherwise
+        // every wall sensor is pushed outside the room.
+        const { isPolygonCCW } = await import('./customGeometryManager.js');
+        const windingSign = isPolygonCCW(customGeomPoints) ? 1 : -1;
+
         for (let i = 0; i < customGeomPoints.length; i++) {
             const p1 = customGeomPoints[i];
             const p2 = customGeomPoints[(i + 1) % customGeomPoints.length];
@@ -876,8 +866,8 @@ async function _generateGridPositions(surface, W, L, H, customGeomPoints = null)
             const len = Math.sqrt(dx * dx + dz * dz);
             if (len <= 0) continue;
 
-            const nx = -dz / len;
-            const nz = dx / len;
+            const nx = windingSign * (-dz / len);
+            const nz = windingSign * (dx / len);
 
             const numH = Math.floor(len / spacing);
             const numV = Math.floor(H / spacing);
@@ -906,46 +896,17 @@ async function _generateGridPositions(surface, W, L, H, customGeomPoints = null)
     }
 
     // Parametric mode (original logic)
-    const generatePointsInRect = (x, z, width, depth, spacing) => {
-        if (spacing <= 0 || width <= 0 || depth <= 0) return [];
-        const rectPositions = [];
-        const numX = Math.floor(width / spacing);
-        const numZ = Math.floor(depth / spacing);
-        if (numX === 0 || numZ === 0) return [];
-        const startX = x + (width - (numX > 1 ? (numX - 1) * spacing : 0)) / 2;
-        const startZ = z + (depth - (numZ > 1 ? (numZ - 1) * spacing : 0)) / 2;
-        for (let i = 0; i < numX; i++) {
-            for (let j = 0; j < numZ; j++) {
-                rectPositions.push({ x: startX + i * spacing, z: startZ + j * spacing });
-            }
-        }
-        return rectPositions;
-    };
-
     const strategies = {
         floor: () => {
+            // The floor grid is ALWAYS the full-room centred grid, in the exact order the
+            // exporter's 'all' branch writes it (x-major, z-minor). Task-area mode must not
+            // change the point list, otherwise the false-colour overlay indices no longer
+            // line up with the results file. The task / surrounding rectangles are drawn
+            // separately as translucent helper planes by _createTaskAreaVisuals().
             const params = gridParams.illuminance.floor;
-            if (!params.isTaskArea) {
-                const pointsX = generateCenteredPoints(W, params.spacing);
-                const pointsZ = generateCenteredPoints(L, params.spacing);
-                for (const x of pointsX) for (const z of pointsZ) positions.push(new THREE.Vector3(x, params.offset, z));
-            } else {
-                const task = params.task;
-                generatePointsInRect(task.x, task.z, task.width, task.depth, params.spacing)
-                    .forEach(p => positions.push(new THREE.Vector3(p.x, params.offset, p.z)));
-                if (params.hasSurrounding) {
-                    const band = params.surroundingWidth;
-                    const outerX = Math.max(0, task.x - band);
-                    const outerZ = Math.max(0, task.z - band);
-                    const outerW = Math.min(W - outerX, task.width + 2 * band);
-                    const outerD = Math.min(L - outerZ, task.depth + 2 * band);
-                    generatePointsInRect(outerX, outerZ, outerW, outerD, params.spacing).forEach(p => {
-                        if (p.x < task.x || p.x > task.x + task.width || p.z < task.z || p.z > task.z + task.depth) {
-                            positions.push(new THREE.Vector3(p.x, params.offset, p.z));
-                        }
-                    });
-                }
-            }
+            const pointsX = generateCenteredPoints(W, params.spacing);
+            const pointsZ = generateCenteredPoints(L, params.spacing);
+            for (const x of pointsX) for (const z of pointsZ) positions.push(new THREE.Vector3(x, params.offset, z));
         },
         ceiling: () => {
             const params = gridParams.illuminance.ceiling;
@@ -2176,6 +2137,9 @@ export function createResizeHandles() {
  */
 export function clearContextObjects() {
     clearGroup(contextObject);
+    // The registry must be cleared too, otherwise the object list keeps showing deleted
+    // blocks and hands back meshes whose geometry/material have already been disposed.
+    contextObjects.clear();
 }
 
 /**

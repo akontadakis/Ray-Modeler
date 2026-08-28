@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { roomObject, wallSelectionGroup, updateScene, setIsCustomGeometry } from './geometry.js';
+import { roomObject, wallSelectionGroup, updateScene, setIsCustomGeometry, clearGroup, disposeMeshLike } from './geometry.js';
 import { getDom } from './dom.js';
 import { registerCustomWall, clearCustomWalls, getCustomWallData, unregisterCustomWall } from './customApertureManager.js';
 
@@ -62,6 +62,48 @@ export function isFinalized() {
     return isGeometryFinalized;
 }
 
+/**
+ * Computes the winding order of a closed polygon in the XZ plane (shoelace formula).
+ * When the result is true (CCW under this convention) the left-hand edge normal
+ * (-dz, dx) points INTO the polygon; when false that normal points outwards and must
+ * be negated.
+ * @param {Array<{x: number, z: number}>} points2D - The polygon vertices.
+ * @returns {boolean} True if the polygon is wound counter-clockwise.
+ */
+export function isPolygonCCW(points2D) {
+    let area = 0;
+    for (let i = 0; i < points2D.length; i++) {
+        const j = (i + 1) % points2D.length;
+        area += points2D[i].x * points2D[j].z;
+        area -= points2D[j].x * points2D[i].z;
+    }
+    return (area / 2) > 0;
+}
+
+/**
+ * Reverses triangle winding and negates the normals of a geometry in place.
+ * @param {THREE.BufferGeometry} geom - The geometry to flip.
+ */
+function flipGeometryFaces(geom) {
+    const index = geom.getIndex();
+    if (index) {
+        const arr = index.array;
+        for (let i = 0; i < arr.length; i += 3) {
+            const tmp = arr[i];
+            arr[i] = arr[i + 2];
+            arr[i + 2] = tmp;
+        }
+        index.needsUpdate = true;
+    }
+    const normal = geom.getAttribute('normal');
+    if (normal) {
+        for (let i = 0; i < normal.count; i++) {
+            normal.setXYZ(i, -normal.getX(i), -normal.getY(i), -normal.getZ(i));
+        }
+        normal.needsUpdate = true;
+    }
+}
+
 export function createCustomRoom(points2D, height, thickness = 0.2) {
     console.log('[CustomGeometry] createCustomRoom called');
     console.log('[CustomGeometry] points2D:', points2D);
@@ -76,15 +118,14 @@ export function createCustomRoom(points2D, height, thickness = 0.2) {
     if (isNaN(height) || height <= 0) {
         console.error('[CustomGeometry] Invalid height:', height);
         return;
-        return;
     }
 
     currentRoomHeight = height;
 
     // 1. Set Custom Mode and Clear existing parametric room
     setIsCustomGeometry(true);
-    while (roomObject.children.length > 0) roomObject.remove(roomObject.children[0]);
-    while (wallSelectionGroup.children.length > 0) wallSelectionGroup.remove(wallSelectionGroup.children[0]);
+    clearGroup(roomObject);
+    clearGroup(wallSelectionGroup);
     clearCustomWalls();
 
     const dom = getDom();
@@ -103,14 +144,20 @@ export function createCustomRoom(points2D, height, thickness = 0.2) {
 
     // 3. Create Floor & Ceiling with proper materials
     const floorGeom = new THREE.ShapeGeometry(shape);
+    // ShapeGeometry faces +Z; rotating +90 deg about X puts the polygon on the XZ plane
+    // with its normal pointing DOWN (0, -1, 0). That is what the ceiling needs, so the
+    // ceiling is cloned first and only the floor is flipped to face up.
     floorGeom.rotateX(Math.PI / 2);
+
+    const ceilGeom = floorGeom.clone();
+    ceilGeom.translate(0, height, 0);
+
+    flipGeometryFaces(floorGeom); // Floor must face up (0, 1, 0)
     const floorMat = new THREE.MeshBasicMaterial({ ...matProps, color: new THREE.Color(getThemeColor('--floor-color', '#8D6E63')) });
     const floorMesh = new THREE.Mesh(floorGeom, floorMat);
     floorMesh.userData.surfaceType = SURFACE_TYPES.INTERIOR_FLOOR;
     roomObject.add(floorMesh);
 
-    const ceilGeom = floorGeom.clone();
-    ceilGeom.translate(0, height, 0);
     const ceilMat = new THREE.MeshBasicMaterial({ ...matProps, color: new THREE.Color(getThemeColor('--ceiling-color', '#FFFFFF')) });
     const ceilMesh = new THREE.Mesh(ceilGeom, ceilMat);
     ceilMesh.userData.surfaceType = SURFACE_TYPES.INTERIOR_CEILING;
@@ -120,15 +167,8 @@ export function createCustomRoom(points2D, height, thickness = 0.2) {
     const wallContainer = new THREE.Group();
     wallSelectionGroup.add(wallContainer);
 
-    // Calculate Polygon Area to determine winding order (Shoelace formula)
-    let area = 0;
-    for (let i = 0; i < points2D.length; i++) {
-        const j = (i + 1) % points2D.length;
-        area += points2D[i].x * points2D[j].z;
-        area -= points2D[j].x * points2D[i].z;
-    }
-    area /= 2;
-    const isCCW = area > 0;
+    // Determine winding order (Shoelace formula)
+    const isCCW = isPolygonCCW(points2D);
 
     // First, detect exterior corners
     const cornerTypes = []; // true = exterior corner, false = interior corner
@@ -216,10 +256,10 @@ export function updateCustomWall(wallId) {
     const wallThickness = wallGroup.userData.thickness || 0.2;
     const extendedLen = wallGroup.userData.extendedLen || wallData.dimensions.length;
 
-    // Remove old mesh
+    // Remove old mesh (dispose geometries AND materials, including edge overlays)
     while (wallGroup.children.length > 0) {
         const child = wallGroup.children[0];
-        if (child.geometry) child.geometry.dispose();
+        child.traverse(disposeMeshLike);
         wallGroup.remove(child);
     }
 

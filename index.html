@@ -4,7 +4,14 @@
 <head>
 
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://unpkg.com; img-src 'self' data: blob: https://unpkg.com https://*.basemaps.cartocdn.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://generativelanguage.googleapis.com https://api.openai.com https://api.anthropic.com https://openrouter.ai https://cdn.jsdelivr.net https://cdn.tailwindcss.com https://unpkg.com http://localhost:* http://127.0.0.1:*; worker-src 'self' blob:">
+    <!-- Every third-party script and stylesheet is now vendored under vendor/,
+         so no remote script origin is allowed and 'unsafe-eval' (which only
+         existed for the cdn.tailwindcss.com JIT compiler) is gone. connect-src
+         still permits the LLM providers and a local Ollama server.
+         img-src keeps unpkg.com only because scripts/ui.js still points the
+         Leaflet marker icons at that CDN; once those are repointed at
+         vendor/leaflet/images/ it can be dropped too. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://unpkg.com https://*.basemaps.cartocdn.com; font-src 'self' data:; connect-src 'self' https://generativelanguage.googleapis.com https://api.openai.com https://api.anthropic.com https://openrouter.ai http://localhost:* http://127.0.0.1:*; worker-src 'self' blob:">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
     <meta name="googlebot" content="noindex, nofollow">
@@ -14,11 +21,13 @@
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 511.987 511.987'><rect x='66.717' y='204.027' transform='matrix(-0.2411 -0.9705 0.9705 -0.2411 -177.6681 420.4137)' fill='%23B6F2FC' width='17.648' height='151.29'/><polygon fill='%238ED7E0' points='235.67,98.502 417.524,413.484 53.815,413.484'/><polygon fill='%23F4BD64' points='511.987,268.44 511.987,315.737 368.184,337.491 344.872,329.255 296.635,235.133'/><polygon fill='%234EB79B' points='511.987,315.737 511.987,363.022 384.886,356.939 384.874,356.939 344.872,329.255 356.814,308.325'/><polygon fill='%23E88158' points='511.987,221.156 511.987,268.44 328.73,259.687 276.634,248.075 300.658,211.061'/><polygon fill='%23B6F2FC' points='384.874,356.939 385.874,358.669 113.88,263.558 300.658,211.061 328.73,259.687 356.802,308.325 356.814,308.325'/></svg>">
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Inter, self-hosted (latin + latin-ext subsets). -->
+    <link rel="stylesheet" href="vendor/inter.css">
 
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Statically compiled Tailwind, replacing the cdn.tailwindcss.com JIT
+         script. Rebuild with `npm run build:css` whenever a new utility class
+         is introduced in index.html or scripts/. -->
+    <link rel="stylesheet" href="vendor/tailwind.css">
 
     <link rel="stylesheet" href="styles.css">
 
@@ -215,12 +224,10 @@
         }
     </style>
 
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="vendor/flatpickr.min.js"></script>
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+    <script src="vendor/leaflet/leaflet.js"></script>
 </head>
 
 <body autocomplete="off">
@@ -6674,20 +6681,24 @@
         <div class="resize-handle-corner bottom-right"></div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script
-        src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    <script src="vendor/chart.umd.min.js"></script>
+    <script src="vendor/chartjs-plugin-datalabels.min.js"></script>
+    <!-- three.js is vendored at 0.160.0, the version this app has always run
+         against. node_modules/three is pinned to the same version so exactly
+         one copy ships. Do not bump without checking scene.js: from r169
+         TransformControls no longer extends Object3D, so `scene.add(controls)`
+         throws and the gizmos disappear. -->
     <script type="importmap">
     {
         "imports": {
-            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-            "three/examples/jsm/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            "three": "./vendor/three/build/three.module.js",
+            "three/addons/": "./vendor/three/examples/jsm/",
+            "three/examples/jsm/": "./vendor/three/examples/jsm/"
         }
     }
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="vendor/mermaid.min.js"></script>
+    <script src="vendor/jszip.min.js"></script>
 
     <script>
         // Minimal non-invasive UI-only mitigation:

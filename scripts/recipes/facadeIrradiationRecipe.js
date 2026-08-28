@@ -13,8 +13,8 @@ const inputSchema = {
     lw: { type: 'number' }
   },
   recipeParams: {
-    'weather-file': { type: 'string' },
-    'facade-selection': { type: 'string' }, // e.g. N,S,E,W,ALL or legacy-specific token
+    'weather-file': { type: 'file' },
+    'facade-selection': { type: 'string' }, // N | S | E | W (see #facade-selection)
     'facade-offset': { type: 'number', optional: true },
     'facade-grid-spacing': { type: 'number', optional: true }
   },

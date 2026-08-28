@@ -14,6 +14,32 @@ function _snapToStep(value, min, max, step) {
     return Math.max(min, Math.min(max, snapped));
 }
 
+/**
+ * CANONICAL goal-id → metric-key mapping.
+ *
+ * Optimizer goal ids carry their direction as a prefix ("maximize_sDA",
+ * "minimize_ASE", "minimize_Annual_DGP_Avg"), but the orchestrator stores the
+ * parsed values under the stripped, lower-cased remainder ("sda", "ase",
+ * "annual_dgp_avg"). BOTH the orchestrator's parser and NSGA-II must go through
+ * this function: a mismatch makes every comparison undefined-vs-undefined,
+ * which silently ranks the whole population as front 1.
+ * @param {string} goalId
+ * @returns {string}
+ */
+export function goalIdToMetricKey(goalId) {
+    return String(goalId ?? '').replace(/^(minimize|maximize)_/i, '').toLowerCase();
+}
+
+/**
+ * CANONICAL optimization direction, derived from the goal id itself rather than
+ * from a separate dropdown that can disagree with it.
+ * @param {string} goalId
+ * @returns {'minimize'|'maximize'}
+ */
+export function goalIdToDirection(goalId) {
+    return /^minimize_/i.test(String(goalId ?? '')) ? 'minimize' : 'maximize';
+}
+
 export class MultiObjectiveOptimizer {
     /**
      * Creates an instance of the Multi-Objective Genetic Algorithm (NSGA-II).
@@ -46,10 +72,15 @@ export class MultiObjectiveOptimizer {
     _dominates(p, q) {
         let pIsBetter = false;
         for (const obj of this.objectives) {
-            const pVal = p.metrics[obj.id];
-            const qVal = q.metrics[obj.id];
+            const key = goalIdToMetricKey(obj.id);
+            const pVal = p.metrics?.[key];
+            const qVal = q.metrics?.[key];
 
-            if (obj.goal === 'maximize') {
+            // A missing metric cannot participate in dominance; skip the objective
+            // rather than poisoning every comparison with NaN.
+            if (!Number.isFinite(pVal) || !Number.isFinite(qVal)) continue;
+
+            if ((obj.goal || goalIdToDirection(obj.id)) === 'maximize') {
                 if (pVal < qVal) return false; // p is worse in at least one objective
                 if (pVal > qVal) pIsBetter = true; // p is better in at least one
             } else { // 'minimize'
@@ -117,23 +148,43 @@ export class MultiObjectiveOptimizer {
         front.forEach(p => p.crowdingDistance = 0);
 
         for (const obj of this.objectives) {
+            const key = goalIdToMetricKey(obj.id);
+            const valueOf = (ind) => {
+                const v = ind.metrics?.[key];
+                return Number.isFinite(v) ? v : 0;
+            };
+
             // Sort by the current objective's metric value
-            front.sort((a, b) => a.metrics[obj.id] - b.metrics[obj.id]);
+            front.sort((a, b) => valueOf(a) - valueOf(b));
 
             // Assign infinite distance to the boundary individuals
             front[0].crowdingDistance = Infinity;
             front[front.length - 1].crowdingDistance = Infinity;
 
-            const minVal = front[0].metrics[obj.id];
-            const maxVal = front[front.length - 1].metrics[obj.id];
+            const minVal = valueOf(front[0]);
+            const maxVal = valueOf(front[front.length - 1]);
             const range = maxVal - minVal;
 
             if (range === 0) continue; // All values are the same
 
             for (let i = 1; i < front.length - 1; i++) {
-                front[i].crowdingDistance += (front[i + 1].metrics[obj.id] - front[i - 1].metrics[obj.id]) / range;
+                front[i].crowdingDistance += (valueOf(front[i + 1]) - valueOf(front[i - 1])) / range;
             }
         }
+    }
+
+    /**
+     * Ranks a population into fronts AND assigns a crowding distance to every
+     * individual in EVERY front (not just the split front). Elites promoted from a
+     * full front used to keep `crowdingDistance === undefined`, which made crowded
+     * tournament selection compare against `undefined`.
+     * @param {Array<object>} population
+     * @returns {Array<Array<object>>} The fronts.
+     */
+    _assignRankAndCrowding(population) {
+        const fronts = this._fastNonDominatedSort(population);
+        fronts.forEach(front => this._calculateCrowdingDistance(front));
+        return fronts;
     }
 
     /**
@@ -144,13 +195,18 @@ export class MultiObjectiveOptimizer {
         const tournamentSize = 2;
         let best = null;
 
+        // Defensive defaults: an individual that somehow escaped ranking must not win
+        // a tournament by comparing `undefined` against a real number.
+        const rankOf = (ind) => Number.isFinite(ind?.rank) ? ind.rank : Number.MAX_SAFE_INTEGER;
+        const crowdingOf = (ind) => (typeof ind?.crowdingDistance === 'number') ? ind.crowdingDistance : -Infinity;
+
         for (let i = 0; i < tournamentSize; i++) {
             const candidate = this.population[Math.floor(Math.random() * this.population.length)];
             if (best === null) {
                 best = candidate;
-            } else if (candidate.rank < best.rank) {
+            } else if (rankOf(candidate) < rankOf(best)) {
                 best = candidate; // Better rank
-            } else if (candidate.rank === best.rank && candidate.crowdingDistance > best.crowdingDistance) {
+            } else if (rankOf(candidate) === rankOf(best) && crowdingOf(candidate) > crowdingOf(best)) {
                 best = candidate; // Same rank, better diversity
             }
         }
@@ -220,7 +276,10 @@ export class MultiObjectiveOptimizer {
         this.shouldStop = false;
 
         // 1. Initialization (P0)
-        if (this.currentGeneration === 0) {
+        // Guard on the population being ABSENT, not on the generation counter: a run
+        // stopped during generation 0 is checkpointed with currentGeneration === 0, and
+        // re-initialising here would throw away the loaded state.
+        if (!Array.isArray(this.population) || this.population.length === 0) {
             this.population = [];
             for (let i = 0; i < this.populationSize; i++) {
                 const params = {};
@@ -235,19 +294,25 @@ export class MultiObjectiveOptimizer {
                 });
                 this.population.push({ params });
             }
+        }
 
-            // Evaluate initial population SEQUENTIALLY. Each evaluation mutates and
-            // reads the single shared UI/scene, so concurrent evaluation would
-            // cross-contaminate results.
-            for (const ind of this.population) {
-                ind.metrics = await fitnessFunction(ind.params);
-            }
+        // Evaluate any un-evaluated individuals SEQUENTIALLY. Each evaluation mutates
+        // and reads the single shared UI/scene, so concurrent evaluation would
+        // cross-contaminate results. Skipping already-evaluated individuals lets a
+        // partially-evaluated resumed population continue where it left off.
+        for (const ind of this.population) {
+            if (this.shouldStop) throw new Error('Optimization cancelled');
+            if (!ind.metrics) ind.metrics = await fitnessFunction(ind.params);
         }
 
         // 2. Start generational loop
         for (let g = this.currentGeneration; g < this.maxGenerations; g++) {
             if (this.shouldStop) throw new Error('Optimization cancelled');
-            this.currentGeneration = g;
+
+            // Rank + crowding for the CURRENT population BEFORE any selection happens.
+            // Without this, generation 0 selected among individuals that had no `rank`
+            // at all, and promoted elites carried a stale/undefined crowding distance.
+            this._assignRankAndCrowding(this.population);
 
             // 3. Create child population (Q_t)
             const childPopulation = [];
@@ -259,7 +324,10 @@ export class MultiObjectiveOptimizer {
             }
 
             // 4. Evaluate child population SEQUENTIALLY (shared UI/scene, see above).
+            // Check the stop flag per individual so cancellation does not have to wait
+            // for the whole generation's simulations to finish.
             for (const ind of childPopulation) {
+                if (this.shouldStop) throw new Error('Optimization cancelled');
                 ind.metrics = await fitnessFunction(ind.params);
             }
             const evaluatedChildren = childPopulation;
@@ -267,21 +335,21 @@ export class MultiObjectiveOptimizer {
             // 5. Combine parent and child (R_t)
             const combinedPopulation = [...this.population, ...evaluatedChildren];
 
-            // 6. Sort combined population into fronts
-            const fronts = this._fastNonDominatedSort(combinedPopulation);
+            // 6. Sort combined population into fronts and give EVERY front a crowding
+            //    distance, so elites promoted whole in step 7 carry a real value.
+            const fronts = this._assignRankAndCrowding(combinedPopulation);
 
             // 7. Build next generation (P_t+1)
             const nextPopulation = [];
             let frontIndex = 0;
-            while (nextPopulation.length + fronts[frontIndex].length <= this.populationSize) {
+            while (fronts[frontIndex] && nextPopulation.length + fronts[frontIndex].length <= this.populationSize) {
                 nextPopulation.push(...fronts[frontIndex]);
                 frontIndex++;
             }
 
             // 8. Handle the last, split front
-            if (nextPopulation.length < this.populationSize) {
+            if (nextPopulation.length < this.populationSize && fronts[frontIndex]) {
                 const lastFront = fronts[frontIndex];
-                this._calculateCrowdingDistance(lastFront);
                 // Sort by crowding distance (descending)
                 lastFront.sort((a, b) => b.crowdingDistance - a.crowdingDistance);
 
@@ -290,9 +358,12 @@ export class MultiObjectiveOptimizer {
             }
 
             this.population = nextPopulation;
-            this.paretoFront = fronts[0];
+            this.paretoFront = fronts[0] || [];
 
-            // 9. Report progress
+            // 9. Report progress. Mark generation `g` COMPLETE first: the progress
+            //    callback is what writes the checkpoint, and recording `g` there made
+            //    a resume re-run the generation that had just finished.
+            this.currentGeneration = g + 1;
             if (progressCallback) {
                 await progressCallback(g + 1, this.paretoFront);
             }
@@ -302,16 +373,24 @@ export class MultiObjectiveOptimizer {
     }
 
     getState() {
+        // Serialize ONLY the durable fields. `dominatedSet` holds references to other
+        // individuals, so a naive deep copy expanded the domination graph into a huge
+        // duplicated tree every generation, and `crowdingDistance` can be Infinity,
+        // which JSON turns into null. Ranks and crowding are recomputed on resume.
+        const snapshot = (ind) => ({
+            params: { ...ind.params },
+            metrics: ind.metrics ? { ...ind.metrics } : undefined
+        });
         return {
             currentGeneration: this.currentGeneration,
-            population: JSON.parse(JSON.stringify(this.population)), // Deep copy
-            paretoFront: this.paretoFront ? JSON.parse(JSON.stringify(this.paretoFront)) : []
+            population: Array.isArray(this.population) ? this.population.map(snapshot) : [],
+            paretoFront: Array.isArray(this.paretoFront) ? this.paretoFront.map(snapshot) : []
         };
     }
 
     loadState(state) {
-        this.currentGeneration = state.currentGeneration;
-        this.population = state.population;
-        this.paretoFront = state.paretoFront;
+        this.currentGeneration = state.currentGeneration || 0;
+        this.population = Array.isArray(state.population) ? state.population : [];
+        this.paretoFront = Array.isArray(state.paretoFront) ? state.paretoFront : [];
     }
 }

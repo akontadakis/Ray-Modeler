@@ -15,8 +15,11 @@ const inputSchema = {
     'pit-month': { type: 'number', required: true },
     'pit-day': { type: 'number', required: true },
     'pit-time': { type: 'string', required: true },
-    'dgp-x-res': { type: 'number' },
-    'dgp-y-res': { type: 'number' },
+    // 'dgp-x-res' / 'dgp-y-res' were declared here but no such controls exist in
+    // #template-recipe-dgp, so they were pinned at their defaults and validate()
+    // reported on a value nobody could set. createDgpScript() already falls back
+    // to 1500x1500, which is the only source of truth today. Removed rather than
+    // mapped; re-declare them if the template ever grows the two inputs.
     'evalglare-c': { type: 'boolean' },
     'evalglare-d': { type: 'boolean' },
     'evalglare-t': { type: 'boolean' }

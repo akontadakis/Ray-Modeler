@@ -135,6 +135,14 @@ export class GeneticOptimizer {
     this.shouldStop = false;
     let populationWithFitness = [];
 
+    // A budget smaller than the population meant the initial population alone spent
+    // (and overshot) the entire budget, so the steady-state loop never ran at all.
+    // Shrink the population to fit rather than silently doing nothing.
+    if (this.maxEvaluations < this.populationSize) {
+        console.warn(`[GeneticOptimizer] maxEvaluations (${this.maxEvaluations}) is below populationSize (${this.populationSize}); shrinking population to fit the budget.`);
+        this.populationSize = Math.max(2, this.maxEvaluations);
+    }
+
     // 1. Initialize and evaluate initial population if this is a new run
     if (this.evaluationsCompleted === 0) {
         this.initializePopulation();
@@ -170,12 +178,19 @@ export class GeneticOptimizer {
         const childAParams = this.mutate(this.crossover(parentA, parentB));
         const childBParams = this.mutate(this.crossover(parentB, parentA));
 
-        // Evaluate 2 new children SEQUENTIALLY (shared UI/scene, see above).
-        const newChildren = [
-            await fitnessFunction(childAParams),
-            await fitnessFunction(childBParams)
-        ];
-        this.evaluationsCompleted += 2;
+        // Evaluate the new children SEQUENTIALLY (shared UI/scene, see above).
+        // Only evaluate as many as the remaining budget allows: the counter advanced
+        // by 2 against a `< maxEvaluations` guard, so an odd budget used to overshoot
+        // by one whole headless Radiance run.
+        const remaining = this.maxEvaluations - this.evaluationsCompleted;
+        const childParamSets = (remaining >= 2) ? [childAParams, childBParams] : [childAParams];
+        const newChildren = [];
+        for (const params of childParamSets) {
+            if (this.shouldStop) break;
+            newChildren.push(await fitnessFunction(params));
+            this.evaluationsCompleted += 1;
+        }
+        if (newChildren.length === 0) break;
 
         // Insert new children and cull the worst
         populationWithFitness = this._insertAndCull(newChildren, populationWithFitness);

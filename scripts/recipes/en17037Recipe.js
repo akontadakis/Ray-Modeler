@@ -13,17 +13,21 @@ const inputSchema = {
     lw: { type: 'number' }
   },
   recipeParams: {
-    // The EN 17037 orchestration uses internal toggles in legacy code.
-    // Expose them here to keep config explicit and forward compatible.
-    'check-daylight-provision': { type: 'boolean' },
-    'check-view-out': { type: 'boolean' },
-    'check-sunlight-exposure': { type: 'boolean' },
-    'check-glare-protection': { type: 'boolean' },
-    // Optional level selectors (e.g. minimum / medium / high) if used by legacy:
-    'daylight-provision-level': { type: 'string' },
-    'view-out-level': { type: 'string' },
-    'sunlight-exposure-level': { type: 'string' },
-    'glare-protection-level': { type: 'string' }
+    // These MUST match the control ids in #template-recipe-en17037 (index.html)
+    // and the keys scriptGenerator.js reads. The previous 'check-*' names existed
+    // nowhere, so every compliance flag resolved to false and validate() was inert.
+    'en17037-provision-toggle': { type: 'boolean', default: true },
+    'en17037-view-toggle': { type: 'boolean', default: true },
+    'en17037-sunlight-toggle': { type: 'boolean', default: true },
+    'en17037-glare-toggle': { type: 'boolean', default: true },
+    // Quantitative view-factor sub-check of the "View Out" pillar.
+    'en17037-view-factor-toggle': { type: 'boolean', default: false },
+    // Target performance levels (minimum / medium / high).
+    'en17037-provision-level': { type: 'string' },
+    'en17037-view-level': { type: 'string' },
+    'en17037-sunlight-level': { type: 'string' },
+    'en17037-glare-level': { type: 'string' },
+    'en17037-sunlight-date': { type: 'string' }
   },
   requiredFiles: [],
   requiredResources: {
@@ -68,10 +72,10 @@ function validate(projectData, config) {
     !!simFiles['weather-file'];
 
   const flags = {
-    daylight: !!config.recipe['check-daylight-provision'],
-    viewOut: !!config.recipe['check-view-out'],
-    sunlight: !!config.recipe['check-sunlight-exposure'],
-    glare: !!config.recipe['check-glare-protection']
+    daylight: !!config.recipe['en17037-provision-toggle'],
+    viewOut: !!config.recipe['en17037-view-toggle'],
+    sunlight: !!config.recipe['en17037-sunlight-toggle'],
+    glare: !!config.recipe['en17037-glare-toggle']
   };
 
   // Require at least one check; otherwise nothing meaningful will run.
