@@ -353,30 +353,55 @@ function _parseIllFileContent(arrayBuffer) {
         throw new Error("No data could be parsed from the .ill file.");
     }
 
-    // Row-major layout, matching the matrices this app generates:
-    // NROWS = timesteps, NCOLS = sensor points, NCOMP components per cell.
-    let numRows = nrows;
-    let numPoints = ncols;
+    // Matrix layout.
+    //
+    // dctimestep and rmtxop write ONE ROW PER SENSOR POINT and one column per
+    // timestep: NROWS = sensor count, NCOLS = timestep count, and the payload is
+    // point-major. This parser used to assume the opposite (NROWS = timesteps),
+    // which is why a perfectly good 30-point annual matrix was rejected as
+    // "30 timesteps". The generated Python post-processors read the Radiance
+    // orientation; this now matches them.
+    //
+    // Files the app wrote under the old assumption are still readable: whichever
+    // of the two dimensions produces a valid hour mapping decides the orientation.
+    let numTimesteps;
+    let numPoints;
+    let pointMajor;
 
-    if (numRows === null || numPoints === null) {
+    if (nrows === null || ncols === null) {
         // Headerless file: fall back to the app's own convention of 8760 hourly rows.
         if (total % (HOURS_IN_YEAR * comps) !== 0) {
             throw new Error(`Invalid .ill file format. The file has no NROWS/NCOLS header and its ${total} values are not a whole number of 8760-hour ${comps}-component records.`);
         }
-        numRows = HOURS_IN_YEAR;
+        numTimesteps = HOURS_IN_YEAR;
         numPoints = total / (HOURS_IN_YEAR * comps);
-    } else if (numRows * numPoints * comps !== total) {
-        throw new Error(`Invalid .ill file. The header declares NROWS=${numRows} NCOLS=${numPoints} NCOMP=${comps} (${numRows * numPoints * comps} values) but the payload contains ${total}.`);
+        pointMajor = false;
+    } else {
+        if (nrows * ncols * comps !== total) {
+            throw new Error(`Invalid .ill file. The header declares NROWS=${nrows} NCOLS=${ncols} NCOMP=${comps} (${nrows * ncols * comps} values) but the payload contains ${total}.`);
+        }
+        if (nrows <= 0 || ncols <= 0) {
+            throw new Error(`Invalid .ill file dimensions: NROWS=${nrows} NCOLS=${ncols}.`);
+        }
+        if (_buildIllHourMapping(ncols)) {
+            numTimesteps = ncols;
+            numPoints = nrows;
+            pointMajor = true;
+        } else if (_buildIllHourMapping(nrows)) {
+            // A matrix written the other way round (older Ray Modeler output).
+            numTimesteps = nrows;
+            numPoints = ncols;
+            pointMajor = false;
+        } else {
+            throw new Error(`Unsupported .ill file: NROWS=${nrows} NCOLS=${ncols}, and neither is a usable timestep count. The annual dashboards are indexed on a 8760-hour year, so the timestep dimension must be 8760, 8784 (leap year) or a whole multiple of 8760 (sub-hourly).`);
+        }
     }
 
-    if (numRows <= 0 || numPoints <= 0) {
-        throw new Error(`Invalid .ill file dimensions: ${numRows} rows x ${numPoints} columns.`);
-    }
-
-    const mapping = _buildIllHourMapping(numRows);
-    if (!mapping) {
-        throw new Error(`Unsupported .ill file: ${numRows} timesteps. The annual dashboards are indexed on a 8760-hour year, so only 8760 rows, 8784 rows (leap year) or a whole multiple of 8760 (sub-hourly) can be read.`);
-    }
+    const mapping = _buildIllHourMapping(numTimesteps);
+    // One of the two branches above already proved this mapping exists.
+    const indexFor = pointMajor
+        ? (p, step) => (p * numTimesteps + step) * comps
+        : (p, step) => (step * numPoints + p) * comps;
 
     const annualData = Array.from({ length: numPoints }, () => new Float32Array(HOURS_IN_YEAR));
     const averageData = [];
@@ -386,7 +411,7 @@ function _parseIllFileContent(arrayBuffer) {
         for (let h = 0; h < HOURS_IN_YEAR; h++) {
             let accumulated = 0;
             for (let s = 0; s < mapping.steps; s++) {
-                const index = (mapping.rowFor(h, s) * numPoints + p) * comps;
+                const index = indexFor(p, mapping.rowFor(h, s));
                 accumulated += (comps === 3)
                     ? 179 * (0.265 * values[index] + 0.670 * values[index + 1] + 0.065 * values[index + 2])
                     : values[index];
