@@ -62,6 +62,38 @@ function _parseFileContent(content, fileName = '') {
 }
 
 /**
+ * Removes a leading Radiance ASCII header from a text results file.
+ *
+ * rmtxop, dctimestep and dcglare all write "#?RADIANCE", the command line that
+ * produced the file, CAPDATE/GMT stamps and NROWS/NCOLS/NCOMP/FORMAT, then a
+ * blank line, then the data. Only the first of those lines starts with "#", so
+ * skipping comment lines alone left the command line in the data and every such
+ * file was rejected with "non-numeric data at line 2".
+ *
+ * @param {string} content Raw file text.
+ * @returns {{body: string, nrows: number|null, ncols: number|null, ncomp: number|null}}
+ */
+function _stripRadianceHeaderText(content) {
+    const empty = { body: content, nrows: null, ncols: null, ncomp: null };
+    if (!/^\s*#\?RADIANCE/.test(content)) return empty;
+
+    const sep = content.search(/\r?\n\r?\n/);
+    if (sep === -1) return empty;
+
+    const header = content.slice(0, sep);
+    const readInt = (name) => {
+        const m = header.match(new RegExp(`^${name}\\s*=\\s*(\\d+)`, 'm'));
+        return m ? parseInt(m[1], 10) : null;
+    };
+    return {
+        body: content.slice(sep).replace(/^\r?\n\r?\n/, ''),
+        nrows: readInt('NROWS'),
+        ncols: readInt('NCOLS'),
+        ncomp: readInt('NCOMP')
+    };
+}
+
+/**
  * Parses a whitespace-delimited numeric results grid (rtrace / rcalc output).
  *
  * Accepts either one value per line (already-reduced illuminance) or three values
@@ -76,7 +108,7 @@ function _parseFileContent(content, fileName = '') {
  * @returns {number[]} One scalar per sensor point.
  */
 function _parseNumericGrid(content) {
-    const lines = content.split(/\r?\n/);
+    const lines = _stripRadianceHeaderText(content).body.split(/\r?\n/);
     const values = [];
     let columns = 0;
 
@@ -112,7 +144,7 @@ function _parseNumericGrid(content) {
  */
 function _parseAnnualGlareFile(content, type) {
     const HOURS_IN_YEAR = 8760;
-    const lines = content.split(/\r?\n/);
+    const lines = _stripRadianceHeaderText(content).body.split(/\r?\n/);
     const dataMatrix = [];
 
     for (let i = 0; i < lines.length; i++) {
@@ -120,7 +152,7 @@ function _parseAnnualGlareFile(content, type) {
         if (line === '' || line.startsWith('#')) continue; // Blank lines and Radiance comments
         const row = line.split(/\s+/).map(Number);
         if (row.some(v => !Number.isFinite(v))) {
-            throw new Error(`File contains non-numeric data at line ${i + 1}.`);
+            throw new Error(`File contains non-numeric data at line ${i + 1}: "${line}".`);
         }
         dataMatrix.push(row);
     }
@@ -129,24 +161,45 @@ function _parseAnnualGlareFile(content, type) {
         throw new Error('Annual glare file contains no data rows.');
     }
 
-    const numPoints = dataMatrix[0].length;
-    if (dataMatrix.some(row => row.length !== numPoints)) {
-        throw new Error('Annual glare file rows do not all contain the same number of sensor points.');
+    const rowLength = dataMatrix[0].length;
+    if (dataMatrix.some(row => row.length !== rowLength)) {
+        throw new Error('Annual glare file rows do not all have the same length.');
     }
 
-    // Consumers index this matrix over a full 8760-hour year. A short file must be
-    // padded explicitly (0 = no glare) rather than left to read `undefined`, which
-    // fails every threshold test and silently counts missing hours as "no glare".
-    if (dataMatrix.length !== HOURS_IN_YEAR) {
-        console.warn(`Annual glare file has ${dataMatrix.length} rows, not ${HOURS_IN_YEAR}. Missing hours are padded with 0; surplus hours are ignored.`);
+    // dcglare writes ONE ROW PER VIEW and one column per timestep, the same
+    // orientation as every other Radiance matrix. A .ga file, written with -l, is a
+    // single glare-autonomy fraction per view: a scalar grid, not a time series.
+    if (rowLength === 1) {
+        return { data: dataMatrix.map(row => row[0]) };
     }
 
-    const usableHours = Math.min(dataMatrix.length, HOURS_IN_YEAR);
+    // Rows are views and columns are hours, unless only the row count is a usable
+    // annual length - which is how this app used to write the file.
+    let numPoints;
+    let usableHours;
+    let valueAt;
+
+    if (_buildIllHourMapping(rowLength)) {
+        numPoints = dataMatrix.length;
+        usableHours = Math.min(rowLength, HOURS_IN_YEAR);
+        valueAt = (p, h) => dataMatrix[p][h];
+    } else if (_buildIllHourMapping(dataMatrix.length)) {
+        numPoints = rowLength;
+        usableHours = Math.min(dataMatrix.length, HOURS_IN_YEAR);
+        valueAt = (p, h) => dataMatrix[h][p];
+    } else {
+        // Neither dimension is an annual length. Keep the historical reading and pad.
+        numPoints = rowLength;
+        usableHours = Math.min(dataMatrix.length, HOURS_IN_YEAR);
+        valueAt = (p, h) => dataMatrix[h][p];
+        console.warn(`Annual glare file is ${dataMatrix.length} rows x ${rowLength} columns; neither is a whole year. Missing hours are padded with 0; surplus hours are ignored.`);
+    }
+
     const transposedData = Array.from({ length: numPoints }, () => new Float32Array(HOURS_IN_YEAR));
 
-    for (let h = 0; h < usableHours; h++) {
-        for (let p = 0; p < numPoints; p++) {
-            transposedData[p][h] = dataMatrix[h][p];
+    for (let p = 0; p < numPoints; p++) {
+        for (let h = 0; h < usableHours; h++) {
+            transposedData[p][h] = valueAt(p, h);
         }
     }
 
