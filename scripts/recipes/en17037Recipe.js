@@ -96,6 +96,17 @@ function validate(projectData, config) {
   }
 
   if (flags.daylight) {
+    // The daylight-provision pillar delegates to the 3-phase recipe, whose
+    // dctimestep run needs a Klems BSDF for the glazing. EN 17037 never checked
+    // for one, so the package generated cleanly and then died minutes later at
+    // 'Cannot open BSDF "../05_bsdf/window.xml"'.
+    const hasBsdf = !!simFiles['bsdf-file'] || !!config.recipe['bsdf-file'];
+    if (!hasBsdf) {
+      addError(
+        result,
+        'EN 17037: The daylight provision check runs the 3-phase method, which requires a Klems BSDF XML for the window system (bsdf-file). Select one, or turn the daylight provision check off.'
+      );
+    }
     if (!hasFloorIllGrid) {
       addError(
         result,

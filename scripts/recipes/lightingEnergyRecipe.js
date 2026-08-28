@@ -73,9 +73,19 @@ function validate(projectData, config) {
     );
   }
 
-  // BSDFs are optional depending on whether shading systems are modeled with BSDF.
   const bsdfOpen = simFiles['bsdf-open-file'] || config.recipe['bsdf-open-file'];
   const bsdfClosed = simFiles['bsdf-closed-file'] || config.recipe['bsdf-closed-file'];
+
+  // Not optional in practice: the generated script always runs dctimestep against
+  // ../05_bsdf/bsdf_open.xml and ../05_bsdf/bsdf_closed.xml, falling back to those
+  // names when nothing is selected. With neither file present the run always died
+  // at 'Cannot open BSDF', several minutes in, with no hint of the cause.
+  if (!bsdfOpen && !bsdfClosed) {
+    addError(
+      result,
+      'Lighting Energy: Requires a Klems BSDF pair for the glazing (bsdf-open-file and bsdf-closed-file). Select both before running.'
+    );
+  }
 
   if ((bsdfOpen && !bsdfClosed) || (!bsdfOpen && bsdfClosed)) {
     addWarning(
