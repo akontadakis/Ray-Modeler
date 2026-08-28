@@ -134,8 +134,9 @@ function openShortcutHelp() {
 // --- MODULE STATE ---
 const dom = getDom(); // Get the cached dom from the new module
 
-let isLeftSidebarDocked = localStorage.getItem('isLeftSidebarDocked') === 'true'; // Load state
-let isTopSidebarDocked = localStorage.getItem('isTopSidebarDocked') === 'true'; // Load state for top sidebar
+// NOTE: the live sidebar dock state lives in sidebar.js (getIsLeftSidebarDocked /
+// getIsTopSidebarDocked). Duplicate module-local copies used to be declared here and
+// were never read or written.
 
 let updateScheduled = false;
 let isResizeMode = false;
@@ -153,6 +154,19 @@ let savedViews = []; // Holds the saved camera view "snapshots"
 let currentSort = { column: 'id', direction: 'asc' }; // Default sort state
 let parsedBsdfData = null; // Holds parsed BSDF data to avoid re-parsing
 
+/**
+ * Invalidates the cached BSDF parse.
+ *
+ * CONTRACT: the cache is keyed on nothing — it simply memoises the last parse of
+ * project.simulationFiles['bsdf-file']. ui.js clears it itself whenever the user picks
+ * (or clears) a BSDF file manually, but ANY other code path that replaces
+ * simulationFiles['bsdf-file'] — notably project.js loading a saved project — must call
+ * this, otherwise the BSDF viewer keeps showing the previous project's data.
+ */
+export function resetBsdfCache() {
+    parsedBsdfData = null;
+}
+
 // --- START: Added state for Task Area Visualizer ---
 let taskAreaCtx, taskAreaCanvas;
 let isDraggingTaskArea = false;
@@ -168,12 +182,14 @@ let zoneCtx, zoneCanvas;
 let isDraggingZoneDivider = false;
 // --- END: Added state for Daylighting Zone Visualizer ---
 
-// Debounce utility to prevent rapid-fire updates from sliders
-let debounceTimer;
+// Debounce utility to prevent rapid-fire updates from sliders.
+// The timer handle is per-debounced-function (a closure variable), not module-wide;
+// a single shared handle made every debounced callback cancel every other one.
 function debounce(func, delay) {
+    let timer;
     return function (...args) {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
             func.apply(this, args);
         }, delay);
     };
@@ -990,20 +1006,16 @@ export async function setupEventListeners() {
 
     // Welcome Screen Options
     dom['start-with-draw']?.addEventListener('click', () => {
-        // Hide welcome screen
-        const welcomeScreen = document.getElementById('welcome-screen');
-        if (welcomeScreen) welcomeScreen.classList.add('hidden');
+        // Use the real teardown so the animation frame, mousemove listener and
+        // ResizeObserver are released instead of leaking for the whole session.
+        dismissWelcomeScreen();
         // Show drawing setup modal (for optional floor plan loading)
         showDrawSetupModal();
     });
 
-    dom['start-with-import']?.addEventListener('click', () => {
-        // Hide welcome screen
-        const welcomeScreen = document.getElementById('welcome-screen');
-        if (welcomeScreen) welcomeScreen.classList.add('hidden');
-        // Trigger import
-        handleModelImport();
-    });
+    // NOTE: #start-with-import is bound once, in setupWelcomeScreen(). A second
+    // listener here raced the first one (it hid the screen without tearing it down
+    // and skipped switchGeometryMode('import')), so it has been consolidated there.
 
 
     Object.keys(dom).forEach(id => {
@@ -1190,7 +1202,8 @@ export async function setupEventListeners() {
     setupDaylightingZoneVisualizer(); // Initialize the new zone visualizer
 
     dom['custom-alert-close']?.addEventListener('click', hideAlert);
-    dom['gizmo-toggle']?.addEventListener('change', (e) => setGizmoVisibility(e.target.checked));
+    // NOTE: #gizmo-toggle is bound once, above, via updateGizmoVisibility(). A second
+    // 'change' listener was registered here and did the same work twice.
 
 
     // --- 3D Scene Interaction ---
@@ -1311,7 +1324,27 @@ export async function setupEventListeners() {
 
         resultsManager.updateColorScale(min, max, palette);
         updateResultsLegend();
+
+        // Repaint the 3D overlay and the 2D heatmap with the new scale. Passing a falsy
+        // value to updateSensorGridColors() clears the overlay, so only call it with data.
+        const activeData = resultsManager.getActiveData();
+        if (activeData && activeData.length > 0) updateSensorGridColors(activeData);
+        render2DHeatmap();
     }
+
+    // The results-dashboard colour-scale controls were never wired up, so the function
+    // above was dead and dragging the sliders did nothing.
+    dom['results-scale-min']?.addEventListener('input', updateColorScaleAndViz);
+    dom['results-scale-max']?.addEventListener('input', updateColorScaleAndViz);
+    dom['results-palette']?.addEventListener('change', updateColorScaleAndViz);
+    dom['results-scale-min-num']?.addEventListener('change', (e) => {
+        if (dom['results-scale-min']) dom['results-scale-min'].value = e.target.value;
+        updateColorScaleAndViz();
+    });
+    dom['results-scale-max-num']?.addEventListener('change', (e) => {
+        if (dom['results-scale-max']) dom['results-scale-max'].value = e.target.value;
+        updateColorScaleAndViz();
+    });
 
     // Add listeners for the material reflectance mode buttons
     const materialTypes = ['wall', 'floor', 'ceiling']; // Expand this array to add spectral controls to other materials
@@ -1435,7 +1468,8 @@ export async function setupEventListeners() {
         if (resultsPanel) {
             const isHidden = resultsPanel.classList.contains('hidden');
             if (isHidden) {
-                if (resultsManager.resultsData.length > 0) {
+                const activeData = resultsManager.getActiveData();
+                if (activeData && activeData.length > 0) {
                     resultsPanel.classList.remove('hidden');
                     updateResultsAnalysisPanel();
                     makeDraggable(resultsPanel, resultsPanel.querySelector('.window-header'));
@@ -1464,100 +1498,6 @@ export async function setupEventListeners() {
         render2DHeatmap();
     });
 
-    function updateResultsAnalysisPanel() {
-        const stats = resultsManager.stats;
-        dom['stats-min-val'].textContent = stats.min.toFixed(1);
-        dom['stats-max-val'].textContent = stats.max.toFixed(1);
-        dom['stats-avg-val'].textContent = stats.avg.toFixed(1);
-        const uniformity = stats.min > 0 ? (stats.min / stats.avg).toFixed(2) : 'N/A';
-        dom['stats-uniformity-val'].textContent = uniformity;
-
-        // Show/hide heatmap mode controls based on annual data availability
-        const hasAnnual = resultsManager.hasAnnualData(resultsManager.activeView);
-        const heatmapControls = dom['heatmap-controls-container'];
-        if (heatmapControls) {
-            heatmapControls.classList.toggle('hidden', !hasAnnual);
-            // Reset to illuminance mode if annual data is not available or cleared
-            if (!hasAnnual) {
-                dom['heatmap-mode-selector'].value = 'illuminance';
-                dom['da-threshold-controls'].classList.add('hidden');
-            } else {
-                // Ensure DA controls are visible/hidden based on current selection
-                const isDaMode = dom['heatmap-mode-selector'].value === 'da';
-                dom['da-threshold-controls']?.classList.toggle('hidden', !isDaMode);
-            }
-        }
-
-        const histogramCtx = dom['illuminance-histogram']?.getContext('2d');
-        if (histogramCtx) {
-            if (window.illuminanceHistogram) {
-                window.illuminanceHistogram.destroy();
-            }
-            window.illuminanceHistogram = new Chart(histogramCtx, {
-                type: 'bar',
-                data: resultsManager.getHistogramData(),
-                options: {
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, title: { display: true, text: 'Count' } },
-                        x: { title: { display: true, text: 'Illuminance (lux)' } }
-                    }
-                }
-            });
-        }
-        updateInteractiveLegend();
-        render2DHeatmap();
-    }
-
-    function updateInteractiveLegend() {
-        const canvas = dom['interactive-legend'];
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const width = canvas.width;
-        const height = canvas.height;
-        const gradient = ctx.createLinearGradient(0, 0, width, 0);
-        const palette = palettes[resultsManager.colorScale.palette] || palettes.viridis;
-
-        palette.forEach((color, i) => {
-            gradient.addColorStop(i / (palette.length - 1), color);
-        });
-
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, width, height);
-
-        dom['legend-min-label'].textContent = Math.round(resultsManager.colorScale.min);
-        dom['legend-max-label'].textContent = Math.round(resultsManager.colorScale.max);
-    }
-
-    /**
-    * Draws the color gradient legend for the difference map.
-    */
-    function updateDifferenceLegend() {
-        const dom = getDom();
-
-        const canvas = dom['difference-legend'];
-        if (!canvas) return;
-
-        const stats = resultsManager.differenceData.stats;
-        if (!stats) return;
-
-        const ctx = canvas.getContext('2d');
-        const width = canvas.width;
-        const height = canvas.height;
-        const gradient = ctx.createLinearGradient(0, 0, width, 0);
-        const palette = palettes.diverging;
-
-        palette.forEach((color, i) => {
-            gradient.addColorStop(i / (palette.length - 1), color);
-        });
-
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, width, height);
-
-        const maxAbs = Math.max(Math.abs(stats.min), Math.abs(stats.max));
-        dom['diff-legend-min-label'].textContent = `-${maxAbs.toFixed(0)}`;
-        dom['diff-legend-max-label'].textContent = `+${maxAbs.toFixed(0)}`;
-    }
 
     // Link interactive legend sliders// Link interactive legend sliders
     const scaleMinSlider = dom['scale-min-input'];
@@ -1569,7 +1509,10 @@ export async function setupEventListeners() {
         const min = parseFloat(scaleMinSlider.value);
         const max = parseFloat(scaleMaxSlider.value);
         resultsManager.updateColorScale(min, max, dom['results-palette'].value);
-        updateSensorGridColors(resultsManager.resultsData);
+        // updateSensorGridColors() treats a falsy argument as "clear the overlay", so the
+        // active data must be re-read here rather than passing a non-existent field.
+        const activeData = resultsManager.getActiveData();
+        if (activeData && activeData.length > 0) updateSensorGridColors(activeData);
         updateInteractiveLegend();
     }
 
@@ -1599,6 +1542,10 @@ export async function setupEventListeners() {
     dom['time-scrubber']?.addEventListener('input', (e) => {
         const hour = parseInt(e.target.value, 10);
         updateTimeScrubberDisplay(hour);
+        // clearSensorHighlights() is the repaint path: it re-reads the scrubber and
+        // recolours the grid from that hour's annual slice. Without this the scrubber
+        // only moved its own label and the 3D view never changed.
+        clearSensorHighlights();
     });
 
     // --- Daylighting Sensor Gizmo Listener ---
@@ -1710,8 +1657,23 @@ export async function setupEventListeners() {
 
     dom['view-bsdf-btn']?.addEventListener('click', openBsdfViewer);
 
+    // --- Lighting Power Density ---
+    // _updateLpdDisplay() had no callers, so #lpd-display was stuck at its markup
+    // default. Recompute whenever any input it reads changes.
+    ['luminaire-wattage', 'grid-rows', 'grid-cols', 'width', 'length'].forEach(id => {
+        dom[id]?.addEventListener('input', _updateLpdDisplay);
+    });
+    // The placement-mode buttons toggle their .active class in their own click handler,
+    // so read it back on the next tick.
+    ['placement-mode-individual', 'placement-mode-grid'].forEach(id => {
+        dom[id]?.addEventListener('click', () => setTimeout(_updateLpdDisplay, 0));
+    });
+    _updateLpdDisplay();
+
     // --- Saved Views Listeners ---
-    setupContextControls();
+    // setupContextControls() is async; awaiting it means the context/massing controls it
+    // wires up are ready before setupEventListeners() resolves.
+    await setupContextControls();
     dom['save-view-btn']?.addEventListener('click', saveCurrentView);
     dom['saved-views-list']?.addEventListener('click', (e) => {
         const target = e.target;
@@ -1813,7 +1775,18 @@ function updateMetricSelector(spectralData) {
 
     if (selector.options.length > 0) {
         container.classList.remove('hidden');
-        selector.value = resultsManager.activeMetricType || 'illuminance';
+        // resultsManager's default activeMetricType ('photopic') is not one of the option
+        // values, so assigning it blindly left selectedIndex at -1 and the control blank.
+        // Fall back to the first available option and push that back into the manager so
+        // the 3D view and the data table agree with what the selector shows.
+        const preferred = resultsManager.activeMetricType;
+        const hasPreferred = preferred && Array.from(selector.options).some(o => o.value === preferred);
+        if (hasPreferred) {
+            selector.value = preferred;
+        } else {
+            selector.value = selector.options[0].value;
+            resultsManager.setActiveMetricType(selector.value);
+        }
     } else {
         container.classList.add('hidden');
     }
@@ -1882,7 +1855,6 @@ export function togglePanelVisibility(panelId, btnId) {
         initializePanelControls(panel);
 
         // Make sure the panel is within the viewport
-        ensureWindowInView(panel);
         ensureWindowInView(panel);
 
         // Special case for the map in the project panel
@@ -3357,19 +3329,46 @@ function promptForProjectDirectory() {
 /**
  * Escapes HTML special characters to prevent XSS when inserting into innerHTML.
  */
-function escapeHtml(str) {
+export function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
 }
 
+/**
+ * Shows the custom alert modal. The message is treated as PLAIN TEXT.
+ *
+ * This previously assigned the message straight to innerHTML with a comment claiming
+ * a tag allowlist that was never implemented; many callers interpolate untrusted
+ * values (file names, parser error text) into the message.
+ * Use showAlertHtml() for the rare caller that genuinely needs markup.
+ *
+ * @param {string} message - Plain-text message body.
+ * @param {string} [title="Notification"] - Plain-text dialog title.
+ */
 export function showAlert(message, title = "Notification") {
     const dom = getDom();
 
     dom['custom-alert-title'].textContent = title;
-    // Allow only known safe HTML tags (br, b, strong, em, i) from internal callers
-    const safeMessage = typeof message === 'string' ? message : escapeHtml(String(message));
-    dom['custom-alert-message'].innerHTML = safeMessage;
+    dom['custom-alert-message'].textContent = typeof message === 'string' ? message : String(message);
+    dom['custom-alert'].style.zIndex = getNewZIndex();
+    dom['custom-alert'].classList.replace('hidden', 'flex');
+}
+
+/**
+ * Shows the custom alert modal with an HTML body.
+ *
+ * ONLY for callers that build the markup themselves from trusted, literal strings.
+ * Any interpolated value MUST be passed through escapeHtml() by the caller.
+ *
+ * @param {string} html - Trusted HTML fragment.
+ * @param {string} [title="Notification"] - Plain-text dialog title.
+ */
+export function showAlertHtml(html, title = "Notification") {
+    const dom = getDom();
+
+    dom['custom-alert-title'].textContent = title;
+    dom['custom-alert-message'].innerHTML = typeof html === 'string' ? html : escapeHtml(String(html));
     dom['custom-alert'].style.zIndex = getNewZIndex();
     dom['custom-alert'].classList.replace('hidden', 'flex');
 }
@@ -3446,7 +3445,10 @@ export function setupThemeSwitcher() {
     const darkTilesUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
 
     // Function to apply a theme
-    const applyTheme = (theme) => {
+    // `rebuildScene` is false for the initial page-load call: main.js already awaits its
+    // own updateScene() during startup and updateScene() has no reentrancy guard, so a
+    // second un-awaited rebuild racing it produced duplicated/half-built scene objects.
+    const applyTheme = (theme, rebuildScene = true) => {
         htmlEl.setAttribute('data-theme', theme);
 
         // Hide all buttons first
@@ -3512,7 +3514,7 @@ export function setupThemeSwitcher() {
 
         // Trigger a full scene update to apply new theme colors to JS-created objects
         // like the North Arrow and to re-calculate the sun paths with the new theme colors.
-        updateScene();
+        if (rebuildScene) updateScene();
 
     };
 
@@ -3527,12 +3529,13 @@ export function setupThemeSwitcher() {
     const savedTheme = localStorage.getItem('theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
+    // No scene rebuild here: main.js performs (and awaits) the initial updateScene().
     if (savedTheme) {
-        applyTheme(savedTheme);
+        applyTheme(savedTheme, false);
     } else if (prefersDark) {
-        applyTheme('dark');
+        applyTheme('dark', false);
     } else {
-        applyTheme('light');
+        applyTheme('light', false);
     }
 }
 
@@ -3550,6 +3553,318 @@ function formatTime(time) {
 }
 
 let timeSeriesChart = null;
+
+/**
+* Draws the false-colour gradient into the results-analysis panel's legend canvas.
+*/
+function updateInteractiveLegend() {
+    const dom = getDom();
+
+    const canvas = dom['interactive-legend'];
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+    const gradient = ctx.createLinearGradient(0, 0, width, 0);
+    const palette = palettes[resultsManager.colorScale.palette] || palettes.viridis;
+
+    palette.forEach((color, i) => {
+        gradient.addColorStop(i / (palette.length - 1), color);
+    });
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+
+    if (dom['legend-min-label']) dom['legend-min-label'].textContent = Math.round(resultsManager.colorScale.min);
+    if (dom['legend-max-label']) dom['legend-max-label'].textContent = Math.round(resultsManager.colorScale.max);
+}
+
+/**
+* Refreshes the Results Analysis panel: summary statistics, heatmap mode controls,
+* histogram, legend and the 2D floor-plan heatmap.
+* Module-scoped because it is also called from showAnnualProfileForPoint().
+*/
+function updateResultsAnalysisPanel() {
+    const dom = getDom();
+
+    const stats = resultsManager.getActiveStats();
+    if (stats) {
+        if (dom['stats-min-val']) dom['stats-min-val'].textContent = stats.min.toFixed(1);
+        if (dom['stats-max-val']) dom['stats-max-val'].textContent = stats.max.toFixed(1);
+        if (dom['stats-avg-val']) dom['stats-avg-val'].textContent = stats.avg.toFixed(1);
+        const uniformity = stats.avg > 0 ? (stats.min / stats.avg).toFixed(2) : 'N/A';
+        if (dom['stats-uniformity-val']) dom['stats-uniformity-val'].textContent = uniformity;
+    } else {
+        ['stats-min-val', 'stats-max-val', 'stats-avg-val', 'stats-uniformity-val'].forEach(id => {
+            if (dom[id]) dom[id].textContent = '--';
+        });
+    }
+
+    // Show/hide heatmap mode controls based on annual data availability
+    const hasAnnual = resultsManager.hasAnnualData(
+        resultsManager.activeView === 'diff' ? 'a' : resultsManager.activeView
+    );
+    const heatmapControls = dom['heatmap-controls-container'];
+    if (heatmapControls) {
+        heatmapControls.classList.toggle('hidden', !hasAnnual);
+        // Reset to illuminance mode if annual data is not available or cleared
+        if (!hasAnnual) {
+            if (dom['heatmap-mode-selector']) dom['heatmap-mode-selector'].value = 'illuminance';
+            dom['da-threshold-controls']?.classList.add('hidden');
+        } else {
+            // Ensure DA controls are visible/hidden based on current selection
+            const isDaMode = dom['heatmap-mode-selector']?.value === 'da';
+            dom['da-threshold-controls']?.classList.toggle('hidden', !isDaMode);
+        }
+    }
+
+    const histogramCtx = dom['illuminance-histogram']?.getContext('2d');
+    if (histogramCtx && typeof Chart !== 'undefined') {
+        if (window.illuminanceHistogram) {
+            window.illuminanceHistogram.destroy();
+        }
+        window.illuminanceHistogram = new Chart(histogramCtx, {
+            type: 'bar',
+            data: resultsManager.getHistogramData(),
+            options: {
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: 'Count' } },
+                    x: { title: { display: true, text: 'Illuminance (lux)' } }
+                }
+            }
+        });
+    }
+    updateInteractiveLegend();
+    render2DHeatmap();
+}
+
+/**
+* Derives the floor sensor-grid dimensions from the current room dimensions and
+* grid spacing. This mirrors generateCenteredPoints() in radiance.js, which is the
+* single source of truth for the grid: the floor grid is written x-major / z-minor,
+* so the value for column ix, row iz lives at index (ix * nz + iz).
+* @returns {{nx:number, nz:number, W:number, L:number}|null}
+*/
+function getFloorGridDimensions() {
+    const dom = getDom();
+    const W = parseFloat(dom['width']?.value);
+    const L = parseFloat(dom['length']?.value);
+    const spacing = parseFloat(dom['floor-grid-spacing']?.value);
+    if (!Number.isFinite(W) || !Number.isFinite(L) || !Number.isFinite(spacing)) return null;
+    if (W <= 0 || L <= 0 || spacing <= 0) return null;
+
+    const nx = Math.floor(W / spacing);
+    const nz = Math.floor(L / spacing);
+    if (nx <= 0 || nz <= 0) return null;
+    return { nx, nz, W, L };
+}
+
+/**
+* Draws a placeholder message on the 2D heatmap canvas.
+*/
+function drawHeatmapPlaceholder(ctx, canvas, message) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim() || '#888';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(message, canvas.width / 2, canvas.height / 2);
+}
+
+/**
+* Renders the floor sensor grid as a 2D false-colour heatmap on #heatmap-canvas.
+* Honours #heatmap-mode-selector ('illuminance' | 'da') and #da-threshold-slider.
+* Uses the real resultsManager API (getActiveData / calculateDaylightAutonomy).
+*/
+async function render2DHeatmap() {
+    const dom = getDom();
+    const canvas = dom['heatmap-canvas'];
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // The canvas is sized by CSS (w-full h-full inside an aspect-square box); keep the
+    // backing store in step so the drawing is not stretched.
+    const cssW = Math.max(1, Math.round(canvas.clientWidth || canvas.width));
+    const cssH = Math.max(1, Math.round(canvas.clientHeight || canvas.height));
+    if (canvas.width !== cssW) canvas.width = cssW;
+    if (canvas.height !== cssH) canvas.height = cssH;
+
+    const grid = getFloorGridDimensions();
+    if (!grid) {
+        drawHeatmapPlaceholder(ctx, canvas, 'No floor grid');
+        return;
+    }
+
+    const activeView = resultsManager.activeView;
+    const isDaMode = dom['heatmap-mode-selector']?.value === 'da'
+        && resultsManager.hasAnnualData(activeView === 'diff' ? 'a' : activeView);
+
+    let values;
+    if (isDaMode) {
+        const threshold = parseFloat(dom['da-threshold-slider']?.value);
+        try {
+            values = await resultsManager.calculateDaylightAutonomy(
+                Number.isFinite(threshold) ? threshold : 300,
+                activeView === 'diff' ? 'a' : activeView
+            );
+        } catch (err) {
+            console.error('render2DHeatmap: daylight autonomy calculation failed.', err);
+            drawHeatmapPlaceholder(ctx, canvas, 'DA calculation failed');
+            return;
+        }
+    } else {
+        values = resultsManager.getActiveData();
+    }
+
+    if (!values || values.length === 0) {
+        drawHeatmapPlaceholder(ctx, canvas, 'No results loaded');
+        return;
+    }
+
+    const cellCount = grid.nx * grid.nz;
+    if (values.length < cellCount) {
+        drawHeatmapPlaceholder(ctx, canvas, 'Grid / results size mismatch');
+        return;
+    }
+
+    // Fit the room footprint into the canvas while preserving its aspect ratio.
+    const pad = 8;
+    const availW = canvas.width - pad * 2;
+    const availH = canvas.height - pad * 2;
+    const scale = Math.min(availW / grid.W, availH / grid.L);
+    const planW = grid.W * scale;
+    const planH = grid.L * scale;
+    const originX = (canvas.width - planW) / 2;
+    const originY = (canvas.height - planH) / 2;
+    const cellW = planW / grid.nx;
+    const cellH = planH / grid.nz;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (let ix = 0; ix < grid.nx; ix++) {
+        for (let iz = 0; iz < grid.nz; iz++) {
+            const value = values[ix * grid.nz + iz];
+            if (!Number.isFinite(value)) continue;
+            // DA is a fixed 0-100 % scale; illuminance follows the shared colour scale.
+            ctx.fillStyle = isDaMode
+                ? resultsManager.getColorForValue(value, 0, 100)
+                : resultsManager.getColorForValue(value);
+            // North is -Z, so iz = 0 (z = 0) is drawn at the top of the plan.
+            ctx.fillRect(
+                originX + ix * cellW,
+                originY + iz * cellH,
+                Math.ceil(cellW) + 1,
+                Math.ceil(cellH) + 1
+            );
+        }
+    }
+
+    // Room outline + a north tick so the plan orientation is unambiguous.
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--grid-color').trim() || '#666';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(originX, originY, planW, planH);
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim() || '#888';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('N', originX + planW / 2, Math.max(0, originY - 10));
+}
+
+/**
+* Tears down the annual Time-Series Explorer: destroys the chart, hides the section
+* and resets the 3D scrubber so a stale hour cannot survive into the next dataset.
+*/
+function clearTimeSeriesExplorer() {
+    const dom = getDom();
+
+    if (timeSeriesChart) {
+        timeSeriesChart.destroy();
+        timeSeriesChart = null;
+    }
+
+    const canvas = dom['time-series-chart'];
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    const scrubber = dom['time-scrubber'];
+    if (scrubber) scrubber.value = scrubber.defaultValue || '4380';
+    if (dom['time-scrubber-display']) dom['time-scrubber-display'].textContent = '--';
+
+    dom['annual-time-series-explorer']?.classList.add('hidden');
+}
+
+/**
+* Populates the annual Time-Series Explorer from the active dataset's annual data:
+* a space-averaged illuminance profile for the full year plus the 3D hour scrubber.
+*/
+function updateTimeSeriesExplorer() {
+    const dom = getDom();
+    const container = dom['annual-time-series-explorer'];
+
+    // 'diff' has no annual data of its own; fall back to dataset A.
+    const key = resultsManager.activeView === 'diff' ? 'a' : resultsManager.activeView;
+    if (!resultsManager.hasAnnualData(key)) {
+        clearTimeSeriesExplorer();
+        return;
+    }
+
+    const hourlyAverages = resultsManager.getHourlyAverageIlluminance(key);
+    if (!hourlyAverages || hourlyAverages.length === 0) {
+        clearTimeSeriesExplorer();
+        return;
+    }
+
+    container?.classList.remove('hidden');
+
+    const scrubber = dom['time-scrubber'];
+    if (scrubber) {
+        scrubber.min = '0';
+        scrubber.max = String(hourlyAverages.length - 1);
+        const current = parseInt(scrubber.value, 10);
+        const clamped = Number.isFinite(current)
+            ? Math.min(Math.max(current, 0), hourlyAverages.length - 1)
+            : 0;
+        scrubber.value = String(clamped);
+        updateTimeScrubberDisplay(clamped);
+    }
+
+    const canvas = dom['time-series-chart'];
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    if (timeSeriesChart) {
+        timeSeriesChart.destroy();
+        timeSeriesChart = null;
+    }
+
+    timeSeriesChart = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: Array.from({ length: hourlyAverages.length }, (_, i) => i),
+            datasets: [{
+                label: 'Space-Averaged Illuminance (lux)',
+                data: Array.from(hourlyAverages),
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1,
+                pointRadius: 0,
+                fill: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, title: { display: true, text: 'lux' } },
+                x: { ticks: { maxTicksLimit: 12 }, title: { display: true, text: 'Hour of Year' } }
+            }
+        }
+    });
+}
 
 /**
 * Clears all UI elements related to results visualization.
@@ -3656,6 +3971,9 @@ async function handleResultsFile(file, key) {
                 }
                 updateTimeSeriesExplorer();
             } else {
+                // clearAnnualDashboard() is not in scope here (it is destructured inside
+                // clearAllResultsDisplay), so resolve it from the module cache.
+                const { clearAnnualDashboard } = await import('./annualDashboard.js');
                 clearAnnualDashboard();
                 clearTimeSeriesExplorer();
             }
@@ -3679,8 +3997,13 @@ async function handleResultsFile(file, key) {
                 dom['summary-b'].classList.remove('hidden');
             }
 
-            // If both datasets are loaded, enable comparison buttons
-            if (resultsManager.datasets.a && resultsManager.datasets.b) {
+            // If both datasets are loaded, enable comparison buttons.
+            // datasets.a / datasets.b are always object literals created in the
+            // constructor, so truthiness alone was always true and the Dataset B /
+            // Difference buttons appeared after loading only A. Test for real data.
+            const hasA = resultsManager.datasets.a?.data?.length > 0;
+            const hasB = resultsManager.datasets.b?.data?.length > 0;
+            if (hasA && hasB) {
                 dom['view-mode-b-btn']?.classList.remove('hidden');
                 dom['view-mode-diff-btn']?.classList.remove('hidden');
             }
@@ -4374,6 +4697,27 @@ function onShowAnnualProfile() {
 }
 
 /**
+* Module-scope handle to setupWelcomeScreen()'s local hideWelcomeScreen(). That is the
+* only teardown path that cancels the animation frame, removes the mousemove listener
+* and disconnects the ResizeObserver, so every "dismiss the welcome screen" path must
+* go through it rather than just adding `hidden` to the element.
+* @type {(() => void) | null}
+*/
+let welcomeScreenHider = null;
+
+/**
+* Dismisses the welcome screen through its real teardown path when one is registered,
+* falling back to simply hiding the element if setupWelcomeScreen() never ran.
+*/
+export function dismissWelcomeScreen() {
+    if (welcomeScreenHider) {
+        welcomeScreenHider();
+        return;
+    }
+    document.getElementById('welcome-screen')?.classList.add('hidden');
+}
+
+/**
 * Sets up the welcome screen with interactive visual effects that can be cycled through.
 */
 export function setupWelcomeScreen() {
@@ -4569,6 +4913,10 @@ export function setupWelcomeScreen() {
         }, 500);
     }
 
+    // Publish the real teardown so other entry points (e.g. the "start with draw"
+    // button wired up in setupEventListeners) do not leak the animation loop.
+    welcomeScreenHider = hideWelcomeScreen;
+
     // --- Setup Event Listeners ---
     const resizeObserver = new ResizeObserver(() => resizeCanvas());
     resizeObserver.observe(welcomeScreen);
@@ -4585,6 +4933,9 @@ export function setupWelcomeScreen() {
         switchGeometryMode('import');
         hideWelcomeScreen();
         togglePanelVisibility('panel-dimensions', 'toggle-panel-dimensions-btn');
+        // Open the file picker straight away (formerly a second, competing listener
+        // registered in setupEventListeners).
+        handleModelImport();
     });
 
     dom['cycle-effect-btn']?.addEventListener('click', (e) => {
@@ -4595,57 +4946,6 @@ export function setupWelcomeScreen() {
     // Initial setup
     resizeCanvas();
     switchEffect(0);
-}
-
-/**
-* Handles a click on the main renderer canvas to select/deselect walls or furniture.
-* @param {MouseEvent} event The click event.
-*/
-function onSceneClick(event) {
-    const dom = getDom();
-
-    // Prevent selection when interacting with gizmos
-    if (transformControls.dragging || sensorTransformControls.dragging) {
-        return;
-    }
-
-    const pointer = new THREE.Vector2();
-    const rect = renderer.domElement.getBoundingClientRect();
-    pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(pointer, activeCamera);
-
-    const objectsToIntersect = [wallSelectionGroup, furnitureObject, contextObject];
-    const intersects = raycaster.intersectObjects(objectsToIntersect, true);
-
-    if (intersects.length > 0) {
-        console.log("Raycaster hits:", intersects.map(i => ({
-            name: i.object.name,
-            type: i.object.type,
-            userData: i.object.userData,
-            parentUserData: i.object.parent ? i.object.parent.userData : 'no-parent'
-        })));
-    }
-
-    const wallIntersect = intersects.find(i => i.object.userData.isSelectableWall === true);
-    const furnitureIntersect = intersects.find(i => i.object.userData.isFurniture === true);
-    const vegetationIntersect = intersects.find(i => i.object.userData.isVegetation === true);
-    const massingIntersect = intersects.find(i => i.object.userData.isMassingBlock === true);
-
-    if (furnitureIntersect) {
-        selectTransformableObject(furnitureIntersect.object);
-    } else if (vegetationIntersect) {
-        selectTransformableObject(vegetationIntersect.object);
-    } else if (massingIntersect) {
-        selectTransformableObject(massingIntersect.object);
-    } else if (wallIntersect) {
-        transformControls.detach(); // Detach from any other object
-        handleWallInteraction(wallIntersect);
-    } else {
-        handleDeselection();
-    }
 }
 
 /**
@@ -4934,6 +5234,21 @@ function _updateLpdDisplay() {
 }
 
 /**
+ * Resolves an input that lives inside a recipe template. Recipe markup is cloned out of
+ * a <template> into #recipe-parameters-container at runtime, so those ids are absent
+ * from the dom cache built at startup (querySelectorAll('[id]') does not descend into
+ * template content, and setupDOM() is not re-run on every recipe change).
+ * @param {string} id - The element id to look up.
+ * @returns {HTMLElement|null}
+ */
+function getRecipeElement(id) {
+    const container = document.getElementById('recipe-parameters-container');
+    return container?.querySelector(`#${CSS.escape(id)}`)
+        || document.getElementById(id)
+        || null;
+}
+
+/**
  * Gathers the current viewpoint parameters and formats them into a Radiance .vf file content string.
  * This version reads directly from the scene's camera object to ensure FPV changes are captured.
  * @param {boolean} [forceFisheye=false] - If true, overrides the UI settings to generate a 180° fisheye view.
@@ -4951,8 +5266,8 @@ export function getViewpointFileContent(forceFisheye = false) {
     // from the render aspect ratio (X/Y resolution). Fisheye/parallel views keep hfov = vfov.
     let hfov = vfov;
     if (viewType === 'v' || viewType === 'c') {
-        const xRes = parseFloat(dom['rpict-x']?.value);
-        const yRes = parseFloat(dom['rpict-y']?.value);
+        const xRes = parseFloat(getRecipeElement('rpict-x')?.value);
+        const yRes = parseFloat(getRecipeElement('rpict-y')?.value);
         const aspect = (Number.isFinite(xRes) && Number.isFinite(yRes) && yRes > 0) ? xRes / yRes : 1;
         hfov = 2 * Math.atan(Math.tan(vfov * Math.PI / 360) * aspect) * 180 / Math.PI;
     }
@@ -5105,7 +5420,10 @@ function populateDataTable() {
         'illuminance': 'Illuminance (lux)', 'Photopic_lux': 'Photopic (lux)',
         'EML': 'EML (lux)', 'CS': 'Circadian Stimulus', 'CCT': 'CCT (K)'
     };
-    const metricName = metricMap[activeMetric] || activeMetric.replace(/_/g, ' ');
+    // activeMetricType defaults to 'photopic', which is not a key of metricMap and can
+    // also be null, so fall back to the illuminance label rather than throwing.
+    const metricName = metricMap[activeMetric]
+        || (typeof activeMetric === 'string' ? activeMetric.replace(/_/g, ' ') : metricMap['illuminance']);
 
     // Update table headers with sort indicators
     const sortIndicator = (col) => {
@@ -6153,6 +6471,10 @@ function onPointerMove(event) {
  * Handles the pointer up event to end a resize drag or trigger a scene click action.
  */
 function onPointerUp(event) {
+    // Mirror onPointerDown()'s guard: only the primary button starts or ends an
+    // interaction, otherwise a right-click release was treated as a scene click.
+    if (event.button !== 0) return;
+
     if (draggedHandle) {
         // This was the end of a resize drag.
         // Now, trigger a single scene update to rebuild the geometry with the final dimensions.
@@ -6327,6 +6649,7 @@ export async function switchGeometryMode(mode) {
     // Import all necessary functions and objects
     const {
         clearImportedModel,
+        clearGroup,
         roomObject,
         wallSelectionGroup,
         shadingObject,
@@ -6356,13 +6679,13 @@ export async function switchGeometryMode(mode) {
         console.log('[UI] switchGeometryMode: Re-creating parametric geometry');
         setIsCustomGeometry(false);
 
-        // 3. Clear the custom geometry groups to ensure they're empty
-        while (roomObject.children.length > 0) {
-            roomObject.remove(roomObject.children[0]);
-        }
-        while (wallSelectionGroup.children.length > 0) {
-            wallSelectionGroup.remove(wallSelectionGroup.children[0]);
-        }
+        // 3. Clear the custom geometry groups to ensure they're empty.
+        // These used to be detached child-by-child without disposing anything, leaking
+        // every BufferGeometry and Material on the GPU. clearGroup() is geometry.js's
+        // canonical teardown: it disposes the whole subtree (skipping the shared
+        // singleton geometries/materials) and then empties the group.
+        clearGroup(roomObject);
+        clearGroup(wallSelectionGroup);
         console.log('[UI] switchGeometryMode: Cleared existing geometry groups');
 
         // 4. Make geometry visible - CRITICAL FIX
@@ -6371,19 +6694,26 @@ export async function switchGeometryMode(mode) {
         shadingObject.visible = true;
         console.log('[UI] switchGeometryMode: Set geometry visible');
 
-        // 5. Force a complete scene rebuild
-        // Apply default values as requested by user
-        dom.width.value = '4.0';
-        dom.length.value = '7.0';
-        dom.height.value = '3.0';
-        dom['surface-thickness'].value = '0.20';
+        // 5. Force a complete scene rebuild.
+        // Seed the parametric dimensions ONLY where there is genuinely no current value.
+        // Unconditionally writing the defaults here clobbered dimensions restored from a
+        // loaded project the moment parametric mode was (re-)entered.
+        const dimensionDefaults = [
+            ['width', '4.0', 'width-val', '4.0m'],
+            ['length', '7.0', 'length-val', '7.0m'],
+            ['height', '3.0', 'height-val', '3.0m'],
+            ['surface-thickness', '0.20', 'surface-thickness-val', '0.20m']
+        ];
+        for (const [id, defaultValue, labelId, defaultLabel] of dimensionDefaults) {
+            const input = dom[id];
+            if (!input) continue;
+            const current = parseFloat(input.value);
+            if (Number.isFinite(current) && current > 0) continue; // Keep the existing value.
+            input.value = defaultValue;
+            if (dom[labelId]) dom[labelId].textContent = defaultLabel;
+        }
 
-        if (dom['width-val']) dom['width-val'].textContent = '4.0m';
-        if (dom['length-val']) dom['length-val'].textContent = '7.0m';
-        if (dom['height-val']) dom['height-val'].textContent = '3.0m';
-        if (dom['surface-thickness-val']) dom['surface-thickness-val'].textContent = '0.20m';
-
-        console.log('[UI] switchGeometryMode: Reset dimension values to defaults');
+        console.log('[UI] switchGeometryMode: Seeded any missing dimension values');
         console.log('[UI] switchGeometryMode: Calling updateScene...');
 
         try {
@@ -6534,11 +6864,10 @@ function openMaterialTagger(materials) {
 function setupMassingTools() {
     const dom = getDom();
 
-    // Shape selection radio buttons
-    const shapeRadios = document.querySelectorAll('input[name="massing-shape"]');
-    shapeRadios.forEach(radio => {
-        radio.addEventListener('change', handleMassingShapeChange);
-    });
+    // Shape selection radio buttons. setupMassingShapeListeners() is the superset of the
+    // handler that used to be inlined here (it also live-updates a selected block), and
+    // it was previously declared but never called.
+    setupMassingShapeListeners();
 
     // Dimension sliders
     const dimensionSliders = ['massing-width', 'massing-depth', 'massing-height', 'massing-radius'];
@@ -6616,23 +6945,40 @@ function handleMassingShapeChange() {
 
     const boxDimensions = dom['box-dimensions'];
     const radiusDimension = dom['radius-dimension'];
-    const heightSlider = dom['massing-height'].parentElement.parentElement;
+    // #box-dimensions wraps the Width, Depth AND Height rows. Hiding the container and
+    // then un-hiding the Height row inside it left Height invisible for cylinders and
+    // pyramids, so the individual rows are toggled and the container only collapses
+    // when none of its rows are needed.
+    const widthRow = dom['massing-width']?.parentElement?.parentElement;
+    const depthRow = dom['massing-depth']?.parentElement?.parentElement;
+    const heightRow = dom['massing-height']?.parentElement?.parentElement;
 
-    if (selectedShape === 'box') {
-        boxDimensions?.classList.remove('hidden');
-        radiusDimension?.classList.add('hidden');
-        heightSlider.classList.remove('hidden');
-    } else if (selectedShape === 'sphere') {
-        boxDimensions?.classList.add('hidden');
-        radiusDimension?.classList.remove('hidden');
-        heightSlider.classList.add('hidden'); // Height is implicit in sphere radius
-    } else { // Cylinder or Pyramid
-        boxDimensions?.classList.add('hidden');
-        radiusDimension?.classList.remove('hidden');
-        heightSlider.classList.remove('hidden');
-    }
+    const showBoxSizes = selectedShape === 'box';
+    const showHeight = selectedShape !== 'sphere'; // Height is implicit in sphere radius
+
+    boxDimensions?.classList.toggle('hidden', !showBoxSizes && !showHeight);
+    widthRow?.classList.toggle('hidden', !showBoxSizes);
+    depthRow?.classList.toggle('hidden', !showBoxSizes);
+    heightRow?.classList.toggle('hidden', !showHeight);
+    radiusDimension?.classList.toggle('hidden', showBoxSizes);
 
     updateMassingInfo();
+}
+
+/**
+ * Reads the number of massing blocks from #massing-count.
+ *
+ * NOTE (markup issue, index.html:2322): the slider is declared step="0.1" even though
+ * it represents a whole number of blocks, so it can land on values like 3.4. The value
+ * is rounded (not truncated, as parseInt did) and clamped to at least 1 so the info
+ * display and the block builder always agree.
+ * @returns {number}
+ * @private
+ */
+function getMassingBlockCount() {
+    const raw = parseFloat(getDom()['massing-count']?.value);
+    if (!Number.isFinite(raw)) return 1;
+    return Math.max(1, Math.round(raw));
 }
 
 /**
@@ -6646,7 +6992,7 @@ function updateMassingInfo() {
     if (!shapeEl) return;
     const shape = shapeEl.value;
 
-    const count = parseInt(dom['massing-count'].value);
+    const count = getMassingBlockCount();
     const infoEl = dom['massing-info'];
 
     if (!infoEl) return;
@@ -6666,8 +7012,11 @@ function updateMassingInfo() {
         } else if (shape === 'sphere') {
             volume = (4 / 3) * Math.PI * radius * radius * radius;
         } else if (shape === 'pyramid') {
-            // Approximate pyramid volume (cone geometry)
-            volume = (1 / 3) * Math.PI * radius * radius * height;
+            // The pyramid is built as THREE.ConeGeometry(radius, height, 4): a square base
+            // inscribed in a circle of `radius`, so side = radius * sqrt(2) and base
+            // area = 2 * radius^2. Using the circular cone formula ((1/3)*PI*r^2*h)
+            // overstated the volume by PI/2 (~57%).
+            volume = (1 / 3) * (2 * radius * radius) * height;
         }
     }
 
@@ -6692,7 +7041,7 @@ async function createMassingBlocks() {
     const shape = shapeEl.value;
     const pattern = patternEl.value;
 
-    const count = parseInt(dom['massing-count'].value);
+    const count = getMassingBlockCount();
     const spacing = parseFloat(dom['massing-spacing'].value);
 
     const baseParams = {
@@ -6838,181 +7187,6 @@ function setupMassingShapeListeners() {
             }
         });
     });
-}
-
-/**
- * Generates an enhanced flowchart for a recipe based on its workflow type.
- * @param {string} recipeName - The name of the recipe.
- * @param {string} content - The guide content.
- * @returns {string} Empty string - flowcharts have been removed.
- */
-function generateEnhancedFlowchart(recipeName, content) {
-    // Flowcharts have been removed from the application
-    return '';
-}
-
-/**
- * Generates flowchart for point-in-time simulations.
- */
-function generatePointInTimeFlowchart() {
-    return `
-    A[Generate Sky<br/>Conditions]:::input
-    B[Compile Scene<br/>Geometry]:::process
-    C[Calculate Illuminance<br/>at Sensor Points]:::process
-    D[Generate Results<br/>Visualization]:::output
-
-    A --> B --> C --> D
-
-    class A,B,C,D codeTheme;
-    `;
-}
-
-/**
- * Generates flowchart for 3-Phase annual simulations.
- */
-function generateAnnual3PhaseFlowchart() {
-    return `
-    A[Load Weather<br/>& BSDF Data]:::input
-    B{Generate Matrices?}:::decision
-    C[Run Matrix<br/>Generation]:::subprocess
-    D[Run Annual<br/>Simulation]:::process
-    E[Calculate Metrics<br/>(sDA, UDI)]:::process
-    F[Generate Results<br/>Dashboard]:::output
-
-    A --> B
-    B -->|Yes| C
-    B -->|No| D
-    C --> D --> E --> F
-
-    class A,B,C,D,E,F codeTheme;
-    `;
-}
-
-/**
- * Generates flowchart for advanced annual simulations.
- */
-function generateAnnualAdvancedFlowchart() {
-    return `
-    A[Load Multiple<br/>Data Files]:::input
-    B[Generate Core<br/>Matrices]:::subprocess
-    C[Run Advanced<br/>Calculations]:::process
-    D[Post-Process<br/>Results]:::process
-    E[Generate Analysis<br/>Dashboards]:::output
-
-    A --> B --> C --> D --> E
-
-    class A,B,C,D,E codeTheme;
-    `;
-}
-
-/**
- * Generates flowchart for compliance recipes.
- */
-function generateComplianceFlowchart() {
-    return `
-    A[Configure Multiple<br/>Checks]:::input
-    B[Run Daylight<br/>Provision]:::subprocess
-    C[Run Sunlight<br/>Exposure]:::subprocess
-    D[Run View<br/>Analysis]:::subprocess
-    E[Run Glare<br/>Protection]:::subprocess
-    F[Generate Compliance<br/>Report]:::output
-
-    A --> B
-    A --> C
-    A --> D
-    A --> E
-    B --> F
-    C --> F
-    D --> F
-    E --> F
-
-    class A,B,C,D,E,F codeTheme;
-    `;
-}
-
-/**
- * Generates flowchart for electric lighting recipes.
- */
-function generateElectricFlowchart() {
-    return `
-    A[Configure Lighting<br/>System]:::input
-    B[Define Task<br/>& Surrounding Areas]:::process
-    C[Calculate Illuminance<br/>Distribution]:::process
-    D[Compute Uniformity<br/>& Compliance]:::process
-    E[Generate Standards<br/>Report]:::output
-
-    A --> B --> C --> D --> E
-
-    class A,B,C,D,E codeTheme;
-    `;
-}
-
-/**
- * Generates flowchart for energy analysis recipes.
- */
-function generateEnergyFlowchart() {
-    return `
-    A[Configure Lighting<br/>& Controls]:::input
-    B[Generate Blind<br/>Operation Schedule]:::subprocess
-    C[Run Annual Illuminance<br/>with Dynamic Blinds]:::process
-    D[Calculate Lighting<br/>Energy Consumption]:::process
-    E[Generate Energy<br/>Savings Report]:::output
-
-    A --> B --> C --> D --> E
-
-    class A,B,C,D,E codeTheme;
-    `;
-}
-
-/**
- * Generates flowchart for facade analysis recipes.
- */
-function generateFacadeFlowchart() {
-    return `
-    A[Define Façade<br/>Analysis Plane]:::input
-    B[Generate Annual<br/>Sky Matrix]:::process
-    C[Calculate Daylight<br/>Coefficients]:::subprocess
-    D[Compute Annual<br/>Irradiation]:::process
-    E[Generate Façade<br/>Heatmap]:::output
-
-    A --> B --> C --> D --> E
-
-    class A,B,C,D,E codeTheme;
-    `;
-}
-
-/**
- * Generates flowchart for annual radiation recipes.
- */
-function generateAnnualRadiationFlowchart() {
-    return `
-    A[Define Interior<br/>Sensor Grids]:::input
-    B[Generate Annual<br/>Sky Conditions]:::process
-    C[Calculate Radiation<br/>Coefficients]:::subprocess
-    D[Compute Annual<br/>Solar Load]:::process
-    E[Generate Surface<br/>Heatmaps]:::output
-
-    A --> B --> C --> D --> E
-
-    class A,B,C,D,E codeTheme;
-    `;
-}
-
-/**
- * Generates generic flowchart for unspecified recipes.
- */
-function generateGenericFlowchart() {
-    return `
-    A[Configure<br/>Parameters]:::input
-    B[Prepare<br/>Scene Data]:::process
-    C[Run<br/>Simulation]:::subprocess
-    D[Process<br/>Results]:::process
-    E[Generate<br/>Output]:::output
-
-    A --> B --> C --> D --> E
-
-    class A,B,C,D,E codeTheme;
-    `;
 }
 
 /**
@@ -7953,8 +8127,11 @@ The final output is a text file containing the total annual solar radiation valu
         const recipeName = guides[i].trim();
         let rawContent = guides[i + 1];
 
-        // 1. Clean content
-        rawContent = rawContent.replace(/\//g, '').trim();
+        // 1. Clean content.
+        // NOTE: this used to be `.replace(/\//g, '')`, which stripped EVERY forward slash
+        // in the guide text ("09_images/hdr" -> "09_imageshdr", "W/m²" -> "Wm²").
+        // Slashes are legitimate content here, so only trim surrounding whitespace.
+        rawContent = rawContent.trim();
 
         // 3. Process content line-by-line to build the main HTML content
         let html = '';

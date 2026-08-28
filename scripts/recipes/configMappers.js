@@ -130,7 +130,12 @@ export function buildRecipeConfig(recipeDef, projectData, simParams, simulationF
 
   const schema = recipeDef.inputSchema || {};
   const globals = mergeParamsWithSchema(globalParams, {}, schema.globalParams || {});
-  const recipe = mergeParamsWithSchema(globalParams, recipeOverrides, schema.recipeParams || {});
+  // Recipe params resolve from the RECIPE layer only. Passing globalParams as the
+  // fallback layer meant any key shared with the global panel (ab, ad, as, ...)
+  // silently picked up the global value whenever the recipe field was blank.
+  const recipe = mergeParamsWithSchema({}, recipeOverrides, schema.recipeParams || {});
+
+  warnOnUnresolvedSchemaKeys(recipeDef, schema, globalParams, recipeOverrides);
 
   return {
     globals,
@@ -138,4 +143,38 @@ export function buildRecipeConfig(recipeDef, projectData, simParams, simulationF
     simulationFiles: simulationFiles || {},
     _raw: { globalParams, recipeOverrides }
   };
+}
+
+/**
+ * Every recipe's generateScripts() rebuilds its params from `config._raw` and
+ * calls the legacy generator, so the schema-driven objects only ever reach
+ * validate(). A schema key that matches no real control therefore produces a
+ * confidently wrong validation result instead of a generation failure — which is
+ * exactly how the EN 17037 'check-*' keys and the facade key mismatch survived.
+ *
+ * This logs loudly for any declared key that resolves to nothing in `_raw`.
+ *
+ * @param {import('./RecipeRegistry.js').RecipeDefinition} recipeDef
+ * @param {Object} schema recipeDef.inputSchema
+ * @param {Object} globalParams
+ * @param {Object} recipeOverrides
+ */
+function warnOnUnresolvedSchemaKeys(recipeDef, schema, globalParams, recipeOverrides) {
+  const check = (declared, raw, layer) => {
+    const missing = Object.keys(declared || {}).filter(
+      key => !Object.prototype.hasOwnProperty.call(raw || {}, key)
+    );
+    if (missing.length > 0) {
+      console.warn(
+        `[recipe:${recipeDef.id}] ${layer} schema key(s) resolve to nothing in the gathered ` +
+        `parameters: ${missing.join(', ')}. Either the control id changed, the control does ` +
+        `not exist, or the value must be mapped from another source. The recipe will fall ` +
+        `back to its declared default, which makes validate() report on a value the user ` +
+        `never set.`
+      );
+    }
+  };
+
+  check(schema.globalParams, globalParams, 'global');
+  check(schema.recipeParams, recipeOverrides, 'recipe');
 }

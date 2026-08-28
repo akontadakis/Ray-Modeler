@@ -1,7 +1,7 @@
 // scripts/project.js
 
 import * as THREE from 'three';
-import { generateRadFileContent, generateViewpointFileContent, transformThreePointToRadianceArray, transformThreeVectorToRadianceArray, generateViewpointFileContentFromState, generateRayFileContent } from './radiance.js';
+import { generateRadFileContent, generateViewpointFileContent, transformThreePointToRadianceArray, transformThreeVectorToRadianceArray, generateViewpointFileContentFromState, generateRayFileContent, generateCenteredPoints } from './radiance.js';
 import { updateScene } from './geometry.js';
 import { recreateSimulationPanels } from './simulation.js';
 import { lightingManager } from './lighting.js';
@@ -24,6 +24,40 @@ import './recipes/facadeIrradiationRecipe.js';
 import './recipes/annualRadiationRecipe.js';
 import './recipes/spectral9ChRecipe.js';
 
+// Version of the saved project JSON schema. Bump whenever the persisted shape
+// changes in a way that older/newer readers need to know about.
+export const PROJECT_SCHEMA_VERSION = 2;
+
+// Directory (inside the project folder) each simulationFiles key is written to
+// and read back from. Keep the save, generate and load paths using this single
+// mapping so a file always lands where the generated scripts look for it.
+function simulationFileDirectory(key) {
+    if (key.includes('weather')) return '04_skies';   // scripts read ../04_skies/<epw>
+    if (key.includes('bsdf')) return '05_bsdf';
+    if (key.includes('schedule')) return '10_schedules';
+    if (key.includes('topo')) return '12_topography';
+    return '11_files';
+}
+
+// getAllShadingParams() stores camelCase keys; every control id is kebab-case.
+function camelToKebab(key) {
+    return key.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+}
+
+// The few saved shading keys whose control is not a plain `<prefix>-<kebab>-<dir>`
+// value input. Verified against the ids AperturePanelUI.js creates.
+const SHADING_PARAM_RESTORERS = {
+    'lightshelf.placeExt': (dir, v, { setActiveButton }) => setActiveButton(`lightshelf-placement-ext-${dir}`, v),
+    'lightshelf.placeInt': (dir, v, { setActiveButton }) => setActiveButton(`lightshelf-placement-int-${dir}`, v),
+    'lightshelf.placeBoth': (dir, v, { setActiveButton }) => setActiveButton(`lightshelf-placement-both-${dir}`, v),
+    'louver.isExterior': (dir, v, { setActiveButton }) => setActiveButton(
+        v ? `louver-placement-ext-${dir}` : `louver-placement-int-${dir}`, true
+    ),
+    'louver.isHorizontal': (dir, v, { setValue }) => setValue(
+        `louver-slat-orientation-${dir}`, v ? 'horizontal' : 'vertical'
+    )
+};
+
 class Project {
     constructor() {
         this.projectName = 'default-project';
@@ -31,10 +65,68 @@ class Project {
         this.simulationFiles = {};
         this.dirHandle = null; // For Web File System Access API (browser)
         this.dirPath = null;   // For Node.js fs module path (Electron)
+        this._projectDataCache = null; // Last full snapshot from gatherAllProjectData().
     }
 
-    setEpwData(epwData) {
+    /**
+     * A synchronous view of the current project for consumers that cannot await
+     * `gatherAllProjectData()`.
+     *
+     * This property was read by resultsManager's sun-path and report paths but was never
+     * assigned anywhere, so it was permanently `undefined`: `getSunPathData()` always
+     * returned null and every sun position silently fell back to latitude 40 / longitude 0.
+     *
+     * Site information is re-read from the DOM on every access rather than served from the
+     * cache, because latitude and longitude change without a save and a stale snapshot would
+     * put the sun in the wrong place. Everything else comes from the last full snapshot, and
+     * is null until one has been taken.
+     */
+    get projectData() {
+        const num = (id) => {
+            const parsed = parseFloat(document.getElementById(id)?.value);
+            return Number.isFinite(parsed) ? parsed : undefined;
+        };
+
+        const liveInfo = {
+            'project-name': document.getElementById('project-name')?.value || this.projectName,
+            latitude: num('latitude'),
+            longitude: num('longitude'),
+            epwFileName: this.simulationFiles['weather-file']?.name || null,
+        };
+
+        if (!this._projectDataCache) return { projectInfo: liveInfo };
+
+        return {
+            ...this._projectDataCache,
+            projectInfo: { ...this._projectDataCache.projectInfo, ...liveInfo },
+        };
+    }
+
+    setEpwData(epwData, fileName = null) {
         this.epwFileContent = epwData;
+        // The recipes and generated scripts look the weather file up in
+        // simulationFiles['weather-file']; the project-level EPW loader only set
+        // epwFileContent, so keep the two in sync here.
+        this.registerEpwSimulationFile(fileName);
+    }
+
+    /**
+     * Publishes the project-level EPW into simulationFiles under the key every
+     * recipe / script generator reads ('weather-file'). Safe to call repeatedly.
+     * @param {string|null} fileName Optional explicit file name.
+     */
+    registerEpwSimulationFile(fileName = null) {
+        if (!this.epwFileContent) {
+            delete this.simulationFiles['weather-file'];
+            return;
+        }
+        const displayed = document.getElementById('epw-file-name')?.textContent?.trim();
+        let resolved = fileName
+            || this.simulationFiles['weather-file']?.name
+            || (displayed && displayed !== 'No file selected' ? displayed : null)
+            || 'climate.epw';
+        if (!/\.epw$/i.test(resolved)) resolved = `${resolved}.epw`;
+        this.addSimulationFile('weather-file', resolved, this.epwFileContent);
     }
 
     addSimulationFile(inputId, fileName, content) {
@@ -218,6 +310,7 @@ class Project {
         const { getAllWindowParams, getAllShadingParams, getSavedViews } = ui;
 
         const projectData = {
+            schemaVersion: PROJECT_SCHEMA_VERSION,
             projectInfo: {
                 'project-name': this.projectName,
                 'project-desc': getValue('project-desc'),
@@ -225,7 +318,11 @@ class Project {
                 'radiance-path': getValue('radiance-path'),
                 'latitude': getValue('latitude'),
                 'longitude': getValue('longitude'),
-                epwFileName: this.epwFileContent ? (getTextContent('epw-file-name') || 'climate.epw') : null,
+                // Prefer the name registered under simulationFiles['weather-file'] so
+                // the JSON, the 04_skies copy and the scripts all agree on one name.
+                epwFileName: this.epwFileContent
+                    ? (this.simulationFiles['weather-file']?.name || getTextContent('epw-file-name') || 'climate.epw')
+                    : null,
             },
             geometry: {
                 room: {
@@ -236,9 +333,15 @@ class Project {
                     'room-orientation': getValue('room-orientation', parseFloat),
                 },
                 mode: await (async () => {
-                    const { isCustomGeometry } = await import('./geometry.js');
+                    const { isCustomGeometry, currentImportedModel } = await import('./geometry.js');
                     if (isCustomGeometry) return 'custom';
-                    return dom['mode-import-btn']?.classList.contains('active') ? 'imported' : 'parametric';
+                    // There is no #mode-import-btn in index.html, so the old
+                    // classList probe was always false and every imported project
+                    // was saved as 'parametric'. Ask the geometry module instead,
+                    // falling back to the visibility of the import controls panel.
+                    if (currentImportedModel) return 'imported';
+                    const importPanel = dom['import-controls'] || document.getElementById('import-controls');
+                    return importPanel && !importPanel.classList.contains('hidden') ? 'imported' : 'parametric';
                 })(),
                 apertures: getAllWindowParams(),
                 shading: getAllShadingParams(),
@@ -385,7 +488,9 @@ class Project {
                 'view-fov': getValue('view-fov', parseFloat), 'view-dist': getValue('view-dist', parseFloat)
             },
             viewOptions: {
-                projection: dom['proj-btn-persp']?.classList.contains('active') ? 'perspective' : 'orthographic',
+                // The real ids are view-btn-persp / view-btn-ortho; 'proj-btn-persp'
+                // exists nowhere, so this always reported 'orthographic'.
+                projection: getClassListContains('view-btn-persp', 'active') ? 'perspective' : 'orthographic',
                 transparent: getChecked('transparent-toggle'),
                 ground: getChecked('ground-plane-toggle'),
                 worldAxes: getChecked('world-axes-toggle'),
@@ -400,13 +505,17 @@ class Project {
                     position: view.cameraState.position.toArray(),
                     quaternion: view.cameraState.quaternion.toArray(),
                     zoom: view.cameraState.zoom,
-                    target: view.cameraState.target.toArray(),
+                    // A saved view without a target must not abort the whole save.
+                    target: view.cameraState.target?.toArray ? view.cameraState.target.toArray() : [0, 0, 0],
                     viewType: view.cameraState.viewType,
                     fov: view.cameraState.fov
                 }
             })),
             topography: {
-                enabled: getChecked('context-mode-topo'),
+                // #context-mode-topo is a <button>, not a checkbox: read its
+                // active state, otherwise `enabled` is undefined and is dropped
+                // by JSON.stringify so topography never restores.
+                enabled: getClassListContains('context-mode-topo', 'active'),
                 heightmapFile: this.simulationFiles['topo-heightmap-file'] ? {
                     inputId: 'topo-heightmap-file',
                     name: this.simulationFiles['topo-heightmap-file'].name
@@ -441,11 +550,33 @@ class Project {
             simulationParameters: this.gatherSimulationParameters()
         };
 
+        // getWindowParamsForWall() consumes the WWR slider to derive ww/wh and does
+        // not return it, so restore it here or the value is lost on the first
+        // save/load round trip.
+        ['n', 's', 'e', 'w'].forEach(dir => {
+            const ap = projectData.geometry.apertures?.[dir.toUpperCase()];
+            if (!ap || ap.mode !== 'wwr') return;
+            const fromDom = getValue(`wwr-${dir}`, parseFloat);
+            if (fromDom !== null) {
+                ap.wwr = fromDom;
+                return;
+            }
+            const wallArea = (ap.wallWidth || 0) * (projectData.geometry.room.height || 0);
+            ap.wwr = wallArea > 0 ? (ap.winCount * ap.ww * ap.wh) / wallArea : 0;
+        });
+
         // Await the promises from the async IIFEs to get the actual data
         projectData.geometry.furniture = await projectData.geometry.furniture;
         projectData.geometry.vegetation = await projectData.geometry.vegetation;
         projectData.geometry.contextMassing = await projectData.geometry.contextMassing;
         projectData.geometry.customGeometry = await projectData.geometry.customGeometry;
+
+        // Cache the snapshot on the singleton. Consumers outside the save path read
+        // `project.projectData` rather than calling this method themselves — notably
+        // resultsManager's sun-position, lighting-power and report paths. Without this the
+        // property was never assigned at all, so those paths silently fell back to their
+        // defaults (latitude 40 / longitude 0) or returned null.
+        this._projectDataCache = projectData;
 
         return projectData;
     }
@@ -485,9 +616,98 @@ class Project {
         }
     }
 
+    /**
+     * Builds the full set of Radiance *input* files for a project (geometry,
+     * materials, views, sensor grids and every uploaded/generated resource).
+     *
+     * Both the "Save Project" and the "Generate Package" paths call this so the
+     * two can never write different layouts — previously only the save path
+     * wrote the EPW / BSDF / IES / SPD / schedule files, which made
+     * Generate-then-Run fail with `epw2wea: cannot open ...`.
+     *
+     * @param {object} projectData Result of gatherAllProjectData().
+     * @param {string} projectName Sanitised project name used in file names.
+     * @returns {Promise<Array<{path: string[], content: any}>>}
+     */
+    async _collectProjectInputFiles(projectData, projectName) {
+        const { materials, geometry } = await generateRadFileContent(projectData);
+        const viewpointContent = generateViewpointFileContent(projectData.viewpoint, projectData.geometry.room);
+        const fisheyeVpData = { ...projectData.viewpoint, 'view-type': 'h' };
+        const fisheyeContent = generateViewpointFileContent(fisheyeVpData, projectData.geometry.room);
+        const allPtsContent = await this._generateSensorPointsContent('all');
+        const taskPtsContent = await this._generateSensorPointsContent('task');
+        const surroundingPtsContent = await this._generateSensorPointsContent('surrounding');
+        const facadePtsContent = await this._generateSensorPointsContent('facade');
+        const daylightingPtsContent = await this._generateDaylightingPointsContent();
+        const rayContent = await generateRayFileContent();
+
+        const files = [
+            { path: ['01_geometry', `${projectName}.rad`], content: geometry },
+            { path: ['02_materials', `${projectName}_materials.rad`], content: materials },
+            { path: ['03_views', 'viewpoint.vf'], content: viewpointContent },
+            { path: ['03_views', 'viewpoint_fisheye.vf'], content: fisheyeContent },
+            { path: ['08_results', 'grid.pts'], content: allPtsContent },
+            { path: ['08_results', 'task_grid.pts'], content: taskPtsContent },
+            { path: ['08_results', 'surrounding_grid.pts'], content: surroundingPtsContent },
+            { path: ['08_results', 'facade_grid.pts'], content: facadePtsContent },
+            { path: ['08_results', 'daylighting_sensors.pts'], content: daylightingPtsContent },
+            { path: ['08_results', 'view_grid.ray'], content: rayContent }
+        ];
+
+        // One .vf per saved camera view.
+        (projectData.savedViews || []).forEach((view, index) => {
+            const cameraStateForVf = {
+                position: new THREE.Vector3().fromArray(view.cameraState.position),
+                quaternion: new THREE.Quaternion().fromArray(view.cameraState.quaternion),
+                viewType: view.cameraState.viewType,
+                fov: view.cameraState.fov,
+            };
+            const viewFileContent = generateViewpointFileContentFromState(cameraStateForVf);
+            if (viewFileContent) {
+                files.push({ path: ['03_views', `saved_view_${index + 1}.vf`], content: viewFileContent });
+            }
+        });
+
+        // The project-level EPW. Every annual script reads ../04_skies/<name>.
+        if (projectData.epwFileContent && projectData.projectInfo?.epwFileName) {
+            files.push({ path: ['04_skies', projectData.projectInfo.epwFileName], content: projectData.epwFileContent });
+        }
+
+        // Uploaded / generated resources: weather, BSDF, IES, SPD, schedules,
+        // topography heightmap and anything else registered by the UI.
+        const simFiles = projectData.simulationFiles || this.simulationFiles || {};
+        for (const key in simFiles) {
+            const fileData = simFiles[key];
+            if (fileData?.name && fileData.content) {
+                files.push({ path: [simulationFileDirectory(key), fileData.name], content: fileData.content });
+            }
+        }
+
+        // Drop empty entries and de-duplicate by destination path so the same
+        // EPW is not written twice under two different keys.
+        const byPath = new Map();
+        files
+            .filter(f => f.content !== null && f.content !== undefined)
+            .forEach(f => byPath.set(f.path.join('/'), f));
+        return Array.from(byPath.values());
+    }
+
+    /**
+     * Converts any Blob file contents into Uint8Arrays. Electron's contextBridge
+     * cannot structured-clone a Blob, and fs.writeFile cannot consume one.
+     * @param {Array<{path: string[], content: any}>} files
+     */
+    static async _serializeFilesForIpc(files) {
+        return Promise.all(files.map(async file => {
+            if (file.content instanceof Blob) {
+                return { ...file, content: new Uint8Array(await file.content.arrayBuffer()) };
+            }
+            return file;
+        }));
+    }
+
     async generateSimulationPackage(panelElement, uniqueId = null) {
         const { showAlert } = await import('./ui.js');
-        const { generateRadFileContent, generateRayFileContent } = await import('./radiance.js');
         const { GeometryOptimizer } = await import('./geometryOptimizer.js');
 
         // 1. Check if a project directory is open
@@ -552,6 +772,17 @@ class Project {
             });
         }
 
+        // Some file-backed inputs the script generator reads are not rendered inside
+        // the recipe panel: the project-level EPW and the generated occupancy CSV.
+        // Surface them under the keys the generator looks up so they resolve in
+        // mergedSimParams (and in config._raw.recipeOverrides for registry recipes).
+        ['weather-file', 'occupancy-schedule'].forEach(key => {
+            const fileData = this.simulationFiles[key];
+            if (fileData?.name && !recipeOverrides[key]) {
+                recipeOverrides[key] = { name: fileData.name, content: fileData.content };
+            }
+        });
+
         // Keep legacy mergedSimParams for non-registry recipes.
         projectData.mergedSimParams = { ...globalParams, ...recipeOverrides };
 
@@ -599,14 +830,7 @@ class Project {
         // --- End of addition ---
 
         // Generate all necessary input files in memory first.
-        const { materials, geometry } = await generateRadFileContent(projectData);
-        const viewpointContent = generateViewpointFileContent(projectData.viewpoint, projectData.geometry.room);
-        const fisheyeVpData = { ...projectData.viewpoint, 'view-type': 'h' };
-        const fisheyeContent = generateViewpointFileContent(fisheyeVpData, projectData.geometry.room);
-        const allPtsContent = await this._generateSensorPointsContent('all');
-        const taskPtsContent = await this._generateSensorPointsContent('task');
-        const surroundingPtsContent = await this._generateSensorPointsContent('surrounding');
-        const rayContent = await generateRayFileContent();
+        const inputFiles = await this._collectProjectInputFiles(projectData, projectName);
 
         // Determine active recipe definition (if any) from the registry.
         const recipeDef = getRecipeById(recipeType);
@@ -652,16 +876,7 @@ class Project {
         }
 
         // 3. Structure all files to be written
-        const filesToWrite = [
-            { path: ['01_geometry', `${projectName}.rad`], content: geometry },
-            { path: ['02_materials', `${projectName}_materials.rad`], content: materials },
-            { path: ['03_views', 'viewpoint.vf'], content: viewpointContent },
-            { path: ['03_views', 'viewpoint_fisheye.vf'], content: fisheyeContent },
-            { path: ['08_results', 'grid.pts'], content: allPtsContent },
-            { path: ['08_results', 'task_grid.pts'], content: taskPtsContent },
-            { path: ['08_results', 'surrounding_grid.pts'], content: surroundingPtsContent },
-            { path: ['08_results', 'view_grid.ray'], content: rayContent }
-        ].filter(f => f.content !== null && f.content !== undefined);
+        const filesToWrite = [...inputFiles];
 
         const makeExecutableContent = `#!/bin/bash\n# Makes all .sh scripts in this directory executable.\nchmod +x ./*.sh\necho "All scripts are now executable."`;
         scriptsToGenerate.push({ fileName: 'make_executable.sh', content: makeExecutableContent });
@@ -674,7 +889,10 @@ class Project {
         try {
             if (window.electronAPI && this.dirPath) {
                 // Electron Method
-                await window.electronAPI.saveProject({ projectPath: this.dirPath, files: filesToWrite });
+                await window.electronAPI.saveProject({
+                    projectPath: this.dirPath,
+                    files: await Project._serializeFilesForIpc(filesToWrite)
+                });
             } else if (this.dirHandle) {
                 // Browser Method
                 const writeFile = async (dirHandle, filename, content) => {
@@ -744,19 +962,9 @@ class Project {
                 }
             }
 
-            // 2. Generate all file contents in memory first.
-            const { materials, geometry } = await generateRadFileContent(projectData);
-            const viewpointContent = generateViewpointFileContent(projectData.viewpoint, projectData.geometry.room);
-            const fisheyeVpData = { ...projectData.viewpoint, 'view-type': 'h' };
-            const fisheyeContent = generateViewpointFileContent(fisheyeVpData, projectData.geometry.room);
-            const allPtsContent = await this._generateSensorPointsContent('all');
-            const taskPtsContent = await this._generateSensorPointsContent('task');
-            const surroundingPtsContent = await this._generateSensorPointsContent('surrounding');
-            const daylightingPtsContent = await this._generateDaylightingPointsContent();
-            const rayContent = await generateRayFileContent();
-
-            // Generate .vf files for each saved camera view
-            const savedViewsData = projectData.savedViews || [];
+            // 2. Generate all file contents in memory first. This is the exact same
+            // set the "Generate Package" path writes, so the two layouts match.
+            const inputFiles = await this._collectProjectInputFiles(projectData, projectName);
 
             // Sanitize the project data for JSON serialization by removing large file contents.
             const dataForJson = JSON.parse(JSON.stringify(projectData));
@@ -767,59 +975,19 @@ class Project {
             const projectJsonContent = JSON.stringify(dataForJson, null, 2);
 
             // 3. Structure all generated content into a list of file objects.
-            let filesToWrite = [
-                { path: ['01_geometry', `${projectName}.rad`], content: geometry },
-                { path: ['02_materials', `${projectName}_materials.rad`], content: materials },
-                { path: ['03_views', 'viewpoint.vf'], content: viewpointContent },
-                { path: ['03_views', 'viewpoint_fisheye.vf'], content: fisheyeContent },
-                { path: ['08_results', 'grid.pts'], content: allPtsContent },
-                { path: ['08_results', 'task_grid.pts'], content: taskPtsContent },
-                { path: ['08_results', 'surrounding_grid.pts'], content: surroundingPtsContent },
-                { path: ['08_results', 'view_grid.ray'], content: rayContent },
+            const filesToWrite = [
+                ...inputFiles,
                 { path: [`${projectName}.json`], content: projectJsonContent }
             ];
-
-            savedViewsData.forEach((view, index) => {
-                // De-serialize the state for the generation function
-                const cameraStateForVf = {
-                    position: new THREE.Vector3().fromArray(view.cameraState.position),
-                    quaternion: new THREE.Quaternion().fromArray(view.cameraState.quaternion),
-                    viewType: view.cameraState.viewType,
-                    fov: view.cameraState.fov,
-                };
-                const viewFileContent = generateViewpointFileContentFromState(cameraStateForVf);
-                if (viewFileContent) {
-                    filesToWrite.push({ path: ['03_views', `saved_view_${index + 1}.vf`], content: viewFileContent });
-                }
-            });
-
-            if (daylightingPtsContent) {
-                filesToWrite.push({ path: ['08_results', 'daylighting_sensors.pts'], content: daylightingPtsContent });
-            }
-            // Add topography heightmap to the files to be written
-            const topoFile = this.simulationFiles['topo-heightmap-file'];
-            if (topoFile?.name && topoFile.content) {
-                filesToWrite.push({ path: ['12_topography', topoFile.name], content: topoFile.content });
-            }
-            if (projectData.epwFileContent && projectData.projectInfo.epwFileName) {
-                filesToWrite.push({ path: ['04_skies', projectData.projectInfo.epwFileName], content: projectData.epwFileContent });
-            }
-            if (projectData.simulationFiles) {
-                for (const key in projectData.simulationFiles) {
-                    const fileData = projectData.simulationFiles[key];
-                    if (fileData?.name && fileData.content) {
-                        const targetDir = key.includes('bsdf') ? '05_bsdf' : key.includes('schedule') ? '10_schedules' : '11_files';
-                        filesToWrite.push({ path: [targetDir, fileData.name], content: fileData.content });
-                    }
-                }
-            }
-            // Filter out any files that might not have content.
-            filesToWrite = filesToWrite.filter(f => f.content !== null && f.content !== undefined);
 
             // 4. Write the files using the appropriate method based on the environment.
             if (window.electronAPI && this.dirPath) {
                 // Electron Method: Send all data to the main process for efficient file writing.
-                await window.electronAPI.saveProject({ projectPath: this.dirPath, files: filesToWrite });
+                // Blobs cannot cross the contextBridge, so serialize them first.
+                await window.electronAPI.saveProject({
+                    projectPath: this.dirPath,
+                    files: await Project._serializeFilesForIpc(filesToWrite)
+                });
             } else if (this.dirHandle) {
                 // Browser Method: Use the File System Access API to write files one by one.
                 for (const file of filesToWrite) {
@@ -947,10 +1115,11 @@ class Project {
             const { x, z, width, depth } = enGridParams.task;
 
             const taskPoints = generatePointsInRect(x, z, width, depth, spacing);
-            const normalVector = [0, 0, 1]; // Normal for a horizontal plane
+            // Three.js ordering: [X_width, Y_height, Z_depth]. Up is +Y.
+            const normalVector = [0, 1, 0];
 
             for (const p of taskPoints) {
-                const localPos = [p.x, p.z, offset];
+                const localPos = [p.x, offset, p.z];
                 const worldPos = transformPoint(localPos);
                 const worldNorm = transformVector(normalVector);
                 points.push(`${worldPos.map(c => c.toFixed(4)).join(' ')} ${worldNorm.map(c => c.toFixed(4)).join(' ')}`);
@@ -971,15 +1140,59 @@ class Project {
             const outerD = Math.min(L - outerZ, task.depth + 2 * bandWidth);
 
             const outerPoints = generatePointsInRect(outerX, outerZ, outerW, outerD, spacing);
-            const normalVector = [0, 0, 1];
+            // Three.js ordering: [X_width, Y_height, Z_depth]. Up is +Y.
+            const normalVector = [0, 1, 0];
 
             for (const p of outerPoints) {
                 // Check if the point is OUTSIDE the inner task area
                 const isOutsideTask = (p.x < task.x || p.x > task.x + task.width || p.z < task.z || p.z > task.z + task.depth);
                 if (isOutsideTask) {
-                    const localPos = [p.x, p.z, offset];
+                    const localPos = [p.x, offset, p.z];
                     const worldPos = transformPoint(localPos);
                     const worldNorm = transformVector(normalVector);
+                    points.push(`${worldPos.map(c => c.toFixed(4)).join(' ')} ${worldNorm.map(c => c.toFixed(4)).join(' ')}`);
+                }
+            }
+        } else if (gridType === 'facade') {
+            // Vertical analysis plane sitting in front of one facade, used by the
+            // Facade Irradiation recipe (which reads ../08_results/facade_grid.pts).
+            // The three controls live in the recipe template, so they only exist
+            // in the document while that recipe is the active one.
+            const readRecipeField = (id) => dom[id] || document.getElementById(id);
+            const selectionEl = readRecipeField('facade-selection');
+            if (!selectionEl) return null;
+
+            const selection = String(selectionEl.value || 'S').trim().toUpperCase().charAt(0);
+            const parseField = (id, fallback) => {
+                const el = readRecipeField(id);
+                const value = el ? parseFloat(el.value) : NaN;
+                return isNaN(value) ? fallback : value;
+            };
+            const spacing = parseField('facade-grid-spacing', 0.5);
+            const facadeOffset = parseField('facade-offset', 0.05);
+            if (spacing <= 0 || H <= 0) return null;
+
+            // North is the z = 0 wall, South z = L, West x = 0, East x = W.
+            // The plane is pushed OUTWARD, so its normal is the outward one.
+            const layouts = {
+                N: { length: W, normal: [0, 0, -1], position: (h, v) => [h, v, -facadeOffset] },
+                S: { length: W, normal: [0, 0, 1], position: (h, v) => [h, v, L + facadeOffset] },
+                W: { length: L, normal: [-1, 0, 0], position: (h, v) => [-facadeOffset, v, h] },
+                E: { length: L, normal: [1, 0, 0], position: (h, v) => [W + facadeOffset, v, h] }
+            };
+            const layout = layouts[selection];
+            if (!layout) {
+                console.warn(`Unknown facade selection '${selection}'; facade_grid.pts not generated.`);
+                return null;
+            }
+
+            const horizontal = generateCenteredPoints(layout.length, spacing);
+            const vertical = generateCenteredPoints(H, spacing);
+            const worldNorm = transformVector(layout.normal);
+
+            for (const h of horizontal) {
+                for (const v of vertical) {
+                    const worldPos = transformPoint(layout.position(h, v));
                     points.push(`${worldPos.map(c => c.toFixed(4)).join(' ')} ${worldNorm.map(c => c.toFixed(4)).join(' ')}`);
                 }
             }
@@ -1004,6 +1217,19 @@ class Project {
                 const { generatePolygonGridPoints } = await import('./radiance.js');
                 const polygonPoints = customGeom.points; // {x, z}
 
+                // Custom rooms are built from the raw drawn polygon and live inside
+                // roomObject, which updateScene() rotates by the room orientation.
+                // The custom geometry export writes the BAKED WORLD coordinates of
+                // that group, so these sensor points must be rotated the same way
+                // and then mapped with the canonical (x, y, z)_three -> (x, -z, y)_rad
+                // transform (determinant +1). This mirrors generateRayFileContent()'s
+                // custom branch in radiance.js exactly. Note: NOT centred on W/L —
+                // custom geometry is exported in world coordinates.
+                const upVector = new THREE.Vector3(0, 1, 0);
+                const rotateToWorld = (x, y, z) =>
+                    new THREE.Vector3(x, y, z).applyAxisAngle(upVector, alphaRad).toArray();
+                const toRadiance = (p) => `${p[0].toFixed(4)} ${(-p[2]).toFixed(4)} ${p[1].toFixed(4)}`;
+
                 // --- Floor Grid ---
                 if (dom['grid-floor-toggle']?.checked) {
                     const spacing = getDimension('floor-grid-spacing');
@@ -1012,13 +1238,12 @@ class Project {
                     const gridPoints = generatePolygonGridPoints(polygonPoints, spacing, offset, 0); // y = offset
                     console.log('[DEBUG] Generated', gridPoints.length, 'floor grid points');
 
-                    // Radiance Up Vector (Z-up) corresponds to Three.js Y-up (0,1,0)
-                    // Normal in Radiance format: 0 0 1
+                    // Three.js up (0,1,0) maps to Radiance (0,0,1); rotation about the
+                    // up axis leaves it unchanged.
                     const radNormal = "0 0 1";
 
                     for (const pt of gridPoints) {
-                        // pt is Three {x, y, z}. Radiance is {x, z, y}
-                        points.push(`${pt.x.toFixed(4)} ${pt.z.toFixed(4)} ${pt.y.toFixed(4)} ${radNormal}`);
+                        points.push(`${toRadiance(rotateToWorld(pt.x, pt.y, pt.z))} ${radNormal}`);
                     }
                 }
 
@@ -1026,13 +1251,16 @@ class Project {
                 if (dom['grid-ceiling-toggle']?.checked) {
                     const spacing = getDimension('ceiling-grid-spacing');
                     const offset = getDimension('ceiling-grid-offset');
-                    const gridPoints = generatePolygonGridPoints(polygonPoints, spacing, H - offset, 0); // y = H - offset
+                    // #ceiling-grid-offset is negative-only (-1.0 .. 0), so the level
+                    // is H + offset. geometry.js's viewer grid uses the same
+                    // expression; H - offset put the custom-room grid above the ceiling.
+                    const gridPoints = generatePolygonGridPoints(polygonPoints, spacing, H + offset, 0); // y = H + offset
 
-                    // Normal in Radiance format: 0 0 -1 (Down)
+                    // Three.js down (0,-1,0) maps to Radiance (0,0,-1).
                     const radNormal = "0 0 -1";
 
                     for (const pt of gridPoints) {
-                        points.push(`${pt.x.toFixed(4)} ${pt.z.toFixed(4)} ${pt.y.toFixed(4)} ${radNormal}`);
+                        points.push(`${toRadiance(rotateToWorld(pt.x, pt.y, pt.z))} ${radNormal}`);
                     }
                 }
 
@@ -1075,10 +1303,9 @@ class Project {
                             const totalLenV = (numV - 1) * spacing;
                             const startV = (H - totalLenV) / 2;
 
-                            // Radiance Normal for this wall
-                            // Wall Normal in Three: (nx, 0, nz)
-                            // Radiance: (nx, nz, 0)
-                            const radNormStr = `${nx.toFixed(4)} ${nz.toFixed(4)} 0`;
+                            // Wall normal in Three.js is (nx, 0, nz). Rotate it with
+                            // the room, then apply (x, y, z)_three -> (x, -z, y)_rad.
+                            const radNormStr = toRadiance(rotateToWorld(nx, 0, nz));
 
                             for (let u = 0; u < numH; u++) {
                                 const hDist = startH + u * spacing;
@@ -1092,8 +1319,7 @@ class Project {
 
                                 for (let v = 0; v < numV; v++) {
                                     const yHeight = startV + v * spacing;
-                                    // Radiance Point: X, Z, Y
-                                    points.push(`${finalX.toFixed(4)} ${finalZ.toFixed(4)} ${yHeight.toFixed(4)} ${radNormStr}`);
+                                    points.push(`${toRadiance(rotateToWorld(finalX, yHeight, finalZ))} ${radNormStr}`);
                                 }
                             }
                         }
@@ -1101,16 +1327,9 @@ class Project {
                 }
 
             } else {
-                // Parametric Logic (Original)
-                const generateCenteredPoints = (totalLength, spacing) => {
-                    if (spacing <= 0 || totalLength <= 0) return [];
-                    const numPoints = Math.floor(totalLength / spacing);
-                    if (numPoints === 0) return [totalLength / 2];
-                    const totalGridLength = (numPoints - 1) * spacing;
-                    const start = (totalLength - totalGridLength) / 2;
-                    return Array.from({ length: numPoints }, (_, i) => start + i * spacing);
-                };
-
+                // Parametric Logic (Original). generateCenteredPoints is imported
+                // from radiance.js so the exported grid and the viewer's preview
+                // grid can never disagree about short surfaces.
                 const surfaces = [
                     { name: 'floor', enabled: dom['grid-floor-toggle']?.checked }, { name: 'ceiling', enabled: dom['grid-ceiling-toggle']?.checked },
                     { name: 'north', enabled: dom['grid-north-toggle']?.checked }, { name: 'south', enabled: dom['grid-south-toggle']?.checked },
@@ -1127,6 +1346,9 @@ class Project {
                         points2 = generateCenteredPoints(L, spacing);
                         // CORRECTED: Define normals in Three.js coordinate system (Y-up)
                         normalVector = (name === 'floor') ? [0, 1, 0] : [0, -1, 0];
+                        // #ceiling-grid-offset is a negative-only slider (-1.0 .. 0),
+                        // so H + offset already hangs the grid below the ceiling.
+                        // This matches geometry.js's viewer grid exactly.
                         positionFunc = (p1, p2) => [p1, name === 'floor' ? offset : H + offset, p2]; // Y is height
                     } else {
                         spacing = getDimension('wall-grid-spacing');
@@ -1190,8 +1412,15 @@ class Project {
         const sinA = Math.sin(alphaRad);
 
         const points = lightingState.daylighting.sensors.map(sensor => {
-            // The sensor object contains {x, y, z} position and {x, y, z} direction
-            const posThree = [sensor.x, sensor.y, sensor.z];
+            // COORDINATE CONVENTION (shared contract with lighting.js):
+            // daylighting sensor x/z are CENTRED on the room (sliders run -10..10
+            // with the room centre at 0), while transformThreePointToRadianceArray
+            // expects CORNER-ORIGIN coordinates and subtracts W/2 and L/2 itself.
+            // Shift here, or the photocell gets centred twice and lands in the
+            // floor/wall corner. y is already an absolute height. Note that the
+            // sibling lightDef.position is corner-origin already — only these
+            // sensor coordinates need the shift.
+            const posThree = [sensor.x + W / 2, sensor.y, sensor.z + L / 2];
             const dirThree = [sensor.direction.x, sensor.direction.y, sensor.direction.z];
 
             // Use the new, centralized utility functions
@@ -1233,9 +1462,14 @@ class Project {
 
             this.simulationFiles = {};
             this.epwFileContent = null;
-            // Clear any existing saved views before loading new ones
-            const { loadSavedViews } = await import('./ui.js');
+            this._projectDataCache = null;
+            // Clear any existing saved views before loading new ones.
+            // resetBsdfCache is required here too: ui.js only invalidates its parsed-BSDF
+            // cache on manual file selection, so without this the BSDF viewer would show
+            // the previous project's data after a load.
+            const { loadSavedViews, resetBsdfCache } = await import('./ui.js');
             loadSavedViews([]);
+            resetBsdfCache();
 
             const readFileContent = async (pathSegments) => {
                 try {
@@ -1267,13 +1501,14 @@ class Project {
 
             if (settings.projectInfo?.epwFileName) {
                 const content = await readFileContent(['04_skies', settings.projectInfo.epwFileName]);
-                if (content) this.setEpwData(content);
+                if (content) this.setEpwData(content, settings.projectInfo.epwFileName);
             }
 
             if (settings.simulationFiles) {
                 const filePromises = Object.entries(settings.simulationFiles).map(async ([key, fileData]) => {
                     if (fileData?.name) {
-                        const targetDir = key.includes('bsdf') ? '05_bsdf' : key.includes('schedule') ? '10_schedules' : '11_files';
+                        // Mirror the directory mapping used when writing.
+                        const targetDir = simulationFileDirectory(key);
                         const content = await readFileContent([targetDir, fileData.name]);
                         if (content) this.addSimulationFile(key, fileData.name, content);
                     }
@@ -1308,6 +1543,18 @@ class Project {
             const dom = getDom();
             dom['project-access-prompt']?.classList.add('hidden');
 
+            // Under Electron the FileSystemAccess handle is enough to READ the
+            // project, but running scripts needs a real filesystem path. Without
+            // it simulation.js would fall back to dirHandle.name — a bare folder
+            // name that resolves against the app's CWD. Ask for the path now.
+            if (window.electronAPI && !this.dirPath) {
+                showAlert(
+                    'Project loaded. Select the same folder once more so simulations can be executed from it.',
+                    'Confirm Project Folder'
+                );
+                await this.requestProjectDirectory();
+            }
+
         } catch (error) {
             if (error.name !== 'AbortError') {
                 console.error("Failed to load project:", error);
@@ -1315,6 +1562,59 @@ class Project {
                 showAlert(`Error loading project: ${error.message}`, 'Load Error');
             }
         }
+    }
+
+    /**
+     * Restores every control in the project-authoring panels to the default
+     * declared in index.html (`value` / `checked` / `selected` attributes, which
+     * the DOM exposes as defaultValue / defaultChecked / defaultSelected).
+     *
+     * Called immediately before applySettings() writes a loaded file, so a field
+     * that project B omits falls back to its markup default instead of silently
+     * inheriting project A's value.
+     *
+     * #panel-simulation-modules is deliberately excluded: its recipe UI is torn
+     * down and rebuilt by recreateSimulationPanels().
+     */
+    _resetUiToDefaults() {
+        const scopes = [
+            'panel-project', 'panel-dimensions', 'panel-aperture', 'panel-materials',
+            'panel-sensor', 'panel-viewpoint', 'panel-scene-elements', 'panel-lighting',
+            'panel-analysis-modules'
+        ];
+
+        scopes.forEach(scopeId => {
+            const scope = document.getElementById(scopeId);
+            if (!scope) return;
+
+            scope.querySelectorAll('input, select, textarea').forEach(el => {
+                const type = (el.type || '').toLowerCase();
+                if (type === 'file' || type === 'button' || type === 'submit' || type === 'reset') return;
+
+                let changed = false;
+                if (el.tagName === 'SELECT') {
+                    Array.from(el.options).forEach(option => {
+                        if (option.selected !== option.defaultSelected) {
+                            option.selected = option.defaultSelected;
+                            changed = true;
+                        }
+                    });
+                } else if (type === 'checkbox' || type === 'radio') {
+                    if (el.checked !== el.defaultChecked) {
+                        el.checked = el.defaultChecked;
+                        changed = true;
+                    }
+                } else if (el.value !== el.defaultValue) {
+                    el.value = el.defaultValue;
+                    changed = true;
+                }
+
+                if (changed) {
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            });
+        });
     }
 
     async applySettings(settings, showAlertCallback) {
@@ -1325,19 +1625,53 @@ class Project {
         // Wait a bit to ensure DOM is fully ready
         await new Promise(resolve => setTimeout(resolve, 100));
 
+        if (settings.schemaVersion && settings.schemaVersion > PROJECT_SCHEMA_VERSION) {
+            console.warn(
+                `Project schema version ${settings.schemaVersion} is newer than this build (${PROJECT_SCHEMA_VERSION}). Some settings may not load.`
+            );
+        }
+
+        // A saved project only stores the keys it had. Without this pass every
+        // field the incoming file omits would silently keep the value of the
+        // project that was open before it.
+        this._resetUiToDefaults();
+
         // Define helper functions here, now that `dom` is guaranteed to be available.
+        // A MISSING KEY means "apply the markup default" (already done by the reset
+        // above, so there is nothing to write); a MISSING ELEMENT is a bug and is
+        // reported. The two used to be indistinguishable silent no-ops.
+        const resolveEl = (id) => dom[id] || document.getElementById(id);
         const setValue = (id, value) => {
-            if (dom[id] && value !== null && value !== undefined) {
-                dom[id].value = value;
-                dom[id].dispatchEvent(new Event('input', { bubbles: true }));
-                dom[id].dispatchEvent(new Event('change', { bubbles: true }));
+            if (value === null || value === undefined) return; // key absent: keep the default
+            const el = resolveEl(id);
+            if (!el) {
+                console.warn(`applySettings: no element with id '${id}'; value not restored.`);
+                return;
             }
+            el.value = value;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
         };
         const setChecked = (id, isChecked) => {
-            if (dom[id] && isChecked !== null && isChecked !== undefined) {
-                dom[id].checked = isChecked;
-                dom[id].dispatchEvent(new Event('change', { bubbles: true }));
+            if (isChecked === null || isChecked === undefined) return; // key absent: keep the default
+            const el = resolveEl(id);
+            if (!el) {
+                console.warn(`applySettings: no element with id '${id}'; checked state not restored.`);
+                return;
             }
+            el.checked = isChecked;
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+        // Button-backed booleans (btn-group members) are not inputs: restore them
+        // by clicking so the group's own handler keeps the .active class in sync.
+        const setActiveButton = (id, isActive) => {
+            if (isActive === null || isActive === undefined) return;
+            const el = resolveEl(id);
+            if (!el) {
+                console.warn(`applySettings: no element with id '${id}'; active state not restored.`);
+                return;
+            }
+            if (isActive && !el.classList.contains('active')) el.click();
         };
 
         // --- Project Info & EPW ---
@@ -1349,11 +1683,15 @@ class Project {
         }
 
         // --- Geometry & Apertures ---
+        // switchGeometryMode() is async (it suspends on a dynamic import and then
+        // resets the dimension inputs). It MUST be awaited before the saved room
+        // dimensions are written, or its continuation overwrites them.
+        // ui.js accepts 'import', not 'imported'.
         if (settings.geometry?.mode === 'imported') {
             showAlertCallback("This project uses an imported model. Please re-import the original .obj and .mtl files to continue.", "Model Import Required");
-            ui.switchGeometryMode('imported');
+            await ui.switchGeometryMode('import');
         } else {
-            ui.switchGeometryMode('parametric');
+            await ui.switchGeometryMode('parametric');
         }
         if (settings.geometry?.room) {
             Object.keys(settings.geometry.room).forEach(key => setValue(key, settings.geometry.room[key]));
@@ -1384,11 +1722,27 @@ class Project {
                 setValue(`shading-type-${dir}`, shadingData.type);
                 ui.handleShadingTypeChange(dir, false); // This reveals the correct controls panel
 
-                // Handle existing, non-generative shading types
-                if (shadingData.overhang) Object.keys(shadingData.overhang).forEach(p => setValue(`overhang-${p}-${dir}`, shadingData.overhang[p]));
-                if (shadingData.lightshelf) Object.keys(shadingData.lightshelf).forEach(p => setValue(`lightshelf-${p}-${dir}`, shadingData.lightshelf[p]));
-                if (shadingData.louver) Object.keys(shadingData.louver).forEach(p => setValue(`louver-${p}-${dir}`, shadingData.louver[p]));
-                if (shadingData.roller) Object.keys(shadingData.roller).forEach(p => setValue(`roller-${p}-${dir}`, shadingData.roller[p]));
+                // Handle existing, non-generative shading types.
+                // getAllShadingParams() saves camelCase keys but the controls are
+                // kebab-cased (distAbove -> overhang-dist-above-n), so every param
+                // used to be dropped on load. A handful of keys are backed by
+                // buttons or a select instead of a value input; those are listed
+                // explicitly below.
+                const restoreShadingGroup = (group, prefix, data) => {
+                    if (!data) return;
+                    Object.keys(data).forEach(param => {
+                        const special = SHADING_PARAM_RESTORERS[`${group}.${param}`];
+                        if (special) {
+                            special(dir, data[param], { setValue, setActiveButton });
+                            return;
+                        }
+                        setValue(`${prefix}-${camelToKebab(param)}-${dir}`, data[param]);
+                    });
+                };
+                restoreShadingGroup('overhang', 'overhang', shadingData.overhang);
+                restoreShadingGroup('lightshelf', 'lightshelf', shadingData.lightshelf);
+                restoreShadingGroup('louver', 'louver', shadingData.louver);
+                restoreShadingGroup('roller', 'roller', shadingData.roller);
 
                 if (shadingData.generative) {
                     // Restore the state object for generative shading
@@ -1432,11 +1786,37 @@ class Project {
         // --- Furniture ---
         if (settings.geometry.furniture && Array.isArray(settings.geometry.furniture)) {
             const { addFurniture, furnitureObject } = await import('./geometry.js');
-            // Clear any existing furniture before loading
-            while (furnitureObject.children.length > 0) furnitureObject.remove(furnitureObject.children[0]);
+            // Clear any existing furniture before loading. Only the CONTENTS of
+            // the container are removed: addFurniture() adds into
+            // furnitureObject.children[0], so removing the container itself would
+            // make every restored item invisible.
+            const furnitureContainer = furnitureObject.children[0];
+            if (furnitureContainer) {
+                while (furnitureContainer.children.length > 0) furnitureContainer.remove(furnitureContainer.children[0]);
+            }
 
             settings.geometry.furniture.forEach(item => {
                 const newObj = addFurniture(item.assetType, new THREE.Vector3(0, 0, 0)); // Add at origin first
+                if (newObj) {
+                    newObj.position.fromArray(item.position);
+                    newObj.quaternion.fromArray(item.quaternion);
+                    newObj.scale.fromArray(item.scale);
+                }
+            });
+        }
+
+        // --- Vegetation ---
+        // Vegetation was gathered and awaited on save but never restored, so trees
+        // vanished on reload and the next save deleted them permanently.
+        if (settings.geometry.vegetation && Array.isArray(settings.geometry.vegetation)) {
+            const { addVegetation, vegetationObject } = await import('./geometry.js');
+            const vegetationContainer = vegetationObject.children[0];
+            if (vegetationContainer) {
+                while (vegetationContainer.children.length > 0) vegetationContainer.remove(vegetationContainer.children[0]);
+            }
+
+            settings.geometry.vegetation.forEach(item => {
+                const newObj = addVegetation(item.assetType, new THREE.Vector3(0, 0, 0), false); // Add at origin first
                 if (newObj) {
                     newObj.position.fromArray(item.position);
                     newObj.quaternion.fromArray(item.quaternion);
@@ -1519,7 +1899,11 @@ class Project {
         // --- Sensor Grids ---
         if (settings.sensorGrids) {
             const sg = settings.sensorGrids;
-            if (sg.illuminance.floor) {
+            // These two were saved but never restored, and every `sg.illuminance.x`
+            // below threw on a project whose JSON has sensorGrids but no illuminance.
+            setChecked('illuminance-grid-toggle', sg.illuminance?.enabled);
+            setChecked('show-floor-grid-3d-toggle', sg.illuminance?.showIn3D);
+            if (sg.illuminance?.floor) {
                 const floor = sg.illuminance.floor;
                 setChecked('grid-floor-toggle', floor.enabled);
                 setValue('floor-grid-spacing', floor.spacing);
@@ -1535,12 +1919,12 @@ class Project {
                 setChecked('surrounding-area-toggle', floor.hasSurrounding);
                 setValue('surrounding-area-width', floor.surroundingWidth);
             }
-            if (sg.illuminance.ceiling) {
+            if (sg.illuminance?.ceiling) {
                 setChecked('grid-ceiling-toggle', sg.illuminance.ceiling.enabled);
                 setValue('ceiling-grid-spacing', sg.illuminance.ceiling.spacing);
                 setValue('ceiling-grid-offset', sg.illuminance.ceiling.offset);
             }
-            if (sg.illuminance.walls) {
+            if (sg.illuminance?.walls) {
                 const walls = sg.illuminance.walls;
                 setValue('wall-grid-spacing', walls.spacing);
                 setValue('wall-grid-offset', walls.offset);
@@ -1595,6 +1979,12 @@ class Project {
             setValue('results-palette', viz.palette);
             setValue('metric-selector', viz.activeMetric);
 
+            // activeView was saved with no restore site. Ids are view-mode-a-btn /
+            // view-mode-b-btn / view-mode-diff-btn.
+            if (viz.activeView) {
+                setActiveButton(`view-mode-${viz.activeView}-btn`, true);
+            }
+
             // Trigger UI updates that depend on these values
             if (dom['compare-mode-toggle']) {
                 dom['compare-mode-toggle'].dispatchEvent(new Event('change', { bubbles: true }));
@@ -1626,88 +2016,28 @@ class Project {
         // --- Custom Geometry ---
         if (settings.geometry.customGeometry) {
             const cg = settings.geometry.customGeometry;
-            const { createCustomRoom } = await import('./customGeometryManager.js');
-            const { registerCustomWall } = await import('./customApertureManager.js');
+            const { createCustomRoom, updateCustomWall } = await import('./customGeometryManager.js');
+            const { getCustomWallData } = await import('./customApertureManager.js');
             const { setIsCustomGeometry } = await import('./geometry.js');
 
-            // 1. Set Flag
+            // 1. Set the flag and rebuild the shell. createCustomRoom() calls
+            // clearCustomWalls() and re-registers every wall with defaults, so any
+            // registration done BEFORE this point is discarded (the old code
+            // registered each wall twice for that reason).
             setIsCustomGeometry(true);
-
-            // 2. Restore Wall Data
-            // 2. Restore Wall Data
-            if (cg.walls) {
-                // Import outside the loop
-                const { getCustomWallData } = await import('./customApertureManager.js');
-
-                cg.walls.forEach(wall => {
-                    registerCustomWall(wall.id, wall.data.dimensions);
-                    // We need to fully restore the aperture/shading data
-                    // We already have registerCustomWall.
-                    // But registerCustomWall resets data to default.
-                    // We need a way to set full data.
-                    // Let's modify customApertureManager to allow setting full data or update it here.
-                });
-
-                // Better approach: Modify registerCustomWall or add setCustomWallData
-                // For now, let's just manually update the map if we can access it? No, it's private.
-                // We need to export a restore function in customApertureManager.
-            }
-
-            // Reconstruct points
             const points = cg.points.map(p => new THREE.Vector3(p.x, p.y, p.z));
-
-            // 3. Create Room
             createCustomRoom(points, cg.height);
 
-            // 4. Apply saved aperture data
-            // We need to do this AFTER createCustomRoom because createCustomRoom calls registerCustomWall (reseting it).
-            // Wait, createCustomRoom calls registerCustomWall.
-            // So we should pass the saved data TO createCustomRoom?
-            // Or we should update the data AFTER createCustomRoom.
-
-            if (cg.walls) {
-                const { getCustomWallData: getCWD } = await import('./customApertureManager.js');
-
+            // 2. Merge the saved per-wall data over those defaults and rebuild each
+            // wall's content so apertures, shading and frames actually reappear.
+            if (Array.isArray(cg.walls)) {
                 cg.walls.forEach(wall => {
-                    const data = getCWD(wall.id);
-                    if (data) {
-                        // Merge saved data
-                        Object.assign(data.apertures, wall.data.apertures);
-                        Object.assign(data.shading, wall.data.shading);
-                        // Trigger update
-                        // We need to import updateCustomWall from customGeometryManager
-                    }
-                });
-
-                // We need to call updateCustomWall for each wall to reflect changes?
-                // createCustomRoom creates geometry based on current data.
-                // If createCustomRoom resets data, we are in trouble.
-                // Let's check createCustomRoom.
-                // It calls registerCustomWall.
-                // registerCustomWall overwrites with defaults.
-
-                // FIX: We need createCustomRoom to NOT reset if data exists?
-                // Or we restore data AFTER createCustomRoom, then regenerate?
-                // Regenerating everything twice is bad.
-
-                // Better: createCustomRoom should take optional "restoreData" or we separate registration.
-                // Let's go with: Restore data AFTER, then update all.
-                // Or modify customApertureManager to have a `restoreCustomWalls` function that sets the map,
-                // and modify createCustomRoom to NOT register if already exists?
-
-                // Let's stick to the plan:
-                // 1. createCustomRoom will register (reset) everything.
-                // 2. We overwrite with saved data.
-                // 3. We call updateCustomWall for each wall.
-
-                const { updateCustomWall } = await import('./customGeometryManager.js');
-                cg.walls.forEach(wall => {
-                    const data = getCWD(wall.id);
-                    if (data) {
-                        Object.assign(data.apertures, wall.data.apertures);
-                        Object.assign(data.shading, wall.data.shading);
-                        updateCustomWall(wall.id);
-                    }
+                    const data = getCustomWallData(wall.id);
+                    if (!data || !wall.data) return;
+                    if (wall.data.apertures) Object.assign(data.apertures, wall.data.apertures);
+                    if (wall.data.shading) Object.assign(data.shading, wall.data.shading);
+                    if (wall.data.frame) Object.assign(data.frame, wall.data.frame);
+                    updateCustomWall(wall.id);
                 });
             }
         } else {

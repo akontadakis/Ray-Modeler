@@ -86,8 +86,13 @@ export class Agent {
      * @returns {Promise<string>} The final response.
      */
     async process(userMessage, context, onThought, onToolCall, llmExecutor, toolExecutor) {
+        // Capture the history array ONCE. `chatHistory` is rebound when the user
+        // switches conversation tabs, and an in-flight request must keep writing to
+        // the conversation it started in.
+        const history = this.chatHistory;
+
         // 1. Add user message to history
-        this.chatHistory.push({ role: 'user', content: userMessage });
+        history.push({ role: 'user', content: userMessage });
 
         // 2. Construct System Prompt with Context
         const memorySummary = this.memory.getSummary();
@@ -108,7 +113,7 @@ You are in a ReAct loop.
 
         let loopCount = 0;
         const maxLoops = 10;
-        let currentMessages = [...this.chatHistory];
+        let currentMessages = [...history];
 
         while (loopCount < maxLoops) {
             loopCount++;
@@ -123,7 +128,7 @@ You are in a ReAct loop.
 
             // Final Answer: text present with no tool calls -> we're done.
             if (response.text && !hasToolCalls) {
-                this.chatHistory.push({ role: 'assistant', content: response.text });
+                history.push({ role: 'assistant', content: response.text });
                 return response.text;
             }
 
@@ -137,11 +142,16 @@ You are in a ReAct loop.
             // This MUST happen BEFORE the role:'tool' results are pushed, otherwise the
             // provider rejects tool results that aren't preceded by their tool-call turn.
             if (hasToolCalls || response.text) {
-                currentMessages.push({
+                const assistantTurn = {
                     role: 'assistant',
                     content: response.text || '',
                     tool_calls: hasToolCalls ? response.toolCalls : undefined
-                });
+                };
+                currentMessages.push(assistantTurn);
+                // ALSO persist it: pushing tool turns only into `currentMessages`
+                // meant the next user turn started from a transcript with no record
+                // that a simulation had already been run, so the model ran it again.
+                history.push(assistantTurn);
             }
 
             // Handle Tool Calls
@@ -162,7 +172,9 @@ You are in a ReAct loop.
                     if (allowed) {
                         onThought(`Executing ${name}...`);
                         try {
-                            // Retry logic
+                            // Retry ONLY transient failures. Retrying every thrown
+                            // error re-ran deterministic failures (a missing panel, a
+                            // bad argument) three times before giving up.
                             let attempts = 0;
                             while (attempts < this.maxRetries) {
                                 try {
@@ -170,8 +182,8 @@ You are in a ReAct loop.
                                     break;
                                 } catch (err) {
                                     attempts++;
-                                    if (attempts >= this.maxRetries) throw err;
-                                    onThought(`Tool failed, retrying (${attempts}/${this.maxRetries})...`);
+                                    if (attempts >= this.maxRetries || !Agent.isTransientError(err)) throw err;
+                                    onThought(`Tool failed (transient), retrying (${attempts}/${this.maxRetries})...`);
                                 }
                             }
                         } catch (error) {
@@ -181,18 +193,41 @@ You are in a ReAct loop.
                         result = { error: "User denied permission." };
                     }
 
-                    // Add result to history for the next loop iteration
-                    currentMessages.push({
+                    // Add result to BOTH the loop transcript and the persistent
+                    // history, so a later turn can see what the tool already returned.
+                    const toolTurn = {
                         role: 'tool',
                         tool_call_id: id,
                         name: name,
                         content: JSON.stringify(result)
-                    });
+                    };
+                    currentMessages.push(toolTurn);
+                    history.push(toolTurn);
                 }
             }
         }
 
         return "I'm sorry, I got stuck in a loop and couldn't finish the task.";
+    }
+
+    /**
+     * Decides whether a thrown tool error is worth retrying. Deterministic failures
+     * (a missing element, an invalid argument, a denied permission) produce the same
+     * error every time, so retrying them only wastes the user's time.
+     * @param {Error|string} err
+     * @returns {boolean}
+     */
+    static isTransientError(err) {
+        const message = String(err?.message ?? err ?? '').toLowerCase();
+        if (!message) return false;
+        const transientPatterns = [
+            'timeout', 'timed out', 'network', 'fetch failed', 'failed to fetch',
+            'econnreset', 'econnrefused', 'etimedout', 'socket hang up',
+            'temporarily', 'try again', 'rate limit', 'too many requests',
+            'service unavailable', 'bad gateway', 'gateway timeout',
+            'busy', 'locked', 'ebusy'
+        ];
+        return transientPatterns.some(p => message.includes(p));
     }
 
     /**
@@ -215,7 +250,7 @@ You are in a ReAct loop.
             'getLightingEnergySummary', 'compareMetrics', 'getGeometryMode',
             'listCustomWalls', 'getWallDetails', 'queryResultsData',
             'getDatasetStatistics', 'searchKnowledgeBase',
-            'analyzeOptimizationResults', 'suggestOptimizationRanges',
+            'analyzeOptimizationResults',
             'showAnalysisDashboard', 'displayResultsForTime',
             'highlightResultPoint', 'filterAndHighlightPoints', 'filterDataTable',
             'toggleDataTable', 'toggleUIPanel', 'toggleHdrViewer',
@@ -228,8 +263,12 @@ You are in a ReAct loop.
         // Destructive tools discard work that cannot be recovered from the UI, so
         // they are confirmed even in autonomous mode. Every name here is checked
         // against the live registry by the test in requiresConfirmation's spec.
+        // `suggestOptimizationRanges` reads like a query but its handler rewrites the
+        // optimizer's UI inputs and then runs `startOptimization('quick')` - a dozen
+        // headless Radiance evaluations. It belongs here, not on the read-only list.
         const destructiveTools = new Set([
-            'loadProject', 'clearResults', 'startOptimization', 'runSimulation'
+            'loadProject', 'clearResults', 'startOptimization', 'runSimulation',
+            'suggestOptimizationRanges'
         ]);
 
         if (this.yoloMode) {

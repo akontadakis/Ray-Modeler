@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { renderer, activeCamera, controls, orthoCamera, setActiveCamera, scene } from './scene.js';
-import { roomObject, wallSelectionGroup, updateScene, setIsCustomGeometry } from './geometry.js';
+import { roomObject, wallSelectionGroup, updateScene, setIsCustomGeometry, clearGroup, disposeMeshLike } from './geometry.js';
 import { getDom } from './dom.js';
 import { createCustomRoom, addCustomPartition, getCustomRoomHeight } from './customGeometryManager.js';
 
@@ -221,8 +221,8 @@ export function startDrawingMode() {
     import('./customGeometryManager.js').then(({ setGeometryFinalized }) => {
         setGeometryFinalized(false);
     });
-    while (roomObject.children.length > 0) roomObject.remove(roomObject.children[0]);
-    while (wallSelectionGroup.children.length > 0) wallSelectionGroup.remove(wallSelectionGroup.children[0]);
+    clearGroup(roomObject);
+    clearGroup(wallSelectionGroup);
     updateScene(); // Refresh scene state
     // -----------------------------------------------
 
@@ -232,7 +232,7 @@ export function startDrawingMode() {
     }
 
     // Switch to Top View (Ortho)
-    import('./ui.js').then(({ setCameraView, showAlert, setCustomGeometryUI }) => {
+    import('./ui.js').then(({ setCameraView, showAlertHtml, setCustomGeometryUI }) => {
         setCustomGeometryUI(true); // Hide parametric dimensions
         setCameraView('top'); // Ensure we are looking down
         // Force Ortho camera just in case
@@ -266,7 +266,7 @@ export function startDrawingMode() {
         // Let's set LEFT to null to be safe for drawing.
         controls.mouseButtons.LEFT = null;
 
-        showAlert("Top-Down Drawing Mode Active.<br>Click to start. Double-click to finish. Type numbers for length.<br>Press 'O' to toggle diagonal drawing, 'S' for snapping.", "Drawing Mode");
+        showAlertHtml("Top-Down Drawing Mode Active.<br>Click to start. Double-click to finish. Type numbers for length.<br>Press 'O' to toggle diagonal drawing, 'S' for snapping.", "Drawing Mode");
     });
 
     // Visual Helpers - Use theme-aware colors
@@ -320,7 +320,7 @@ export function startPartitionDrawingMode() {
     }
 
     // Switch to Top View (reuse UI logic)
-    import('./ui.js').then(({ setCameraView, showAlert, setCustomGeometryUI }) => {
+    import('./ui.js').then(({ setCameraView, showAlertHtml, setCustomGeometryUI }) => {
         setCustomGeometryUI(true);
         setCameraView('top');
         setActiveCamera(orthoCamera);
@@ -338,7 +338,7 @@ export function startPartitionDrawingMode() {
             RIGHT: THREE.MOUSE.PAN
         };
 
-        showAlert("Partition Drawing Mode.<br>Click to start chain. Double-click to finish chain. Esc to exit.<br>Press 'O' to toggle diagonal drawing.", "Drawing Mode");
+        showAlertHtml("Partition Drawing Mode.<br>Click to start chain. Double-click to finish chain. Esc to exit.<br>Press 'O' to toggle diagonal drawing.", "Drawing Mode");
 
         // Show Finalize Button
         const finalizeContainer = document.getElementById('finalize-geometry-container');
@@ -403,7 +403,10 @@ function getMousePosition(event) {
 
     const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     const target = new THREE.Vector3();
-    raycaster.ray.intersectPlane(plane, target);
+    // intersectPlane returns null when the ray is parallel to the ground plane and leaves
+    // `target` untouched; without this guard the caller would use a zeroed vector and drop
+    // a wall vertex at the world origin.
+    if (!raycaster.ray.intersectPlane(plane, target)) return null;
 
     // Grid Snapping (0.5m snap)
     const SNAP = 0.5;
@@ -420,6 +423,7 @@ function onMouseMove(e) {
     if (!isDrawing) return;
 
     let target = getMousePosition(e);
+    if (!target) return; // Ray parallel to the ground plane - no valid cursor position
 
     // Ortho Lock Logic (only when enabled)
     if (points.length > 0 && isOrthoLockEnabled) {
@@ -691,13 +695,18 @@ function addPoint(pt) {
     // Clear Active Preview Line
     if (activeLine) {
         tempGroup.remove(activeLine);
+        disposeMeshLike(activeLine);
         activeLine = null;
     }
 
     // Clear Ruler
     if (rulerGroup) {
         // Keep ruler? No, usually ruler is only for active segment.
-        while (rulerGroup.children.length > 0) rulerGroup.remove(rulerGroup.children[0]);
+        while (rulerGroup.children.length > 0) {
+            const c = rulerGroup.children[0];
+            disposeMeshLike(c);
+            rulerGroup.remove(c);
+        }
     }
 }
 

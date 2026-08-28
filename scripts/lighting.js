@@ -14,16 +14,28 @@ import { updateAllLabels } from './ui.js';
 class IESParser {
     /**
      * Parses the IES file content and extracts key photometric data.
+     *
+     * Candela values are returned already scaled by the file's candela multiplier and
+     * ballast factor, so they are true candela regardless of the units the file was
+     * authored in. Luminaire dimensions are returned in metres.
+     *
      * @param {string} iesContent The raw text content of the .ies file.
      * @returns {{
      * lumensPerLamp: number,
      * numLamps: number,
+     * candelaMultiplier: number,
+     * ballastFactor: number,
+     * photometricType: number,
+     * unitsType: number,
+     * dimensions: {width: number, length: number, height: number},
+     * isAbsolute: boolean,
      * wattage: number,
      * maxCandela: number,
      * verticalAngles: number[],
      * horizontalAngles: number[],
      * allCandelaValues: number[],
-     * candelaValuesFor2D: number[]
+     * candelaValuesFor2D: number[],
+     * warnings: string[]
      * }} Parsed photometric data.
      * @throws {Error} If the file format is invalid.
      */
@@ -36,78 +48,117 @@ class IESParser {
             lineIndex++;
         }
         if (lineIndex >= lines.length) throw new Error("IES file format error: TILT line not found.");
+
+        const tiltValue = (lines[lineIndex].split('=')[1] || '').trim().toUpperCase();
         lineIndex++; // Move past the TILT line
 
-        const dataLine1 = lines[lineIndex++].split(/\s+/).map(Number);
-        const dataLine2 = lines[lineIndex++].split(/\s+/).map(Number);
+        // LM-63 allows every numeric record to wrap across physical lines, so the rest of
+        // the file is consumed as one whitespace-delimited token stream rather than
+        // line-by-line. Blank lines are simply absorbed by the split.
+        const tokens = lines.slice(lineIndex).join(' ').trim().split(/\s+/).filter(t => t.length > 0);
+        let t = 0;
+        const takeNumbers = (count, what) => {
+            if (t + count > tokens.length) {
+                throw new Error(`IES file format error: Not enough data for ${what}.`);
+            }
+            const out = new Array(count);
+            for (let k = 0; k < count; k++) {
+                const value = Number(tokens[t + k]);
+                if (!Number.isFinite(value)) {
+                    throw new Error(`IES file format error: Non-numeric value "${tokens[t + k]}" in ${what}.`);
+                }
+                out[k] = value;
+            }
+            t += count;
+            return out;
+        };
 
-        if (dataLine1.length < 10) throw new Error("IES file format error: Invalid data definition line 1.");
-        if (dataLine2.length < 3) throw new Error("IES file format error: Invalid ballast/watts definition line 2.");
+        // TILT=INCLUDE embeds a tilt block here: the lamp-to-luminaire geometry flag, the
+        // number of angle/multiplier pairs, then the two arrays. TILT=NONE and
+        // TILT=<filename> embed nothing. Skipping only one line breaks every tiltable file.
+        if (tiltValue === 'INCLUDE') {
+            takeNumbers(1, 'TILT lamp-to-luminaire geometry');
+            const [numTiltPairs] = takeNumbers(1, 'TILT pair count');
+            if (!Number.isInteger(numTiltPairs) || numTiltPairs < 0) {
+                throw new Error("IES file format error: Invalid TILT pair count.");
+            }
+            takeNumbers(numTiltPairs * 2, 'TILT angle/multiplier pairs');
+        }
 
-        const [numLamps, lumensPerLamp, candelaMultiplier, numVAngles, numHAngles] = dataLine1;
+        const dataLine1 = takeNumbers(10, 'data definition line 1');
+        const dataLine2 = takeNumbers(3, 'ballast/watts definition line 2');
+
+        const [numLamps, lumensPerLamp, candelaMultiplier, numVAngles, numHAngles,
+            photometricType, unitsType] = dataLine1;
+        const ballastFactor = dataLine2[0];
         const wattage = dataLine2[2];
         // Absolute photometry files use lumensPerLamp === -1; luminous flux is defined
         // directly by the candela data rather than a rated lamp lumen value.
         const isAbsolute = lumensPerLamp === -1;
 
-        if (numVAngles <= 0 || numHAngles <= 0) throw new Error("IES file format error: Invalid number of angles.");
-
-        // All subsequent lines contain angle and candela data as a stream of numbers.
-        const dataValues = lines.slice(lineIndex).join(' ').trim().split(/\s+/).map(Number);
-        if (dataValues.length < numVAngles + numHAngles + numVAngles * numHAngles) {
-            throw new Error("IES file format error: Not enough data points for angles and candelas.");
+        if (!Number.isInteger(numVAngles) || !Number.isInteger(numHAngles) || numVAngles <= 0 || numHAngles <= 0) {
+            throw new Error("IES file format error: Invalid number of angles.");
         }
 
-        const verticalAngles = dataValues.slice(0, numVAngles);
-        const horizontalAngles = dataValues.slice(numVAngles, numVAngles + numHAngles);
-        const candelaStartIndex = numVAngles + numHAngles;
-        const allCandelaValues = dataValues.slice(candelaStartIndex, candelaStartIndex + (numVAngles * numHAngles));
+        const verticalAngles = takeNumbers(numVAngles, 'vertical angles');
+        const horizontalAngles = takeNumbers(numHAngles, 'horizontal angles');
+        const rawCandela = takeNumbers(numVAngles * numHAngles, 'candela values');
+
+        // The candela multiplier and the ballast factor both scale the tabulated values;
+        // a file authored in e.g. millicandela carries the 0.001 in the multiplier.
+        const scale = (Number.isFinite(candelaMultiplier) && candelaMultiplier > 0 ? candelaMultiplier : 1)
+            * (Number.isFinite(ballastFactor) && ballastFactor > 0 ? ballastFactor : 1);
+        const allCandelaValues = rawCandela.map(c => c * scale);
 
         // For 2D plot, use the first set of vertical candela values (C0 plane)
         const candelaValuesFor2D = allCandelaValues.slice(0, numVAngles);
 
-        const maxCandela = Math.max(...allCandelaValues);
-        if (maxCandela <= 0) throw new Error("No valid candela values found for plotting.");
+        // Loop-based max: Math.max(...arr) blows the argument limit on large webs
+        // (a 181x721 file is 130k values) and NaN <= 0 is false, so it never caught garbage.
+        let maxCandela = -Infinity;
+        for (let i = 0; i < allCandelaValues.length; i++) {
+            const v = allCandelaValues[i];
+            if (v > maxCandela) maxCandela = v;
+        }
+        if (!Number.isFinite(maxCandela) || maxCandela <= 0) {
+            throw new Error("No valid candela values found for plotting.");
+        }
+
+        // Units type: 1 = feet, 2 = metres. Only the luminaire dimensions carry units.
+        const dimensionScale = (unitsType === 1) ? 0.3048 : 1;
+        const dimensions = {
+            width: dataLine1[7] * dimensionScale,
+            length: dataLine1[8] * dimensionScale,
+            height: dataLine1[9] * dimensionScale
+        };
+
+        const warnings = [];
+        // Photometric type: 1 = C, 2 = B, 3 = A. The viewer's spherical maths assume Type C.
+        if (photometricType !== 1) {
+            const typeName = photometricType === 2 ? 'B' : photometricType === 3 ? 'A' : `${photometricType}`;
+            warnings.push(`Photometric Type ${typeName} file: the viewer renders Type C (C-gamma) geometry, so the plotted web is indicative only.`);
+        }
+        if (unitsType !== 1 && unitsType !== 2) {
+            warnings.push(`Unrecognised units type "${unitsType}"; luminaire dimensions assumed to be metres.`);
+        }
 
         return {
             lumensPerLamp,
             numLamps,
             candelaMultiplier,
+            ballastFactor,
+            photometricType,
+            unitsType,
+            dimensions,
             isAbsolute,
             wattage,
             maxCandela,
             verticalAngles,
             horizontalAngles,
             allCandelaValues,
-            candelaValuesFor2D
+            candelaValuesFor2D,
+            warnings
         };
-    }
-
-    /**
-     * Helper to read a block of angle data.
-     * @param {string[]} lines - All lines from the file.
-     * @param {number} startIndex - The line index to start reading from.
-     * @param {number} count - The number of angles to read.
-     * @returns {number[]} The array of angles.
-     * @private
-     */
-    static _readAngleData(lines, startIndex, count) {
-        return lines.slice(startIndex, startIndex + count).join(' ').trim().split(/\s+/).map(Number);
-    }
-
-    /**
-     * Helper to read candela values, specifically targeting the primary vertical distribution.
-     * @param {string[]} lines - All lines from the file.
-     * @param {number} startIndex - The line index to start reading from.
-     * @param {number} vCount - The number of vertical angles.
-     * @param {number} hCount - The number of horizontal angles.
-     * @returns {number[]} The candela values for the first horizontal angle (main distribution).
-     * @private
-     */
-    static _readCandelaData(lines, startIndex, vCount) {
-        // For the 2D plot, we only need the candela values for the first horizontal angle.
-        const allValues = lines.slice(startIndex).join(' ').trim().split(/\s+/).map(Number);
-        return allValues.slice(0, vCount);
     }
 }
 
@@ -138,7 +189,11 @@ class LightingManager {
         /** @private @type {object} */
         this.ies3d = { scene: null, camera: null, renderer: null, controls: null, webMesh: null, animationFrameId: null, resizeObserver: null };
         /** @private @type {boolean} */
-        this.isUpdatingFractions = false;
+        this._isUpdatingFractions = false;
+        /** @private @type {boolean} */
+        this.isPanelSetup = false;
+        /** @private @type {number} */
+        this._iesReadRequestId = 0;
 
         this.lightsGroup.name = 'LightingGizmos';
     }
@@ -164,6 +219,14 @@ class LightingManager {
             console.error("LightingManager not initialized. Call init() first.");
             return;
         }
+        // Guard against a second call: _bindEventListeners attaches a permanent
+        // 'dragging-changed' listener to the shared sensorTransformControls that is never
+        // removed, so re-entry would duplicate every handler.
+        if (this.isPanelSetup) {
+            this._synchronizeUIState();
+            return;
+        }
+        this.isPanelSetup = true;
 
         this._bindEventListeners();
         this._synchronizeUIState();
@@ -206,10 +269,11 @@ class LightingManager {
         this._addGridDef(lightDef);
         this._addDaylightingDef(lightDef);
 
-        // A valid IES definition requires a loaded file
-        if (lightDef.type === 'ies' && !this.iesFileData) {
-            return null;
-        }
+        // A valid IES definition requires a loaded file. Returning null here would make
+        // project.js read the whole lighting section as "disabled" and silently drop the
+        // position, grid, maintenance factor and the entire daylighting-control setup, so
+        // flag the missing file instead and keep everything else intact.
+        lightDef.ies_file_missing = (lightDef.type === 'ies' && !this.iesFileData);
 
         return lightDef;
     }
@@ -244,6 +308,18 @@ class LightingManager {
         while (this.lightsGroup.children.length > 0) {
             const object = this.lightsGroup.children[0];
             object.traverse((child) => {
+                // ArrowHelper's cone and line geometries are MODULE-LEVEL singletons shared
+                // by every arrow in the app (see three/src/helpers/ArrowHelper.js: the
+                // lazily-created _lineGeometry / _coneGeometry). Disposing them here would
+                // free the GPU buffers behind the daylighting-sensor arrows and the sun
+                // tracer as well. Only the per-instance materials belong to this gizmo, and
+                // arrow.line is a Line (not a Mesh) so its material was previously leaked.
+                if (child.type === 'ArrowHelper') {
+                    child.line?.material?.dispose();
+                    child.cone?.material?.dispose();
+                    return;
+                }
+                if (child.parent?.type === 'ArrowHelper') return; // handled above
                 if (child.isMesh) {
                     child.geometry.dispose();
                     if (child.material) {
@@ -272,9 +348,32 @@ class LightingManager {
         if (lightDef.placement === 'grid' && lightDef.grid) {
             this._createGridGizmos(lightDef, placeGizmo);
         } else {
+            this._setGridWarning(null);
             placeGizmo(lightDef.position, null);
         }
 }
+
+    /**
+     * Shows or clears an inline warning under the grid layout inputs.
+     * The element is created on first use because index.html has no placeholder for it.
+     * @param {?string} message - The warning text, or null to clear it.
+     * @private
+     */
+    _setGridWarning(message) {
+        const host = this.dom['grid-layout-inputs'];
+        if (!host) return;
+        let warning = host.querySelector('[data-lighting-grid-warning]');
+        if (!warning) {
+            if (!message) return;
+            warning = document.createElement('p');
+            warning.setAttribute('data-lighting-grid-warning', '');
+            warning.className = 'text-xs mt-2 leading-snug';
+            warning.style.color = 'var(--warning-color, #d97706)';
+            host.appendChild(warning);
+        }
+        warning.textContent = message || '';
+        warning.classList.toggle('hidden', !message);
+    }
     
     /**
      * Positions and rotates a single gizmo in world space, accounting for room rotation.
@@ -287,13 +386,28 @@ class LightingManager {
         const W = parseFloat(this.dom['width'].value);
         const L = parseFloat(this.dom['length'].value);
         const roomRotationY = THREE.MathUtils.degToRad(parseFloat(this.dom['room-orientation'].value));
+        // lightsGroup is added straight to the scene and is NOT in geometry.js's
+        // groupsToTransform list, so the room elevation is never applied to it by the scene
+        // rebuild. Read it exactly as geometry.js readParams() does and apply it here,
+        // otherwise upper-storey luminaires sit below their own floor.
+        const elevationRaw = parseFloat(this.dom['elevation']?.value);
+        const elevation = Number.isFinite(elevationRaw) ? elevationRaw : 0;
 
         // Calculate world position relative to the rotated room
         const centeredPos = new THREE.Vector3(position.x - W / 2, position.y, position.z - L / 2);
         const worldPos = centeredPos.applyAxisAngle(new THREE.Vector3(0, 1, 0), roomRotationY);
+        worldPos.y += elevation;
         gizmo.position.copy(worldPos);
 
-        // Calculate world rotation including the room's rotation
+        // Calculate world rotation including the room's rotation.
+        //
+        // ORIENTATION CONVENTION (verified against ies2rad, Radiance 6.1a):
+        //   The gizmo's aim is its local -Z. With the panel default light-rot-x = -90 the
+        //   'YXZ' composition below sends local -Z to world (0, -1, 0), i.e. straight down,
+        //   which is the correct preview for a ceiling downlight.
+        //   ies2rad already emits its prototype polygon aimed at nadir (-Z in Radiance), so
+        //   the exporter must apply the IDENTITY rotation for this default, not '-rx -90'.
+        //   See the module footer for the full preview -> xform correspondence.
         const euler = new THREE.Euler(
             THREE.MathUtils.degToRad(rotation.x),
             THREE.MathUtils.degToRad(rotation.y),
@@ -315,8 +429,8 @@ class LightingManager {
     _createSingleGizmo(lightDef, position, gridInfo = null) {
         const gizmo = new THREE.Group();
 
-        // The color is now determined by the luminaire's physical position
-        const color = this._getGizmoColor(lightDef, position);
+        // The color is determined by which control zone the luminaire falls in
+        const color = this._getGizmoColor(lightDef, gridInfo);
 
         const material = new THREE.MeshBasicMaterial({
             color: new THREE.Color(color),
@@ -336,13 +450,20 @@ class LightingManager {
     }
     
 /**
-     * Determines the appropriate color for a light gizmo based on its physical position and the daylighting zone strategy.
+     * Determines the appropriate color for a light gizmo based on which control zone it
+     * falls in.
+     *
+     * `percentControlled` is labelled "Fraction of Lights Controlled", so the split must be
+     * by LUMINAIRE COUNT, not by a linear slice of the room's length/width — for an uneven
+     * grid (e.g. 3 rows at 60%) those two give different answers.
+     *
      * @param {object} lightDef - The light definition.
-     * @param {object} position - The {x, y, z} position of the luminaire in room coordinates.
+     * @param {?{r: number, c: number, numRows: number, numCols: number}} gridInfo - The
+     *        luminaire's index within the grid, or null for a single luminaire.
      * @returns {string} The CSS color string.
      * @private
      */
-    _getGizmoColor(lightDef, position) {
+    _getGizmoColor(lightDef, gridInfo = null) {
         const style = getComputedStyle(document.documentElement);
         const visualizeZones = this.dom['daylighting-visualize-zones-toggle']?.checked;
         const daylightingEnabled = lightDef.daylighting?.enabled;
@@ -357,18 +478,21 @@ class LightingManager {
                 return zone1Color; // If only one sensor, all lights are in its zone.
             }
             if (sensors.length === 2) {
-                const percent1 = sensors[0].percentControlled;
-                const W = parseFloat(this.dom.width.value);
-                const L = parseFloat(this.dom.length.value);
+                // A lone luminaire cannot be split; it belongs entirely to sensor 1's zone.
+                if (!gridInfo) return zone1Color;
+
+                const percent1 = Math.min(1, Math.max(0, sensors[0].percentControlled ?? 1));
+                const { r, c, numRows, numCols } = gridInfo;
 
                 if (zoningStrategy === 'rows') {
-                    // 'Rows' splits the room along its length (Z-axis). Zone 1 is the "front" part.
-                    const dividerZ = L * percent1;
-                    return (position.z < dividerZ) ? zone1Color : zone2Color;
+                    // 'Rows' assigns whole rows to zone 1, front to back, until the
+                    // requested fraction of the luminaire count is reached.
+                    const zone1Rows = Math.round(numRows * percent1);
+                    return (r < zone1Rows) ? zone1Color : zone2Color;
                 } else { // strategy === 'cols'
-                    // 'Columns' splits the room along its width (X-axis). Zone 1 is the "left" part.
-                    const dividerX = W * percent1;
-                    return (position.x < dividerX) ? zone1Color : zone2Color;
+                    // 'Columns' assigns whole columns to zone 1, left to right.
+                    const zone1Cols = Math.round(numCols * percent1);
+                    return (c < zone1Cols) ? zone1Color : zone2Color;
                 }
             }
         }
@@ -394,7 +518,11 @@ class LightingManager {
             }
             case 'ring': {
                 const geom = new THREE.RingGeometry(innerRadius, outerRadius, 32);
-                return geom.rotateX(-Math.PI / 2); // Align with XY plane
+                // RingGeometry is already built in the XY plane with a +Z normal. The old
+                // rotateX(-PI/2) pushed it into the XZ plane, so a ceiling ring drew
+                // edge-on as a vertical disc. Rotate by PI instead, which keeps it in XY
+                // and turns the normal to -Z, matching the aim arrow and spotlight cone.
+                return geom.rotateX(Math.PI);
             }
             case 'polygon':
             case 'ies':
@@ -421,7 +549,8 @@ class LightingManager {
     }
     
     /**
-     * Creates gizmos for a grid layout, constrained to room dimensions.
+     * Creates gizmos for a grid layout. The grid is NOT constrained to the room; it is laid
+     * out exactly as scriptGenerator.js will export it, and an overflow is reported instead.
      * @param {object} lightDef - The light definition object.
      * @param {Function} placeGizmo - The function to call for placing each gizmo.
      * @private
@@ -439,21 +568,18 @@ class LightingManager {
 
         const { x: desiredCenterX, z: desiredCenterZ } = lightDef.position;
 
-        const gridMinX = desiredCenterX - gridSpanX / 2;
-        const gridMaxX = desiredCenterX + gridSpanX / 2;
-        const gridMinZ = desiredCenterZ - gridSpanZ / 2;
-        const gridMaxZ = desiredCenterZ + gridSpanZ / 2;
+        // The grid start must match scriptGenerator.js exactly (it recomputes startX/startY
+        // from the same numbers with no clamping). The preview used to shove an oversized
+        // grid back inside the room, which made the preview and the exported scene disagree
+        // about where every luminaire is. Per the shared contract the clamp is gone; an
+        // out-of-room grid is now reported instead of silently moved.
+        const startX = desiredCenterX - gridSpanX / 2;
+        const startZ = desiredCenterZ - gridSpanZ / 2;
 
-        let offsetX = 0;
-        if (gridMinX < 0) offsetX = -gridMinX;
-        else if (gridMaxX > W) offsetX = W - gridMaxX;
-
-        let offsetZ = 0;
-        if (gridMinZ < 0) offsetZ = -gridMinZ;
-        else if (gridMaxZ > L) offsetZ = L - gridMaxZ;
-
-        const startX = (desiredCenterX + offsetX) - gridSpanX / 2;
-        const startZ = (desiredCenterZ + offsetZ) - gridSpanZ / 2;
+        const overflows = (startX < 0) || (startX + gridSpanX > W) || (startZ < 0) || (startZ + gridSpanZ > L);
+        this._setGridWarning(overflows
+            ? `Luminaire grid extends outside the room (${numCols}×${numRows} spanning ${gridSpanX.toFixed(2)}×${gridSpanZ.toFixed(2)} m in a ${W.toFixed(2)}×${L.toFixed(2)} m room). Luminaires outside the room are still exported at these positions.`
+            : null);
 
         for (let r = 0; r < numRows; r++) {
         for (let c = 0; c < numCols; c++) {
@@ -565,17 +691,23 @@ class LightingManager {
      */
     async _handleScheduleFileChange(event) {
         const file = event.target.files[0];
-        const { project } = await import('./project.js'); // Lazy load
-        if (file) {
-            const content = await file.text();
-            // Key must match the load side in project.js (daylighting-availability-schedule).
-            project.addSimulationFile('daylighting-availability-schedule', file.name, content);
-            this.scheduleFileData = { name: file.name };
-            this._setFileDisplayName('daylighting-availability-schedule', file.name);
-        } else {
-            project.addSimulationFile('daylighting-availability-schedule', null, null);
+        try {
+            const { project } = await import('./project.js'); // Lazy load
+            if (file) {
+                const content = await file.text();
+                // Key must match the load side in project.js (daylighting-availability-schedule).
+                project.addSimulationFile('daylighting-availability-schedule', file.name, content);
+                this.scheduleFileData = { name: file.name };
+                this._setFileDisplayName('daylighting-availability-schedule', file.name);
+            } else {
+                project.addSimulationFile('daylighting-availability-schedule', null, null);
+                this.scheduleFileData = null;
+                this._setFileDisplayName('daylighting-availability-schedule', null);
+            }
+        } catch (error) {
+            console.error("Error reading availability schedule file:", error);
             this.scheduleFileData = null;
-            this._setFileDisplayName('daylighting-availability-schedule', null);
+            this._setFileDisplayName('daylighting-availability-schedule', 'Error reading file');
         }
     }
 
@@ -754,21 +886,38 @@ class LightingManager {
      */
     async _handleIesFileChange(event) {
         const file = event.target.files[0];
-        if (!file) {
-            this.iesFileData = null;
-            this._setFileDisplayName('ies-file-input', null);
-            this._updateIesViewer(null);
-            this._scheduleUpdate();
-            return;
-        }
+        // Sequencing guard: this handler awaits, so picking file A then file B quickly can
+        // settle out of order. Only the newest request is allowed to commit its result.
+        const requestId = ++this._iesReadRequestId;
 
         try {
+            const { project } = await import('./project.js'); // Lazy load
+            if (requestId !== this._iesReadRequestId) return;
+
+            if (!file) {
+                // Key must match scriptGenerator.js, which reads simulationFiles['ies-file-input'].
+                project.addSimulationFile('ies-file-input', null, null);
+                this.iesFileData = null;
+                this._setFileDisplayName('ies-file-input', null);
+                this._updateIesViewer(null);
+                this._scheduleUpdate();
+                return;
+            }
+
             const content = await file.text();
+            if (requestId !== this._iesReadRequestId) return;
+
+            // Register the file in the central project store. Without this,
+            // scriptGenerator.js cannot find simulationFiles['ies-file-input'] and emits
+            // '# ERROR: IES file selected but file data not found in project.', so the
+            // whole electric-lighting simulation runs with zero luminous output.
+            project.addSimulationFile('ies-file-input', file.name, content);
             this.iesFileData = { name: file.name, content: content };
             this._setFileDisplayName('ies-file-input', file.name);
             this._updateIesViewer(content);
             this._scheduleUpdate();
         } catch (error) {
+            if (requestId !== this._iesReadRequestId) return;
             console.error("Error reading IES file:", error);
             this.iesFileData = null;
             this._setFileDisplayName('ies-file-input', 'Error reading file');
@@ -814,8 +963,11 @@ class LightingManager {
         this.ies3d.scene = new THREE.Scene();
         this.ies3d.scene.background = null; // transparent
 
-        const aspect = container.clientWidth / container.clientHeight;
-        this.ies3d.camera = new THREE.PerspectiveCamera(50, aspect, 0.1, 100);
+        // The container is only measurable once it is visible; if it is still collapsed
+        // (0x0) the aspect would be NaN and the camera projection matrix would be poisoned.
+        const initW = container.clientWidth || 1;
+        const initH = container.clientHeight || 1;
+        this.ies3d.camera = new THREE.PerspectiveCamera(50, initW / initH, 0.1, 100);
         this.ies3d.camera.position.set(1.2, 0.8, 1.8);
 
         const ambient = new THREE.AmbientLight(0xffffff, 0.6);
@@ -825,7 +977,7 @@ class LightingManager {
         this.ies3d.scene.add(directional);
 
         this.ies3d.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        this.ies3d.renderer.setSize(container.clientWidth, container.clientHeight);
+        this.ies3d.renderer.setSize(initW, initH);
         this.ies3d.renderer.setPixelRatio(window.devicePixelRatio);
         container.appendChild(this.ies3d.renderer.domElement);
 
@@ -839,6 +991,7 @@ class LightingManager {
 
 
         const animate = () => {
+            if (!this.ies3d.renderer || !this.ies3d.scene || !this.ies3d.camera) return;
             this.ies3d.animationFrameId = requestAnimationFrame(animate);
             this.ies3d.controls.update();
             this.ies3d.renderer.render(this.ies3d.scene, this.ies3d.camera);
@@ -846,14 +999,85 @@ class LightingManager {
         animate();
 
         this.ies3d.resizeObserver = new ResizeObserver(() => {
-            if (!this.ies3d.renderer) return;
+            if (!this.ies3d.renderer || !this.ies3d.camera) return;
             const w = container.clientWidth;
             const h = container.clientHeight;
+            if (w === 0 || h === 0) return;
             this.ies3d.camera.aspect = w / h;
             this.ies3d.camera.updateProjectionMatrix();
             this.ies3d.renderer.setSize(w, h);
         });
         this.ies3d.resizeObserver.observe(container);
+    }
+
+    /**
+     * Expands the tabulated C-planes of an LM-63 file into a full, closed 0..360 degree
+     * ring of planes so the photometric web can be built as a proper surface.
+     *
+     * LM-63 lets a file declare only the planes it needs and rely on symmetry:
+     *   - one plane (or a 0..0 span): the distribution is rotationally symmetric, so the
+     *     single plane is revolved into a solid of revolution;
+     *   - 0..90 : quadrant symmetry, mirrored about 90 then about 180;
+     *   - 0..180: bilateral symmetry, mirrored about 180;
+     *   - 0..360: already complete (the last plane duplicates the first);
+     *   - anything else (e.g. 0..350): closed by repeating the first plane at +360.
+     *
+     * @param {number[]} verticalAngles - The vertical angle list.
+     * @param {number[]} horizontalAngles - The tabulated horizontal (C) angles.
+     * @param {number[]} allCandelaValues - Candela values, H-major then V.
+     * @returns {{hAngles: number[], planes: number[][]}} The closed ring of planes.
+     * @private
+     */
+    _expandPhotometricPlanes(verticalAngles, horizontalAngles, allCandelaValues) {
+        const numV = verticalAngles.length;
+        const numH = horizontalAngles.length;
+
+        const sourcePlanes = [];
+        for (let j = 0; j < numH; j++) {
+            sourcePlanes.push(allCandelaValues.slice(j * numV, (j + 1) * numV));
+        }
+
+        const span = numH > 1 ? horizontalAngles[numH - 1] - horizontalAngles[0] : 0;
+        const near = (a, b) => Math.abs(a - b) < 0.5;
+
+        // Rotationally symmetric: revolve the single plane about the vertical axis.
+        if (numH === 1 || near(span, 0)) {
+            const STEPS = 24;
+            const hAngles = [];
+            const planes = [];
+            for (let k = 0; k <= STEPS; k++) {
+                hAngles.push((k * 360) / STEPS);
+                planes.push(sourcePlanes[0]);
+            }
+            return { hAngles, planes };
+        }
+
+        const hAngles = horizontalAngles.slice();
+        const planes = sourcePlanes.slice();
+
+        const mirrorAbout = (total) => {
+            const n = hAngles.length;
+            for (let k = n - 2; k >= 0; k--) {
+                hAngles.push(total - hAngles[k]);
+                planes.push(planes[k]);
+            }
+        };
+
+        if (near(span, 90)) {
+            mirrorAbout(180);
+            mirrorAbout(360);
+        } else if (near(span, 180)) {
+            mirrorAbout(360);
+        } else if (near(span, 360)) {
+            // Already a closed full revolution.
+        } else {
+            // Partial coverage that is not a documented symmetry (e.g. 0..350 in 10 degree
+            // steps): close the ring by repeating the first plane one turn later.
+            hAngles.push(hAngles[0] + 360);
+            planes.push(planes[0]);
+        }
+
+        return { hAngles, planes };
     }
 
     /**
@@ -865,20 +1089,25 @@ class LightingManager {
     _createPhotometricWeb(parsedData) {
         const { verticalAngles, horizontalAngles, allCandelaValues, maxCandela } = parsedData;
         const numV = verticalAngles.length;
-        const numH = horizontalAngles.length;
 
-        if (numV < 2 || numH < 1 || allCandelaValues.length === 0) return null;
+        if (numV < 2 || horizontalAngles.length < 1 || allCandelaValues.length === 0) return null;
+
+        // Expand the tabulated C-planes into a closed 0..360 ring so the surface can be
+        // built without wrapping the last plane back onto C0.
+        const { hAngles, planes } = this._expandPhotometricPlanes(verticalAngles, horizontalAngles, allCandelaValues);
+        const numH = hAngles.length;
+        if (numH < 2) return null;
 
         const vertices = [];
         const indices = [];
         const scale = 1 / maxCandela;
 
         for (let j = 0; j < numH; j++) {
+            const hAngleRad = THREE.MathUtils.degToRad(hAngles[j]);
+            const plane = planes[j];
             for (let i = 0; i < numV; i++) {
                 const vAngleRad = THREE.MathUtils.degToRad(verticalAngles[i]);
-                const hAngleRad = THREE.MathUtils.degToRad(horizontalAngles[j]);
-                const candela = allCandelaValues[j * numV + i];
-                const r = candela * scale;
+                const r = plane[i] * scale;
 
                 const x = r * Math.sin(vAngleRad) * Math.cos(hAngleRad);
                 const y = -r * Math.cos(vAngleRad);
@@ -887,14 +1116,15 @@ class LightingManager {
             }
         }
 
-        for (let j = 0; j < numH; j++) {
+        // The ring is already closed (the last plane repeats the first), so quads run
+        // strictly between consecutive planes. The old `(j + 1) % numH` collapsed every
+        // triangle when numH === 1, which is the common rotationally-symmetric downlight.
+        for (let j = 0; j < numH - 1; j++) {
             for (let i = 0; i < numV - 1; i++) {
-                const currentH = j;
-                const nextH = (j + 1) % numH;
-                const p1 = currentH * numV + i;
-                const p2 = nextH * numV + i;
-                const p3 = nextH * numV + (i + 1);
-                const p4 = currentH * numV + (i + 1);
+                const p1 = j * numV + i;
+                const p2 = (j + 1) * numV + i;
+                const p3 = (j + 1) * numV + (i + 1);
+                const p4 = j * numV + (i + 1);
                 indices.push(p1, p2, p4);
                 indices.push(p2, p3, p4);
             }
@@ -941,18 +1171,35 @@ class LightingManager {
         if (this.ies3d.scene) {
             while (this.ies3d.scene.children.length > 0) {
                 const object = this.ies3d.scene.children[0];
+                // Free the GPU resources too, not just the parent link. This viewer scene
+                // only ever holds lights and the generated web, none of which share
+                // geometry or materials with anything else.
+                object.traverse?.(child => {
+                    child.geometry?.dispose?.();
+                    if (child.material) {
+                        const materials = Array.isArray(child.material) ? child.material : [child.material];
+                        materials.forEach(material => material.dispose?.());
+                    }
+                });
                 this.ies3d.scene.remove(object);
             }
+            this.ies3d.scene = null;
         }
-        if (this.ies3d.renderer) {
-            this.ies3d.renderer.dispose();
-            this.ies3d.renderer.domElement.remove();
-            this.ies3d.renderer = null;
-        }
+        this.ies3d.webMesh = null;
         if (this.ies3d.controls) {
             this.ies3d.controls.dispose();
             this.ies3d.controls = null;
         }
+        if (this.ies3d.renderer) {
+            // dispose() alone leaves the WebGL context alive; alternating valid and
+            // malformed IES files then exhausts the browser's context cap (~16) and the
+            // browser starts reclaiming contexts, which can kill the main room viewport.
+            this.ies3d.renderer.dispose();
+            this.ies3d.renderer.forceContextLoss?.();
+            this.ies3d.renderer.domElement.remove();
+            this.ies3d.renderer = null;
+        }
+        this.ies3d.camera = null;
     }
 
     // --- PRIVATE: STATE GETTERS ---
@@ -1015,8 +1262,11 @@ class LightingManager {
                 def.alternate_material = this.dom['illum-alt-material']?.value.trim();
                 break;
             case 'ies':
+                // Field names below are the exporter's contract; they map 1:1 onto ies2rad
+                // flags: ies_units -> -d, ies_multiplier -> -m, ies_lamp_type -> -t,
+                // ies_force_color/ies_color -> -c, ies_file -> the .rad prototype basename.
                 def.ies_file_data = this.iesFileData;
-                def.ies_file = this.iesFileData?.name.replace(/\.ies$/i, '');
+                def.ies_file = this.iesFileData?.name?.replace(/\.ies$/i, '');
                 def.ies_units = this.dom['ies-units']?.value;
                 def.ies_multiplier = this._getUIValue('ies-multiplier');
                 def.ies_lamp_type = this.dom['ies-lamp-type']?.value.trim();
@@ -1063,8 +1313,21 @@ class LightingManager {
 
     /**
      * Gathers the definition for a single daylighting sensor.
+     *
+     * COORDINATE CONVENTION — note that this object and its sibling `lightDef.position`
+     * use DIFFERENT origins, deliberately:
+     *   - The daylighting sensor x/z returned here are CENTRED: the sliders in index.html
+     *     run min=-10 max=10 with the room centre at 0, so x = -W/2 is the west wall and
+     *     x = +W/2 is the east wall. y is an absolute height above the floor.
+     *   - `lightDef.position` (see _getBaseLightDef) is CORNER-ORIGIN: x in [0, W],
+     *     z in [0, L], measured from the room's (0, 0) corner.
+     * Per the shared contract, lighting.js keeps the centred values as authored by the UI
+     * and project.js converts centred -> corner-origin before handing them to
+     * transformThreePointToRadianceArray. Do NOT subtract W/2 or L/2 here; doing it on both
+     * sides is what put the sensor in the floor/wall corner.
+     *
      * @param {number} index - The 1-based index of the sensor.
-     * @returns {object} The sensor definition object.
+     * @returns {object} The sensor definition object with centred x/z.
      * @private
      */
     _getSensorDef(index) {
@@ -1086,6 +1349,10 @@ class LightingManager {
     /** @private @param {object} state */
     _applyGeneralState(state) {
         this._setUIValue('light-type-selector', state.type);
+        // Restore the placement mode. _getBaseLightDef reads it from the button's 'active'
+        // class and _synchronizeUIState re-reads that same class, so without this a saved
+        // grid reopens as a single luminaire.
+        this._togglePlacementMode(state.placement === 'grid');
         this._setUIValue('light-pos-x', state.position?.x);
         this._setUIValue('light-pos-y', state.position?.y);
         this._setUIValue('light-pos-z', state.position?.z);
@@ -1141,6 +1408,14 @@ class LightingManager {
                 break;
             case 'ies':
                 this.iesFileData = state.ies_file_data || null;
+                // Re-register with the project store so scriptGenerator.js can find
+                // simulationFiles['ies-file-input'] after loading a project that predates
+                // the file ever being registered there.
+                if (this.iesFileData?.name && this.iesFileData?.content) {
+                    import('./project.js')
+                        .then(({ project }) => project.addSimulationFile('ies-file-input', this.iesFileData.name, this.iesFileData.content))
+                        .catch(err => console.error("Failed to register IES file with project:", err));
+                }
                 this._setFileDisplayName('ies-file-input', this.iesFileData?.name);
                 this._setUIValue('ies-units', state.ies_units);
                 this._setUIValue('ies-multiplier', state.ies_multiplier);
@@ -1229,8 +1504,25 @@ class LightingManager {
     _setFileDisplayName(inputId, fileName) {
         const input = this.dom[inputId];
         if (!input) return;
-        const display = input.parentElement?.querySelector(`[data-file-display-for="${inputId}"]`) || document.createElement('span');
+
+        // Neither ies-file-input nor daylighting-availability-schedule has a
+        // [data-file-display-for] target in index.html, and the old fallback created a
+        // detached span that was never inserted — so the chosen filename was invisible and
+        // a read failure looked exactly like a success. Create and insert the element.
+        let display = input.parentElement?.querySelector(`[data-file-display-for="${inputId}"]`)
+            || document.querySelector(`[data-file-display-for="${inputId}"]`);
+
+        if (!display) {
+            if (!input.parentElement) return;
+            display = document.createElement('span');
+            display.setAttribute('data-file-display-for', inputId);
+            display.className = 'block text-xs font-mono mt-1 break-all';
+            display.style.color = 'var(--text-secondary)';
+            input.insertAdjacentElement('afterend', display);
+        }
+
         display.textContent = fileName || '';
+        display.title = fileName || '';
     }
     
     /**
@@ -1243,16 +1535,23 @@ class LightingManager {
         if (iesContent) {
             try {
                 const parsedData = IESParser.parse(iesContent);
+                // Un-hide FIRST: while the container is hidden, canvas.clientWidth and the
+                // 3D container's clientWidth/clientHeight are all 0, so the polar plot was
+                // sized 0x0 with radius 0 and the camera aspect was NaN. Nothing ever
+                // redrew them afterwards, so the 2D plot stayed permanently blank.
+                viewerContainer?.classList.remove('hidden');
                 this._updateIesInfoDisplay(parsedData);
                 this._drawIesPolarPlot(parsedData);
                 this._updateIes3dView(parsedData);
-                viewerContainer?.classList.remove('hidden');
             } catch (error) {
                 console.error("Error parsing or rendering IES data:", error);
+                this._setFileDisplayName('ies-file-input', `Invalid IES file: ${error.message}`);
+                this._setIesWarnings([]);
                 viewerContainer?.classList.add('hidden');
                 this._clearIes3dView();
             }
         } else {
+            this._setIesWarnings([]);
             viewerContainer?.classList.add('hidden');
             this._clearIes3dView();
         }
@@ -1264,16 +1563,43 @@ class LightingManager {
      * @private
      */
     _updateIesInfoDisplay(parsedData) {
-        const { numLamps, lumensPerLamp, wattage, isAbsolute } = parsedData;
+        const { numLamps, lumensPerLamp, wattage, isAbsolute, ballastFactor, warnings } = parsedData;
         // Absolute-photometry IES files signal luminous flux via candela values, not a
         // rated lamp lumen figure (lumensPerLamp === -1). Avoid showing negative totals.
         const isAbs = isAbsolute || lumensPerLamp === -1;
-        const totalLumens = isAbs ? null : numLamps * lumensPerLamp;
+        // The ballast factor scales the delivered output; ignoring it overstates efficacy.
+        const bf = (Number.isFinite(ballastFactor) && ballastFactor > 0) ? ballastFactor : 1;
+        const totalLumens = isAbs ? null : numLamps * lumensPerLamp * bf;
         const efficacy = (!isAbs && wattage > 0) ? (totalLumens / wattage).toFixed(1) : 'N/A';
 
         if (this.dom['ies-lumens-val']) this.dom['ies-lumens-val'].textContent = isAbs ? 'Absolute' : totalLumens.toFixed(0);
         if (this.dom['ies-wattage-val']) this.dom['ies-wattage-val'].textContent = wattage.toFixed(1);
         if (this.dom['ies-efficacy-val']) this.dom['ies-efficacy-val'].textContent = efficacy;
+
+        this._setIesWarnings(warnings);
+    }
+
+    /**
+     * Shows or clears the IES parser warnings (non Type-C photometry, odd units, ...).
+     * The element is created on first use because index.html has no placeholder for it.
+     * @param {string[]} [warnings] - The warning messages to display.
+     * @private
+     */
+    _setIesWarnings(warnings) {
+        const host = this.dom['ies-photometry-viewer'];
+        if (!host) return;
+        const messages = Array.isArray(warnings) ? warnings.filter(Boolean) : [];
+        let box = host.querySelector('[data-ies-warnings]');
+        if (!box) {
+            if (messages.length === 0) return;
+            box = document.createElement('p');
+            box.setAttribute('data-ies-warnings', '');
+            box.className = 'text-xs mt-2 leading-snug';
+            box.style.color = 'var(--warning-color, #d97706)';
+            host.appendChild(box);
+        }
+        box.textContent = messages.join(' ');
+        box.classList.toggle('hidden', messages.length === 0);
     }
 
     /**
@@ -1288,8 +1614,10 @@ class LightingManager {
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         const dpr = window.devicePixelRatio || 1;
-        const width = canvas.clientWidth;
-        const height = canvas.clientHeight;
+        // The caller un-hides the viewer before drawing so these are measurable; the
+        // fallbacks only guard against the panel itself being collapsed.
+        const width = canvas.clientWidth || canvas.parentElement?.clientWidth || 200;
+        const height = canvas.clientHeight || canvas.parentElement?.clientHeight || 200;
         canvas.width = width * dpr;
         canvas.height = height * dpr;
         ctx.scale(dpr, dpr);
@@ -1308,7 +1636,10 @@ class LightingManager {
             const angleRad = verticalAngles[i] * Math.PI / 180;
             const r = (cd / maxCandela) * radius;
             const x = centerX + r * Math.sin(angleRad);
-            const y = centerY - r * Math.cos(angleRad);
+            // Vertical angle 0 is NADIR in LM-63, and canvas y grows DOWNWARD, so nadir
+            // must plot BELOW the centre. The old `centerY - r*cos` drew every downlight as
+            // an uplighter. This now matches the 3D web, which uses y = -r*cos(v).
+            const y = centerY + r * Math.cos(angleRad);
             if (i === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
         });
@@ -1354,3 +1685,41 @@ class LightingManager {
 
 // Create the singleton instance to be imported by other modules.
 export const lightingManager = new LightingManager();
+
+/**
+ * Re-draws the luminaire gizmos against the current room dimensions, orientation and
+ * elevation.
+ *
+ * `lightsGroup` is added directly to the scene and is deliberately NOT in geometry.js's
+ * `groupsToTransform` list (it bakes the room transform into each gizmo instead, so that
+ * per-luminaire rotations survive). That means the scene rebuild must call this whenever
+ * the room changes, or the luminaires stay where they were. Import it lazily from
+ * geometry.js (`import('./lighting.js').then(({ updateLightingVisuals }) => ...)`) to avoid
+ * a static import cycle, since lighting.js already imports from geometry.js.
+ */
+export function updateLightingVisuals() {
+    lightingManager.updateVisuals();
+}
+
+/*
+ * ---------------------------------------------------------------------------------------
+ * PREVIEW -> RADIANCE ORIENTATION CONTRACT (for scriptGenerator.js)
+ * ---------------------------------------------------------------------------------------
+ * The preview composes the luminaire orientation as THREE.Euler(rx, ry, rz, 'YXZ'), i.e.
+ * R_three = Ry(ry) . Rx(rx) . Rz(rz), and aims the luminaire along its local -Z.
+ *
+ * ies2rad emits its prototype already aimed at nadir (verified with Radiance 6.1a: the
+ * generated polygon's winding gives a -Z normal), so the exporter must NOT apply '-rx -90'
+ * — that lands the luminaire horizontal. With the shared coordinate convention
+ * (x, y, z)_three -> (x, -z, y)_radiance, the required Radiance rotation is
+ *
+ *     R_rad = Rz(ry) . Rx(rx) . Ry(-rz) . Rx(90)
+ *
+ * xform applies transforms in command order (first listed applied first), so:
+ *
+ *     !xform -rx 90 -ry <-rot.z> -rx <rot.x> -rz <rot.y> -t <X> <Y> <Z> <basename>.rad
+ *
+ * For the panel default (rot.x = -90, rot.y = rot.z = 0) this collapses to the identity,
+ * which is correct: the prototype is already a downlight.
+ * ---------------------------------------------------------------------------------------
+ */

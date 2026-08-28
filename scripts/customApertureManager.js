@@ -59,11 +59,17 @@ export function getCustomWallData(id) {
 }
 
 /**
- * Returns a copy of all custom wall data for AI assistant queries.
- * @returns {Map} A copy of all custom walls with their data.
+ * Returns a deep copy of all custom wall data for AI assistant queries.
+ * A shallow Map copy would still share the nested aperture/shading/frame objects, so a
+ * caller mutating them would silently corrupt the live wall state.
+ * @returns {Map} A deep copy of all custom walls with their data.
  */
 export function getAllCustomWalls() {
-    return new Map(customWalls);
+    const copy = new Map();
+    customWalls.forEach((data, id) => {
+        copy.set(id, structuredClone(data));
+    });
+    return copy;
 }
 
 export function injectCustomWallUI(wallId) {
@@ -127,8 +133,12 @@ function handleCustomWallChange(wallId, inputId, value) {
 
     const suffix = wallId; // e.g. "wall_0"
 
-    // Helper to strip suffix
-    const key = inputId.replace(`-${suffix}`, '').replace(`-${suffix}-manual`, '');
+    // Helper to strip suffix. Note the manual window-depth control is named
+    // `win-depth-pos-<wallId>-manual`, so that longer form must be tested FIRST -
+    // stripping `-<wallId>` on its own would leave a trailing `-manual`.
+    const key = inputId.endsWith(`-${suffix}-manual`)
+        ? inputId.slice(0, -`-${suffix}-manual`.length)
+        : (inputId.endsWith(`-${suffix}`) ? inputId.slice(0, -`-${suffix}`.length) : inputId);
 
     // Basic Mapping Logic
     // 1. Apertures

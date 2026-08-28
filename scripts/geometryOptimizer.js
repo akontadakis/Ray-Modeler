@@ -1,6 +1,6 @@
 
 import * as THREE from 'three';
-import { BufferGeometryUtils } from 'three/addons/utils/BufferGeometryUtils.js';
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import { roomObject, wallSelectionGroup, importedModelObject, shadingObject, vegetationObject, furnitureObject, contextObject, updateScene } from './geometry.js';
 import { getDom } from './dom.js';
 import { getNewZIndex, showAlert } from './ui.js';
@@ -10,6 +10,7 @@ export class GeometryOptimizer {
         this.originalVisibility = new Map();
         this.optimizedGroup = null;
         this.previewGroup = null;
+        this.previewWireframes = [];
     }
 
     /**
@@ -115,7 +116,6 @@ export class GeometryOptimizer {
                 if (child.isMesh) {
                     // Check if it's a visible, renderable mesh (ignore helpers)
                     if (child.visible && !child.userData.isHelper && !child.isTransformControl) {
-                        const clone = child.clone();
                         // Apply world transform if needed? 
                         // The original groups (roomObject etc) have transforms applied.
                         // We need to bake these transforms into the geometry if we are going to merge.
@@ -257,11 +257,15 @@ export class GeometryOptimizer {
         // Seeing the wireframe might be good to verify "reduction of surfaces".
 
         const wireframeColor = 0x00ff00;
+        // These overlays are preview-only. They are tracked so restoreOriginalScene() can
+        // detach and dispose them; the group they hang off is the one returned for export.
+        this.previewWireframes = [];
         optimizedGroup.traverse(child => {
             if (child.isMesh) {
                 const edges = new THREE.EdgesGeometry(child.geometry);
                 const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: wireframeColor, opacity: 0.5, transparent: true }));
                 child.add(line);
+                this.previewWireframes.push(line);
             }
         });
 
@@ -307,6 +311,15 @@ export class GeometryOptimizer {
     }
 
     async restoreOriginalScene() {
+        // Remove the preview-only wireframe overlays before the optimized group is handed
+        // over for export, disposing their geometry and material.
+        this.previewWireframes.forEach(line => {
+            line.removeFromParent();
+            line.geometry?.dispose();
+            line.material?.dispose();
+        });
+        this.previewWireframes.length = 0;
+
         // Remove preview
         if (this.previewGroup) {
             const { scene } = await import('./scene.js');

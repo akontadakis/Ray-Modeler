@@ -73,12 +73,30 @@ function _findGlazingPanels() {
 }
 
 /**
+ * Removes every ray segment from the ray group, disposing its geometry and material.
+ * @private
+ */
+function _clearRayGroup() {
+    while (rayGroup.children.length) {
+        const child = rayGroup.children[0];
+        if (child.geometry) child.geometry.dispose?.();
+        if (child.material) {
+            if (Array.isArray(child.material)) child.material.forEach(m => m.dispose?.());
+            else child.material.dispose?.();
+        }
+        rayGroup.remove(child);
+    }
+}
+
+/**
  * The main function to orchestrate the ray tracing visualization.
  * @param {object} params - User-defined parameters from the UI.
  */
 export function traceSunRays(params) {
-    // Clear any previous lines
-    rayGroup.clear();
+    // Clear any previous lines, disposing their geometry and material.
+    // rayGroup.clear() only detaches the children, leaking one BufferGeometry and one
+    // LineBasicMaterial per ray segment on every re-trace.
+    _clearRayGroup();
     if (!scene.getObjectByName(rayGroup.name)) {
         scene.add(rayGroup);
     }
@@ -142,10 +160,12 @@ if (glazingPanels.length === 0) {
         const width = geometry.parameters.width;
         const height = geometry.parameters.height;
 
-        for (let i = 0; i <= gridDim; i++) {
-            for (let j = 0; j <= gridDim; j++) {
-                const u = (i / gridDim) - 0.5;
-                const v = (j / gridDim) - 0.5;
+        // Sample cell centres so the loop yields exactly gridDim^2 rays (i <= gridDim
+        // with u = i / gridDim produced (gridDim + 1)^2, e.g. 121 rays for a request of 100).
+        for (let i = 0; i < gridDim; i++) {
+            for (let j = 0; j < gridDim; j++) {
+                const u = ((i + 0.5) / gridDim) - 0.5;
+                const v = ((j + 0.5) / gridDim) - 0.5;
                 const localPoint = new THREE.Vector3(u * width, v * height, 0);
                 const targetPoint = localPoint.clone().applyMatrix4(matrix);
 
@@ -241,23 +261,6 @@ function _traceAndBounceRay(startPosition, startDirection, raycaster, allObjects
 }
 
 // --- UNCHANGED HELPER FUNCTIONS ---
-
-function _getSolarDataFromEpw(epwContent, date, time) {
-    const month = date.getUTCMonth() + 1;
-    const day = date.getUTCDate();
-    const hour = parseInt(time.split(':')[0], 10);
-    const epwHour = hour + 1;
-    const lines = epwContent.split('\n');
-    const dataLines = lines.slice(8);
-    for (const line of dataLines) {
-        const parts = line.split(',');
-        if (parts.length < 16) continue;
-        if (parseInt(parts[1], 10) === month && parseInt(parts[2], 10) === day && parseInt(parts[3], 10) === epwHour) {
-            return { dni: parseFloat(parts[14]), dhi: parseFloat(parts[15]) };
-        }
-    }
-    return null;
-}
 
 /**
  * Compute solar position for visualization.
@@ -363,11 +366,14 @@ export function computeSolarPosition(params) {
     const altitudeDeg = THREE.MathUtils.radToDeg(altitudeRad);
     const azimuthDeg = THREE.MathUtils.radToDeg(azimuthRad);
 
-    // Build direction vector from origin TOWARDS the sun
+    // Build direction vector from origin TOWARDS the sun.
+    // setFromSphericalCoords measures theta from +Z, but the app's North is -Z
+    // (createNorthArrow emits (0, 0, -1)) with East at +X. Using theta = PI - azimuth
+    // maps compass azimuth 0 deg (North) to -Z and 90 deg (East) to +X.
     const direction = new THREE.Vector3().setFromSphericalCoords(
         1,
         Math.PI / 2 - altitudeRad,
-        azimuthRad
+        Math.PI - azimuthRad
     );
 
     return { altitudeDeg, azimuthDeg, direction };

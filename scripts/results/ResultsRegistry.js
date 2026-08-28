@@ -40,8 +40,12 @@ export const ResultsRegistry = (() => {
   }
 
   function findDescriptor(fileName, workerResult) {
-    // 1) Prefer explicit match handlers
+    // 1) Prefer explicit match handlers.
+    //    The generic scalar grid is skipped here: its match() is true for anything
+    //    carrying a data array, so leaving it in this loop would shadow any
+    //    descriptor registered after it and make the fallback below dead code.
     for (const d of descriptors) {
+      if (d.id === "generic-scalar-grid") continue;
       try {
         if (d.match && d.match(fileName, workerResult)) {
           return d;
@@ -52,7 +56,11 @@ export const ResultsRegistry = (() => {
     }
 
     // 2) Fallback to generic scalar grid
-    return descriptors.find((d) => d.id === "generic-scalar-grid") || null;
+    const generic = descriptors.find((d) => d.id === "generic-scalar-grid");
+    if (generic && (!generic.match || generic.match(fileName, workerResult))) {
+      return generic;
+    }
+    return null;
   }
 
   // Helper: safe dataset accessor; resultsManager is expected to provide this,
@@ -104,7 +112,7 @@ export const ResultsRegistry = (() => {
       apply: (rm, key, result, { fileName }) => {
         const ds = ensureDataset(rm, key);
         if (!ds) return;
-        ds.fileName = ds.fileName || fileName;
+        ds.fileName = fileName;
         ds.annualData = result.annualData;
         ds.data = Array.isArray(result.data)
           ? result.data
@@ -219,8 +227,11 @@ export const ResultsRegistry = (() => {
   register({
     id: "evalglare-pit",
     label: "Evalglare Point-in-time",
+    // An empty `annualGlareResults` object is truthy, so testing the object alone
+    // never matched a point-in-time report. Test for actual annual glare content.
     match: (_fileName, result) =>
-      !!result.glareResult && !result.annualGlareResults,
+      !!result.glareResult &&
+      !Object.keys(result.annualGlareResults || {}).length,
     storage: {
       target: "dataset",
       apply: (rm, key, result) => {
@@ -343,7 +354,7 @@ export const ResultsRegistry = (() => {
       apply: (rm, key, result, { fileName }) => {
         const ds = ensureDataset(rm, key);
         if (!ds) return;
-        ds.fileName = ds.fileName || fileName;
+        ds.fileName = fileName;
         ds.data = Array.isArray(result.data) ? result.data : result;
         if (typeof rm._updateStatsForDataset === "function") {
           rm._updateStatsForDataset(key);
@@ -357,5 +368,8 @@ export const ResultsRegistry = (() => {
     register,
     findDescriptor,
     descriptors,
+    // Exposed so resultsManager can recognise the "load total, then load direct"
+    // companion file without duplicating the pattern.
+    DIRECT_ILL_RE,
   };
 })();

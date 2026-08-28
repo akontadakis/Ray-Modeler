@@ -3,7 +3,7 @@ import { setUiValue, showAlert, setShadingState, getNewZIndex } from './ui.js';
 import { project } from './project.js';
 import { resultsManager } from './resultsManager.js';
 import { GeneticOptimizer } from './optimizationEngine.js';
-import { MultiObjectiveOptimizer } from './mogaOptimizer.js'; // ADDED
+import { MultiObjectiveOptimizer, goalIdToMetricKey, goalIdToDirection } from './mogaOptimizer.js'; // ADDED
 import { programmaticallyGeneratePackage } from './simulation.js';
 
 // --- Master Parameter Configuration ---
@@ -135,6 +135,18 @@ let optimizer = null; // Can be instance of GeneticOptimizer or MultiObjectiveOp
 let isOptimizing = false;
 let optimizationPanel = null; // This will store the reference to the correct panel
 let fitnessCache = new Map(); // Cache evaluations: designKey -> metrics object
+
+/**
+ * Builds a fitness-cache key namespaced by algorithm. SSGA and MOGA store
+ * different shapes under the same design, so an un-namespaced key let one
+ * algorithm read the other's entry and get `undefined`.
+ * @param {'ssga'|'moga'} algorithm
+ * @param {object} designParams
+ * @returns {string}
+ */
+function _cacheKey(algorithm, designParams) {
+    return `${algorithm}|${JSON.stringify(designParams)}`;
+}
 let selectedDesignParams = null; // Store params of the clicked-on result
 
 
@@ -171,6 +183,11 @@ export const RECIPE_METRICS = {
 // recipes in RECIPE_METRICS (imageless-glare, spectral-9ch, en17037) have no
 // parser and are therefore hidden from the optimization recipe dropdowns.
 export const OPTIMIZER_SUPPORTED_RECIPES = ['sda-ase', 'illuminance', 'dgp'];
+
+// Sentinel written when a metric cannot be parsed: the WORST value for the
+// objective's direction (negated for maximize). Deliberately finite so that
+// crowding-distance ranges stay computable, but far outside any real metric.
+const FAILED_METRIC_SENTINEL = 1e9;
 
 // Master list of all optimizable parameters for each shading type
 const SHADING_PARAMETERS = {
@@ -334,6 +351,23 @@ export function initOptimizationUI(optPanel) {
             option.textContent = metric.name;
             goalSelect.appendChild(option);
         });
+        syncGoalDirection(goalSelect);
+    };
+
+    // The direction is derived from the metric id at run time; keep the Goal-type
+    // dropdown showing the same thing so the UI cannot contradict the optimizer.
+    const syncGoalDirection = (goalSelect) => {
+        if (!goalSelect) return;
+        const typeSelectorById = {
+            'opt-goal-metric': '#opt-goal-type',
+            'opt-goal-1': '#opt-goal-type-1',
+            'opt-goal-2': '#opt-goal-type-2'
+        };
+        const selector = typeSelectorById[goalSelect.id];
+        if (!selector) return;
+        const typeSelect = optimizationPanel.querySelector(selector);
+        if (!typeSelect || typeSelect.value === 'set-target') return;
+        typeSelect.value = goalIdToDirection(goalSelect.value);
     };
 
     /// Populate all recipe dropdowns
@@ -387,6 +421,11 @@ export function initOptimizationUI(optPanel) {
         const recipeToUse = (optRecipe2.value === "") ? optRecipe1 : optRecipe2;
         populateGoals(recipeToUse, optGoal2);
     });
+
+    // Keep each Goal-type dropdown in step with the direction encoded in its metric id.
+    optGoalMetric?.addEventListener('change', () => syncGoalDirection(optGoalMetric));
+    optGoal1?.addEventListener('change', () => syncGoalDirection(optGoal1));
+    optGoal2?.addEventListener('change', () => syncGoalDirection(optGoal2));
 
     // --- Initial Population of UI ---
     startOptimizationBtn?.addEventListener('click', () => startOptimization('full'));
@@ -671,6 +710,14 @@ function log(message) {
     console.log(`[Optimization] ${message}`);
 }
 
+/**
+ * Formats a number for the log/results UI, rendering "n/a" for a missing or
+ * non-finite value instead of throwing inside an awaited progress callback.
+ */
+function _fmtNum(value, digits = 2) {
+    return Number.isFinite(value) ? value.toFixed(digits) : 'n/a';
+}
+
 function clearLog() {
     if (!optimizationPanel) return;
     const logEl = optimizationPanel.querySelector('#optimization-log');
@@ -681,7 +728,65 @@ function clearLog() {
 
 // ==================== OPTIMIZATION CONTROL ====================
 
-function cancelOptimization() {
+/**
+ * Returns every user-editable control inside the optimization panel.
+ * Returns an empty array when the panel is not mounted.
+ */
+function getOptControls() {
+    if (!optimizationPanel) return [];
+    return Array.from(optimizationPanel.querySelectorAll('input, select, textarea, button'));
+}
+
+/**
+ * The panel template ships without a Cancel button, so create one on demand
+ * next to "Start Optimization" and wire it to cancelOptimization().
+ */
+function _ensureCancelButton() {
+    if (!optimizationPanel) return null;
+    let cancelBtn = optimizationPanel.querySelector('#cancel-optimization-btn');
+    if (!cancelBtn) {
+        const startBtn = optimizationPanel.querySelector('#start-optimization-btn');
+        if (!startBtn || !startBtn.parentElement) return null;
+        cancelBtn = document.createElement('button');
+        cancelBtn.id = 'cancel-optimization-btn';
+        cancelBtn.className = 'btn btn-danger w-full mt-2 hidden';
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.addEventListener('click', () => cancelOptimization());
+        startBtn.parentElement.appendChild(cancelBtn);
+    }
+    return cancelBtn;
+}
+
+/**
+ * Disables (or restores) the optimization controls while a run is in progress.
+ * Never throws: a failure here must never strand the `isOptimizing` guard.
+ */
+function setControlsLocked(locked) {
+    try {
+        if (!optimizationPanel) return;
+        const cancelBtn = _ensureCancelButton();
+        getOptControls().forEach(control => {
+            if (control === cancelBtn) return;
+            if (locked) {
+                // Remember intentionally-disabled controls so unlocking does not enable them.
+                control.dataset.optPrevDisabled = control.disabled ? '1' : '0';
+                control.disabled = true;
+            } else {
+                control.disabled = control.dataset.optPrevDisabled === '1';
+                delete control.dataset.optPrevDisabled;
+            }
+        });
+        if (cancelBtn) {
+            cancelBtn.disabled = false;
+            cancelBtn.textContent = 'Cancel';
+            cancelBtn.classList.toggle('hidden', !locked);
+        }
+    } catch (err) {
+        console.warn('[Optimization] setControlsLocked failed:', err);
+    }
+}
+
+export function cancelOptimization() {
     if (optimizer) {
     optimizer.stop();
     log('❌ Cancellation requested - will stop after current generation');
@@ -701,7 +806,10 @@ export async function startOptimization(mode = 'full') {
     }
 
     const resume = mode === 'resume';
-    if (resume && !optimizer) {
+    // An in-memory `optimizer` is NOT required to resume - the on-disk checkpoint is
+    // precisely what makes resume useful after a reload. Refuse only when neither the
+    // live optimizer nor a checkpoint file exists.
+    if (resume && !optimizer && !(await _checkpointExists())) {
         showAlert('No previous optimization run found to resume.', 'Error');
         return;
     }
@@ -746,11 +854,15 @@ export async function startOptimization(mode = 'full') {
 
             const fitnessFunction = async (designParams) => {
                 if (optimizer.shouldStop) throw new Error('Optimization cancelled');
-                const designKey = JSON.stringify(designParams);
-                if (fitnessCache.has(designKey)) {
+                // Namespace the key by algorithm: SSGA entries carry `ssgaResult`,
+                // MOGA entries do not, so a shared key made an SSGA hit on a MOGA
+                // entry return `undefined` as the fitness.
+                const designKey = _cacheKey('ssga', designParams);
+                const cached = fitnessCache.get(designKey);
+                if (cached?.ssgaResult) {
                     log(`    → (Cache HIT) ${designKey}`);
                     // Return the pre-calculated ssgaResult for the optimizer
-                    return fitnessCache.get(designKey).ssgaResult;
+                    return cached.ssgaResult;
                 }
 
                 log(`  Spawning eval for: ${designKey}`);
@@ -767,23 +879,25 @@ export async function startOptimization(mode = 'full') {
                 // Store BOTH the raw metrics (for AI analysis) and the processed result (for the SSGA)
                 fitnessCache.set(designKey, { rawMetrics: metrics, ssgaResult: result });
 
-                log(`    → Fitness: ${fitness.score.toFixed(2)} (${fitness.value.toFixed(2)}${fitness.unit})`);
+                log(`    → Fitness: ${_fmtNum(fitness.score)} (${_fmtNum(fitness.value)}${fitness.unit})`);
                 return result; // Return the processed result to the optimizer
             };
 
             const progressCallback = async (evalsCompleted, bestDesign) => {
                 populateParetoFront([bestDesign], 'ssga'); // Use same display for single best
-                log(`✓ Evals ${evalsCompleted}/${settings.maxEvaluations}. Best: ${bestDesign.metricValue.toFixed(2)}${bestDesign.unit}`);
+                log(`✓ Evals ${evalsCompleted}/${settings.maxEvaluations}. Best: ${_fmtNum(bestDesign?.metricValue)}${bestDesign?.unit ?? ''}`);
                 await saveCheckpoint();
             };
 
             const result = await optimizer.run(fitnessFunction, progressCallback);
 
-            if (isOptimizing) { // Check if it finished, not cancelled
+            if (!optimizer.shouldStop) { // Check if it finished, not cancelled
+                // `isOptimizing` is still true here (it is only cleared in `finally`),
+                // so a CANCELLED run used to report success and auto-apply its design.
                 log(`\n🎉 Optimization complete!`);
                 log(`\nBest design:`);
-                Object.entries(result.params).forEach(([key, val]) => log(`  ${key}: ${val.toFixed(3)}`));
-                log(`  Final score: ${result.metricValue.toFixed(2)}${result.unit}`);
+                Object.entries(result.params).forEach(([key, val]) => log(`  ${key}: ${typeof val === 'number' ? _fmtNum(val, 3) : val}`));
+                log(`  Final score: ${_fmtNum(result.metricValue)}${result.unit ?? ''}`);
 
                 await applyDesignToScene(result.params, settings);
                 showAlert('Optimization complete! Best design applied to scene.', 'Success');
@@ -809,11 +923,13 @@ export async function startOptimization(mode = 'full') {
 
             const fitnessFunction = async (designParams) => {
                 if (optimizer.shouldStop) throw new Error('Optimization cancelled');
-                const designKey = JSON.stringify(designParams);
-                if (fitnessCache.has(designKey)) {
+                // Namespaced key - see the SSGA branch above.
+                const designKey = _cacheKey('moga', designParams);
+                const cached = fitnessCache.get(designKey);
+                if (cached?.rawMetrics) {
                     log(`    → (Cache HIT) ${designKey}`);
                     // Return the raw metrics for the MOGA optimizer
-                    return fitnessCache.get(designKey).rawMetrics;
+                    return cached.rawMetrics;
                 }
 
                 log(`  Spawning eval for: ${designKey}`);
@@ -834,7 +950,9 @@ export async function startOptimization(mode = 'full') {
 
             const finalParetoFront = await optimizer.run(fitnessFunction, progressCallback);
 
-            if (isOptimizing) { // Check if it finished, not cancelled
+            if (!optimizer.shouldStop) { // Check if it finished, not cancelled
+                // `isOptimizing` is still true here (it is only cleared in `finally`),
+                // so a CANCELLED run used to report success and auto-apply its design.
                 log(`\n🎉 Optimization complete!`);
                 log(`Found ${finalParetoFront.length} non-dominated solutions (trade-offs).`);
                 showAlert('Optimization complete! Select a solution from the Results list to apply it.', 'Success');
@@ -849,16 +967,22 @@ export async function startOptimization(mode = 'full') {
             showAlert('Optimization cancelled', 'Info');
         }
     } finally {
-        setControlsLocked(false);
-        if (optimizationPanel) {
-            const cancelBtn = optimizationPanel.querySelector('#cancel-optimization-btn');
-            if (cancelBtn) {
-                cancelBtn.disabled = false;
-                cancelBtn.textContent = 'Cancel';
-            }
-        }
+        // Release the concurrency guard FIRST: nothing below may strand it.
         // Do not nullify optimizer here, so "Apply Best Design" can work
-        isOptimizing = false; 
+        isOptimizing = false;
+        try {
+            setControlsLocked(false);
+            if (optimizationPanel) {
+                const cancelBtn = optimizationPanel.querySelector('#cancel-optimization-btn');
+                if (cancelBtn) {
+                    cancelBtn.disabled = false;
+                    cancelBtn.textContent = 'Cancel';
+                    cancelBtn.classList.add('hidden');
+                }
+            }
+        } catch (cleanupErr) {
+            console.warn('[Optimization] cleanup failed:', cleanupErr);
+        }
     }
 }
 
@@ -936,6 +1060,26 @@ function gatherSettings(mode = 'full') {
         });
     }
 
+    // Validate the bounds BEFORE spending any simulations. An empty Min made every
+    // gene NaN for the whole budget, and step === 0 gave integer parameters
+    // fractional values - both only visible after the run had burned its budget.
+    for (const p of selectedParams) {
+        if (p.type !== 'continuous') continue;
+        const label = MASTER_PARAMETER_CONFIG[p.name]?.name || p.name;
+        if (!Number.isFinite(p.min) || !Number.isFinite(p.max)) {
+            throw new Error(`Parameter "${label}": Min and Max must both be numbers.`);
+        }
+        if (p.max <= p.min) {
+            throw new Error(`Parameter "${label}": Max (${p.max}) must be greater than Min (${p.min}).`);
+        }
+        if (!Number.isFinite(p.step) || p.step <= 0) {
+            throw new Error(`Parameter "${label}": Step must be a number greater than 0.`);
+        }
+        if (p.step > (p.max - p.min)) {
+            throw new Error(`Parameter "${label}": Step (${p.step}) is larger than the Min-Max range.`);
+        }
+    }
+
     if (selectedParams.length === 0) {
         throw new Error('No parameters selected. Please check at least one parameter to optimize.');
     }
@@ -957,13 +1101,21 @@ function gatherSettings(mode = 'full') {
             log('... Using Quick Optimize settings: 8 population, 20 max evaluations.');
         }
 
+        const goalId = optimizationPanel.querySelector('#opt-goal-metric')?.value || 'maximize_sDA';
+        const selectedGoalType = optimizationPanel.querySelector('#opt-goal-type')?.value || 'maximize';
+        // The metric id ALREADY encodes the direction ("minimize_ASE"). Deriving it from
+        // the id keeps the two from disagreeing (picking "Minimize ASE" while the goal
+        // dropdown still said "maximize" made the GA maximize ASE). Only "set-target"
+        // comes from the dropdown, because no id can express it.
+        const goalType = (selectedGoalType === 'set-target') ? 'set-target' : goalIdToDirection(goalId);
+
         return {
             type: 'ssga',
             wall: optTargetWall?.value || 's',
             shadingType: optShadingType?.value || 'overhang',
             recipe: optimizationPanel.querySelector('#opt-simulation-recipe')?.value || 'sda-ase',
-            goalId: optimizationPanel.querySelector('#opt-goal-metric')?.value || 'maximize_sDA',
-            goalType: optimizationPanel.querySelector('#opt-goal-type')?.value || 'maximize',
+            goalId: goalId,
+            goalType: goalType,
             targetValue: parseFloat(optimizationPanel.querySelector('#opt-goal-target-value')?.value || '0'),
             constraint: optimizationPanel.querySelector('#opt-constraint')?.value.trim() || '',
             populationSize: populationSize,
@@ -978,14 +1130,12 @@ function gatherSettings(mode = 'full') {
             log('... Using Quick Optimize settings: 12 population, 10 generations.');
         }
 
-        const objective1 = {
-            id: optimizationPanel.querySelector('#opt-goal-1')?.value,
-            goal: optimizationPanel.querySelector('#opt-goal-type-1')?.value
-        };
-        const objective2 = {
-            id: optimizationPanel.querySelector('#opt-goal-2')?.value,
-            goal: optimizationPanel.querySelector('#opt-goal-type-2')?.value
-        };
+        // Direction comes from the metric id, not from the separate Goal dropdown
+        // that can silently contradict it.
+        const objective1Id = optimizationPanel.querySelector('#opt-goal-1')?.value;
+        const objective2Id = optimizationPanel.querySelector('#opt-goal-2')?.value;
+        const objective1 = { id: objective1Id, goal: goalIdToDirection(objective1Id) };
+        const objective2 = { id: objective2Id, goal: goalIdToDirection(objective2Id) };
 
         if (!objective1.id || !objective2.id) {
             throw new Error('Both Objective 1 and Objective 2 must be set for Multi-Objective Optimization.');
@@ -1011,8 +1161,26 @@ function gatherSettings(mode = 'full') {
 async function applyDesignToScene(params, settings) {
     const { wall, shadingType } = settings;
 
-    // Enable shading for this wall
-    setShadingState(wall, { enabled: true, type: shadingType });
+    // `#opt-target-wall` / `#opt-shading-type` do not exist in the panel, so `wall`
+    // and `shadingType` are only the "s"/"overhang" fallbacks. Unconditionally
+    // enabling a south overhang changed the geometry being measured even for a
+    // pure-WWR or materials study, so only touch shading when a shading parameter
+    // is actually part of the search, and derive the wall/type from the parameter id.
+    const shadingTargets = new Map(); // "wall" -> "type"
+    for (const paramName of Object.keys(params)) {
+        const master = MASTER_PARAMETER_CONFIG[paramName];
+        if (master) {
+            if (master.domain !== 'Shading') continue;
+            // Ids look like "shading_<dir>_<type>_<property>".
+            const parts = paramName.split('_');
+            if (parts.length >= 3) shadingTargets.set(parts[1], parts[2]);
+        } else if (SHADING_PARAMETERS[shadingType]?.some(p => p.id === paramName)) {
+            shadingTargets.set(wall, shadingType);
+        }
+    }
+    shadingTargets.forEach((type, targetWall) => {
+        setShadingState(targetWall, { enabled: true, type });
+    });
 
     // Set each parameter value in the UI
     for (const [paramName, value] of Object.entries(params)) {
@@ -1025,7 +1193,7 @@ async function applyDesignToScene(params, settings) {
             continue;
         }
 
-        const paramConfig = SHADING_PARAMETERS[shadingType].find(p => p.id === paramName);
+        const paramConfig = SHADING_PARAMETERS[shadingType]?.find(p => p.id === paramName);
         if (!paramConfig) {
             console.warn(`applyDesignToScene: no config found for parameter "${paramName}"; skipping.`);
             continue;
@@ -1064,6 +1232,20 @@ async function applyDesignToScene(params, settings) {
     await new Promise(resolve => setTimeout(resolve, 300));
 }
 
+/**
+ * Resolves the DOM element hosting a recipe's parameters.
+ * Recipes render into the sidebar container `#recipe-parameters-container`, which
+ * simulation.js tags with `data-active-recipe-template`. Legacy floating windows
+ * are still supported as a fallback.
+ * @param {string} templateId
+ * @returns {HTMLElement|null}
+ */
+function _findRecipePanel(templateId) {
+    const container = document.getElementById('recipe-parameters-container');
+    if (container && container.dataset.activeRecipeTemplate === templateId) return container;
+    return document.querySelector(`.floating-window[data-template-id="${templateId}"]`);
+}
+
 async function runSimulation(settings) {
     // Dynamically import simulation functions to avoid circular dependencies
     const { openRecipePanelByType, programmaticallyGeneratePackage } = await import('./simulation.js');
@@ -1083,12 +1265,17 @@ async function runSimulation(settings) {
 
     if (!templateId) throw new Error(`Unknown recipe: ${settings.recipe}`);
 
-    // Open panel if needed (it may be hidden)
-    let panel = document.querySelector(`.floating-window[data-template-id="${templateId}"]`);
+    // Open panel if needed (it may be hidden).
+    // Recipes now render into #recipe-parameters-container, which simulation.js marks
+    // with `data-active-recipe-template`; the old `.floating-window[data-template-id]`
+    // lookup was always null. openRecipePanelByType is async and MUST be awaited -
+    // otherwise `panel` is a Promise and `panel.id` below is undefined.
+    let panel = _findRecipePanel(templateId);
     if (!panel || panel.classList.contains('hidden')) {
-        panel = openRecipePanelByType(templateId);
+        panel = await openRecipePanelByType(templateId);
         await new Promise(resolve => setTimeout(resolve, 200)); // Wait for panel to render
     }
+    if (!panel) throw new Error(`Could not open the recipe panel for "${settings.recipe}".`);
 
     // Set quality preset on the recipe panel
     // Handle both floating panels (with suffix) and container (no suffix)
@@ -1167,7 +1354,9 @@ async function calculateFitness(settings) {
         }
         unit = '%';
     } else if (settings.recipe === 'illuminance') {
-        const stats = resultsManager.getActiveStats();
+        // Slot 'a' explicitly - `getActiveStats()` dispatches on the active VIEW.
+        const stats = resultsManager.datasets?.a?.stats;
+        if (!stats) throw new Error('No statistics available for the loaded illuminance file.');
         if (settings.goalId.includes('avg')) {
             value = stats.avg;
         } else if (settings.goalId === 'maximize_uniformity') {
@@ -1177,8 +1366,10 @@ async function calculateFitness(settings) {
         unit = settings.goalId === 'maximize_uniformity' ? ' (U0)' : ' lux';
     } else if (settings.recipe === 'dgp') {
         const text = await file.text();
-        const match = text.match(/DGP:\s*([\d.]+)/); // Assuming simple text output for DGP
-        value = match ? parseFloat(match[1]) : 0;
+        // Same pattern as parsingWorker.js `_parseEvalglareContent`.
+        const match = text.match(/Daylight Glare Probability\s*:\s*([0-9.]+)/im);
+        if (!match) throw new Error('No "Daylight Glare Probability" line in evalglare output.');
+        value = parseFloat(match[1]);
         unit = '';
     } else {
         throw new Error(`Fitness calculation not implemented for recipe: ${settings.recipe}`);
@@ -1244,6 +1435,24 @@ async function readProjectFile(relativePath) {
     return new File([blob], result.name, { type: 'application/octet-stream' });
 }
 
+const CHECKPOINT_PATH = '11_files/optimization_checkpoint.json';
+
+/**
+ * @returns {Promise<boolean>} True when a resumable checkpoint file is on disk.
+ */
+async function _checkpointExists() {
+    if (!window.electronAPI?.readFile || !project.dirPath) return false;
+    try {
+        const result = await window.electronAPI.readFile({
+            projectPath: project.dirPath,
+            filePath: CHECKPOINT_PATH
+        });
+        return !!result?.success;
+    } catch (err) {
+        return false;
+    }
+}
+
 async function saveCheckpoint() {
     if (!optimizer || !window.electronAPI?.writeFile || !project.dirPath) return;
     
@@ -1252,7 +1461,7 @@ async function saveCheckpoint() {
         const content = JSON.stringify(state, null, 2);
         await window.electronAPI.writeFile({
             projectPath: project.dirPath,
-            filePath: '11_files/optimization_checkpoint.json',
+            filePath: CHECKPOINT_PATH,
             content: content
         });
         log('  💾 Checkpoint saved');
@@ -1267,7 +1476,7 @@ async function loadCheckpoint() {
     try {
         const result = await window.electronAPI.readFile({
             projectPath: project.dirPath,
-            filePath: '11_files/optimization_checkpoint.json'
+            filePath: CHECKPOINT_PATH
         });
 
         if (result.success) {
@@ -1355,7 +1564,11 @@ async function _parseSimulationResult(settings, uniqueId) {
         if (illumStats) return illumStats;
         const file = await _getFileFromElectron(filePath);
         await resultsManager.loadAndProcessFile(file, 'a');
-        illumStats = resultsManager.getActiveStats();
+        // Read slot 'a' EXPLICITLY, matching the sDA/ASE path below.
+        // `getActiveStats()` dispatches on the active VIEW, so a loaded B dataset or
+        // the difference view would return statistics for the wrong grid.
+        illumStats = resultsManager.datasets?.a?.stats || null;
+        if (!illumStats) throw new Error('No statistics available for the loaded illuminance file.');
         return illumStats;
     };
 
@@ -1375,9 +1588,8 @@ async function _parseSimulationResult(settings, uniqueId) {
             continue;
         }
 
-        // Strip the leading minimize_/maximize_ prefix and keep the remainder so that
-        // multi-underscore ids (e.g. "minimize_Annual_DGP_Avg") parse correctly.
-        const metricKey = metricId.replace(/^(minimize|maximize)_/, '').toLowerCase(); // e.g., sda, ase, avg
+        // CANONICAL mapping — must match the one NSGA-II uses to read these metrics.
+        const metricKey = goalIdToMetricKey(metricId); // e.g., sda, ase, avg
         const filePath = `08_results/${baseName}${goalMetric.file}`;
 
         try {
@@ -1397,13 +1609,25 @@ async function _parseSimulationResult(settings, uniqueId) {
             } else if (recipe === 'dgp') {
                 const file = await _getFileFromElectron(filePath);
                 const textContent = await file.text();
-                const match = textContent.match(/DGP:\s*([\d.]+)/);
-                metrics.dgp = match ? parseFloat(match[1]) : 0;
+                // Use the SAME pattern as parsingWorker.js `_parseEvalglareContent`.
+                const match = textContent.match(/Daylight Glare Probability\s*:\s*([0-9.]+)/im);
+                if (!match) throw new Error('No "Daylight Glare Probability" line in evalglare output.');
+                metrics.dgp = parseFloat(match[1]);
+            } else {
+                // Recipes without a parser are filtered out of the dropdowns by
+                // OPTIMIZER_SUPPORTED_RECIPES; reaching here means a stale setting.
+                throw new Error(`No optimizer parser implemented for recipe "${recipe}".`);
             }
-            // TODO: Add parsing logic for other MOGA-compatible recipes (imageless, spectral)
         } catch (err) {
+            // A failed evaluation must score as the WORST value for this objective's
+            // direction. Scoring it 0 made a crashed design the BEST possible result
+            // for every minimize objective, so it dominated every real design.
+            const worst = (goalIdToDirection(metricId) === 'minimize')
+                ? FAILED_METRIC_SENTINEL
+                : -FAILED_METRIC_SENTINEL;
+            metrics[metricKey] = worst;
             console.error(`Failed to parse metric ${metricId} from ${filePath}:`, err);
-            metrics[metricKey] = 0; // Assign 0 for failed parses
+            log(`    ⚠ Could not read ${metricId} (${err.message}) - scored as worst case (${worst}).`);
         }
     }
 
@@ -1479,7 +1703,7 @@ function populateParetoFront(paretoFront, type, objectives = []) {
         const li = document.createElement('li');
         li.className = 'p-2 bg-[--grid-color] rounded active-result'; // Auto-select the best
         li.dataset.params = JSON.stringify(best.params);
-        li.innerHTML = `<strong>Best:</strong> ${best.metricValue.toFixed(2)}${best.unit} (Evals: ${optimizer.evaluationsCompleted}) <br> <span class="text-xs">${JSON.stringify(best.params)}</span>`;
+        li.innerHTML = `<strong>Best:</strong> ${_fmtNum(best.metricValue)}${best.unit ?? ''} (Evals: ${optimizer?.evaluationsCompleted ?? '?'}) <br> <span class="text-xs">${JSON.stringify(best.params)}</span>`;
         summaryList.appendChild(li);
         selectedDesignParams = best.params; // Pre-select it
         dom['apply-best-design-btn']?.classList.remove('hidden'); // Show apply button
@@ -1488,11 +1712,22 @@ function populateParetoFront(paretoFront, type, objectives = []) {
         // --- Display Pareto front for MOGA ---
         const obj1 = objectives[0];
         const obj2 = objectives[1];
+        if (!obj1 || !obj2) return;
+
+        const key1 = goalIdToMetricKey(obj1.id);
+        const key2 = goalIdToMetricKey(obj2.id);
+
+        // A missing/failed metric must never throw inside the awaited progress
+        // callback - that used to kill every run after generation 1.
+        const fmt = (ind, key) => {
+            const v = ind?.metrics?.[key];
+            return Number.isFinite(v) ? v.toFixed(2) : 'n/a';
+        };
 
         // Add header
         const header = document.createElement('li');
         header.className = 'p-2 text-[--text-secondary] sticky top-0 bg-[--panel-bg]';
-        header.innerHTML = `<strong class="w-1/3 inline-block">${obj1.id.split('_')[1].toUpperCase()}</strong> <strong class="w-1/3 inline-block">${obj2.id.split('_')[1].toUpperCase()}</strong> <strong>Params</strong>`;
+        header.innerHTML = `<strong class="w-1/3 inline-block">${key1.toUpperCase()}</strong> <strong class="w-1/3 inline-block">${key2.toUpperCase()}</strong> <strong>Params</strong>`;
         summaryList.appendChild(header);
 
         paretoFront.forEach(ind => {
@@ -1500,8 +1735,8 @@ function populateParetoFront(paretoFront, type, objectives = []) {
             li.className = 'p-2 hover:bg-[--grid-color] rounded cursor-pointer';
             li.dataset.params = JSON.stringify(ind.params);
             li.innerHTML = `
-                <span class="w-1/3 inline-block">${ind.metrics[obj1.id].toFixed(2)}</span>
-                <span class="w-1/3 inline-block">${ind.metrics[obj2.id].toFixed(2)}</span>
+                <span class="w-1/3 inline-block">${fmt(ind, key1)}</span>
+                <span class="w-1/3 inline-block">${fmt(ind, key2)}</span>
                 <span class="text-xs">${JSON.stringify(ind.params)}</span>
             `;
             summaryList.appendChild(li);
@@ -1764,7 +1999,22 @@ function _addParameterToDynamicList(optPanel) {
         return;
     }
 
-    // Add the new parameter item
+    _createDynamicParamRow(container, paramId);
+    modal.classList.replace('flex', 'hidden');
+}
+
+/**
+ * Creates one row in the dynamic optimization-parameter list.
+ * @param {HTMLElement} container - The `#dynamic-opt-params-list` element.
+ * @param {string} paramId - A MASTER_PARAMETER_CONFIG id.
+ * @param {{min?:number, max?:number, step?:number}} [bounds] - Overrides the defaults.
+ * @returns {HTMLElement|null} The created row.
+ */
+function _createDynamicParamRow(container, paramId, bounds = {}) {
+    const paramConfig = MASTER_PARAMETER_CONFIG[paramId];
+    const template = document.getElementById('template-dynamic-opt-param');
+    if (!container || !template || !paramConfig) return null;
+
     const clone = template.content.cloneNode(true);
     const item = clone.querySelector('.dynamic-opt-param-item');
     item.dataset.paramId = paramId;
@@ -1775,14 +2025,30 @@ function _addParameterToDynamicList(optPanel) {
     const maxInput = clone.querySelector('.dynamic-opt-param-max');
     const stepInput = clone.querySelector('.dynamic-opt-param-step');
 
-    minInput.value = paramConfig.default.min;
-    maxInput.value = paramConfig.default.max;
-    stepInput.value = paramConfig.default.step;
+    minInput.value = (bounds.min ?? paramConfig.default.min);
+    maxInput.value = (bounds.max ?? paramConfig.default.max);
+    stepInput.value = (bounds.step ?? paramConfig.default.step);
 
     clone.querySelector('.remove-dynamic-opt-param-btn').addEventListener('click', (e) => {
         e.target.closest('.dynamic-opt-param-item').remove();
     });
 
     container.appendChild(clone);
-    modal.classList.replace('flex', 'hidden');
+    return item;
+}
+
+/**
+ * Programmatically replaces the optimization parameter list with a single parameter.
+ * The AI assistant used to write into `#opt-params-container`, which does not exist
+ * in the panel template; this is the supported entry point.
+ * @param {string} paramId - A MASTER_PARAMETER_CONFIG id.
+ * @param {{min?:number, max?:number, step?:number}} [bounds]
+ * @returns {boolean} True when the row was created.
+ */
+export function setSingleOptimizationParameter(paramId, bounds = {}) {
+    if (!optimizationPanel) return false;
+    const container = optimizationPanel.querySelector('#dynamic-opt-params-list');
+    if (!container || !MASTER_PARAMETER_CONFIG[paramId]) return false;
+    container.innerHTML = '';
+    return !!_createDynamicParamRow(container, paramId, bounds);
 }

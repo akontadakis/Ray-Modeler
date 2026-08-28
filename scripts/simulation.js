@@ -3,7 +3,7 @@
 import { showAlert, makeDraggable, makeResizable, ensureWindowInView, getNewZIndex, setupFileListenersForPanel, initializePanelControls } from './ui.js';
 import { getDom } from './dom.js';
 import { project } from './project.js'; // Import project to access its state
-import { getRecipeById } from './recipes/RecipeRegistry.js';
+import { getRecipeById, getAllRecipes } from './recipes/RecipeRegistry.js';
 import { getRuntimeEnvironment, getRecipeExecutionSupport } from './recipes/runtimeEnvironment.js';
 
 // --- MODULE-LEVEL VARIABLES ---
@@ -37,6 +37,130 @@ const availableModules = [
     { id: 'template-recipe-annual-radiation', name: 'Recipe: Annual Solar Radiation' }
 ];
 
+// Result files each recipe's script writes into 08_results/, relative to the
+// project root. `${p}` is replaced with the sanitised project name. Nothing
+// enumerates the directory over IPC, so this table is how a finished run knows
+// what to hand to resultsManager.
+const RECIPE_RESULT_FILES = {
+    'template-recipe-illuminance': ['08_results/${p}_illuminance.txt'],
+    'template-recipe-df': ['08_results/${p}_df_results.txt'],
+    'template-recipe-dgp': ['08_results/${p}_dgp.txt', '08_results/${p}.dgp'],
+    'template-recipe-annual-3ph': ['08_results/total_3ph.ill', '08_results/direct_3ph.ill'],
+    'template-recipe-annual-5ph': ['08_results/${p}_5ph_final.ill', '08_results/direct_5ph.ill'],
+    'template-recipe-sda-ase': ['08_results/${p}_ASE_direct_only.ill', '08_results/${p}_sDA_final.ill'],
+    'template-recipe-imageless-glare': ['08_results/${p}.dgp', '08_results/${p}.ga', '08_results/${p}_sGA.txt'],
+    'template-recipe-en17037': ['08_results/${p}.ill', '08_results/${p}.dgp', '08_results/${p}_view_factor.txt'],
+    'template-recipe-en-illuminance': ['08_results/task_results_lux.txt', '08_results/surround_results_lux.txt'],
+    'template-recipe-en-ugr': ['08_results/EN12464_UGR_Summary.txt'],
+    'template-recipe-lighting-energy': ['08_results/${p}_energy_final.ill'],
+    'template-recipe-facade-irradiation': ['08_results/facade_annual_kWh.txt', '08_results/facade_hourly_W.ill'],
+    'template-recipe-annual-radiation': ['08_results/${p}_annual_radiation.txt', '08_results/hourly_solar_total.txt'],
+    'template-recipe-spectral-9ch': ['08_results/hourly_solar_rgb.ill']
+};
+
+// The recipe whose run is currently in flight, so the shared script-exit handler
+// knows which result files to look for.
+let pendingResultsRecipeId = null;
+
+/**
+ * Resolves the active recipe template id for a panel. For the sidebar the id
+ * lives on #recipe-parameters-container, not on the panel itself.
+ * @param {HTMLElement} panel
+ * @returns {string|null}
+ */
+function _resolveActiveRecipeId(panel) {
+    return panel?.dataset?.templateId
+        || panel?.dataset?.activeRecipeTemplate
+        || document.getElementById('recipe-parameters-container')?.dataset?.activeRecipeTemplate
+        || null;
+}
+
+/**
+ * Remembers which recipe is about to run so the exit handler can load its output.
+ * @param {string|null} recipeId
+ */
+function _armResultsLoadOnExit(recipeId) {
+    pendingResultsRecipeId = recipeId || null;
+}
+
+/**
+ * Reads the result files produced by the run that just finished and hands them
+ * to resultsManager, connecting the manual run -> parse -> display chain that
+ * previously only existed on the AI-driven path (ai-assistant.js).
+ * @param {number} exitCode Process exit code reported by Electron.
+ * @param {HTMLElement|null} outputConsole Console element to append status to.
+ */
+async function _loadResultsAfterRun(exitCode, outputConsole) {
+    const recipeId = pendingResultsRecipeId;
+    pendingResultsRecipeId = null;
+
+    if (exitCode !== 0) return;
+    if (!window.electronAPI?.readFile || !project.dirPath) return;
+
+    const patterns = RECIPE_RESULT_FILES[recipeId];
+    if (!patterns || patterns.length === 0) return;
+
+    const projectName = (project.projectName || 'scene').replace(/\s+/g, '_');
+    const { resultsManager } = await import('./resultsManager.js');
+
+    let loaded = 0;
+    for (const pattern of patterns) {
+        const filePath = pattern.replace('${p}', projectName);
+        try {
+            if (window.electronAPI.checkFileExists) {
+                const exists = await window.electronAPI.checkFileExists({ projectPath: project.dirPath, filePath });
+                if (!exists) continue;
+            }
+            const result = await window.electronAPI.readFile({ projectPath: project.dirPath, filePath });
+            if (!result || result.success === false || !result.content) continue;
+            const { content, name } = result;
+            const bytes = new Uint8Array(content?.data ?? content);
+            const file = new File([bytes], name || filePath.split('/').pop(), { type: 'application/octet-stream' });
+            await resultsManager.loadAndProcessFile(file, 'a');
+            loaded++;
+        } catch (error) {
+            console.warn(`Could not load result file '${filePath}':`, error);
+        }
+    }
+
+    if (outputConsole) {
+        outputConsole.textContent += loaded > 0
+            ? `\n--- Loaded ${loaded} result file(s) into the Analysis panel ---`
+            : `\n--- No result files found to load for this recipe ---`;
+        outputConsole.scrollTop = outputConsole.scrollHeight;
+    }
+}
+
+/**
+ * Builds the ordered list of recipes to offer in the dropdown.
+ *
+ * The registry is the source of truth; `availableModules` is only a fallback for
+ * labels and for the (unlikely) case where no recipe module has registered yet.
+ * Recipes without a DOM template are skipped — selecting one would clear the
+ * container and leave the user with nothing to configure.
+ * @returns {Array<{id: string, name: string}>}
+ */
+function getSelectableRecipes() {
+    const registered = getAllRecipes();
+    const source = registered.length > 0
+        ? registered.map(r => ({
+            id: r.id,
+            name: r.name || availableModules.find(m => m.id === r.id)?.name || r.id
+        }))
+        : availableModules.filter(m => m.id !== 'template-global-sim-params');
+
+    return source.filter(entry => {
+        // 'template-global-sim-params' has no #simulation-module-list entry and no
+        // recipe template; it must never reach the dropdown.
+        if (entry.id === 'template-global-sim-params') return false;
+        if (!document.getElementById(entry.id)) {
+            console.warn(`Recipe "${entry.id}" is registered but has no DOM template; omitted from the recipe list.`);
+            return false;
+        }
+        return true;
+    });
+}
+
 const FOLDER_STRUCTURE = [
     '01_geometry', '02_materials', '03_views', '04_skies', '05_bsdf',
     '06_octrees', '07_scripts', '08_results', '09_images', '10_schedules', '11_files', '12_topography'
@@ -51,10 +175,7 @@ export function setupSimulationSidebar() {
     // Initialize the logic for the entire panel, including global parameters.
     initializePanelLogic(simPanel);
 
-    availableModules.forEach(module => {
-       // Skip adding "Global" to the recipe dropdown
-        if (module.id === 'template-global-sim-params') return;
-
+    getSelectableRecipes().forEach(module => {
         const option = document.createElement('option');
         option.value = module.id;
         option.textContent = module.name;
@@ -621,9 +742,26 @@ export function initializePanelLogic(panel) {
         });
     });
 
-    // Initializes the execution buttons and Command Center
-    const generateBtn = panel.querySelector('[data-action="generate"]');
-    const runBtn = panel.querySelector('[data-action="run"]');
+    // Initializes the execution buttons and Command Center.
+    //
+    // Three recipe TEMPLATES (EN 12464-1 Illuminance, Lighting Energy, Facade
+    // Irradiation) carry their own duplicate `[data-action="generate"]` button.
+    // Once such a template is cloned into #recipe-parameters-container, a plain
+    // panel.querySelector() finds THAT copy and binds it with a fresh, empty
+    // `generatedScriptFiles` closure — while the persistent Run button (which
+    // lives outside the container) keeps the original, now-orphaned closure. The
+    // user then sees "No script has been generated for this recipe yet."
+    //
+    // Ignoring any button inside #recipe-parameters-container makes this function
+    // always bind the persistent pair for the sidebar, bind nothing when it is
+    // called with the container itself, and still bind their own buttons for
+    // legacy floating panels.
+    const pickActionButton = (action) => {
+        const candidates = Array.from(panel.querySelectorAll(`[data-action="${action}"]`));
+        return candidates.find(btn => !btn.closest('#recipe-parameters-container')) || null;
+    };
+    const generateBtn = pickActionButton('generate');
+    const runBtn = pickActionButton('run');
     let generatedScriptFiles = {}; // Variable to hold script names between generate and run
 
    if (generateBtn) {
@@ -645,7 +783,7 @@ export function initializePanelLogic(panel) {
                 return;
             }
 
-            const recipeType = panel.dataset.templateId || panel.dataset.activeRecipeTemplate;
+            const recipeType = _resolveActiveRecipeId(panel);
             const recipeDef = recipeType ? getRecipeById(recipeType) : null;
             const runtimeEnv = getRuntimeEnvironment();
             const support = getRecipeExecutionSupport(recipeDef, runtimeEnv);
@@ -666,15 +804,20 @@ export function initializePanelLogic(panel) {
                 return;
             }
 
-            // Auto-run via Electron when supported.
-            if (window.electronAPI && (project.dirPath || project.dirHandle)) {
-                const commandCenter = panel.querySelector('.command-center');
+            // Auto-run via Electron when supported. A dirHandle alone is NOT enough:
+            // its .name is a bare folder name that the main process would resolve
+            // against the app's CWD, so require the real filesystem path.
+            if (window.electronAPI && project.dirPath) {
+                const commandCenter = panel.querySelector('.command-center') || document.querySelector('.command-center');
                 if (commandCenter) {
                     commandCenter.classList.remove('hidden');
                 }
 
+                // Load the results this run produces as soon as it exits cleanly.
+                _armResultsLoadOnExit(recipeType);
+
                 window.electronAPI.runScript({
-                    projectPath: project.dirPath || project.dirHandle?.name,
+                    projectPath: project.dirPath,
                     scriptName: scriptFile
                 });
             } else {
@@ -717,6 +860,11 @@ export function initializePanelLogic(panel) {
                 outputConsole.textContent += `\n--- PROCESS EXITED WITH CODE: ${code} ---`;
                 outputConsole.scrollTop = outputConsole.scrollHeight;
             }
+            // Nothing used to read 08_results/* after a manual run, so run -> parse
+            // -> display was never connected outside the AI path. Do it here.
+            _loadResultsAfterRun(code, outputConsole).catch(err => {
+                console.error('Failed to load simulation results after run:', err);
+            });
         });
     }
 }

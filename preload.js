@@ -75,10 +75,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return ipcRenderer.invoke('run-live-render', args);
   },
 
-  // --- Methods for one-way communication or event listeners ---
+  // --- Script execution and its output streams ---
+
+  /**
+   * Starts a script. Resolves to `{ success: true, jobId }` (or
+   * `{ success: false, error }`). Pass the jobId to onScriptOutputFor /
+   * onScriptExitFor to receive only THIS run's output; the legacy global
+   * onScriptOutput / onScriptExit still fire for every run.
+   */
   runScript: (args) => {
     validatePathArgs(args, ['projectPath', 'scriptName']);
-    ipcRenderer.send('run-script', args);
+    // Never reject: several callers fire this without awaiting.
+    return ipcRenderer.invoke('run-script', args)
+      .catch((err) => ({ success: false, error: err && err.message ? err.message : String(err) }));
   },
 
   onScriptOutput: (callback) => {
@@ -93,5 +102,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('script-exit', listener);
     // Return unsubscribe function to prevent listener leaks
     return () => ipcRenderer.removeListener('script-exit', listener);
+  },
+
+  /** Output for one specific job only. Returns an unsubscribe function. */
+  onScriptOutputFor: (jobId, callback) => {
+    if (typeof jobId !== 'string' || !jobId) throw new Error("Invalid argument: 'jobId' must be a non-empty string");
+    const channel = `script-output:${jobId}`;
+    const listener = (_event, value) => callback(value);
+    ipcRenderer.on(channel, listener);
+    return () => ipcRenderer.removeListener(channel, listener);
+  },
+
+  /** Exit code for one specific job only. Returns an unsubscribe function. */
+  onScriptExitFor: (jobId, callback) => {
+    if (typeof jobId !== 'string' || !jobId) throw new Error("Invalid argument: 'jobId' must be a non-empty string");
+    const channel = `script-exit:${jobId}`;
+    const listener = (_event, value) => callback(value);
+    ipcRenderer.on(channel, listener);
+    return () => ipcRenderer.removeListener(channel, listener);
   },
 });

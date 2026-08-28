@@ -97,8 +97,15 @@ class ReportGenerator {
         // Lighting metrics (if computed for the chosen dataset)
         const lightingMetrics = activeDataset.lightingMetrics || null;
 
+        // The unit depends on what was actually loaded: a daylight-factor grid is a
+        // percentage and an irradiance grid is W/m2, not lux.
+        const quantity = typeof resultsManager.getQuantityForDataset === 'function'
+            ? resultsManager.getQuantityForDataset(reportDataKey)
+            : { label: 'Illuminance', unit: 'lux' };
+
         this.data = {
             projectData,
+            quantity,
             stats: activeDataset.stats || null,
             annualMetrics,
             glareResult,
@@ -237,24 +244,45 @@ class ReportGenerator {
 
     /** @private */
     _buildKeyMetricsSection() {
-        const { stats, annualMetrics, glareResult, circadianMetrics } = this.data;
+        const { stats, annualMetrics, glareResult, circadianMetrics, quantity } = this.data;
         const hasMetrics = stats || annualMetrics || glareResult || circadianMetrics;
 
         if (!hasMetrics) return '';
+
+        // Every one of these can be missing or null in a legitimate run: DGP is null on
+        // a UGR-only report, and the circadian fields come from an unvalidated user JSON.
+        // An unguarded .toFixed() on any of them aborted the entire report.
+        const q = quantity || { label: 'Illuminance', unit: 'lux' };
 
         return `
             <div class="section">
                 <h2>Key Metrics Summary</h2>
                 <div class="metric-grid">
-                    ${stats ? this._buildMetricCard('Average Illuminance', stats.avg.toFixed(1), 'lux') : ''}
-                    ${stats ? this._buildMetricCard('Uniformity (Uo)', (Number.isFinite(stats.uniformity) ? stats.uniformity : (stats.avg > 0 ? stats.min / stats.avg : 0)).toFixed(2)) : ''}
-                    ${annualMetrics ? this._buildMetricCard('sDA <sub>300/50%</sub>', annualMetrics.sDA.toFixed(1), '%') : ''}
-                    ${annualMetrics ? this._buildMetricCard('ASE <sub>1000,250h</sub>', annualMetrics.ASE === null ? 'n/a' : annualMetrics.ASE.toFixed(1), annualMetrics.ASE === null ? '' : '%') : ''}
-                    ${glareResult ? this._buildMetricCard('DGP', glareResult.dgp.toFixed(3)) : ''}
-                    ${circadianMetrics ? this._buildMetricCard('Avg. Circadian Stimulus', circadianMetrics.avg_cs.toFixed(3)) : ''}
-                    ${circadianMetrics ? this._buildMetricCard('Avg. EML', circadianMetrics.avg_eml.toFixed(0), 'lux') : ''}
+                    ${this._buildMetricCard(`Average ${q.label}`, this._fmt(stats?.avg, 1), q.unit)}
+                    ${stats ? this._buildMetricCard('Uniformity (Uo)', this._fmt(Number.isFinite(stats.uniformity) ? stats.uniformity : (stats.avg > 0 ? stats.min / stats.avg : 0), 2)) : ''}
+                    ${this._buildMetricCard('sDA <sub>300/50%</sub>', this._fmt(annualMetrics?.sDA, 1), '%')}
+                    ${annualMetrics ? this._buildMetricCard('ASE <sub>1000,250h</sub>', Number.isFinite(annualMetrics.ASE) ? annualMetrics.ASE.toFixed(1) : 'n/a', Number.isFinite(annualMetrics.ASE) ? '%' : '') : ''}
+                    ${this._buildMetricCard('DGP', this._fmt(glareResult?.dgp, 3))}
+                    ${this._buildMetricCard('UGR', this._fmt(glareResult?.ugr, 1))}
+                    ${this._buildMetricCard('Avg. Circadian Stimulus', this._fmt(circadianMetrics?.avg_cs, 3))}
+                    ${this._buildMetricCard('Avg. EML', this._fmt(circadianMetrics?.avg_eml, 0), 'lux')}
+                    ${this._buildMetricCard('Avg. CCT', this._fmt(circadianMetrics?.avg_cct, 0), 'K')}
                 </div>
             </div>`;
+    }
+
+    /**
+     * Formats a value that may be absent, null or non-numeric (circadian fields come
+     * from a user-supplied JSON summary, and `dgp` is explicitly null on a UGR-only
+     * evalglare report). Returns null so _buildMetricCard omits the card entirely.
+     * @private
+     * @param {*} value
+     * @param {number} digits
+     * @returns {string|null}
+     */
+    _fmt(value, digits) {
+        const n = Number(value);
+        return Number.isFinite(n) ? n.toFixed(digits) : null;
     }
 
     /** @private */
@@ -348,21 +376,20 @@ class ReportGenerator {
 
         const { avgPower, savings, lpd, annualEnergy } = lightingMetrics;
 
-        const hasLpd = typeof lpd === 'number';
-        const hasAnnual = typeof annualEnergy === 'number';
-
         return `
             <div class="section">
                 <h2>Lighting Performance Summary</h2>
                 <div class="metric-grid">
-                    ${this._buildMetricCard('Average Lighting Power Fraction', (avgPower * 100).toFixed(1), '%')}
-                    ${this._buildMetricCard('Estimated Lighting Energy Savings', savings.toFixed(1), '%')}
-                    ${hasLpd ? this._buildMetricCard('Installed LPD', lpd.toFixed(2), ' W/m²') : ''}
-                    ${hasAnnual ? this._buildMetricCard('Estimated Annual Lighting Energy', annualEnergy.toFixed(0), ' kWh/m²') : ''}
+                    ${this._buildMetricCard('Average Lighting Power Fraction', this._fmt(Number(avgPower) * 100, 1), '%')}
+                    ${this._buildMetricCard('Estimated Lighting Energy Savings', this._fmt(savings, 1), '%')}
+                    ${this._buildMetricCard('Installed LPD', this._fmt(lpd, 2), ' W/m²')}
+                    ${this._buildMetricCard('Estimated Annual Lighting Energy', this._fmt(annualEnergy, 0), ' kWh/m²')}
                 </div>
                 <p style="font-size:0.8em;color:#555;margin-top:6px;">
                     Lighting control performance is estimated from the daylight autonomy-based control model
-                    configured in the project, using occupied hours consistent with sDA/ASE calculations.
+                    configured in the project, over the same occupied hours as the sDA calculation
+                    (the loaded occupancy schedule, or Mon&ndash;Fri 08:00&ndash;18:00 if none is loaded).
+                    ASE is reported over the LM-83 analysis period (all days, 08:00&ndash;18:00) instead.
                 </p>
             </div> `;
     }
