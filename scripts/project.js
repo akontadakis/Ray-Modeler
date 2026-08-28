@@ -1383,7 +1383,12 @@ class Project {
             }
             return null;
         }
-        return "# Radiance Sensor Points (X Y Z Vx Vy Vz)\n" + points.join('\n');
+        // NO header comment. rtrace does not skip a leading '#' line and continue -- it
+        // discards the ENTIRE file and exits 0, so every recipe produced a 0-byte result
+        // and the app reported "No valid numerical data found". Verified against Radiance
+        // 6.1a on a real 59-point grid: 0 rows with the header, 59 without.
+        // Column order is X Y Z Vx Vy Vz.
+        return points.join('\n') + '\n';
     }
 
     async _generateDaylightingPointsContent() {
@@ -1433,7 +1438,9 @@ class Project {
             return `${worldPos} ${worldNorm}`;
         });
 
-        return "# Radiance Daylighting Control Sensor Points (X Y Z Vx Vy Vz)\n" + points.join('\n');
+        // NO header comment -- rtrace discards a whole file whose first line is '#'.
+        // Column order is X Y Z Vx Vy Vz.
+        return points.join('\n') + '\n';
     }
 
     async loadProject() {

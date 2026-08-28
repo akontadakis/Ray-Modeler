@@ -185,15 +185,20 @@ export function _parseBsdfXml(xmlContent) {
  */
 
 function transmittanceToTransmissivity(Tn) {
-    // Correct implementation based on Stokes' equations for a single pane of glass (n=1.52)
-    // This formula is a simplified approximation and assumes Rn (reflectance) is ~0.08
+    // Radiance's `glass` primitive takes TRANSMISSIVITY, not transmittance. This is the
+    // standard conversion from the Radiance reference manual for n = 1.52.
+    //
+    // The previous implementation used a hand-derived "Stokes" expression that was wrong by
+    // roughly 11x: Tn 0.7 came out as 0.0659 instead of 0.7628, so every window was modelled
+    // as nearly opaque and daylight factors came back around 0.03% instead of a few percent.
+    // Reference check: clear single glazing Tn 0.88 must give tn ~ 0.96; this gives 0.958,
+    // the old one gave 0.083.
     if (Tn <= 0) return 0;
-    const Rn = 0.08;
-    const term1 = Math.sqrt((1 - Rn) ** 4 + 4 * (Rn ** 2) * (Tn ** 2));
-    const term2 = (1 - Rn) ** 2;
-    const tn = (term1 - term2) / (2 * Rn * Tn);
-    // Clamp the result to a physically plausible range [0, 1]
-    return Math.max(0, Math.min(1, tn));
+    const tn = (Math.sqrt(0.8402528435 + 0.0072522239 * Tn * Tn) - 0.9166530661)
+             / (0.0036261119 * Tn);
+    // Transmissivity legitimately exceeds transmittance and can pass 1.0 for very clear
+    // glazing, so only guard against negatives here.
+    return Math.max(0, tn);
 }
 
 function generateRadBox(topVerts, thickness, material, name, transformFunc) {
@@ -1212,7 +1217,8 @@ export async function generateRayFileContent() {
     const dom = getDom();
     const gridParams = getSensorGridParams();
     if (!gridParams?.view?.enabled) {
-        return "# View grid is not enabled. No rays generated.";
+        // Empty, not a comment: rtrace discards a whole file whose first line is '#'.
+        return "";
     }
 
     const { spacing, offset, numDirs, startVec } = gridParams.view;
@@ -1293,10 +1299,15 @@ export async function generateRayFileContent() {
     }
 
     if (rays.length === 0) {
-        return "# No view grid points generated.";
+        // Empty, not a comment: rtrace discards a whole file whose first line is '#'.
+        return "";
     }
 
-    return "# Radiance Rays (X Y Z Vx Vy Vz)\n" + rays.join('\n');
+    // NO header comment -- see the note in project.js's sensor-point writer. A leading '#'
+    // makes rtrace/rcontrib read zero rays and exit 0, which silently produced empty
+    // results for every recipe that consumes this file.
+    // Column order is X Y Z Vx Vy Vz.
+    return rays.join('\n') + '\n';
 }
 
 /**
