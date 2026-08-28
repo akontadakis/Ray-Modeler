@@ -184,7 +184,7 @@ export function _parseBsdfXml(xmlContent) {
  * @returns {string} A string containing the Radiance definitions for the 6 box faces.
  */
 
-function transmittanceToTransmissivity(Tn) {
+export function transmittanceToTransmissivity(Tn) {
     // Radiance's `glass` primitive takes TRANSMISSIVITY, not transmittance. This is the
     // standard conversion from the Radiance reference manual for n = 1.52.
     //

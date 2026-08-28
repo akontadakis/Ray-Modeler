@@ -1,6 +1,6 @@
 // scripts/scriptGenerator.js
 
-import { _parseAndBinSpectralData } from './radiance.js';
+import { _parseAndBinSpectralData, transmittanceToTransmissivity } from './radiance.js';
 
 /**
  * Converts a "HH:MM" clock string to decimal hours (e.g. "12:30" -> 12.5),
@@ -486,6 +486,19 @@ function createSpectral9ChScript(projectData) {
     const binnedFloorRefl9ch = _parseAndBinSpectralData(floorSrdContent, 'spectral-9') || Array(9).fill(p['floor-refl'] || 0.2);
     const binnedCeilingRefl9ch = _parseAndBinSpectralData(ceilingSrdContent, 'spectral-9') || Array(9).fill(p['ceiling-refl'] || 0.8);
 
+    // Every modifier the geometry writer can emit needs a definition in EVERY channel
+    // group, or oconv aborts with `undefined modifier "glass_mat"` and the run produces
+    // nothing. Only wall, floor and ceiling carry per-band reflectances; the rest are
+    // broadband, so the same scalar is repeated across the group's three channels.
+    const grey = (v) => { const s = Number(v).toFixed(4); return `${s} ${s} ${s}`; };
+    const mat = projectData.materials || {};
+    const frameRefl = mat.frame?.reflectance ?? p['frame-refl'] ?? 0.5;
+    const shadingRefl = mat.shading?.reflectance ?? p['shading-refl'] ?? 0.35;
+    const furnitureRefl = mat.furniture?.reflectance ?? p['furniture-refl'] ?? 0.5;
+    const contextRefl = mat.context?.reflectance ?? p['context-refl'] ?? 0.2;
+    const glazingTn = mat.glazing?.transmittance ?? p['glazing-trans'] ?? 0.65;
+    const glazingTs = transmittanceToTransmissivity(parseFloat(glazingTn));
+
     const generateMaterialSet = (suffix, wallBins, floorBins, ceilingBins) => `
 void plastic wall_mat
 0
@@ -501,6 +514,41 @@ void plastic ceiling_mat
 0
 0
 5 ${ceilingBins.map(v => v.toFixed(4)).join(' ')} 0 0
+
+void glass glass_mat
+0
+0
+3 ${grey(glazingTs)}
+
+void plastic frame_mat
+0
+0
+5 ${grey(frameRefl)} 0 0
+
+void plastic shading_mat
+0
+0
+5 ${grey(shadingRefl)} 0 0
+
+void plastic furniture_mat
+0
+0
+5 ${grey(furnitureRefl)} 0 0
+
+void plastic context_mat
+0
+0
+5 ${grey(contextRefl)} 0 0
+
+void plastic ground_mat
+0
+0
+5 0.1500 0.1500 0.1500 0 0
+
+void trans vegetation_canopy_mat
+0
+0
+7 0.1000 0.2000 0.1000 0 0.5 0.3 0
     `;
     
     const materialDefs9ch = {
@@ -726,8 +774,14 @@ CALEOF
     # (e.g. 6.807e+06), which bc cannot parse. bc would fail silently here and
     # leave every scaled band empty, producing an unusable modifier file.
     L_BASE=$(awk -v r="$R_RAD" -v g="$G_RAD" -v b="$B_RAD" 'BEGIN{printf "%.10g", 179*(0.265*r + 0.670*g + 0.065*b)}')
+    # The band multipliers must land in the SAME units the post-processor integrates in:
+    # process_spectral.py computes 683 * sum(E_i * width_i * V_i), so E_i is a BAND-AVERAGE
+    # spectral quantity per nm and the nine bin widths (44/29/24/24/24/29/39/44/135 nm) do
+    # not cancel. Normalising with a width-less sum at 179 lm/W instead, as this line once
+    # did, left every channel about 125x too large: 683/179 = 3.816 for the efficacy and
+    # about 32.9 nm for the V(lambda)-weighted mean bin width.
     L_SPEC_UNSCALED=$(awk -v b1="$B1_SUN" -v b2="$B2_SUN" -v b3="$B3_SUN" -v b4="$B4_SUN" -v b5="$B5_SUN" -v b6="$B6_SUN" -v b7="$B7_SUN" -v b8="$B8_SUN" -v b9="$B9_SUN" \
-        'BEGIN{printf "%.10g", 179*(b1*0.0003+b2*0.0232+b3*0.1465+b4*0.3644+b5*0.7386+b6*0.9859+b7*0.8654+b8*0.3804+b9*0.0535)}')
+        'BEGIN{printf "%.10g", 683*(b1*0.0003*44+b2*0.0232*29+b3*0.1465*24+b4*0.3644*24+b5*0.7386*24+b6*0.9859*29+b7*0.8654*39+b8*0.3804*44+b9*0.0535*135)}')
     C_SCALE=$(awk -v a="$L_BASE" -v b="$L_SPEC_UNSCALED" 'BEGIN{printf "%.10g", a/(b + 1e-9)}')
     scale_band() { awk -v v="$1" -v c="$C_SCALE" 'BEGIN{printf "%.10g", v*c}'; }
     S1_SCALED=$(scale_band "$B1_SUN"); S2_SCALED=$(scale_band "$B2_SUN"); S3_SCALED=$(scale_band "$B3_SUN")
@@ -738,12 +792,14 @@ CALEOF
     # sun's absolute radiance: the "skyfunc" brightfunc already carries the absolute sky
     # brightness, and a Radiance pattern MULTIPLIES the value it modifies. Feeding the
     # raw SPD numbers in as the colorfunc arguments would therefore scale the sky by the
-    # SPD magnitude on top of its own brightness. Normalising so that the V(lambda)
-    # weighted sum of the nine band multipliers equals 1 leaves the sky luminance exactly
-    # as gendaylit computed it while distributing it across the bands by spectral shape.
+    # SPD magnitude on top of its own brightness. The target is that the post-processor's
+    # own integral, 683 * sum(K_i * width_i * V_i), reproduces the luminance Radiance would
+    # report for the same sky through its 179 lm/W broadband weighting. That fixes the
+    # normalisation constant at 179/683, NOT at 1: a unity width-less sum, as this line
+    # once used, left the sky about 125x too bright once the widths were applied downstream.
     K_SPEC_UNSCALED=$(awk -v b1="$B1_SKY" -v b2="$B2_SKY" -v b3="$B3_SKY" -v b4="$B4_SKY" -v b5="$B5_SKY" -v b6="$B6_SKY" -v b7="$B7_SKY" -v b8="$B8_SKY" -v b9="$B9_SKY" \\
-        'BEGIN{printf "%.10g", b1*0.0003+b2*0.0232+b3*0.1465+b4*0.3644+b5*0.7386+b6*0.9859+b7*0.8654+b8*0.3804+b9*0.0535}')
-    C_SCALE_SKY=$(awk -v b="$K_SPEC_UNSCALED" 'BEGIN{printf "%.10g", 1/(b + 1e-9)}')
+        'BEGIN{printf "%.10g", 683*(b1*0.0003*44+b2*0.0232*29+b3*0.1465*24+b4*0.3644*24+b5*0.7386*24+b6*0.9859*29+b7*0.8654*39+b8*0.3804*44+b9*0.0535*135)}')
+    C_SCALE_SKY=$(awk -v b="$K_SPEC_UNSCALED" 'BEGIN{printf "%.10g", 179/(b + 1e-9)}')
     scale_sky_band() { awk -v v="$1" -v c="$C_SCALE_SKY" 'BEGIN{printf "%.10g", v*c}'; }
     K1_SCALED=$(scale_sky_band "$B1_SKY"); K2_SCALED=$(scale_sky_band "$B2_SKY"); K3_SCALED=$(scale_sky_band "$B3_SKY")
     K4_SCALED=$(scale_sky_band "$B4_SKY"); K5_SCALED=$(scale_sky_band "$B5_SKY"); K6_SCALED=$(scale_sky_band "$B6_SKY")
@@ -785,6 +841,7 @@ EOF
                 }
                 { print }' > $SKY_FILE
         cat $MOD_FILE $SKY_FILE > "\${OUTPUT_DIR}/sky_final_\${SUFFIX}.rad"
+${_appendSkyGlowSh('${OUTPUT_DIR}/sky_final_${SUFFIX}.rad')}
     done
 
     # --- 4. SCENE COMPILATION & 5. SIMULATION ---
