@@ -382,3 +382,15 @@ export function computeSolarPosition(params) {
 export function toggleSunRaysVisibility(visible) {
     rayGroup.visible = visible;
 }
+
+/**
+ * Removes every traced ray from the scene and frees its GPU resources.
+ *
+ * Use this when the feature is switched off, as opposed to
+ * {@link toggleSunRaysVisibility}, which only hides what is already there.
+ * Turning the feature off used to leave the rays drawn, because the toggle
+ * handler only hid the controls panel and never touched the scene.
+ */
+export function clearSunRays() {
+    _clearRayGroup();
+}

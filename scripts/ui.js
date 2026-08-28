@@ -1175,6 +1175,14 @@ export async function setupEventListeners() {
         dom[`sun-ray-tracing-toggle-${dir}`]?.addEventListener('change', handleSunRayToggle);
     });
 
+    // "Show Traced Rays". This had no listener at all, so the box could be unticked and the
+    // rays stayed on screen; sunTracer's toggleSunRaysVisibility was exported with no caller.
+    dom['sun-rays-visibility-toggle']?.addEventListener('change', (e) => {
+        import('./sunTracer.js').then(({ toggleSunRaysVisibility }) => {
+            toggleSunRaysVisibility(e.target.checked);
+        });
+    });
+
     // Set initial state for ground grid controls
     if (dom['ground-grid-controls'] && dom['ground-plane-toggle']) {
         dom['ground-grid-controls'].classList.toggle('hidden', !dom['ground-plane-toggle'].checked);
@@ -6097,14 +6105,31 @@ function handleSunRayToggle(event) {
         }
     });
 
+    // Any change of the active wall invalidates the rays already in the scene: they were
+    // traced through a different aperture. Hiding the controls panel is not enough, because
+    // the ray geometry lives in the scene, not in the panel.
+    import('./sunTracer.js').then(({ clearSunRays, toggleSunRaysVisibility }) => {
+        clearSunRays();
+        // Re-arm visibility so the next trace is actually drawn. Without this, a user who
+        // unticked "Show Traced Rays" earlier would leave the group hidden, and the next
+        // trace would silently produce nothing.
+        if (checkbox.checked) toggleSunRaysVisibility(true);
+    });
+
     if (checkbox.checked) {
         // Move the section into the correct parent container and make it visible
         const parentContainer = checkbox.parentElement.parentElement; // The div containing the label
         parentContainer.appendChild(sunRaySection);
         sunRaySection.classList.remove('hidden');
+
+        // Keep the checkbox in step with the group visibility set just above.
+        const visibilityToggle = dom['sun-rays-visibility-toggle'];
+        if (visibilityToggle) visibilityToggle.checked = true;
     } else {
         // Just hide the section. It will be moved again if another toggle is activated.
         sunRaySection.classList.add('hidden');
+        const infoDisplay = dom['sun-ray-info-display'];
+        if (infoDisplay) infoDisplay.classList.add('hidden');
     }
 }
 
