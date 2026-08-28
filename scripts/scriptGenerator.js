@@ -388,7 +388,11 @@ export function generateScripts(projectData, recipeType) {
             if (scriptSet.sh) scripts.push(scriptSet.sh);
             if (scriptSet.bat) scripts.push(scriptSet.bat);
             
-            // Python script is cross-platform, handle it separately.
+            // Python scripts are cross-platform, handle them separately. Both matrix
+            // scripts shell out to `python3 ./extract_aperture.py`, so the package has
+            // to carry it or step 1 dies with "No such file or directory" and every
+            // later step fails on the missing aperture files.
+            scripts.push(createApertureExtractorScript());
             const postProcessScript = createPostProcessingScript();
             scripts.push(postProcessScript);
             return scripts; // Return early as this case is special
@@ -406,6 +410,7 @@ export function generateScripts(projectData, recipeType) {
             if (scriptSet.sh) scripts.push(scriptSet.sh);
             if (scriptSet.bat) scripts.push(scriptSet.bat);
 
+            scripts.push(createApertureExtractorScript());
             const postProcessScript5ph = createPostProcessingScript();
             scripts.push(postProcessScript5ph);
             return scripts;
@@ -1911,7 +1916,7 @@ function create3phAnnualSimScript(projectData) {
     SKY_MTX="\${MATRIX_DIR}/sky.smx"
     # -m MUST match the MF the daylight matrix was binned with (see the matrix generation
     # script) or the two matrices cannot be multiplied. LM-83 asks for MF:${ANNUAL_SKY_MF}.
-    epw2wea "\${WEATHER_FILE}" | gendaymtx -m ${ANNUAL_SKY_MF} - > "\${SKY_MTX}"
+    epw2wea "\${WEATHER_FILE}" | gendaymtx -m ${ANNUAL_SKY_MF} > "\${SKY_MTX}"
     if [ \$? -ne 0 ]; then echo "Error generating Sky Matrix."; exit 1; fi
 
     # 2. Run dctimestep to get annual results
@@ -1955,7 +1960,7 @@ function create3phAnnualSimScript(projectData) {
     REM 1. Generate Sky Matrix from Weather File
     echo 1. Generating sky matrix from EPW file...
     set "SKY_MTX=%MATRIX_DIR%\\sky.smx"
-    (epw2wea "%WEATHER_FILE%") | gendaymtx -m ${ANNUAL_SKY_MF} - > "%SKY_MTX%"
+    (epw2wea "%WEATHER_FILE%") | gendaymtx -m ${ANNUAL_SKY_MF} > "%SKY_MTX%"
     if %errorlevel% neq 0 ( echo "Error generating Sky Matrix." & exit /b 1 )
 
     REM 2. Run dctimestep to get annual results
@@ -2084,7 +2089,7 @@ function create5phMatrixGenerationScript(projectData) {
     # 3. Generate Annual Sky Matrix (S)
     echo "3. Generating annual sky matrix from EPW..."
     SKY_MTX="\${MATRIX_DIR}/sky.mtx"
-    epw2wea "\${WEATHER_FILE}" | gendaymtx -m \${SKY_MF} - > "\${SKY_MTX}"
+    epw2wea "\${WEATHER_FILE}" | gendaymtx -m \${SKY_MF} > "\${SKY_MTX}"
     if [ \$? -ne 0 ]; then echo "Error generating Sky Matrix."; exit 1; fi
 
     # 4. Generate Daylight Matrix (D): aperture -> sky, sampled with genklemsamp.
@@ -2115,15 +2120,15 @@ function create5phMatrixGenerationScript(projectData) {
     SUN_MODS="\${MATRIX_DIR}/sunmods.txt"
     SUN_MTX="\${MATRIX_DIR}/sun.mtx"
     epw2wea "\${WEATHER_FILE}" \\
-    | gendaymtx -n -D "\${SUNS_RAD}" -M "\${SUN_MODS}" -m \${SKY_MF} - > /dev/null
+    | gendaymtx -n -D "\${SUNS_RAD}" -M "\${SUN_MODS}" -m \${SKY_MF} > /dev/null
     if [ \$? -ne 0 ]; then echo "Error generating sun primitives."; exit 1; fi
-    epw2wea "\${WEATHER_FILE}" | gendaymtx -5 0.533 -d -m \${SKY_MF} - > "\${SUN_MTX}"
+    epw2wea "\${WEATHER_FILE}" | gendaymtx -5 0.533 -d -m \${SKY_MF} > "\${SUN_MTX}"
     if [ \$? -ne 0 ]; then echo "Error generating the direct sky matrix."; exit 1; fi
 
     # 7. Direct-only sky matrix for the 3-phase subtraction term.
     echo "7. Generating direct-only sky matrix..."
     SUN_SKY_MTX="\${MATRIX_DIR}/sun_sky.mtx"
-    epw2wea "\${WEATHER_FILE}" | gendaymtx -m \${SKY_MF} -d - > "\${SUN_SKY_MTX}"
+    epw2wea "\${WEATHER_FILE}" | gendaymtx -m \${SKY_MF} -d > "\${SUN_SKY_MTX}"
     if [ \$? -ne 0 ]; then echo "Error generating Sun Sky Matrix."; exit 1; fi
 
     # 8. Generate the direct sun coefficient matrix (C_ds), one column per sun.
@@ -2267,7 +2272,7 @@ function create5phMatrixGenerationScript(projectData) {
     REM 3. Generate Annual Sky Matrix (S)
     echo 3. Generating annual sky matrix from EPW...
     set "SKY_MTX=%MATRIX_DIR%\\sky.mtx"
-    (epw2wea "%WEATHER_FILE%") | gendaymtx -m %SKY_MF% - > "%SKY_MTX%"
+    (epw2wea "%WEATHER_FILE%") | gendaymtx -m %SKY_MF% > "%SKY_MTX%"
     if %errorlevel% neq 0 ( echo "Error generating Sky Matrix." & exit /b 1 )
 
     REM 4. Generate Daylight Matrix (D)
@@ -2287,15 +2292,15 @@ function create5phMatrixGenerationScript(projectData) {
     set "SUNS_RAD=%MATRIX_DIR%\\suns.rad"
     set "SUN_MODS=%MATRIX_DIR%\\sunmods.txt"
     set "SUN_MTX=%MATRIX_DIR%\\sun.mtx"
-    (epw2wea "%WEATHER_FILE%") | gendaymtx -n -D "%SUNS_RAD%" -M "%SUN_MODS%" -m %SKY_MF% - > nul
+    (epw2wea "%WEATHER_FILE%") | gendaymtx -n -D "%SUNS_RAD%" -M "%SUN_MODS%" -m %SKY_MF% > nul
     if %errorlevel% neq 0 ( echo "Error generating sun primitives." & exit /b 1 )
-    (epw2wea "%WEATHER_FILE%") | gendaymtx -5 0.533 -d -m %SKY_MF% - > "%SUN_MTX%"
+    (epw2wea "%WEATHER_FILE%") | gendaymtx -5 0.533 -d -m %SKY_MF% > "%SUN_MTX%"
     if %errorlevel% neq 0 ( echo "Error generating the direct sky matrix." & exit /b 1 )
 
     REM 7. Direct-only sky matrix for the subtraction term.
     echo 7. Generating direct-only sky matrix...
     set "SUN_SKY_MTX=%MATRIX_DIR%\\sun_sky.mtx"
-    (epw2wea "%WEATHER_FILE%") | gendaymtx -m %SKY_MF% -d - > "%SUN_SKY_MTX%"
+    (epw2wea "%WEATHER_FILE%") | gendaymtx -m %SKY_MF% -d > "%SUN_SKY_MTX%"
     if %errorlevel% neq 0 ( echo "Error generating Sun Sky Matrix." & exit /b 1 )
 
     REM 8. Direct sun coefficient matrix (C_ds)
@@ -2544,10 +2549,58 @@ import argparse
 import os
 from typing import Optional
 
+def _load_radiance_matrix(path, num_points):
+    """Reads a matrix written by dctimestep or rmtxop into (hours, points, comp).
+
+    Two things make a plain np.fromfile wrong here. The file carries an ASCII
+    header before the payload, so reading the whole file as float32 turns the
+    header bytes into bogus samples and shifts every later index. And the header
+    says NROWS is the SENSOR count while NCOLS is the number of timesteps, so the
+    payload is point-major; reshaping it as (8760, num_points, 3) transposes the
+    result and silently scrambles every annual metric computed from it.
+    """
+    rows = cols = 0
+    ncomp = 3
+    # A file with no Radiance header is one this script wrote itself, and those are
+    # raw float32. Defaulting to 'ascii' here made the recombined .ill unreadable.
+    fmt = 'float'
+    with open(path, 'rb') as f:
+        if f.read(10) == b'#?RADIANCE':
+            fmt = 'ascii'
+            f.seek(0)
+            while True:
+                line = f.readline()
+                if not line or not line.strip():
+                    break
+                text = line.decode('ascii', 'replace').strip()
+                if text.startswith('NROWS='):
+                    rows = int(text.split('=', 1)[1])
+                elif text.startswith('NCOLS='):
+                    cols = int(text.split('=', 1)[1])
+                elif text.startswith('NCOMP='):
+                    ncomp = int(text.split('=', 1)[1])
+                elif text.startswith('FORMAT='):
+                    fmt = text.split('=', 1)[1].strip()
+        else:
+            f.seek(0)
+        payload = f.read()
+    if 'double' in fmt:
+        data = np.frombuffer(payload, dtype=np.float64)
+    elif 'float' in fmt:
+        data = np.frombuffer(payload, dtype=np.float32)
+    else:
+        data = np.array(payload.split(), dtype=np.float64)
+    if not rows:
+        # A headerless file: the recombination step writes raw point-major floats.
+        rows, ncomp = num_points, 3
+        cols = data.size // max(rows * ncomp, 1)
+    data = data[:rows * cols * ncomp].reshape(rows, cols, ncomp)
+    return np.swapaxes(data, 0, 1)
+
+
 def _read_ill(path: str, num_points: int):
     """Read a Radiance annual .ill file and reduce RGB to photopic illuminance."""
-    data = np.fromfile(path, dtype=np.float32)
-    rgb = data.reshape(8760, num_points, 3)
+    rgb = _load_radiance_matrix(path, num_points)
     return 179 * (rgb[:, :, 0] * 0.265 + rgb[:, :, 1] * 0.670 + rgb[:, :, 2] * 0.065)
 
 
@@ -2566,9 +2619,7 @@ def calculate_metrics(illuminance_file: str, output_dir: str, num_points: int, s
     direct_illuminance = None
     try:
         # Radiance .ill files are typically 3-channel (RGB) float32
-        data = np.fromfile(illuminance_file, dtype=np.float32)
-        # Convert RGB to single illuminance value
-        rgb_illuminance = data.reshape(8760, num_points, 3)
+        rgb_illuminance = _load_radiance_matrix(illuminance_file, num_points)
         annual_illuminance = 179 * (rgb_illuminance[:,:,0]*0.265 + rgb_illuminance[:,:,1]*0.670 + rgb_illuminance[:,:,2]*0.065)
     except Exception as e:
         print(f"Error reading or reshaping file: {e}")
@@ -2752,7 +2803,7 @@ function createImagelessGlareScript(projectData) {
     # 2. Generate Annual Sky Matrix (S)
     echo "2. Generating annual sky matrix from EPW..."
     SKY_MTX="\${MATRIX_DIR}/\${PROJECT_NAME}_sky.mtx"
-    epw2wea "\${WEATHER_FILE}" | gendaymtx -m 1 - > "\${SKY_MTX}"
+    epw2wea "\${WEATHER_FILE}" | gendaymtx -m 1 > "\${SKY_MTX}"
     if [ \$? -ne 0 ]; then echo "Error generating sky matrix."; exit 1; fi
 
     # 3. Generate Direct Daylight Coefficients (D_direct)
@@ -2850,7 +2901,7 @@ function createImagelessGlareScript(projectData) {
     REM 2. Generate Annual Sky Matrix (S)
     echo 2. Generating annual sky matrix from EPW...
     set "SKY_MTX=%MATRIX_DIR%\\%PROJECT_NAME%_sky.mtx"
-    (epw2wea "%WEATHER_FILE%") | gendaymtx -m 1 - > "%SKY_MTX%"
+    (epw2wea "%WEATHER_FILE%") | gendaymtx -m 1 > "%SKY_MTX%"
     if %errorlevel% neq 0 ( echo "Error generating sky matrix." & exit /b 1 )
 
     REM 3. Generate Direct Daylight Coefficients (D_direct)
@@ -2932,15 +2983,59 @@ import argparse
 import os
 import struct
 
+def _load_radiance_matrix(path, num_points):
+    """Reads a matrix written by dctimestep or rmtxop into (hours, points, comp).
+
+    Two things make a plain np.fromfile wrong here. The file carries an ASCII
+    header before the payload, so reading the whole file as float32 turns the
+    header bytes into bogus samples and shifts every later index. And the header
+    says NROWS is the SENSOR count while NCOLS is the number of timesteps, so the
+    payload is point-major; reshaping it as (8760, num_points, 3) transposes the
+    result and silently scrambles every annual metric computed from it.
+    """
+    rows = cols = 0
+    ncomp = 3
+    # A file with no Radiance header is one this script wrote itself, and those are
+    # raw float32. Defaulting to 'ascii' here made the recombined .ill unreadable.
+    fmt = 'float'
+    with open(path, 'rb') as f:
+        if f.read(10) == b'#?RADIANCE':
+            fmt = 'ascii'
+            f.seek(0)
+            while True:
+                line = f.readline()
+                if not line or not line.strip():
+                    break
+                text = line.decode('ascii', 'replace').strip()
+                if text.startswith('NROWS='):
+                    rows = int(text.split('=', 1)[1])
+                elif text.startswith('NCOLS='):
+                    cols = int(text.split('=', 1)[1])
+                elif text.startswith('NCOMP='):
+                    ncomp = int(text.split('=', 1)[1])
+                elif text.startswith('FORMAT='):
+                    fmt = text.split('=', 1)[1].strip()
+        else:
+            f.seek(0)
+        payload = f.read()
+    if 'double' in fmt:
+        data = np.frombuffer(payload, dtype=np.float64)
+    elif 'float' in fmt:
+        data = np.frombuffer(payload, dtype=np.float32)
+    else:
+        data = np.array(payload.split(), dtype=np.float64)
+    if not rows:
+        # A headerless file: the recombination step writes raw point-major floats.
+        rows, ncomp = num_points, 3
+        cols = data.size // max(rows * ncomp, 1)
+    data = data[:rows * cols * ncomp].reshape(rows, cols, ncomp)
+    return np.swapaxes(data, 0, 1)
+
+
 def read_ill_file(file_path, num_points):
     """Reads a binary .ill file and converts to photopic illuminance."""
     try:
-        data = np.fromfile(file_path, dtype=np.float32)
-        if data.size == 0:
-            print(f"Warning: Ill file is empty: {file_path}")
-            return np.zeros((8760, num_points))
-
-        rgb_illuminance = data.reshape(8760, num_points, 3)
+        rgb_illuminance = _load_radiance_matrix(file_path, num_points)
         # Standard photopic conversion from radiance (W/m^2/sr) to illuminance (lux)
         illuminance = 179 * (rgb_illuminance[:,:,0]*0.265 + rgb_illuminance[:,:,1]*0.670 + rgb_illuminance[:,:,2]*0.065)
         return illuminance
@@ -2973,24 +3068,20 @@ def combine_results(schedule_file, open_ill_file, closed_ill_file, num_points, o
     with open(schedule_file, "r") as f:
         schedule = [int(line.strip()) for line in f]
 
-    # Open files in binary read mode
-    with open(open_ill_file, "rb") as f_open, open(closed_ill_file, "rb") as f_closed, open(output_file, "wb") as f_out:
-        # Each point-hour is 3 floats * 4 bytes/float = 12 bytes
-        record_size = 12 
-        
-        for hour in range(8760):
-            for point in range(num_points):
-                # Calculate the byte offset for the current record
-                offset = (hour * num_points + point) * record_size
-                
-                if schedule[hour] == 1: # Blinds closed
-                    f_closed.seek(offset)
-                    record = f_closed.read(record_size)
-                else: # Blinds open
-                    f_open.seek(offset)
-                    record = f_open.read(record_size)
-                
-                f_out.write(record)
+    # Seeking by byte offset assumed a headerless, hour-major file. dctimestep writes
+    # neither: it puts an ASCII header first, and its payload is point-major
+    # (NROWS = sensors, NCOLS = timesteps). Load both matrices through the shared
+    # reader, pick per hour with the schedule, and write the result back headerless
+    # and point-major so _load_radiance_matrix reads it correctly.
+    ill_open = _load_radiance_matrix(open_ill_file, num_points)      # (hours, points, 3)
+    ill_closed = _load_radiance_matrix(closed_ill_file, num_points)
+
+    hours = min(len(schedule), ill_open.shape[0], ill_closed.shape[0])
+    closed = np.asarray(schedule[:hours], dtype=bool)[:, None, None]
+    combined = np.where(closed, ill_closed[:hours], ill_open[:hours])
+
+    # (hours, points, 3) -> (points, hours, 3), the order dctimestep would have written.
+    np.swapaxes(combined, 0, 1).astype(np.float32).tofile(output_file)
 
     print(f"Final combined results saved to {output_file}")
 
@@ -3062,13 +3153,16 @@ if __name__ == "__main__":
     echo "1. Generating full and direct-only sky matrices..."
     SKY_MTX="\${MATRIX_DIR}/sky.smx"
     SKY_DIRECT_MTX="\${MATRIX_DIR}/sky_direct.smx"
-    epw2wea "\${WEATHER_FILE}" | gendaymtx -m 1 - > "\${SKY_MTX}"
-    epw2wea "\${WEATHER_FILE}" | gendaymtx -m 1 -d - > "\${SKY_DIRECT_MTX}"
+    # The Reinhart subdivision MUST match the one the view and daylight matrices were
+    # built with (ANNUAL_SKY_MF in the 3-phase recipe), or dctimestep is asked to
+    # multiply a 146-bin sky against a 2306-bin daylight matrix.
+    epw2wea "\${WEATHER_FILE}" | gendaymtx -m ${ANNUAL_SKY_MF} > "\${SKY_MTX}"
+    epw2wea "\${WEATHER_FILE}" | gendaymtx -m ${ANNUAL_SKY_MF} -d > "\${SKY_DIRECT_MTX}"
 
     # 2. Run dctimestep for ASE (Direct Sun Only)
     echo "2. Calculating direct-only illuminance for ASE and blind schedule..."
     ILL_DIRECT_ONLY="\${RESULTS_DIR}/\${PROJECT_NAME}_ASE_direct_only.ill"
-    dctimestep "\${MATRIX_DIR}/view.mtx" "\${BSDF_OPEN}" "\${MATRIX_DIR}/daylight.mtx" "\${SKY_DIRECT_MTX}" > "\${ILL_DIRECT_ONLY}"
+    dctimestep -of "\${MATRIX_DIR}/view.mtx" "\${BSDF_OPEN}" "\${MATRIX_DIR}/daylight.mtx" "\${SKY_DIRECT_MTX}" > "\${ILL_DIRECT_ONLY}"
     echo "-> ASE results file created: \${ILL_DIRECT_ONLY}"
 
     # 3. Generate Blind Schedule with Python script
@@ -3078,12 +3172,12 @@ if __name__ == "__main__":
     # 4. Run dctimestep for Blinds OPEN state (Full Sky)
     echo "4. Calculating annual illuminance with blinds OPEN..."
     ILL_OPEN="\${RESULTS_DIR}/results_open.ill"
-    dctimestep "\${MATRIX_DIR}/view.mtx" "\${BSDF_OPEN}" "\${MATRIX_DIR}/daylight.mtx" "\${SKY_MTX}" > "\${ILL_OPEN}"
+    dctimestep -of "\${MATRIX_DIR}/view.mtx" "\${BSDF_OPEN}" "\${MATRIX_DIR}/daylight.mtx" "\${SKY_MTX}" > "\${ILL_OPEN}"
 
     # 5. Run dctimestep for Blinds CLOSED state (Full Sky)
     echo "5. Calculating annual illuminance with blinds CLOSED..."
     ILL_CLOSED="\${RESULTS_DIR}/results_closed.ill"
-    dctimestep "\${MATRIX_DIR}/view.mtx" "\${BSDF_CLOSED}" "\${MATRIX_DIR}/daylight.mtx" "\${SKY_MTX}" > "\${ILL_CLOSED}"
+    dctimestep -of "\${MATRIX_DIR}/view.mtx" "\${BSDF_CLOSED}" "\${MATRIX_DIR}/daylight.mtx" "\${SKY_MTX}" > "\${ILL_CLOSED}"
 
     # 6. Combine Results for sDA based on schedule
     echo "6. Combining results based on blind schedule..."
@@ -3172,8 +3266,7 @@ def check_daylight_provision(illuminance_file, epw_file, num_points, ET, F_plane
         daylight_hours_indices = global_horizontal_irradiance.nlargest(4380).index
 
         # Read Radiance .ill file
-        data = np.fromfile(illuminance_file, dtype=np.float32)
-        rgb_illuminance = data.reshape(8760, num_points, 3)
+        rgb_illuminance = _load_radiance_matrix(illuminance_file, num_points)
         annual_illuminance = 179 * (rgb_illuminance[:,:,0]*0.265 + rgb_illuminance[:,:,1]*0.670 + rgb_illuminance[:,:,2]*0.065)
 
         # Filter for daylight hours
@@ -3769,14 +3862,59 @@ import argparse
 import os
 import pandas as pd
 
+def _load_radiance_matrix(path, num_points):
+    """Reads a matrix written by dctimestep or rmtxop into (hours, points, comp).
+
+    Two things make a plain np.fromfile wrong here. The file carries an ASCII
+    header before the payload, so reading the whole file as float32 turns the
+    header bytes into bogus samples and shifts every later index. And the header
+    says NROWS is the SENSOR count while NCOLS is the number of timesteps, so the
+    payload is point-major; reshaping it as (8760, num_points, 3) transposes the
+    result and silently scrambles every annual metric computed from it.
+    """
+    rows = cols = 0
+    ncomp = 3
+    # A file with no Radiance header is one this script wrote itself, and those are
+    # raw float32. Defaulting to 'ascii' here made the recombined .ill unreadable.
+    fmt = 'float'
+    with open(path, 'rb') as f:
+        if f.read(10) == b'#?RADIANCE':
+            fmt = 'ascii'
+            f.seek(0)
+            while True:
+                line = f.readline()
+                if not line or not line.strip():
+                    break
+                text = line.decode('ascii', 'replace').strip()
+                if text.startswith('NROWS='):
+                    rows = int(text.split('=', 1)[1])
+                elif text.startswith('NCOLS='):
+                    cols = int(text.split('=', 1)[1])
+                elif text.startswith('NCOMP='):
+                    ncomp = int(text.split('=', 1)[1])
+                elif text.startswith('FORMAT='):
+                    fmt = text.split('=', 1)[1].strip()
+        else:
+            f.seek(0)
+        payload = f.read()
+    if 'double' in fmt:
+        data = np.frombuffer(payload, dtype=np.float64)
+    elif 'float' in fmt:
+        data = np.frombuffer(payload, dtype=np.float32)
+    else:
+        data = np.array(payload.split(), dtype=np.float64)
+    if not rows:
+        # A headerless file: the recombination step writes raw point-major floats.
+        rows, ncomp = num_points, 3
+        cols = data.size // max(rows * ncomp, 1)
+    data = data[:rows * cols * ncomp].reshape(rows, cols, ncomp)
+    return np.swapaxes(data, 0, 1)
+
+
 def read_ill_file(file_path, num_points):
     """Reads a binary .ill file and converts to photopic illuminance."""
     try:
-        data = np.fromfile(file_path, dtype=np.float32)
-        if data.size == 0:
-            print(f"Warning: Ill file is empty: {file_path}")
-            return np.zeros((8760, num_points))
-        rgb = data.reshape(8760, num_points, 3)
+        rgb = _load_radiance_matrix(file_path, num_points)
         return 179 * (rgb[:,:,0]*0.265 + rgb[:,:,1]*0.670 + rgb[:,:,2]*0.065)
     except Exception as e:
         print(f"Error reading or reshaping file '{file_path}': {e}")
@@ -3804,15 +3942,18 @@ def combine_results(schedule_file, open_ill_file, closed_ill_file, num_points, o
     with open(schedule_file, "r") as f:
         schedule = [int(line.strip()) for line in f]
 
-    with open(open_ill_file, "rb") as f_open, open(closed_ill_file, "rb") as f_closed, open(output_file, "wb") as f_out:
-        record_size = 12 
-        for hour in range(8760):
-            for point in range(num_points):
-                offset = (hour * num_points + point) * record_size
-                f_source = f_closed if schedule[hour] == 1 else f_open
-                f_source.seek(offset)
-                record = f_source.read(record_size)
-                f_out.write(record)
+    # Seeking by byte offset assumed a headerless, hour-major file. dctimestep writes
+    # an ASCII header first, and its payload is point-major (NROWS = sensors,
+    # NCOLS = timesteps), so the old offsets read the wrong record every time.
+    ill_open = _load_radiance_matrix(open_ill_file, num_points)      # (hours, points, 3)
+    ill_closed = _load_radiance_matrix(closed_ill_file, num_points)
+
+    hours = min(len(schedule), ill_open.shape[0], ill_closed.shape[0])
+    closed = np.asarray(schedule[:hours], dtype=bool)[:, None, None]
+    combined = np.where(closed, ill_closed[:hours], ill_open[:hours])
+
+    # (hours, points, 3) -> (points, hours, 3), the order dctimestep would have written.
+    np.swapaxes(combined, 0, 1).astype(np.float32).tofile(output_file)
     print(f"Final combined results saved to {output_file}")
 
 def calculate_energy(final_ill_file, num_points, args):
@@ -3942,13 +4083,16 @@ if __name__ == "__main__":
     echo "1. Generating full and direct-only sky matrices..."
     SKY_MTX="\${MATRIX_DIR}/sky.smx"
     SKY_DIRECT_MTX="\${MATRIX_DIR}/sky_direct.smx"
-    epw2wea "\${WEATHER_FILE}" | gendaymtx -m 1 - > "\${SKY_MTX}"
-    epw2wea "\${WEATHER_FILE}" | gendaymtx -m 1 -d - > "\${SKY_DIRECT_MTX}"
+    # The Reinhart subdivision MUST match the one the view and daylight matrices were
+    # built with (ANNUAL_SKY_MF in the 3-phase recipe), or dctimestep is asked to
+    # multiply a 146-bin sky against a 2306-bin daylight matrix.
+    epw2wea "\${WEATHER_FILE}" | gendaymtx -m ${ANNUAL_SKY_MF} > "\${SKY_MTX}"
+    epw2wea "\${WEATHER_FILE}" | gendaymtx -m ${ANNUAL_SKY_MF} -d > "\${SKY_DIRECT_MTX}"
 
     # 2. Calculate direct illuminance for blind schedule
     echo "2. Calculating direct-only illuminance for blind schedule..."
     ILL_DIRECT="\${RESULTS_DIR}/results_direct.ill"
-    dctimestep "\${MATRIX_DIR}/view.mtx" "\${BSDF_OPEN}" "\${MATRIX_DIR}/daylight.mtx" "\${SKY_DIRECT_MTX}" > "\${ILL_DIRECT}"
+    dctimestep -of "\${MATRIX_DIR}/view.mtx" "\${BSDF_OPEN}" "\${MATRIX_DIR}/daylight.mtx" "\${SKY_DIRECT_MTX}" > "\${ILL_DIRECT}"
 
     # 3. Generate Blind Schedule
     echo "3. Generating hourly blind operation schedule..."
@@ -3958,8 +4102,8 @@ if __name__ == "__main__":
     echo "4. Calculating annual illuminance for both blind states..."
     ILL_OPEN="\${RESULTS_DIR}/results_open.ill"
     ILL_CLOSED="\${RESULTS_DIR}/results_closed.ill"
-    dctimestep "\${MATRIX_DIR}/view.mtx" "\${BSDF_OPEN}" "\${MATRIX_DIR}/daylight.mtx" "\${SKY_MTX}" > "\${ILL_OPEN}"
-    dctimestep "\${MATRIX_DIR}/view.mtx" "\${BSDF_CLOSED}" "\${MATRIX_DIR}/daylight.mtx" "\${SKY_MTX}" > "\${ILL_CLOSED}"
+    dctimestep -of "\${MATRIX_DIR}/view.mtx" "\${BSDF_OPEN}" "\${MATRIX_DIR}/daylight.mtx" "\${SKY_MTX}" > "\${ILL_OPEN}"
+    dctimestep -of "\${MATRIX_DIR}/view.mtx" "\${BSDF_CLOSED}" "\${MATRIX_DIR}/daylight.mtx" "\${SKY_MTX}" > "\${ILL_CLOSED}"
 
     # 5. Combine results based on schedule
     echo "5. Combining results based on blind schedule..."
@@ -4044,7 +4188,7 @@ function createFacadeIrradiationScript(projectData) {
     # total is not sensitive to a finer sky the way a direct-sun metric is.
     echo "1. Generating annual sky matrix..."
     SKY_MTX="\${MATRIX_DIR}/sky.smx"
-    epw2wea "\${WEATHER_FILE}" | gendaymtx -m ${SKY_MF} -O1 - > "\${SKY_MTX}"
+    epw2wea "\${WEATHER_FILE}" | gendaymtx -m ${SKY_MF} -O1 > "\${SKY_MTX}"
 
     # 2. Create Scene Octree (includes room, shading, context)
     echo "2. Creating scene octree..."
@@ -4165,7 +4309,7 @@ function createAnnualRadiationScript(projectData) {
     # Reinhart binning in step 3.
     echo "2. Generating annual sky matrix from EPW..."
     SKY_MTX="\${MATRIX_DIR}/sky.smx"
-    epw2wea "\${WEATHER_FILE}" | gendaymtx -m ${SKY_MF} -O1 - > "\${SKY_MTX}"
+    epw2wea "\${WEATHER_FILE}" | gendaymtx -m ${SKY_MF} -O1 > "\${SKY_MTX}"
     if [ \$? -ne 0 ]; then echo "Error generating Sky Matrix."; exit 1; fi
 
     # 3. Generate Daylight Coefficients for Irradiance (DC)
