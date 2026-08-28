@@ -3284,7 +3284,7 @@ function checkRadiancePath() {
     if (!radianceInput.value && !localStorage.getItem('radiancePathAcknowledged')) {
         const message = `Please confirm the <b>Radiance Installation Path</b> is set correctly in the Project Setup panel.
                          <br><br>
-                         The default path for your operating system is typically <code>${defaultPath}</code>.
+                         The default path for your operating system is typically <code>${escapeHtml(defaultPath)}</code>.
                          If Radiance is installed elsewhere, please enter the correct path.
                          <br><br>
                          If you need to install Radiance, you can download it from the 
@@ -3293,7 +3293,7 @@ function checkRadiancePath() {
                          <br><br>
                          <button id="ack-radiance-path" class="btn btn-secondary btn-sm mt-2">Don't show this again</button>`;
 
-        showAlert(message, 'Reminder: Set Radiance Path');
+        showAlertHtml(message, 'Reminder: Set Radiance Path');
 
         // Add a one-time listener to the acknowledgement button inside the alert
         const ackButton = document.getElementById('ack-radiance-path');

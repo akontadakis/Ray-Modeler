@@ -851,13 +851,13 @@ class Project {
 
             const validation = recipeDef.validate(projectData, config);
             if (validation.errors && validation.errors.length > 0) {
-                const { showAlert } = await import('./ui.js');
+                const { showAlertHtml, escapeHtml } = await import('./ui.js');
                 const errorHtml =
                     '<p>The selected simulation recipe configuration is invalid:</p>' +
                     '<ul class="list-disc pl-5 space-y-1">' +
-                    validation.errors.map(e => `<li>${e}</li>`).join('') +
+                    validation.errors.map(e => `<li>${escapeHtml(e)}</li>`).join('') +
                     '</ul>';
-                showAlert(errorHtml, 'Cannot Generate Package: Invalid Configuration');
+                showAlertHtml(errorHtml, 'Cannot Generate Package: Invalid Configuration');
                 return null;
             }
             if (validation.warnings && validation.warnings.length > 0) {

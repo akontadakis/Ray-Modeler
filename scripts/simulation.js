@@ -1,6 +1,6 @@
 // scripts/simulation.js
 
-import { showAlert, makeDraggable, makeResizable, ensureWindowInView, getNewZIndex, setupFileListenersForPanel, initializePanelControls } from './ui.js';
+import { showAlert, showAlertHtml, escapeHtml, makeDraggable, makeResizable, ensureWindowInView, getNewZIndex, setupFileListenersForPanel, initializePanelControls } from './ui.js';
 import { getDom } from './dom.js';
 import { project } from './project.js'; // Import project to access its state
 import { getRecipeById, getAllRecipes } from './recipes/RecipeRegistry.js';
@@ -660,7 +660,7 @@ function _showBrowserRunInstructions(scriptFile) {
         <div class="space-y-2">
             <label class="block font-semibold text-sm">2. Make Script Executable (macOS/Linux Only)</label>
             <div class="flex items-center gap-2">
-                <code class="code-block flex-grow">${chmodCommand}</code>
+                <code class="code-block flex-grow">${escapeHtml(chmodCommand)}</code>
                 <button id="copy-chmod-command-btn" class="btn btn-xs btn-secondary">Copy</button>
             </div>
         </div>
@@ -677,7 +677,7 @@ function _showBrowserRunInstructions(scriptFile) {
             <div class="space-y-2">
                 <label class="block font-semibold text-sm">${isWindows ? '2.' : '3.'} Run the Simulation</label>
                 <div class="flex items-center gap-2">
-                    <code class="code-block flex-grow">${command}</code>
+                    <code class="code-block flex-grow">${escapeHtml(command)}</code>
                     <button id="copy-run-command-btn" class="btn btn-xs btn-secondary">Copy</button>
                 </div>
             </div>
@@ -690,7 +690,7 @@ function _showBrowserRunInstructions(scriptFile) {
         alertPanel.classList.remove('max-w-sm');
         alertPanel.classList.add('max-w-lg');
     }
-    showAlert(instructions, 'How to Run Simulation');
+    showAlertHtml(instructions, 'How to Run Simulation');
 
     // Attach listeners to the copy buttons inside the newly created alert
     const copyBtn = (id, text) => {
@@ -796,8 +796,8 @@ export function initializePanelLogic(panel) {
 
                 // Optionally surface reasons in a separate info alert for clarity.
                 if (support.reasons && support.reasons.length) {
-                    showAlert(
-                        `<div class="text-xs text-[--text-secondary] space-y-1">${support.reasons.map(r => `<div>${r}</div>`).join('')}</div>`,
+                    showAlertHtml(
+                        `<div class="text-xs text-[--text-secondary] space-y-1">${support.reasons.map(r => `<div>${escapeHtml(r)}</div>`).join('')}</div>`,
                         'Execution Information'
                     );
                 }
