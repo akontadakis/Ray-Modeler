@@ -629,6 +629,37 @@ app.whenReady().then(() => {
     }
   });
 
+  // Opens a generated HTML report in the user's default browser.
+  //
+  // The renderer used to call window.open() on a blob: URL. setWindowOpenHandler
+  // denies every renderer-requested window, and blob: is not an allowed external
+  // URL, so the report was silently dropped while the UI still claimed a tab had
+  // opened. Writing the report to a real file and handing it to the OS keeps the
+  // navigation hardening intact and gives the user something they can re-open.
+  ipcMain.handle('report:open', async (event, { html, fileName }) => {
+    try {
+      if (typeof html !== 'string' || !html) {
+        return { success: false, error: 'No report content supplied.' };
+      }
+      // Never let the renderer choose a path: keep the basename only.
+      const safeName = path.basename(String(fileName || 'ray-modeler-report.html'))
+        .replace(/[^A-Za-z0-9._-]/g, '_') || 'ray-modeler-report.html';
+      const reportDir = path.join(app.getPath('temp'), 'ray-modeler-reports');
+      await fsp.mkdir(reportDir, { recursive: true });
+      const fullPath = validatePath(reportDir, safeName);
+      await fsp.writeFile(fullPath, html, 'utf8');
+
+      const openError = await shell.openPath(fullPath);
+      if (openError) {
+        return { success: false, error: openError, path: fullPath };
+      }
+      return { success: true, path: fullPath };
+    } catch (err) {
+      console.error('Failed to open report:', err);
+      return { success: false, error: err.message };
+    }
+  });
+
   // Handle request to run a Python script
   ipcMain.handle('run-python-script', async (event, { projectPath, scriptPath: relScriptPath }) => {
     return new Promise((resolve) => {
