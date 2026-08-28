@@ -5298,7 +5298,10 @@ export function getViewpointFileContent(forceFisheye = false) {
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(viewpointCamera.quaternion);
     const rad_vu = `${up.x.toFixed(4)} ${up.z.toFixed(4)} ${up.y.toFixed(4)}`;
 
-    return `${radViewType} -vp ${rad_vp} -vd ${rad_vd} -vu ${rad_vu} -vh ${hfov} -vv ${vfov}`;
+    // The "rvu " prefix is required: Radiance's viewfile() reader rejects a bare
+    // "-vtv ..." line with "bad view file". Kept inline rather than imported from
+    // radiance.js, which already imports this module.
+    return `rvu ${radViewType} -vp ${rad_vp} -vd ${rad_vd} -vu ${rad_vu} -vh ${hfov} -vv ${vfov}\n`;
 }
 
 /**

@@ -503,7 +503,17 @@ export async function programmaticallyGeneratePackage(panel, uniqueId = null) {
 
     try {
         const result = await project.generateSimulationPackage(panel, uniqueId);
-        if (!result) throw new Error("Script generation failed or was aborted.");
+        if (!result) {
+            // Every null path inside generateSimulationPackage has already shown a
+            // specific alert - invalid recipe configuration, no project directory,
+            // a file-system error. Throwing here replaced that alert with a generic
+            // "Script generation failed or was aborted", so the user was told the
+            // package failed but never why. Return the null instead; the catch
+            // below still handles real exceptions.
+            const failedRunBtn = panel.querySelector('[data-action="run"]') || document.querySelector('[data-action="run"]');
+            if (failedRunBtn) failedRunBtn.disabled = true;
+            return null;
+        }
 
         // Find command center in panel or globally
         const commandCenter = panel.querySelector('.command-center') || document.querySelector('.command-center');

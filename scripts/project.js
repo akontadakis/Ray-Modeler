@@ -921,7 +921,16 @@ class Project {
             const batScript = scriptsToGenerate.find(s => s.fileName.endsWith('.bat'));
             const displayContent = shScript ? shScript.content : (batScript ? batScript.content : null);
 
-            if (!displayContent) return null;
+            if (!displayContent) {
+                // The package was written, but nothing in it can be shown in the
+                // command centre. Say so: this was the one null path that returned
+                // without telling the user anything.
+                showAlert(
+                    'The package was written, but it contains no runnable script to display.',
+                    'Generation Incomplete'
+                );
+                return null;
+            }
 
             return {
                 content: displayContent,

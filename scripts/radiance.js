@@ -349,6 +349,22 @@ function makeWorldPointFormatter(elevationOffset = 0) {
 /**
  * Generates the content for a Radiance .vf (view file).
 /**
+ * Wraps a Radiance view specification in the form a .vf file must take.
+ *
+ * Radiance's viewfile() reader only accepts a line that begins with the name of
+ * a view-aware program (rvu, rpict, rholo) or with "VIEW=". Every .vf this app
+ * wrote held a bare "-vtv -vp ..." line, so rpict, vwrays and evalglare all
+ * rejected it with "bad view file" and the rendering, DGP and EN 12464-1 UGR
+ * recipes could never run.
+ *
+ * @param {string} viewArgs - The view options, e.g. "-vtv -vp 0 0 1 ...".
+ * @returns {string} The full .vf file content, newline terminated.
+ */
+export function formatViewFileContent(viewArgs) {
+    return `rvu ${String(viewArgs).trim()}\n`;
+}
+
+/**
  * Computes the horizontal field of view from a vertical FOV and image aspect ratio.
  * @param {number} vfov - Vertical field of view in degrees.
  * @param {number} aspect - Image aspect ratio (width / height).
@@ -432,7 +448,7 @@ export function generateViewpointFileContent(viewpointData, roomData) {
 
     const rad_vu = resolveRadianceUpVector(rad_vd_array).join(' ');
 
-    return `${radViewType} -vp ${rad_vp} -vd ${rad_vd} -vu ${rad_vu} -vh ${hfov} -vv ${vfov}`;
+    return formatViewFileContent(`${radViewType} -vp ${rad_vp} -vd ${rad_vd} -vu ${rad_vu} -vh ${hfov} -vv ${vfov}`);
 }
 
 /**
@@ -1342,7 +1358,7 @@ export function generateViewpointFileContentFromState(cameraState) {
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(quaternion);
     const rad_vu = toRadianceVector(up.toArray());
 
-    return `${radViewType} -vp ${rad_vp} -vd ${rad_vd} -vu ${rad_vu} -vh ${hfov} -vv ${vfov}`;
+    return formatViewFileContent(`${radViewType} -vp ${rad_vp} -vd ${rad_vd} -vu ${rad_vu} -vh ${hfov} -vv ${vfov}`);
 }
 
 /**

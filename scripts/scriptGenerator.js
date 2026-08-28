@@ -66,6 +66,22 @@ const SKY_GLOW_PRIMITIVES = [
 ];
 
 /**
+ * The sky/ground dome an rcontrib daylight-coefficient run bins against.
+ *
+ * Unlike {@link SKY_GLOW_PRIMITIVES} this is modified by `void`, not by `skyfunc`:
+ * it goes into an octree that holds no gensky output, so `skyfunc` is undefined
+ * there and oconv aborts with `undefined modifier "skyfunc"`. The sky brightness
+ * comes from the gendaymtx sky matrix, not from the octree, so a uniform white
+ * glow is exactly what is wanted. Mirrors GLOW_BLOCK in extract_aperture.py.
+ */
+const MATRIX_SKY_PRIMITIVES = [
+    'void glow sky_glow', '0', '0', '4 1 1 1 0', '',
+    'sky_glow source sky', '0', '0', '4 0 0 1 180', '',
+    'void glow ground_glow', '0', '0', '4 1 1 1 0', '',
+    'ground_glow source ground', '0', '0', '4 0 0 -1 180'
+];
+
+/**
  * Shell snippet that appends the sky/ground glow+source block to a sky file.
  * @param {string} shellVar - The shell expansion of the sky file, already escaped
  *                            for inclusion in a template literal (e.g. '\\${SKY_FILE}').
@@ -2037,6 +2053,9 @@ function create3phAnnualSimScript(projectData) {
     RESULTS_DIR="../08_results"
     MATRIX_DIR="\${RESULTS_DIR}/matrices"
     SKY_DIR="../04_skies" # gendaymtx might output files here
+    # Run on its own, before the matrix-generation script, this directory does not
+    # exist yet and the sky matrix redirect below dies with "No such file or directory".
+    mkdir -p "\${RESULTS_DIR}" "\${MATRIX_DIR}"
 
     # --- Main Script ---
     # 1. Generate Sky Matrix from Weather File
@@ -2890,6 +2909,12 @@ function createImagelessGlareScript(projectData) {
 
     const scheduleFlag = scheduleFile ? `-sf ../10_schedules/${scheduleFile}` : '';
 
+    // dcglare consumes the sky matrix this script builds with `gendaymtx -m 1`, so the
+    // rcontrib binning stays at MF:1. Unlike the sDA/ASE and lighting-energy recipes,
+    // nothing here is multiplied against the MF:4 matrices the 3-phase recipe writes.
+    const glareMf = 1;
+    const glareNrbins = _reinhartNrbins(glareMf);
+
     const shContent = `#!/bin/bash
     # RUN_Imageless_Glare.sh
     # Script for imageless annual glare analysis using the Accelerad method.
@@ -2915,18 +2940,39 @@ function createImagelessGlareScript(projectData) {
     MATRIX_DIR="\${RESULTS_DIR}/matrices"
     mkdir -p \$OCT_DIR \$RESULTS_DIR \$MATRIX_DIR
 
+    # This recipe bins its own rcontrib runs, so it is self-consistent at MF:1 as
+    # long as gendaymtx below uses -m 1. The two MUST stay equal.
+    SKY_MF=${glareMf}
+    SKY_NRBINS=${glareNrbins}
+
     echo "--- Starting Imageless Annual Glare Analysis ---"
 
     # 1. Create Octree
+    #
+    # The octree must contain the sky and ground dome named sky_glow: rcontrib bins
+    # contributions BY MODIFIER, so without it "-m sky_glow" names a modifier that
+    # exists nowhere and rcontrib aborts with "missing required modifier argument".
     echo "1. Creating scene octree..."
     OCTREE="\${OCT_DIR}/\${PROJECT_NAME}.oct"
+    MATRIX_SKY_RAD="\${MATRIX_DIR}/matrix_sky.rad"
+    cat > "\${MATRIX_SKY_RAD}" << 'SKYGLOWEOF'
+${MATRIX_SKY_PRIMITIVES.join('\n')}
+SKYGLOWEOF
     (
     cat "\${MAT_FILE}"
     cat "\${GEOM_FILE}"
     echo
+    cat "\${MATRIX_SKY_RAD}"
+    echo
     echo "${lightDefs}"
     ) | oconv - > "\${OCTREE}"
     if [ \$? -ne 0 ]; then echo "Error during oconv."; exit 1; fi
+
+    if [ ! -s "\${VIEW_RAYS_FILE}" ]; then
+        echo "ERROR: \${VIEW_RAYS_FILE} is empty or missing. Enable a view grid and regenerate." >&2
+        exit 1
+    fi
+    NUM_RAYS=\$(wc -l < "\${VIEW_RAYS_FILE}" | tr -d ' ')
 
     # 2. Generate Annual Sky Matrix (S)
     echo "2. Generating annual sky matrix from EPW..."
@@ -2937,31 +2983,42 @@ function createImagelessGlareScript(projectData) {
     # 3. Generate Direct Daylight Coefficients (D_direct)
     echo "3. Generating Direct Daylight Coefficients (-ab \${AB_DIRECT})..."
     DC_DIRECT_MTX="\${MATRIX_DIR}/\${PROJECT_NAME}_dc_direct.mtx"
-    rcontrib -I+ -w -ab \${AB_DIRECT} -ad \${AD} -as \${AS} -ar \${AR} -aa \${AA} -lw \${LW} "\${OCTREE}" < "\${VIEW_RAYS_FILE}" > "\${DC_DIRECT_MTX}"
+    rcontrib -I+ -w -ab \${AB_DIRECT} -ad \${AD} -as \${AS} -ar \${AR} -aa \${AA} -lw \${LW} \\
+        -e MF:\${SKY_MF} -f reinhart.cal -b rbin -bn \${SKY_NRBINS} -m sky_glow \\
+        -y \${NUM_RAYS} "\${OCTREE}" < "\${VIEW_RAYS_FILE}" > "\${DC_DIRECT_MTX}"
     if [ \$? -ne 0 ]; then echo "Error generating direct DC matrix."; exit 1; fi
 
     # 4. Generate Total Daylight Coefficients (D_total)
     echo "4. Generating Total Daylight Coefficients (-ab \${AB_TOTAL})..."
     DC_TOTAL_MTX="\${MATRIX_DIR}/\${PROJECT_NAME}_dc_total.mtx"
-    rcontrib -I+ -w -ab \${AB_TOTAL} -ad \${AD} -as \${AS} -ar \${AR} -aa \${AA} -lw \${LW} "\${OCTREE}" < "\${VIEW_RAYS_FILE}" > "\${DC_TOTAL_MTX}"
+    rcontrib -I+ -w -ab \${AB_TOTAL} -ad \${AD} -as \${AS} -ar \${AR} -aa \${AA} -lw \${LW} \\
+        -e MF:\${SKY_MF} -f reinhart.cal -b rbin -bn \${SKY_NRBINS} -m sky_glow \\
+        -y \${NUM_RAYS} "\${OCTREE}" < "\${VIEW_RAYS_FILE}" > "\${DC_TOTAL_MTX}"
     if [ \$? -ne 0 ]; then echo "Error generating total DC matrix."; exit 1; fi
 
     # 5. Calculate Annual DGP time-series
     echo "5. Calculating annual DGP values..."
     DGP_RESULTS="\${RESULTS_DIR}/\${PROJECT_NAME}.dgp"
-    dcglare ${scheduleFlag} "\${DC_DIRECT_MTX}" "\${DC_TOTAL_MTX}" "\${SKY_MTX}" > "\${DGP_RESULTS}"
+    # -vf is not optional: the imageless method orients every view against the sky
+    # patches, and without it dcglare stops with "missing view direction". The same
+    # ray file rcontrib read is the file dcglare expects.
+    dcglare -vf "\${VIEW_RAYS_FILE}" ${scheduleFlag} "\${DC_DIRECT_MTX}" "\${DC_TOTAL_MTX}" "\${SKY_MTX}" > "\${DGP_RESULTS}"
     if [ \$? -ne 0 ]; then echo "Error during dcglare for DGP."; exit 1; fi
 
     # 6. Calculate Glare Autonomy (GA)
     echo "6. Calculating Glare Autonomy (GA) for a threshold of \${DGP_THRESHOLD}..."
     GA_RESULTS="\${RESULTS_DIR}/\${PROJECT_NAME}.ga"
-    dcglare -l \${DGP_THRESHOLD} ${scheduleFlag} "\${DC_DIRECT_MTX}" "\${DC_TOTAL_MTX}" "\${SKY_MTX}" > "\${GA_RESULTS}"
+    dcglare -vf "\${VIEW_RAYS_FILE}" -l \${DGP_THRESHOLD} ${scheduleFlag} "\${DC_DIRECT_MTX}" "\${DC_TOTAL_MTX}" "\${SKY_MTX}" > "\${GA_RESULTS}"
     if [ \$? -ne 0 ]; then echo "Error during dcglare for GA."; exit 1; fi
 
     # 7. Calculate Spatial Glare Autonomy (sGA)
     echo "7. Calculating spatial Glare Autonomy (sGA) for a target of \${SGA_TARGET}..."
     SGA_RESULTS="\${RESULTS_DIR}/\${PROJECT_NAME}_sGA.txt"
-    awk -v t=\${SGA_TARGET} 'BEGIN{n=0;c=0} {n++; if ($1+0 >= t) c++} END{ if (n>0) printf "%.2f\\n", 100*c/n; else print "0" }' "\${GA_RESULTS}" > "\${SGA_RESULTS}"
+    # dcglare writes a Radiance header before the payload. Counting it as data made
+    # every view "fail": four views under a 13-line file reported sGA = 30.77%.
+    # getinfo - strips the header here, where awk is the only consumer.
+    getinfo - < "\${GA_RESULTS}" \\
+    | awk -v t=\${SGA_TARGET} 'BEGIN{n=0;c=0} NF {n++; if ($1+0 >= t) c++} END{ if (n>0) printf "%.2f\\n", 100*c/n; else print "0" }' > "\${SGA_RESULTS}"
 
     SGA_VALUE=\$(cat "\${SGA_RESULTS}")
     echo "---"
@@ -3007,6 +3064,10 @@ function createImagelessGlareScript(projectData) {
     if not exist "%RESULTS_DIR%" mkdir "%RESULTS_DIR%"
     if not exist "%MATRIX_DIR%" mkdir "%MATRIX_DIR%"
 
+    REM rcontrib's MF and gendaymtx -m below MUST stay equal.
+    set "SKY_MF=${glareMf}"
+    set "SKY_NRBINS=${glareNrbins}"
+
     echo --- Starting Imageless Annual Glare Analysis ---
 
     REM 1. Create Octree
@@ -3022,9 +3083,18 @@ function createImagelessGlareScript(projectData) {
         )
     ) > "%TEMP_RAD_FILE%"
 
+    REM The sky/ground dome must be in the octree: rcontrib bins by modifier, so
+    REM "-m sky_glow" needs sky_glow to exist or it aborts.
+    set "MATRIX_SKY_RAD=%MATRIX_DIR%\\matrix_sky.rad"
+    break> "%MATRIX_SKY_RAD%"
+${MATRIX_SKY_PRIMITIVES.map(l => (l === '' ? '    echo.>> "%MATRIX_SKY_RAD%"' : `    echo ${l}>> "%MATRIX_SKY_RAD%"`)).join('\n')}
+    type "%MATRIX_SKY_RAD%" >> "%TEMP_RAD_FILE%"
+
     oconv "%TEMP_RAD_FILE%" > "%OCTREE%"
     if %errorlevel% neq 0 ( echo "Error during oconv." & del "%TEMP_RAD_FILE%" & exit /b 1 )
     del "%TEMP_RAD_FILE%"
+
+    for /f %%%%C in ('type "%VIEW_RAYS_FILE%" ^\| find /c /v ""') do set "NUM_RAYS=%%%%C"
 
     REM 2. Generate Annual Sky Matrix (S)
     echo 2. Generating annual sky matrix from EPW...
@@ -3035,25 +3105,25 @@ function createImagelessGlareScript(projectData) {
     REM 3. Generate Direct Daylight Coefficients (D_direct)
     echo 3. Generating Direct Daylight Coefficients (-ab %AB_DIRECT%)...
     set "DC_DIRECT_MTX=%MATRIX_DIR%\\%PROJECT_NAME%_dc_direct.mtx"
-    rcontrib -I+ -w -ab %AB_DIRECT% -ad %AD% -as %AS% -ar %AR% -aa %AA% -lw %LW% "%OCTREE%" < "%VIEW_RAYS_FILE%" > "%DC_DIRECT_MTX%"
+    rcontrib -I+ -w -ab %AB_DIRECT% -ad %AD% -as %AS% -ar %AR% -aa %AA% -lw %LW% -e MF:%SKY_MF% -f reinhart.cal -b rbin -bn %SKY_NRBINS% -m sky_glow -y %NUM_RAYS% "%OCTREE%" < "%VIEW_RAYS_FILE%" > "%DC_DIRECT_MTX%"
     if %errorlevel% neq 0 ( echo "Error generating direct DC matrix." & exit /b 1 )
 
     REM 4. Generate Total Daylight Coefficients (D_total)
     echo 4. Generating Total Daylight Coefficients (-ab %AB_TOTAL%)...
     set "DC_TOTAL_MTX=%MATRIX_DIR%\\%PROJECT_NAME%_dc_total.mtx"
-    rcontrib -I+ -w -ab %AB_TOTAL% -ad %AD% -as %AS% -ar %AR% -aa %AA% -lw %LW% "%OCTREE%" < "%VIEW_RAYS_FILE%" > "%DC_TOTAL_MTX%"
+    rcontrib -I+ -w -ab %AB_TOTAL% -ad %AD% -as %AS% -ar %AR% -aa %AA% -lw %LW% -e MF:%SKY_MF% -f reinhart.cal -b rbin -bn %SKY_NRBINS% -m sky_glow -y %NUM_RAYS% "%OCTREE%" < "%VIEW_RAYS_FILE%" > "%DC_TOTAL_MTX%"
     if %errorlevel% neq 0 ( echo "Error generating total DC matrix." & exit /b 1 )
 
     REM 5. Calculate Annual DGP time-series
     echo 5. Calculating annual DGP values...
     set "DGP_RESULTS=%RESULTS_DIR%\\%PROJECT_NAME%.dgp"
-    dcglare ${batScheduleFlag} "%DC_DIRECT_MTX%" "%DC_TOTAL_MTX%" "%SKY_MTX%" > "%DGP_RESULTS%"
+    dcglare -vf "%VIEW_RAYS_FILE%" ${batScheduleFlag} "%DC_DIRECT_MTX%" "%DC_TOTAL_MTX%" "%SKY_MTX%" > "%DGP_RESULTS%"
     if %errorlevel% neq 0 ( echo "Error during dcglare for DGP." & exit /b 1 )
 
     REM 6. Calculate Glare Autonomy (GA)
     echo 6. Calculating Glare Autonomy (GA) for a threshold of %DGP_THRESHOLD%...
     set "GA_RESULTS=%RESULTS_DIR%\\%PROJECT_NAME%.ga"
-    dcglare -l %DGP_THRESHOLD% ${batScheduleFlag} "%DC_DIRECT_MTX%" "%DC_TOTAL_MTX%" "%SKY_MTX%" > "%GA_RESULTS%"
+    dcglare -vf "%VIEW_RAYS_FILE%" -l %DGP_THRESHOLD% ${batScheduleFlag} "%DC_DIRECT_MTX%" "%DC_TOTAL_MTX%" "%SKY_MTX%" > "%GA_RESULTS%"
     if %errorlevel% neq 0 ( echo "Error during dcglare for GA." & exit /b 1 )
 
     REM 7. Calculate Spatial Glare Autonomy (sGA)
@@ -3064,7 +3134,8 @@ function createImagelessGlareScript(projectData) {
     REM if($1-target,1,0) would be a ">" test while the .sh awk uses ">=". Inverting the
     REM operands - if(target-$1, 0, 1) - makes the batch test ">=" as well, so both
     REM scripts count a view that exactly meets the target as passing.
-    (rcalc -e "$1=if(%SGA_TARGET%-$1,0,1)" "%GA_RESULTS%") | total > "%RESULTS_DIR%\\_sga_pass.txt"
+    REM getinfo - strips dcglare's header, which would otherwise be counted as data.
+    (getinfo - < "%GA_RESULTS%" | rcalc -e "$1=if(%SGA_TARGET%-$1,0,1)") | total > "%RESULTS_DIR%\\_sga_pass.txt"
     set /p SGA_PASS=<"%RESULTS_DIR%\\_sga_pass.txt"
     (rcalc -e "$1=1" "%GA_RESULTS%") | total > "%RESULTS_DIR%\\_sga_count.txt"
     set /p SGA_NPTS=<"%RESULTS_DIR%\\_sga_count.txt"
