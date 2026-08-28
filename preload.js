@@ -22,6 +22,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // --- Methods that expect a return value (invoked) ---
   openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
 
+  // Writes a generated HTML report to disk and opens it in the default browser.
+  openReport: (args) => ipcRenderer.invoke('report:open', args),
+
   saveProject: (args) => {
     validatePathArgs(args, ['projectPath']);
     if (!Array.isArray(args.files)) throw new Error('Invalid argument: files must be an array');

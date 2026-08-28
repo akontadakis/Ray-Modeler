@@ -27,9 +27,9 @@ class ReportGenerator {
 
             await this._gatherData();
             const htmlContent = this._buildHtml();
-            this._displayReport(htmlContent);
+            const outcome = await this._displayReport(htmlContent);
 
-            this._showSuccessMessage();
+            this._showSuccessMessage(outcome);
 
         } catch (error) {
             console.error("Failed to generate report:", error);
@@ -120,26 +120,69 @@ class ReportGenerator {
     }
 
     /**
-     * Opens the generated HTML content in a new browser tab.
+     * Opens the generated HTML content for the user.
+     *
+     * Inside Electron a plain window.open() on a blob: URL is dropped:
+     * setWindowOpenHandler denies every renderer-requested window and blob: is
+     * not an allowed external URL, so the report never appeared while the UI
+     * still announced a new tab. There, the main process writes the report to a
+     * file and hands it to the OS instead. In a browser the popup can still be
+     * blocked, so a failed window.open falls back to a download.
+     *
      * @private
      * @param {string} htmlContent - The complete HTML string of the report.
+     * @returns {Promise<{mode: 'app'|'tab'|'download', path?: string, fileName?: string}>}
      */
-    _displayReport(htmlContent) {
+    async _displayReport(htmlContent) {
+        const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+        const projectName = this.data?.projectData?.projectInfo?.['project-name'] || 'report';
+        const fileName = `${projectName}_report_${stamp}.html`;
+
+        if (window.electronAPI?.openReport) {
+            const result = await window.electronAPI.openReport({ html: htmlContent, fileName });
+            if (result?.success) {
+                return { mode: 'app', path: result.path };
+            }
+            console.error('openReport failed:', result?.error);
+        }
+
         const blob = new Blob([htmlContent], { type: 'text/html' });
         const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
+        const tab = window.open(url, '_blank');
+        if (tab) {
+            return { mode: 'tab', fileName };
+        }
+
+        // Popup blocked, or the host denied the window: save the file instead.
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        return { mode: 'download', fileName };
     }
 
     /**
      * Updates the UI alert to inform the user of successful report generation.
      * @private
      */
-    _showSuccessMessage() {
+    _showSuccessMessage(outcome) {
         const dom = getDom();
-        if (dom['custom-alert-message'] && dom['custom-alert-title']) {
-            dom['custom-alert-message'].innerHTML = 'Your report has been opened in a new tab. You can now print or save it as a PDF from your browser.';
-            dom['custom-alert-title'].textContent = 'Report Generated';
+        if (!dom['custom-alert-message'] || !dom['custom-alert-title']) return;
+
+        let text;
+        if (outcome?.mode === 'app') {
+            text = `The report opened in your default browser. Print it or save it as a PDF from there. The file is at: ${outcome.path}`;
+        } else if (outcome?.mode === 'download') {
+            text = `The report was saved as ${outcome.fileName}. Open it in your browser to print it or save it as a PDF.`;
+        } else {
+            text = 'Your report has been opened in a new tab. You can now print or save it as a PDF from your browser.';
         }
+
+        // Plain text: the path and the file name come from user-supplied values.
+        dom['custom-alert-message'].textContent = text;
+        dom['custom-alert-title'].textContent = 'Report Generated';
     }
 
     /**

@@ -62,6 +62,38 @@ function _parseFileContent(content, fileName = '') {
 }
 
 /**
+ * Removes a leading Radiance ASCII header from a text results file.
+ *
+ * rmtxop, dctimestep and dcglare all write "#?RADIANCE", the command line that
+ * produced the file, CAPDATE/GMT stamps and NROWS/NCOLS/NCOMP/FORMAT, then a
+ * blank line, then the data. Only the first of those lines starts with "#", so
+ * skipping comment lines alone left the command line in the data and every such
+ * file was rejected with "non-numeric data at line 2".
+ *
+ * @param {string} content Raw file text.
+ * @returns {{body: string, nrows: number|null, ncols: number|null, ncomp: number|null}}
+ */
+function _stripRadianceHeaderText(content) {
+    const empty = { body: content, nrows: null, ncols: null, ncomp: null };
+    if (!/^\s*#\?RADIANCE/.test(content)) return empty;
+
+    const sep = content.search(/\r?\n\r?\n/);
+    if (sep === -1) return empty;
+
+    const header = content.slice(0, sep);
+    const readInt = (name) => {
+        const m = header.match(new RegExp(`^${name}\\s*=\\s*(\\d+)`, 'm'));
+        return m ? parseInt(m[1], 10) : null;
+    };
+    return {
+        body: content.slice(sep).replace(/^\r?\n\r?\n/, ''),
+        nrows: readInt('NROWS'),
+        ncols: readInt('NCOLS'),
+        ncomp: readInt('NCOMP')
+    };
+}
+
+/**
  * Parses a whitespace-delimited numeric results grid (rtrace / rcalc output).
  *
  * Accepts either one value per line (already-reduced illuminance) or three values
@@ -76,7 +108,7 @@ function _parseFileContent(content, fileName = '') {
  * @returns {number[]} One scalar per sensor point.
  */
 function _parseNumericGrid(content) {
-    const lines = content.split(/\r?\n/);
+    const lines = _stripRadianceHeaderText(content).body.split(/\r?\n/);
     const values = [];
     let columns = 0;
 
@@ -112,7 +144,7 @@ function _parseNumericGrid(content) {
  */
 function _parseAnnualGlareFile(content, type) {
     const HOURS_IN_YEAR = 8760;
-    const lines = content.split(/\r?\n/);
+    const lines = _stripRadianceHeaderText(content).body.split(/\r?\n/);
     const dataMatrix = [];
 
     for (let i = 0; i < lines.length; i++) {
@@ -120,7 +152,7 @@ function _parseAnnualGlareFile(content, type) {
         if (line === '' || line.startsWith('#')) continue; // Blank lines and Radiance comments
         const row = line.split(/\s+/).map(Number);
         if (row.some(v => !Number.isFinite(v))) {
-            throw new Error(`File contains non-numeric data at line ${i + 1}.`);
+            throw new Error(`File contains non-numeric data at line ${i + 1}: "${line}".`);
         }
         dataMatrix.push(row);
     }
@@ -129,24 +161,45 @@ function _parseAnnualGlareFile(content, type) {
         throw new Error('Annual glare file contains no data rows.');
     }
 
-    const numPoints = dataMatrix[0].length;
-    if (dataMatrix.some(row => row.length !== numPoints)) {
-        throw new Error('Annual glare file rows do not all contain the same number of sensor points.');
+    const rowLength = dataMatrix[0].length;
+    if (dataMatrix.some(row => row.length !== rowLength)) {
+        throw new Error('Annual glare file rows do not all have the same length.');
     }
 
-    // Consumers index this matrix over a full 8760-hour year. A short file must be
-    // padded explicitly (0 = no glare) rather than left to read `undefined`, which
-    // fails every threshold test and silently counts missing hours as "no glare".
-    if (dataMatrix.length !== HOURS_IN_YEAR) {
-        console.warn(`Annual glare file has ${dataMatrix.length} rows, not ${HOURS_IN_YEAR}. Missing hours are padded with 0; surplus hours are ignored.`);
+    // dcglare writes ONE ROW PER VIEW and one column per timestep, the same
+    // orientation as every other Radiance matrix. A .ga file, written with -l, is a
+    // single glare-autonomy fraction per view: a scalar grid, not a time series.
+    if (rowLength === 1) {
+        return { data: dataMatrix.map(row => row[0]) };
     }
 
-    const usableHours = Math.min(dataMatrix.length, HOURS_IN_YEAR);
+    // Rows are views and columns are hours, unless only the row count is a usable
+    // annual length - which is how this app used to write the file.
+    let numPoints;
+    let usableHours;
+    let valueAt;
+
+    if (_buildIllHourMapping(rowLength)) {
+        numPoints = dataMatrix.length;
+        usableHours = Math.min(rowLength, HOURS_IN_YEAR);
+        valueAt = (p, h) => dataMatrix[p][h];
+    } else if (_buildIllHourMapping(dataMatrix.length)) {
+        numPoints = rowLength;
+        usableHours = Math.min(dataMatrix.length, HOURS_IN_YEAR);
+        valueAt = (p, h) => dataMatrix[h][p];
+    } else {
+        // Neither dimension is an annual length. Keep the historical reading and pad.
+        numPoints = rowLength;
+        usableHours = Math.min(dataMatrix.length, HOURS_IN_YEAR);
+        valueAt = (p, h) => dataMatrix[h][p];
+        console.warn(`Annual glare file is ${dataMatrix.length} rows x ${rowLength} columns; neither is a whole year. Missing hours are padded with 0; surplus hours are ignored.`);
+    }
+
     const transposedData = Array.from({ length: numPoints }, () => new Float32Array(HOURS_IN_YEAR));
 
-    for (let h = 0; h < usableHours; h++) {
-        for (let p = 0; p < numPoints; p++) {
-            transposedData[p][h] = dataMatrix[h][p];
+    for (let p = 0; p < numPoints; p++) {
+        for (let h = 0; h < usableHours; h++) {
+            transposedData[p][h] = valueAt(p, h);
         }
     }
 
@@ -353,30 +406,55 @@ function _parseIllFileContent(arrayBuffer) {
         throw new Error("No data could be parsed from the .ill file.");
     }
 
-    // Row-major layout, matching the matrices this app generates:
-    // NROWS = timesteps, NCOLS = sensor points, NCOMP components per cell.
-    let numRows = nrows;
-    let numPoints = ncols;
+    // Matrix layout.
+    //
+    // dctimestep and rmtxop write ONE ROW PER SENSOR POINT and one column per
+    // timestep: NROWS = sensor count, NCOLS = timestep count, and the payload is
+    // point-major. This parser used to assume the opposite (NROWS = timesteps),
+    // which is why a perfectly good 30-point annual matrix was rejected as
+    // "30 timesteps". The generated Python post-processors read the Radiance
+    // orientation; this now matches them.
+    //
+    // Files the app wrote under the old assumption are still readable: whichever
+    // of the two dimensions produces a valid hour mapping decides the orientation.
+    let numTimesteps;
+    let numPoints;
+    let pointMajor;
 
-    if (numRows === null || numPoints === null) {
+    if (nrows === null || ncols === null) {
         // Headerless file: fall back to the app's own convention of 8760 hourly rows.
         if (total % (HOURS_IN_YEAR * comps) !== 0) {
             throw new Error(`Invalid .ill file format. The file has no NROWS/NCOLS header and its ${total} values are not a whole number of 8760-hour ${comps}-component records.`);
         }
-        numRows = HOURS_IN_YEAR;
+        numTimesteps = HOURS_IN_YEAR;
         numPoints = total / (HOURS_IN_YEAR * comps);
-    } else if (numRows * numPoints * comps !== total) {
-        throw new Error(`Invalid .ill file. The header declares NROWS=${numRows} NCOLS=${numPoints} NCOMP=${comps} (${numRows * numPoints * comps} values) but the payload contains ${total}.`);
+        pointMajor = false;
+    } else {
+        if (nrows * ncols * comps !== total) {
+            throw new Error(`Invalid .ill file. The header declares NROWS=${nrows} NCOLS=${ncols} NCOMP=${comps} (${nrows * ncols * comps} values) but the payload contains ${total}.`);
+        }
+        if (nrows <= 0 || ncols <= 0) {
+            throw new Error(`Invalid .ill file dimensions: NROWS=${nrows} NCOLS=${ncols}.`);
+        }
+        if (_buildIllHourMapping(ncols)) {
+            numTimesteps = ncols;
+            numPoints = nrows;
+            pointMajor = true;
+        } else if (_buildIllHourMapping(nrows)) {
+            // A matrix written the other way round (older Ray Modeler output).
+            numTimesteps = nrows;
+            numPoints = ncols;
+            pointMajor = false;
+        } else {
+            throw new Error(`Unsupported .ill file: NROWS=${nrows} NCOLS=${ncols}, and neither is a usable timestep count. The annual dashboards are indexed on a 8760-hour year, so the timestep dimension must be 8760, 8784 (leap year) or a whole multiple of 8760 (sub-hourly).`);
+        }
     }
 
-    if (numRows <= 0 || numPoints <= 0) {
-        throw new Error(`Invalid .ill file dimensions: ${numRows} rows x ${numPoints} columns.`);
-    }
-
-    const mapping = _buildIllHourMapping(numRows);
-    if (!mapping) {
-        throw new Error(`Unsupported .ill file: ${numRows} timesteps. The annual dashboards are indexed on a 8760-hour year, so only 8760 rows, 8784 rows (leap year) or a whole multiple of 8760 (sub-hourly) can be read.`);
-    }
+    const mapping = _buildIllHourMapping(numTimesteps);
+    // One of the two branches above already proved this mapping exists.
+    const indexFor = pointMajor
+        ? (p, step) => (p * numTimesteps + step) * comps
+        : (p, step) => (step * numPoints + p) * comps;
 
     const annualData = Array.from({ length: numPoints }, () => new Float32Array(HOURS_IN_YEAR));
     const averageData = [];
@@ -386,7 +464,7 @@ function _parseIllFileContent(arrayBuffer) {
         for (let h = 0; h < HOURS_IN_YEAR; h++) {
             let accumulated = 0;
             for (let s = 0; s < mapping.steps; s++) {
-                const index = (mapping.rowFor(h, s) * numPoints + p) * comps;
+                const index = indexFor(p, mapping.rowFor(h, s));
                 accumulated += (comps === 3)
                     ? 179 * (0.265 * values[index] + 0.670 * values[index + 1] + 0.065 * values[index + 2])
                     : values[index];

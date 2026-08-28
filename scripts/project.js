@@ -851,13 +851,13 @@ class Project {
 
             const validation = recipeDef.validate(projectData, config);
             if (validation.errors && validation.errors.length > 0) {
-                const { showAlert } = await import('./ui.js');
+                const { showAlertHtml, escapeHtml } = await import('./ui.js');
                 const errorHtml =
                     '<p>The selected simulation recipe configuration is invalid:</p>' +
                     '<ul class="list-disc pl-5 space-y-1">' +
-                    validation.errors.map(e => `<li>${e}</li>`).join('') +
+                    validation.errors.map(e => `<li>${escapeHtml(e)}</li>`).join('') +
                     '</ul>';
-                showAlert(errorHtml, 'Cannot Generate Package: Invalid Configuration');
+                showAlertHtml(errorHtml, 'Cannot Generate Package: Invalid Configuration');
                 return null;
             }
             if (validation.warnings && validation.warnings.length > 0) {
@@ -921,7 +921,16 @@ class Project {
             const batScript = scriptsToGenerate.find(s => s.fileName.endsWith('.bat'));
             const displayContent = shScript ? shScript.content : (batScript ? batScript.content : null);
 
-            if (!displayContent) return null;
+            if (!displayContent) {
+                // The package was written, but nothing in it can be shown in the
+                // command centre. Say so: this was the one null path that returned
+                // without telling the user anything.
+                showAlert(
+                    'The package was written, but it contains no runnable script to display.',
+                    'Generation Incomplete'
+                );
+                return null;
+            }
 
             return {
                 content: displayContent,
