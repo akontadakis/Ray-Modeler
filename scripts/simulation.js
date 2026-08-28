@@ -28,7 +28,7 @@ const availableModules = [
     { id: 'template-recipe-sda-ase', name: 'Recipe: sDA & ASE (LM-83)' },
     { id: 'template-recipe-annual-5ph', name: 'Recipe: Annual Daylight (5-Phase)' },
     { id: 'template-recipe-imageless-glare', name: 'Recipe: Imageless Annual Glare' },
-    { id: 'template-recipe-spectral-lark', name: 'Recipe: Spectral Analysis (Lark)' },
+    { id: 'template-recipe-spectral-9ch', name: 'Recipe: Spectral Analysis (9-Channel)' },
     { id: 'template-recipe-en17037', name: 'Recipe: EN 17037 Compliance' },
     { id: 'template-recipe-en-illuminance', name: 'Recipe: EN 12464-1 Illuminance' },
     { id: 'template-recipe-en-ugr', name: 'Recipe: EN 12464-1 UGR' },
@@ -242,16 +242,23 @@ export function recreateSimulationPanels(simSettings, loadedFiles, ui) {
                 // Populate restored UI with saved values, matching the ID-mapping logic
                 const activePanel = sidebarContainer.firstElementChild;
                 if (activePanel && values && typeof values === 'object') {
-                    const panelIdSuffix = activePanel.id.split('-').pop();
-                    activePanel.querySelectorAll('input, select').forEach(input => {
-                        const baseId = input.id.replace(`-${panelIdSuffix}`, '');
+                    // Only derive a suffix when the panel has a real hyphenated id.
+                    // The sidebar's first child is an id-less <div>, and stripping a
+                    // bare "-" would corrupt input ids (pit-month -> pitmonth).
+                    const panelIdSuffix = (activePanel.id && activePanel.id.includes('-'))
+                        ? activePanel.id.split('-').pop()
+                        : '';
+                    // Scan the whole container: a cloned template contributes every
+                    // child of its .window-content, not just the first section.
+                    sidebarContainer.querySelectorAll('input, select').forEach(input => {
+                        const baseId = panelIdSuffix ? input.id.replace(`-${panelIdSuffix}`, '') : input.id;
                         if (!baseId) return;
                         if (!(baseId in values)) return;
 
                         const savedValue = values[baseId];
                         if (input.type === 'file') {
                             if (savedValue && savedValue.name && project.simulationFiles[baseId]) {
-                                let display = activePanel.querySelector(`[data-file-display-for="${input.id}"]`);
+                                let display = sidebarContainer.querySelector(`[data-file-display-for="${input.id}"]`);
                                 if (!display) {
                                     display = document.createElement('span');
                                     display.className = 'text-sm text-gray-500 ml-4 truncate max-w-[150px]';

@@ -183,7 +183,7 @@ const availableTools = [
                     "properties": {
                         "recipeType": {
                             "type": "STRING",
-                            "description": "The type of recipe to open. Must be one of: 'illuminance', 'rendering', 'dgp', 'df', 'annual-3ph', 'sda-ase', 'annual-5ph', 'imageless-glare', 'spectral-lark', 'en17037', 'en-illuminance', 'en-ugr'."
+                            "description": "The type of recipe to open. Must be one of: 'illuminance', 'rendering', 'dgp', 'df', 'annual-3ph', 'sda-ase', 'annual-5ph', 'imageless-glare', 'spectral-9ch', 'en17037', 'en-illuminance', 'en-ugr'."
                         }
                     },
                     "required": ["recipeType"]
@@ -735,7 +735,7 @@ const legacyRecipeMap = {
     'sda-ase': 'template-recipe-sda-ase',
     'annual-5ph': 'template-recipe-annual-5ph',
     'imageless-glare': 'template-recipe-imageless-glare',
-    'spectral-lark': 'template-recipe-spectral-lark',
+    'spectral-9ch': 'template-recipe-spectral-9ch',
     'en17037': 'template-recipe-en17037',
     'en-illuminance': 'template-recipe-en-illuminance',
     'en-ugr': 'template-recipe-en-ugr'

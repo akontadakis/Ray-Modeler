@@ -22,7 +22,7 @@ import './recipes/en17037Recipe.js';
 import './recipes/lightingEnergyRecipe.js';
 import './recipes/facadeIrradiationRecipe.js';
 import './recipes/annualRadiationRecipe.js';
-import './recipes/spectralLarkRecipe.js';
+import './recipes/spectral9ChRecipe.js';
 
 class Project {
     constructor() {
@@ -122,7 +122,10 @@ class Project {
                 : '';
             const activeValues = {};
 
-            activePanel.querySelectorAll('input, select').forEach(input => {
+            // Scan the whole container, not just its first child. A cloned recipe
+            // template contributes every child of its .window-content, so most
+            // recipes place inputs across several sibling sections.
+            sidebarContainer.querySelectorAll('input, select').forEach(input => {
                 const key = panelIdSuffix ? input.id.replace(`-${panelIdSuffix}`, '') : input.id;
                 if (!key) return;
 
@@ -526,7 +529,8 @@ class Project {
             const panelIdSuffix = (activeRecipePanel.id && activeRecipePanel.id.includes('-'))
                 ? activeRecipePanel.id.split('-').pop()
                 : '';
-            activeRecipePanel.querySelectorAll('input, select').forEach(input => {
+            // Scan the whole container, not just its first child (see note above).
+            recipeContainer.querySelectorAll('input, select').forEach(input => {
                 const key = panelIdSuffix ? input.id.replace(`-${panelIdSuffix}`, '') : input.id;
                 if (!key) return;
 

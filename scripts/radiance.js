@@ -57,12 +57,12 @@ const KLEMS_ANGLES = [
 ];
 
 const SPECTRAL_BINS = {
-    'lark-9': [
+    'spectral-9': [
         { start: 380, end: 424 }, { start: 425, end: 454 }, { start: 455, end: 479 },
         { start: 480, end: 504 }, { start: 505, end: 529 }, { start: 530, end: 559 },
         { start: 560, end: 599 }, { start: 600, end: 644 }, { start: 645, end: 780 }
     ],
-    'lark-3': [
+    'spectral-3': [
         // B, G, R order
         { start: 380, end: 498 }, { start: 498, end: 586 }, { start: 586, end: 780 }
     ]
@@ -71,10 +71,10 @@ const SPECTRAL_BINS = {
 /**
 * Parses a two-column spectral data file and averages the values into discrete bins.
 * @param {string} fileContent - The raw text content of the spectral data file.
-* @param {string} [binConfigKey='lark-9'] - The key for the binning configuration ('lark-9' or 'lark-3').
+* @param {string} [binConfigKey='spectral-9'] - The key for the binning configuration ('spectral-9' or 'spectral-3').
 * @returns {number[]|null} An array of binned values, or null if parsing fails.
 */
-export function _parseAndBinSpectralData(fileContent, binConfigKey = 'lark-9') {
+export function _parseAndBinSpectralData(fileContent, binConfigKey = 'spectral-9') {
     if (!fileContent) return null;
     const bins = SPECTRAL_BINS[binConfigKey];
     if (!bins) return null;
@@ -459,7 +459,7 @@ export async function generateRadFileContent(options = {}) {
         const spectralFile = project.simulationFiles[spectralFileKey];
 
         if ((type === 'wall' || type === 'floor' || type === 'ceiling') && mode === 'srd' && channelSet && spectralFile?.content) {
-            const binnedValues = _parseAndBinSpectralData(spectralFile.content, 'lark-9');
+            const binnedValues = _parseAndBinSpectralData(spectralFile.content, 'spectral-9');
 
             if (binnedValues && binnedValues.length === 9) {
                 let values;

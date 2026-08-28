@@ -2724,7 +2724,7 @@
                         and <code>EN 12464-1</code>.</li>
                     <li><strong>Advanced Annual Methods</strong>: Support for industry-standard annual simulation
                         methods, including 3-Phase and 5-Phase Daylight Analysis.</li>
-                    <li><strong>Spectral Lighting Analysis</strong>: A full implementation of the Lark methodology to
+                    <li><strong>Spectral Lighting Analysis</strong>: A full implementation of the 9-channel spectral methodology to
                         run multi-channel simulations and calculate non-visual lighting metrics like melanopic and
                         neuropic illuminance.</li>
                     <li><strong>Automated Compliance Workflows</strong>: Specialized recipes for checking compliance
@@ -3190,7 +3190,7 @@
                     <li><strong>Imageless Annual Glare</strong>: An advanced recipe using <code>rcontrib</code> and
                         <code>dcglare</code> to efficiently calculate an 8760-hour DGP profile.
                     </li>
-                    <li><strong>Spectral Analysis (Lark)</strong>: Implements the Lark methodology for multi-channel
+                    <li><strong>Spectral Analysis (9-Channel)</strong>: Implements the 9-channel spectral methodology for multi-channel
                         spectral simulations to calculate non-visual lighting metrics.</li>
                     <li><strong>Compliance Recipes</strong>: A suite of specialized recipes for checking compliance with
                         major industry standards:
@@ -3248,6 +3248,24 @@
 
 
 
+                <h2>Credits &amp; Attribution</h2>
+                <p class="mb-4">Ray Modeler is an independent project. It is not affiliated with, endorsed by, or
+                    derived from the source code of the projects listed below. The full list is in the
+                    <code>CREDITS.md</code> file.</p>
+                <ul>
+                    <li><strong>Spectral Analysis (9-Channel)</strong>: This recipe is an independent implementation of
+                        the published multi-channel spectral simulation method for Radiance. The method, including the
+                        9-band partitioning of the visible spectrum, was developed and published by the
+                        <a href="https://github.com/larkspectral/Lark_Spectral_Lighting" target="_blank"
+                            class="text-[--text-secondary] underline">Lark Spectral Lighting</a> project &mdash;
+                        Mehlika Inanici, Ph.D. (University of Washington) and ZGF Architects LLP, with later
+                        contributions from Clotilde Pierson, Ph.D., Myrta Gkaintatzi-Masouti, M.Sc., Bo Jung, M.Sc. and
+                        Zining Cheng. Lark Spectral Lighting is distributed under a Modified 3-Clause BSD License. Ray
+                        Modeler contains no source code from Lark Spectral Lighting.</li>
+                    <li><strong>Radiance</strong>: The simulation engine, developed at Lawrence Berkeley National
+                        Laboratory and distributed under its own open source license.</li>
+                </ul>
+
                 <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.5"
                         stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -3256,6 +3274,7 @@
                 <p class="mb-4">This project is licensed under the <a href="https://opensource.org/license/mit"
                         target="_blank" class="text-[--text-secondary] underline">MIT</a> License - also see the LICENSE
                     file for details.</p>
+                <p class="mb-4">Third-party attributions are listed in the <code>CREDITS.md</code> file.</p>
             </div>
             <div class="resize-handle-edge top"></div>
             <div class="resize-handle-edge right"></div>
@@ -5052,7 +5071,7 @@
                                 <option value="illuminance">Illuminance</option>
                                 <option value="dgp">DGP</option>
                                 <option value="imageless-glare">Imageless Annual Glare</option>
-                                <option value="spectral-lark">Spectral Analysis (Lark)</option>
+                                <option value="spectral-9ch">Spectral Analysis (9-Channel)</option>
                                 <option value="en17037">EN 17037 Compliance</option>
                             </select>
                         </div>
@@ -6130,6 +6149,99 @@
             <div class="resize-handle-corner top-right"></div>
             <div class="resize-handle-corner bottom-left"></div>
             <div class="resize-handle-corner bottom-right"></div>
+        </template>
+
+        <template id="template-recipe-sda-ase">
+            <div class="floating-window ui-panel">
+                <div class="window-header">
+                    <span>Recipe: sDA &amp; ASE (LM-83)</span>
+                    <div class="window-controls">
+                        <div class="window-icon-max"></div>
+                        <div class="collapse-icon"></div>
+                        <div class="window-icon-close"></div>
+                    </div>
+                </div>
+                <div class="window-content">
+                    <div class="param-section space-y-4">
+                        <p class="info-box">This recipe requires an illuminance sensor grid in the Sensor Grid panel. It
+                            runs a two-state annual daylight simulation (blinds open and blinds closed) and reports
+                            Spatial Daylight Autonomy (sDA) and Annual Sunlight Exposure (ASE) to IES LM-83.</p>
+                        <div>
+                            <label class="label" for="weather-file">Weather File (.epw)</label>
+                            <input type="file" id="weather-file" accept=".epw" class="w-full text-sm mt-1">
+                        </div>
+                        <div>
+                            <label class="label" for="bsdf-open-file">BSDF - Blinds Open (.xml)</label>
+                            <input type="file" id="bsdf-open-file" accept=".xml" class="w-full text-sm mt-1">
+                        </div>
+                        <div>
+                            <label class="label" for="bsdf-closed-file">BSDF - Blinds Closed (.xml)</label>
+                            <input type="file" id="bsdf-closed-file" accept=".xml" class="w-full text-sm mt-1">
+                        </div>
+                        <h4 class="text-base font-semibold">Blind Operation Parameters</h4>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="label" for="blinds-threshold-lux">Illuminance Threshold (lux)</label>
+                                <input type="number" id="blinds-threshold-lux" value="1000" min="0" step="50"
+                                    class="w-full mt-1" autocomplete="off"></div>
+                            <div><label class="label" for="blinds-trigger-percent">Area Trigger (%)</label>
+                                <input type="number" id="blinds-trigger-percent" value="2" min="0" max="100" step="1"
+                                    class="w-full mt-1" autocomplete="off"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <template id="template-recipe-spectral-9ch">
+            <div class="floating-window ui-panel">
+                <div class="window-header">
+                    <span>Recipe: Spectral Analysis (9-Channel)</span>
+                    <div class="window-controls">
+                        <div class="window-icon-max"></div>
+                        <div class="collapse-icon"></div>
+                        <div class="window-icon-close"></div>
+                    </div>
+                </div>
+                <div class="window-content">
+                    <div class="param-section space-y-4">
+                        <p class="info-box">This recipe requires an illuminance floor grid in the Sensor Grid panel. For
+                            spectral materials, set Walls, Floor or Ceiling to "Spectral" in the Material Properties
+                            panel and load a reflectance file for each.</p>
+                        <label class="flex items-center cursor-pointer"><input type="checkbox"
+                                id="spectral-run-9ch-toggle" checked><span class="ml-2 text-sm">Run 9-channel simulation
+                                (recommended)</span></label>
+                        <h4 class="text-base font-semibold">Sky &amp; Sun Definition</h4>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div><label class="label" for="spectral-month">Month</label>
+                                <input type="number" id="spectral-month" min="1" max="12" value="6" class="w-full mt-1"
+                                    autocomplete="off"></div>
+                            <div><label class="label" for="spectral-day">Day</label>
+                                <input type="number" id="spectral-day" min="1" max="31" value="21" class="w-full mt-1"
+                                    autocomplete="off"></div>
+                            <div><label class="label" for="spectral-time">Time (HH:MM)</label>
+                                <input type="time" id="spectral-time" value="12:00" class="w-full mt-1"
+                                    autocomplete="off"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="label" for="spectral-dni">Direct Normal Irradiance (W/m²)</label>
+                                <input type="number" id="spectral-dni" min="0" step="10" value="800" class="w-full mt-1"
+                                    autocomplete="off"></div>
+                            <div><label class="label" for="spectral-dhi">Diffuse Horizontal Irradiance (W/m²)</label>
+                                <input type="number" id="spectral-dhi" min="0" step="10" value="120" class="w-full mt-1"
+                                    autocomplete="off"></div>
+                        </div>
+                        <h4 class="text-base font-semibold">Spectral Data Files</h4>
+                        <div>
+                            <label class="label" for="spectral-sun-spd">Sun SPD (.spd, .txt, .dat)</label>
+                            <input type="file" id="spectral-sun-spd" accept=".spd,.txt,.dat" class="w-full text-sm mt-1">
+                        </div>
+                        <div>
+                            <label class="label" for="spectral-sky-spd">Sky SPD (.spd, .txt, .dat)</label>
+                            <input type="file" id="spectral-sky-spd" accept=".spd,.txt,.dat" class="w-full text-sm mt-1">
+                        </div>
+                    </div>
+                </div>
+            </div>
         </template>
 
         <template id="template-recipe-en17037">

@@ -202,8 +202,8 @@ export function generateScripts(projectData, recipeType) {
         case 'template-recipe-imageless-glare':
             scriptSet = createImagelessGlareScript(projectData);
             break;
-        case 'template-recipe-spectral-lark':
-            scriptSet = createLarkSpectralScript(projectData);
+        case 'template-recipe-spectral-9ch':
+            scriptSet = createSpectral9ChScript(projectData);
         break;
         case 'template-recipe-lighting-energy':
             scriptSet = createLightingEnergyScript(projectData);
@@ -283,27 +283,27 @@ function _binSpectralData(spdContent, bins) {
     });
 }
 
-function createLarkSpectralScript(projectData) {
+function createSpectral9ChScript(projectData) {
     const { projectInfo: pi, mergedSimParams: p, materials, simulationFiles } = projectData;
     const projectName = pi['project-name'].replace(/\s+/g, '_') || 'scene';
 
     // --- Common Parameters ---
-    const month = p['lark-month'], day = p['lark-day'], hour = _timeToDecimalHour(p['lark-time'], '12:00');
+    const month = p['spectral-month'], day = p['spectral-day'], hour = _timeToDecimalHour(p['spectral-time'], '12:00');
     const lat = pi.latitude, lon = pi.longitude, mer = (Math.round(lon / 15) * 15) * -1;
-    const dni = p['lark-dni'], dhi = p['lark-dhi'];
-    const sunSpdFile = p['lark-sun-spd']?.name || 'sun.spd';
-    const skySpdFile = p['lark-sky-spd']?.name || 'sky.spd';
+    const dni = p['spectral-dni'], dhi = p['spectral-dhi'];
+    const sunSpdFile = p['spectral-sun-spd']?.name || 'sun.spd';
+    const skySpdFile = p['spectral-sky-spd']?.name || 'sky.spd';
     const ab = p['ab'], ad = p['ad'], as = p['as'], ar = p['ar'], aa = p['aa'], lw = p['lw'];
-    const run9ch = p['lark-run-9ch-toggle'];
+    const run9ch = p['spectral-run-9ch-toggle'];
 
     /// --- Spectral Binning (in JavaScript) ---
     const wallSrdContent = simulationFiles['wall-srd-file']?.content;
     const floorSrdContent = simulationFiles['floor-srd-file']?.content;
     const ceilingSrdContent = simulationFiles['ceiling-srd-file']?.content;
 
-    const binnedWallRefl9ch = _parseAndBinSpectralData(wallSrdContent, 'lark-9') || Array(9).fill(p['wall-refl'] || 0.5);
-    const binnedFloorRefl9ch = _parseAndBinSpectralData(floorSrdContent, 'lark-9') || Array(9).fill(p['floor-refl'] || 0.2);
-    const binnedCeilingRefl9ch = _parseAndBinSpectralData(ceilingSrdContent, 'lark-9') || Array(9).fill(p['ceiling-refl'] || 0.8);
+    const binnedWallRefl9ch = _parseAndBinSpectralData(wallSrdContent, 'spectral-9') || Array(9).fill(p['wall-refl'] || 0.5);
+    const binnedFloorRefl9ch = _parseAndBinSpectralData(floorSrdContent, 'spectral-9') || Array(9).fill(p['floor-refl'] || 0.2);
+    const binnedCeilingRefl9ch = _parseAndBinSpectralData(ceilingSrdContent, 'spectral-9') || Array(9).fill(p['ceiling-refl'] || 0.8);
 
     const generateMaterialSet = (suffix, wallBins, floorBins, ceilingBins) => `
 void plastic wall_mat
@@ -354,11 +354,11 @@ def calculate_metrics(res_file, num_points):
         print(f"Error reading or reshaping file: {e}")
         return
 
-    # Lark-9 Bins and their representative bandwidths (nm)
+    # 9-channel bins and their representative bandwidths (nm)
     bins = [(380, 424), (425, 454), (455, 479), (480, 504), (505, 529), (530, 559), (560, 599), (600, 644), (645, 780)]
     bin_widths = np.array([b[1] - b[0] for b in bins])
 
-    # Pre-averaged weighting functions for each of the 9 Lark bins
+    # Pre-averaged weighting functions for each of the 9 spectral bins
     # V(lambda) for Photopic Illuminance
     v_lambda_binned = np.array([0.0003, 0.0232, 0.1465, 0.3644, 0.7386, 0.9859, 0.8654, 0.3804, 0.0535])
     # Melanopic Action Spectrum m(lambda)

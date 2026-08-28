@@ -33,6 +33,7 @@ Ray Modeler is a desktop application providing a graphical user interface (GUI) 
     - [📜 Simulation Modules (Recipes)](#-simulation-modules-recipes)
   - [Analysis Modules 📊](#analysis-modules-)
 
+  - [Credits & Attribution 🙏](#credits--attribution-)
   - [License 📄](#license-)
 
 ## 🚀 Getting Started
@@ -113,7 +114,7 @@ Ray Modeler is packed with features that automate and enhance the Radiance workf
 
 - **Advanced Annual Methods**: Support for industry-standard annual simulation methods, including 3-Phase and 5-Phase Daylight Analysis.
 
-- **Spectral Lighting Analysis**: A full implementation of the Lark methodology to run multi-channel simulations and calculate non-visual lighting metrics like melanopic and neuropic illuminance.
+- **Spectral Lighting Analysis**: A full implementation of the 9-channel spectral methodology to run multi-channel simulations and calculate non-visual lighting metrics like melanopic and neuropic illuminance.
 
 - **Automated Compliance Workflows**: Specialized recipes for checking compliance with major industry standards, including `IES LM-83 (sDA/ASE)`, `EN 17037 (Daylight in Buildings)`, and `EN 12464-1 (Light and lighting of work places)`.
 
@@ -255,7 +256,7 @@ The UI allows you to:
 
 - Select a **Target Wall** and **Shading Type** (Overhang, Louver, etc.).
 - Choose up to 3 **Parameters** to optimize (e.g., `depth`, `tilt`).
-- Define a **Goal** by selecting a **Recipe** (e.g., `sDA & ASE`, `Imageless Annual Glare`, `Spectral Analysis (Lark)`) and a **Metric** (e.g., `Maximize sDA`, `Minimize Annual DGP Avg`, `Maximize Circadian Stimulus`).
+- Define a **Goal** by selecting a **Recipe** (e.g., `sDA & ASE`, `Imageless Annual Glare`, `Spectral Analysis (9-Channel)`) and a **Metric** (e.g., `Maximize sDA`, `Minimize Annual DGP Avg`, `Maximize Circadian Stimulus`).
 - Set a **Goal Type**: `Maximize`, `Minimize`, or `Set Target Value` (e.g., set sDA to exactly 55%).
 - Set an optional **Constraint** (e.g., `ASE < 10`).
 - Apply **Preset Profiles** like "Maximize Daylight" or "Minimize Glare".
@@ -618,7 +619,7 @@ Each recipe in the Simulation Sidebar automates a specific Radiance workflow by 
 
 - **Imageless Annual Glare**: An advanced recipe using `rcontrib` and `dcglare` to efficiently calculate an 8760-hour DGP profile.
 
-- **Spectral Analysis (Lark)**: Implements the Lark methodology for multi-channel spectral simulations to calculate non-visual lighting metrics.
+- **Spectral Analysis (9-Channel)**: Implements the 9-channel spectral methodology for multi-channel spectral simulations to calculate non-visual lighting metrics.
 
 - **Compliance Recipes**: A suite of specialized recipes for checking compliance with major industry standards:
   - `IES LM-83 (sDA/ASE)`
@@ -756,6 +757,16 @@ For detailed instructions on cross-platform builds, please refer to the [electro
 
 - **Desktop App**: [Electron](https://www.electronjs.org/) (optional, for direct script execution)
 
+## Credits & Attribution 🙏
+
+Ray Modeler is an independent project. It is not affiliated with, endorsed by, or derived from the source code of the projects listed below. See [CREDITS.md](CREDITS.md) for the full list.
+
+- **Spectral Analysis (9-Channel)**: This recipe is an independent implementation of the published multi-channel spectral simulation method for Radiance. The method, including the 9-band partitioning of the visible spectrum, was developed and published by the [Lark Spectral Lighting](https://github.com/larkspectral/Lark_Spectral_Lighting) project — Mehlika Inanici, Ph.D. (University of Washington) and ZGF Architects LLP, with later contributions from Clotilde Pierson, Ph.D., Myrta Gkaintatzi-Masouti, M.Sc., Bo Jung, M.Sc. and Zining Cheng. Lark Spectral Lighting is distributed under a Modified 3-Clause BSD License. Ray Modeler contains no source code from Lark Spectral Lighting.
+
+- **Radiance**: The simulation engine, developed at Lawrence Berkeley National Laboratory and distributed under its own open source license.
+
 ## License 📄
 
 This project is licensed under the [MIT](https://opensource.org/license/mit) License - also see the LICENSE file for details.
+
+Third-party attributions are listed in [CREDITS.md](CREDITS.md).

@@ -157,7 +157,7 @@ export const RECIPE_METRICS = {
         { id: 'maximize_Glare_Autonomy_Avg', name: 'Maximize Glare Autonomy (Avg)', file: '.ga' },
         { id: 'maximize_sGA', name: 'Maximize sGA (Spatial Glare Autonomy)', file: '_sGA.txt' }
     ],
-    'spectral-lark': [
+    'spectral-9ch': [
         { id: 'maximize_CS_avg', name: 'Maximize Circadian Stimulus (CS)', file: 'circadian_summary.json' },
         { id: 'maximize_EML_avg', name: 'Maximize Melanopic Lux (EML)', file: 'circadian_summary.json' }
     ],
@@ -168,7 +168,7 @@ export const RECIPE_METRICS = {
 };
 
 // Recipes whose result files _parseSimulationResult can currently parse. Other
-// recipes in RECIPE_METRICS (imageless-glare, spectral-lark, en17037) have no
+// recipes in RECIPE_METRICS (imageless-glare, spectral-9ch, en17037) have no
 // parser and are therefore hidden from the optimization recipe dropdowns.
 export const OPTIMIZER_SUPPORTED_RECIPES = ['sda-ase', 'illuminance', 'dgp'];
 
@@ -352,7 +352,7 @@ export function initOptimizationUI(optPanel) {
 
         Object.keys(RECIPE_METRICS).forEach(recipeId => {
             // Only expose recipes whose result files _parseSimulationResult can parse.
-            // imageless-glare, spectral-lark and en17037 have no parser yet and would
+            // imageless-glare, spectral-9ch and en17037 have no parser yet and would
             // yield empty metrics (undefined in Pareto comparison), so hide them.
             if (!OPTIMIZER_SUPPORTED_RECIPES.includes(recipeId)) return;
             const option = document.createElement('option');
@@ -491,7 +491,7 @@ function updateAnnualSimWarning(recipeId) {
     if (!optimizationPanel) return;
     const annualSimWarning = optimizationPanel.querySelector('#opt-warning-annual-sim');
     if (annualSimWarning) {
-        const isExpensive = ['imageless-glare', 'spectral-lark', 'en17037'].includes(recipeId);
+        const isExpensive = ['imageless-glare', 'spectral-9ch', 'en17037'].includes(recipeId);
         annualSimWarning.classList.toggle('hidden', !isExpensive);
     }
 }
@@ -1074,7 +1074,7 @@ async function runSimulation(settings) {
         'illuminance': 'template-recipe-illuminance',
         'dgp': 'template-recipe-dgp',
         'imageless-glare': 'template-recipe-imageless-glare',
-        'spectral-lark': 'template-recipe-spectral-lark',
+        'spectral-9ch': 'template-recipe-spectral-9ch',
         'en17037': 'template-recipe-en17037'
         // 'en-illuminance' is excluded as it's not for shading optimization
     };
@@ -1523,7 +1523,7 @@ async function _generateQuickSimScript(recipe, quality, uniqueId) {
         'illuminance': 'template-recipe-illuminance',
         'dgp': 'template-recipe-dgp',
         'imageless-glare': 'template-recipe-imageless-glare',
-        'spectral-lark': 'template-recipe-spectral-lark',
+        'spectral-9ch': 'template-recipe-spectral-9ch',
         'en17037': 'template-recipe-en17037'
     };
     const templateId = recipeTemplates[recipe];

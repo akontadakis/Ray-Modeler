@@ -7538,7 +7538,7 @@ After the simulation completes, you can analyze the output to understand the ann
 | sGA Target | \`Imageless Glare Recipe\` | The percentage of occupied time a single viewpoint must be *below* the DGP threshold to be considered "glare-free". | """95% is a common target (i.e., allowing glare for up to 5% of the time).""" |
 | Global Sim Parameters | \`Simulation Panel\` | Radiance quality settings (\`-ab\`, \`-ad\`, etc.) used for the matrix calculations. | High-quality parameters (\`-ab 8\`, \`-ad 4096\`, etc.) are essential for accurate glare results. The recipe defaults to these. |
 
-# Guide to the "Spectral Analysis (Lark)" Recipe
+# Guide to the "Spectral Analysis (9-Channel)" Recipe
 
 This recipe calculates the full spectral power distribution of light at each sensor point. It then uses a Python script to post-process this data and compute key circadian metrics, such as Circadian Stimulus (CS), Equivalent Melanopic Lux (EML), and Correlated Color Temperature (CCT). This is essential for analyses focused on WELL Building Standards or human-centric lighting design.
 ## Part 1: Foundational Scene Setup (Prerequisites)
@@ -7557,7 +7557,7 @@ You must tell Radiance where to perform the spectral calculations.
 This is the most important prerequisite. This recipe requires specific text files that describe the spectral properties of your materials and light sources.
 - **A. Material Spectral Reflectance Data (SRD):**
     - **What it is:** A simple two-column text file (\`.dat\` or \`.txt\`) where the first column is wavelength (in nanometers) and the second is the material's reflectance at that wavelength.
-- **Why it's needed:** The recipe uses this data to create spectrally-accurate materials for the simulation. The script automatically bins this data into the 9 channels required for the Lark method.
+- **Why it's needed:** The recipe uses this data to create spectrally-accurate materials for the simulation. The script automatically bins this data into the 9 channels required for the spectral method.
 - **Where to get it:**
         - From building material manufacturers.
 - From scientific material databases (e.g., REFPROP).
@@ -7576,7 +7576,7 @@ This is the most important prerequisite. This recipe requires specific text file
 With the scene and spectral data prepared, you can configure the simulation.
 ### Step 4: Configure the Spectral Recipe
 1. Open the **Simulation** panel (Toolbar toggle-modules-btn).
-2. From the **"Select Recipe"** dropdown, choose **"Recipe: Spectral Analysis (Lark)"**.
+2. From the **"Select Recipe"** dropdown, choose **"Recipe: Spectral Analysis (9-Channel)"**.
 3. The panel will display the following settings:
     - **9-Channel Simulation Toggle:** Keep this **checked**. This enables the high-accuracy, 9-channel simulation which is the core of this recipe.
 - **Sky & Sun Definition:** Unlike other recipes, this one uses direct radiometric inputs instead of relying on an EPW file for a single time point.
