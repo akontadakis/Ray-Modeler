@@ -3606,6 +3606,12 @@ async function _callModelAPI(payload, provider, apiKey, model) {
             throw new Error(`Unsupported provider: ${provider}`);
     }
 
+    // Every provider except Ollama needs a key. Fail here, naming the provider,
+    // rather than letting the remote answer with its own opaque 401 text.
+    if (provider !== 'ollama' && !apiKey) {
+        throw new Error(`No API key is stored for "${provider}". Open AI Settings, paste the key for ${provider} and press Save.`);
+    }
+
     // No request had a timeout or an abort path: a hung provider left the fetch
     // pending forever with the chat input disabled and the `finally` never running.
     const controller = new AbortController();
@@ -3648,7 +3654,14 @@ async function _callModelAPI(payload, provider, apiKey, model) {
             || errorData?.message
             || (errorText && errorText.trim())
             || `API Error: ${response.status}`;
-        throw new Error(message);
+        // Name the provider, the model and the status. Each provider keeps its own
+        // stored key, so a bare remote message such as "Missing Authentication
+        // header" left no way to tell which key was actually rejected.
+        const where = `${provider} (${model}) returned HTTP ${response.status}`;
+        if (response.status === 401 || response.status === 403) {
+            throw new Error(`${where}: ${message}. The API key stored for "${provider}" was rejected. Open AI Settings, check that the provider matches the key you pasted, re-enter the key and press Save.`);
+        }
+        throw new Error(`${where}: ${message}`);
     }
 
     return response.json();
